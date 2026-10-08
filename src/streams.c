@@ -2456,6 +2456,12 @@ static void desenharAudioBars(float x, float y, float alt, float alfa, Uint32 ag
 
 void stream_folha_abrir(void) {
   int excl, aut, alvo;
+  // DEFESA CONTRA LISTA OBSOLETA: se a folha abriu para um alvo diferente do que
+  // esta em memoria (alvoLista != alvoPedido), descarta as fontes do titulo
+  // anterior para nao exibi-las enquanto a busca nova ainda esta na rede.
+  if (alvoPedido[0] && n > 0 && !stream_lista_do_alvo(alvoPedido)) {
+    stream_invalidar("folha aberta com lista de outro alvo");
+  }
   fitAbrir();
   aberta=1; escolha=-1; grupo=1; filtro=0; soMp4=0; soCache=0; soDub=0; recarregar=0;
   folhaGeometria();

@@ -2462,6 +2462,11 @@ static void buscarPedido(const char *imdb, const char *tipo, int forcar) {
       snprintf(pendId, sizeof pendId, "%s", imdb);
       snprintf(pendTipo, sizeof pendTipo, "%s", tipo ? tipo : "movie");
       pendRenovar = forcar;
+      // O alvo mudou com uma busca em curso: a lista em memoria e do alvo velho
+      // e nao deve ser exibida na folha nem usada pelo alvo novo.
+      if (stream_n() > 0 && !stream_lista_do_alvo(imdb)) {
+        stream_invalidar("novo alvo pendente nos addons");
+      }
     }
     return;
   }

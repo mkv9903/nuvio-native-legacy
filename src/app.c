@@ -3623,6 +3623,9 @@ void app_atualizar(float dt, Uint32 agora) {
         if (!strcmp(alvo, ultimoAlvo)) printf("[addons] lista mudou: refazendo a busca de fontes de %s\n", alvo);
         snprintf(ultimoAlvo, sizeof ultimoAlvo, "%s", alvo);
         ultimaVersao = addons_versao();
+        if (stream_n() > 0 && !stream_lista_do_alvo(alvo)) {
+          stream_invalidar("alvo do detalhe mudou");
+        }
         // A FICHA (meta) SAI ANTES DAS FONTES (R2): a pagina espera a ficha, nao
         // a lista de streams; o pedido de fontes segue logo depois, em paralelo.
         // Episodios do titulo aberto, na temporada onde o dono parou. Sai da
@@ -3717,6 +3720,12 @@ void app_atualizar(float dt, Uint32 agora) {
       if (c) ilhasalvar_aviso(c, entrar);   // o voo da capa e o "Salvo em ..." na ilha
     }
     if (detail_pediu_fontes()) {
+      char alvo[64];
+      const CatItem *ci = cat_item(detail_indice());
+      idDoAlvo(ci, alvo, sizeof alvo);
+      if (alvo[0] && stream_n() > 0 && !stream_lista_do_alvo(alvo)) {
+        stream_invalidar("folha do detalhe: lista e de outro alvo");
+      }
       // A lembrada e localizada ANTES de abrir, para a folha ja desenhar a
       // marca no primeiro quadro. E so uma varredura da lista em memoria.
       char base[24];
