@@ -182,11 +182,6 @@ typedef struct { const char *etapa; unsigned ms; int prontos, total, fileiras, f
 void ilha_atividade_carga(const IlhaAtvCarga *c);
 int ilha_atividade_expansivel(void);
 
-// Bolinha de acento no relogio em repouso: "ha enquete aberta" (enquete.c).
-// Com ela, AZUL/CH+ no relogio parado nao abre a central: ilha_ponto_pediu()
-// devolve 1 uma vez para quem a liga reabrir a enquete.
-void ilha_ponto_enquete(int aberto);
-int  ilha_ponto_pediu(void);
 
 // Onde o relogio pode ficar, decidido por quadro por app.c (a home tem o topo
 // esquerdo livre; Ajustes e Explorar tem titulo ali).
@@ -217,10 +212,7 @@ int  ilha_ocupada(void);
 // avisos e a atividade continuam passando na frente; dois cartoes alternam a
 // cada ILHA_ALTERNA_MS. AZUL/CH+ com um cartao na pilula abre o MODAL — a
 // pilula cresce ate um cartao maior com a arte e os botoes (ilha_evento).
-// ILHA_AMIGO (02/10, mockup aprovado): o terceiro cartao, "Ana · Severance ·
-// agora", com o rosto dela e a capa — o evento de inicio mais novo do feed
-// enquanto ele tiver menos de 15 min (a regra de RecAmigo.temAgora).
-enum { ILHA_VIVO = 0, ILHA_ESTREIA, ILHA_AMIGO, ILHA_N_CARTOES };
+enum { ILHA_VIVO = 0, ILHA_ESTREIA, ILHA_N_CARTOES };
 #define ILHA_ALTERNA_MS 6000u
 typedef struct {
   char chave[80];        // muda = outro conteudo (a pilula remorfa)
@@ -232,7 +224,6 @@ typedef struct {
   int  restanteMin;      // ILHA_VIVO
   char quando[24];       // ILHA_ESTREIA: "hoje" (ja traduzido) ou ""
   char avisoId[72];      // ILHA_ESTREIA: id do aviso em avisos.c
-  char pessoa[64], rosto[256];   // ILHA_AMIGO: nome e avatar de quem esta vendo
 } IlhaCartao;
 // NULL tira o cartao. A copia e da ilha; quem chama pode descartar o seu.
 void ilha_cartao(int qual, const IlhaCartao *c);

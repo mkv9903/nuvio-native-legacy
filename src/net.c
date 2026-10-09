@@ -464,12 +464,7 @@ char *net_post_st(const char *url, int seconds, const char *const *headers,
   return r;
 const char *net_last_error(void) { return ""; }
 
-char *net_post_secure_st(const char *url, int seconds, const char *const *headers,
-                         const char *body, int *status) {
-  if (status) *status = 0;
-  if (!url || strncmp(url, "https://", 8)) return NULL;
-  return net_post_st(url, seconds, headers, body, status);
-}
+
 
 EM_JS(int, nv_url_sonda, (const char *url, const char *cabs, char *dst,
                           int tam, int *status, char *mime, int mimeTam, long *corpo), {
@@ -627,11 +622,7 @@ int net_warmup_batch(const char *const *origins, int n, unsigned *ms) {
   return rede_aquecer_lote(origins, n, ms);
 }
 
-NetTls *net_tls_open(const char *url, int seconds) { (void)url; (void)seconds; return NULL; }
-int net_tls_send(NetTls *t, const void *buf, size_t n) { (void)t; (void)buf; (void)n; return -1; }
-int net_tls_try_send(NetTls *t, const void *buf, size_t n, size_t *sent) { (void)t; (void)buf; (void)n; if (sent) *sent = 0; return -1; }
-int net_tls_recv(NetTls *t, void *buf, size_t n, int wait_ms) { (void)t; (void)buf; (void)n; (void)wait_ms; return -1; }
-void net_tls_close(NetTls *t) { (void)t; }
+
 
 #else
 
@@ -1557,12 +1548,7 @@ char *net_post_st(const char *url, int seconds, const char *const *headers,
   return post_native(url, seconds, headers, body, status, 0);
 }
 
-char *net_post_secure_st(const char *url, int seconds, const char *const *headers,
-                         const char *body, int *status) {
-  if (status) *status = 0;
-  if (!url || strncmp(url, "https://", 8)) return NULL;
-  return post_native(url, seconds, headers, body, status, 1);
-}
+
 
 #define VAZ_SEG_BALDES 64
 #define VAZ_ESPERA_PADRAO_MS 8000UL
@@ -1746,97 +1732,7 @@ int net_measure_throughput(const char *url, const char *const *headers, int seco
 
 #include <sys/select.h>
 
-struct NetTls { void *c; int fd; };
 
-static int tls_wait(int fd, int write_mode, int ms) {
-  fd_set f;
-  struct timeval tv;
-  if (fd < 0 || fd >= FD_SETSIZE) return -1;
-  FD_ZERO(&f);
-  FD_SET(fd, &f);
-  tv.tv_sec = ms / 1000;
-  tv.tv_usec = (ms % 1000) * 1000;
-  return select(fd + 1, write_mode ? NULL : &f, write_mode ? &f : NULL, NULL, &tv);
-}
-
-NetTls *net_tls_open(const char *url, int seconds) {
-  NetTls *t;
-  void *c;
-  long fd = -1;
-  int r;
-  if (!url || !*url || !net_curl_open() || !curl_send || !curl_recv) return NULL;
-  c = curl_init();
-  if (!c) return NULL;
-  curl_setopt(c, OPT_URL, url);
-  curl_setopt(c, OPT_CONNECT_ONLY, (long)1);
-  curl_setopt(c, OPT_HTTP_VERSION, (long)2 /* CURL_HTTP_VERSION_1_1 */);
-  curl_setopt(c, OPT_CONNECTTIMEOUT_MS, (long)(seconds > 0 ? seconds : 15) * 1000L);
-  curl_setopt(c, OPT_NOSIGNAL, (long)1);
-  curl_setopt(c, OPT_TCP_KEEPALIVE, (long)1);
-  curl_setopt(c, OPT_TCP_KEEPIDLE, (long)15);
-  curl_setopt(c, OPT_TCP_KEEPINTVL, (long)5);
-  curl_setopt(c, OPT_SSL_VERIFYPEER, (long)1);
-  curl_setopt(c, OPT_SSL_VERIFYHOST, (long)2);
-  r = curl_perform(c);
-  if (r == 0 && curl_getinfo) curl_getinfo(c, INFO_LASTSOCKET, &fd);
-  if (r != 0 || fd < 0) {
-    printf("[rede] tls: falhou (curl %d)\n", r);
-    curl_cleanup(c);
-    return NULL;
-  }
-  t = (NetTls *)calloc(1, sizeof *t);
-  if (!t) { curl_cleanup(c); return NULL; }
-  t->c = c;
-  t->fd = (int)fd;
-  return t;
-}
-
-int net_tls_try_send(NetTls *t, const void *buf, size_t n, size_t *sent) {
-  int r;
-  if (sent) *sent = 0;
-  if (!t || !sent) return -1;
-  r = curl_send(t->c, buf, n, sent);
-  if (r == CURLE_AGAIN_) { *sent = 0; return 0; }
-  return r == 0 ? 0 : -1;
-}
-
-int net_tls_send(NetTls *t, const void *buf, size_t n) {
-  const unsigned char *p = (const unsigned char *)buf;
-  int loops = 0;
-  if (!t) return -1;
-  while (n > 0) {
-    size_t sent = 0;
-    int r = curl_send(t->c, p, n, &sent);
-    if (r == CURLE_AGAIN_) {
-      if (++loops > 100 || tls_wait(t->fd, 1, 100) < 0) return -1;
-      continue;
-    }
-    if (r != 0) return -1;
-    p += sent;
-    n -= sent;
-  }
-  return 0;
-}
-
-int net_tls_recv(NetTls *t, void *buf, size_t n, int wait_ms) {
-  size_t recvd = 0;
-  int r;
-  if (!t) return -1;
-  r = curl_recv(t->c, buf, n, &recvd);
-  if (r == CURLE_AGAIN_ && wait_ms > 0) {
-    if (tls_wait(t->fd, 0, wait_ms) <= 0) return 0;
-    r = curl_recv(t->c, buf, n, &recvd);
-  }
-  if (r == CURLE_AGAIN_) return 0;
-  if (r != 0) return -1;
-  return recvd > 0 ? (int)recvd : -1;
-}
-
-void net_tls_close(NetTls *t) {
-  if (!t) return;
-  curl_cleanup(t->c);
-  free(t);
-}
 
 typedef struct {
   Bucket body;
@@ -2362,13 +2258,4 @@ void rede_avisar_host(void (*f)(const char *url, int codigo, int http, unsigned 
 }
 void rede_preparar(void) { net_prepare(); }
 const char *rede_ultimo_erro(void) { return net_last_error(); }
-char *rede_postar_seguro_st(const char *u, int s, const char *const *h, const char *c, int *st) {
-  return net_post_secure_st(u, s, h, c, st);
-}
-RedeTls *rede_tls_abrir(const char *u, int s) { return net_tls_open(u, s); }
-int rede_tls_enviar(RedeTls *t, const void *b, size_t n) { return net_tls_send(t, b, n); }
-int rede_tls_tentar_enviar(RedeTls *t, const void *b, size_t n, size_t *f) {
-  return net_tls_try_send(t, b, n, f);
-}
-int rede_tls_receber(RedeTls *t, void *b, size_t n, int e) { return net_tls_recv(t, b, n, e); }
-void rede_tls_fechar(RedeTls *t) { net_tls_close(t); }
+

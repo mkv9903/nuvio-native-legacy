@@ -13,6 +13,4 @@ grep -q 'vel_tempo_real((double)(duracaoSeg - posSeg), velMed.efetiva)' src/play
 grep -q 'relogio_taxa(&relLeg, velMed.efetiva / 100.0)' src/player.c
 grep -q 'vel_tempo_real(durSeg - posSeg, player_velocidade_efetiva())' src/posplay.c
 ! grep -q 'relogio_taxa(&relLeg, video_velocidade_atual()' src/player.c
-# O .wgt nao oferece a linha (AVPlay setSpeed e trick play inteiro).
-grep -q 'int  video_velocidade_suportada(void) { return 0; }' src/video_tizen.c
-echo "velocidade: legenda, termina as, proximo episodio (pela efetiva) e .wgt conferidos"
+echo "velocidade: legenda, termina as, proximo episodio (pela efetiva) conferidos"

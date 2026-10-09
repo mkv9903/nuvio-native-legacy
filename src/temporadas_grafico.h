@@ -65,8 +65,6 @@ const TgDados *tgraf_dados(int idxCatalogo);
 // Indice da coluna da temporada `numero` (-1 = nao esta no grafico).
 int  tgraf_coluna(const TgDados *d, int numero);
 
-void tgraf_frase_amigos(const TgDados *d, char *dst, size_t tam);
-
 float tgraf_altura(void);
 // Desenha o bloco em (x, y), largura `w`. `foco` = coluna focada (-1 = a
 // fileira nao tem o foco); `selNumero` = temporada escolhida na pagina.

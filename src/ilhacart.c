@@ -105,7 +105,6 @@ void ilhacart_tecla(Uint32 agora) { ultimaTecla = agora; }
 
 void ilhacart_dispensar(int qual) {
   if (qual == ILHA_VIVO) { temVivo = 0; ilha_cartao(ILHA_VIVO, NULL); return; }
-  if (qual == ILHA_AMIGO) { ilha_cartao(ILHA_AMIGO, NULL); return; }
   // "Dispensar" (06/10): o episodio sai da lista de Avisos e nao volta, nem
   // depois de reiniciar (avisodisp.h). O lembrete da serie continua ligado.
   if (temEstreia) avisos_dispensar(estreia.avisoId);

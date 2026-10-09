@@ -100,12 +100,6 @@ int  trakt_continuar_falhou(void);
 // serie cujo ultimo visto terminou. Entra na fileira com progresso 0.
 int trakt_e_a_seguir(const char *id);
 
-// Atividade recente dos AMIGOS do dono. Usa o feed social oficial do Trakt
-// (/users/me/friends/activities), mantendo no CatItem o titulo/arte normais e
-// os dados sociais nos campos de apresentacao: `pais` = nome do amigo,
-// `provNome` = acao e `direcao` = contexto do episodio. BLOQUEIA.
-int  trakt_social(CatItem *saida, int max);
-
 // Snapshot mensal usado pela tela Perfil e Stats. Faz as chamadas no fio de
 // trabalho do app e nunca deve ser executado no laco de desenho.
 int  trakt_perfil(PerfilDados *saida);

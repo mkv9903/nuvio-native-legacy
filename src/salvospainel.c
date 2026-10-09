@@ -2852,8 +2852,4 @@ static void desenharPainel(Uint32 agora) {
   gfx_sem_recorte();
 }
 
-const char *spainel_foco_social(void) {
-  return "";
-}
-
 int spainel_n_continuar(void) { if (listaVelha()) reconstruir(); return nCont; }

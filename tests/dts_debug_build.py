@@ -4,14 +4,12 @@ import hashlib,json,os,pathlib,shutil,subprocess,tempfile
 ROOT=pathlib.Path(__file__).resolve().parents[1]
 with tempfile.TemporaryDirectory(prefix='dts-debug-build-test-') as directory:
     fixture=pathlib.Path(directory); repository=fixture/'repo';tools=repository/'tools';tools.mkdir(parents=True)
-    for name in ('build-dts-debug.sh','arm.sh','env.sh','tizen-config.xml'):
+    for name in ('build-dts-debug.sh','arm.sh','env.sh'):
         shutil.copy2(ROOT/'tools'/name,tools/name)
-    (tools/'p2p-motor').mkdir();shutil.copy2(ROOT/'tools/p2p-motor/pasta.sh',tools/'p2p-motor/pasta.sh')
     (repository/'src').mkdir();shutil.copy2(ROOT/'src/app_id.h',repository/'src/app_id.h')
     app=repository/'deploy/app';(app/'art').mkdir(parents=True)
     metadata=json.loads((ROOT/'deploy/app/appinfo.json').read_text())
     (app/'appinfo.json').write_text(json.dumps(metadata,indent=2)+'\n')
-    (app/'licencas').mkdir();(app/'licencas/p2p-avisos.txt').write_text('fixture P2P notices')
     (app/'nuvio-proto').write_bytes(b'production executable stays intact')
     (app/'art/addons.txt').write_text('person credential must not ship')
     (app/'art/public.png').write_bytes(b'public asset')

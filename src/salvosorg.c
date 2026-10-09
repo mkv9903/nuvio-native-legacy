@@ -19,7 +19,7 @@ typedef struct { char id[24]; int cat; } SorgItem;
 
 static int perfilLido = -1;
 static unsigned revisao;
-static int ordem, grupo, estilo, social;
+static int ordem, grupo, estilo;
 static SorgCat cats[SORG_CAT_MAX];
 static int nCats, proximoId = 1;
 static SorgItem *mapa;
@@ -62,8 +62,8 @@ static void gravar(void) {
   int i;
   if (!b) return;
   k += (size_t)snprintf(b + k, cap - k,
-                        "# nuvio salvos-org v%d\nordem\t%d\ngrupo\t%d\nestilo\t%d\n"
-                        "social\t%d\n", SORG_VERSAO, ordem, grupo, estilo, social);
+                        "# nuvio salvos-org v%d\nordem\t%d\ngrupo\t%d\nestilo\t%d\n",
+                        SORG_VERSAO, ordem, grupo, estilo);
   for (i = 0; i < nCats && k + 1 < cap; i++)
     k += (size_t)snprintf(b + k, cap - k, "cat\t%d\t%s\n", cats[i].id, cats[i].nome);
   for (i = 0; i < nMapa && k + 1 < cap; i++)
@@ -77,7 +77,7 @@ void sorg_carregar(void) {
   char *b, *linha, *prox;
   if (p == perfilLido) return;
   perfilLido = p;
-  ordem = grupo = estilo = social = 0;
+  ordem = grupo = estilo = 0;
   nCats = 0; nMapa = 0; proximoId = 1;
   revisao++;
   b = dados_ler(arquivo(p));
@@ -93,7 +93,7 @@ void sorg_carregar(void) {
     if (!strcmp(linha, "ordem"))  { ordem  = clampi(atoi(t1), SORG_ORDEM_N);  continue; }
     if (!strcmp(linha, "grupo"))  { grupo  = clampi(atoi(t1), SORG_GRUPO_N);  continue; }
     if (!strcmp(linha, "estilo")) { estilo = clampi(atoi(t1), SORG_ESTILO_N); continue; }
-    if (!strcmp(linha, "social")) { social = clampi(atoi(t1), SORG_SOCIAL_N); continue; }
+    if (!strcmp(linha, "social")) { continue; }
     t2 = strchr(t1, '\t');
     if (!t2) continue;
     *t2++ = 0;
@@ -127,7 +127,6 @@ void sorg_carregar(void) {
 int sorg_ordem(void)  { sorg_carregar(); return ordem; }
 int sorg_grupo(void)  { sorg_carregar(); return grupo; }
 int sorg_estilo(void) { sorg_carregar(); return estilo; }
-int sorg_social(void) { sorg_carregar(); return social; }
 
 static void definir(int *campo, int v, int n) {
   sorg_carregar();
@@ -140,7 +139,6 @@ static void definir(int *campo, int v, int n) {
 void sorg_definir_ordem(int v)  { definir(&ordem, v, SORG_ORDEM_N); }
 void sorg_definir_grupo(int v)  { definir(&grupo, v, SORG_GRUPO_N); }
 void sorg_definir_estilo(int v) { definir(&estilo, v, SORG_ESTILO_N); }
-void sorg_definir_social(int v) { definir(&social, v, SORG_SOCIAL_N); }
 
 int sorg_n_categorias(void) { sorg_carregar(); return nCats; }
 int sorg_categoria_id(int i) { return i >= 0 && i < nCats ? cats[i].id : 0; }
@@ -278,7 +276,7 @@ void sorg_esquecer(void) {
   nMapa = capMapa = 0;
   nCats = 0;
   proximoId = 1;
-  ordem = grupo = estilo = social = 0;
+  ordem = grupo = estilo = 0;
   perfilLido = -1;
   revisao++;
 }

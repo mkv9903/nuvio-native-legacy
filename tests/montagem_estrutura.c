@@ -237,8 +237,6 @@ int   simkl_e_a_seguir(const char *id)     { (void)id; return 0; }
 int   ajustes_salvos_no_simkl(void)        { return 1; }   // para simkl_plantowatch rodar
 int   trakt_enfeitar_lote(CatItem *s, int n) { (void)s; return n; }
 // O servico social proprio (recomenda.c) fica fora deste teste: a uniao e so o que o Trakt trouxe.
-int   recomenda_social_mesclar(CatItem *i, int nTrakt, int max) { (void)i; (void)max; return nTrakt; }
-int   trakt_social(CatItem *s, int m)      { (void)s; (void)m; return 0; }
 int   trakt_continuar(CatItem *s, int m)   { (void)s; (void)m; return 0; }
 int   trakt_continuar_falhou(void)        { return 0; }
 int   trakt_e_a_seguir(const char *id)     { (void)id; return 0; }

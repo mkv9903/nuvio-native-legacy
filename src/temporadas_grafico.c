@@ -101,11 +101,6 @@ int tgraf_existe(const TgDados *d) {
   return d && d->n > 0 && d->sabe && d->vistos > 0;
 }
 
-void tgraf_frase_amigos(const TgDados *d, char *dst, size_t tam) {
-  (void)d;
-  if (dst && tam) dst[0] = 0;
-}
-
 // --- DADOS DA PAGINA (com revisao) ------------------------------------------
 
 static TgDados dados;

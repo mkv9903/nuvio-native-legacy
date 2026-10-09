@@ -396,37 +396,6 @@ int main(int argc, char **argv) {
   { char ar[1024]; if (realpath("deploy/app/art", ar)) extras_carregar(ar); }
   montarCatalogo();
   cacheFrases();
-  // NUVIO_SHOT_AMIGOS=1: amigos falsos (feed externo) no filme e na serie —
-  // o que a ilha e a lista "O que os amigos acharam" mostram (06/10/2026):
-  // quem recomendou, reacao, nota de tracker, progresso, "parou" e "terminou".
-  if (getenv("NUVIO_SHOT_AMIGOS")) {
-    static SvEvento e[12];
-    long long ag = (long long)time(NULL);
-    int n = 0;
-#define AMG(pid, nome, av, im, ac) do { memset(&e[n], 0, sizeof e[n]); e[n].pct = -1; e[n].restanteMin = -1; \
-      e[n].reacao = SV_REAC_NADA; e[n].quando = ag - 600 * n; e[n].acao = (ac); \
-      snprintf(e[n].pessoaId, 96, "%s", pid); snprintf(e[n].pessoaNome, 64, "%s", nome); \
-      snprintf(e[n].pessoaAvatar, 512, "%s", av); snprintf(e[n].imdb, 24, "%s", im); \
-      snprintf(e[n].tipo, 8, "%s", !strcmp(im, IMDB_SERIE) ? "series" : "movie"); } while (0)
-    AMG("nuvio:ana", "Ana", A "elenco/00_0.jpg", IMDB_FILME, SV_MANDOU);
-    snprintf(e[n].texto, sizeof e[n].texto, "Imperdível, vai por mim"); n++;
-    AMG("nuvio:mari", "Mari", A "elenco/00_1.jpg", IMDB_FILME, SV_REACAO); e[n].reacao = SV_REAC_GOSTOU; n++;
-    AMG("nuvio:mari", "Mari", A "elenco/00_1.jpg", IMDB_FILME, SV_FIM); n++;
-    AMG("trakt:rafa", "Rafa", "", IMDB_FILME, SV_AVALIOU); e[n].nota = 80; n++;
-    AMG("nuvio:fabi", "Fabi", A "elenco/00_2.jpg", IMDB_FILME, SV_REACAO); e[n].reacao = SV_REAC_MEIO; n++;
-    AMG("nuvio:leo", "Leo", "", IMDB_FILME, SV_FIM); n++;
-    AMG("nuvio:mari", "Mari", A "elenco/00_1.jpg", IMDB_SERIE, SV_AGORA); e[n].temporada = 2; e[n].episodio = 3; n++;
-    AMG("nuvio:rafa", "Rafa", "", IMDB_SERIE, SV_FIM); e[n].temporada = 2; e[n].episodio = 5; n++;
-    AMG("nuvio:bia", "Bia", A "elenco/00_3.jpg", IMDB_SERIE, SV_FIM); e[n].temporada = 2; e[n].episodio = 8;
-    e[n].reacao = SV_REAC_GOSTOU; n++;
-    AMG("nuvio:duda", "Duda", "", IMDB_SERIE, SV_FIM); e[n].temporada = 1; e[n].episodio = 3;
-    e[n].quando = ag - 34 * 86400LL; n++;
-#undef AMG
-    socialvis_definir_feed(e, n);
-    { SvPerfil p; memset(&p, 0, sizeof p);
-      p.gostoPct = 82; p.gostoTotal = 11; p.estado = SV_PERFIL_OK;
-      socialvis_definir_perfil_extra("nuvio:mari", &p); }
-  }
 
   if (quer(argc, argv, "filme-topo")) { abrir(1, 0, 0, 0); gravar("filme-topo"); }
   // O ULTIMO circular da linha aberta em foco: hoje o "..." (Mais opcoes).
@@ -457,29 +426,6 @@ int main(int argc, char **argv) {
       gravar(serie ? "serie-mais" : "filme-mais");
       detmais_zerar();
     }
-  }
-  // A ILHA DE AMIGOS em foco e a lista que o OK abre (06/10/2026).
-  if (quer(argc, argv, "filme-amigos")) {
-    abrir(1, 0, 0, 0); focoAmigos = 1; quadros(30); gravar("filme-amigos");
-  }
-  if (quer(argc, argv, "filme-amigos-lista")) {
-    AmigosTitulo at; int ut, ue;
-    abrir(1, 0, 0, 0); focoAmigos = 1;
-    if (amigosDoTitulo(&at)) { ultimoEpisodio(&ut, &ue); amtui_abrir(&at, ut, ue, tituloDe(idx)); }
-    for (int k = 0; k < 30; k++) { quadros(1); SDL_Delay(16); }
-    gravar("filme-amigos-lista");
-    amtui_fechar();
-  }
-  if (quer(argc, argv, "serie-amigos")) {
-    abrir(0, 0, 0, 0); focoAmigos = 1; quadros(30); gravar("serie-amigos");
-  }
-  if (quer(argc, argv, "serie-amigos-lista")) {
-    AmigosTitulo at; int ut, ue;
-    abrir(0, 0, 0, 0); focoAmigos = 1;
-    if (amigosDoTitulo(&at)) { ultimoEpisodio(&ut, &ue); amtui_abrir(&at, ut, ue, tituloDe(idx)); }
-    for (int k = 0; k < 30; k++) { quadros(1); SDL_Delay(16); }
-    gravar("serie-amigos-lista");
-    amtui_fechar();
   }
   if (quer(argc, argv, "filme-trailers")) { abrir(1, 1, SEC_TRAILERS, 0); gravar("filme-trailers"); }
   if (quer(argc, argv, "filme-elenco")) { abrir(1, 1, SEC_ELENCO, 0); gravar("filme-elenco"); }

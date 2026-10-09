@@ -253,15 +253,6 @@ int main(int argc, char **argv) {
     pilula(25, "amigo-assistindo", e); }
   fundo(28); limpar(); atividade = "Sincronizando a conta…"; quadros(70); captura("28-sincronizando", 140); atividade = NULL;
 
-  // --- 4. o cartao do amigo -------------------------------------------------------
-  { IlhaCartao c;
-    memset(&c, 0, sizeof c);
-    snprintf(c.chave, sizeof c.chave, "amigo:ana:tt1:1");
-    snprintf(c.titulo, sizeof c.titulo, "Severance");
-    snprintf(c.pessoa, sizeof c.pessoa, "Ana");
-    snprintf(c.poster, sizeof c.poster, "deploy/app/art/poster/02.jpg");
-    c.progresso = -1.0f;
-    fundo(32); limpar(); ilha_cartao(ILHA_AMIGO, &c); quadros(80); captura("32-cartao-amigo", 140); }
 
   // --- 5. modais -------------------------------------------------------------------
   { static IlhaModal m;

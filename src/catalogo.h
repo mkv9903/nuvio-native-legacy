@@ -112,8 +112,6 @@ typedef struct {
   // sozinho com esta mudanca.
   char imdb[64];
   char tipo[8];
-  // Autoria do feed social, separada dos metadados do filme.
-  char socialNome[96], socialSlug[128], socialAvatar[768], socialAcao[64];
   // Id do titulo no TMDB, quando a busca por imdb_id ja o resolveu (ver
   // fotosDoElenco em descoberta.c). Era descartado; e por ele que se chega a
   // COLECAO do filme, que o TMDB so expoe por id proprio.

@@ -213,13 +213,11 @@ int trakt_continuar(CatItem *s, int m) {
 }
 int   trakt_continuar_falhou(void)        { return 0; }
 // O servico social proprio (recomenda.c) fica fora deste teste: sem amigos Nuvio, a uniao e o que o Trakt trouxe.
-int   recomenda_social_mesclar(CatItem *i, int nTrakt, int max) { (void)i; (void)max; return nTrakt; }
 // Segunda chamada = segunda montagem. E ali, no log, entre "trakt continuar
 // assistindo" e "trakt atividade dos amigos", que o sync entrega as colecoes:
 // "[desc] fileiras remontadas sem rede: 12 de 12". A config muda junto.
 static volatile int chamadasSocial, errosNoRemontar = -1;
 static int conferir(const char *rotulo);
-int trakt_social(CatItem *s, int m) {
   if (++chamadasSocial == 2) {
     // O QUE A HOME MOSTRA NESTE INSTANTE, e nao so no fim: uma volta posterior
     // que publique certo esconderia a janela torta que ficou na tela ate ela.

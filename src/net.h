@@ -386,19 +386,6 @@ const char *net_url_public(const char *url, char *dst, unsigned size);
 const char *net_url_log(const char *url, char *dst, unsigned size);
 int net_segment_is_suspicious(const char *s, unsigned n);
 
-// RAW TLS CONNECTION, without HTTP. For Discord websocket (discordws.c):
-// TV libcurl (7.53.1) lacks websocket support, but opens TLS and delivers channel
-// with CONNECT_ONLY. `url` is "https://host:port/" — only host and port matter.
-// OAuth POST: verified TLS, dedicated handle, no native redirects.
-char *net_post_secure_st(const char *url, int seconds, const char *const *headers,
-                         const char *body, int *status);
-
-typedef struct NetTls NetTls;
-NetTls *net_tls_open(const char *url, int seconds);
-int net_tls_send(NetTls *t, const void *buf, size_t n);
-int net_tls_try_send(NetTls *t, const void *buf, size_t n, size_t *sent);
-int net_tls_recv(NetTls *t, void *buf, size_t n, int wait_ms);
-void net_tls_close(NetTls *t);
 
 // ===========================================================================
 // Backward-compatibility wrappers & aliases for Portuguese names
@@ -435,7 +422,6 @@ typedef NetResponse RedeResposta;
 typedef NetMeasurement RedeMedida;
 typedef NetControl RedeControle;
 typedef NetThroughput RedeVazao;
-typedef NetTls RedeTls;
 
 #if defined(NV_TPK40)
 #define rede_teto_ptr net_cap_ptr
@@ -506,11 +492,6 @@ int rede_aquecer_lote(const char *const *origens, int n, unsigned *ms);
 const char *rede_url_publica(const char *url, char *dst, unsigned tam);
 const char *rede_url_log(const char *url, char *dst, unsigned tam);
 int rede_segmento_suspeito(const char *s, unsigned n);
-char *rede_postar_seguro_st(const char *u, int s, const char *const *h, const char *c, int *st);
-RedeTls *rede_tls_abrir(const char *u, int s);
-int rede_tls_enviar(RedeTls *t, const void *b, size_t n);
-int rede_tls_tentar_enviar(RedeTls *t, const void *b, size_t n, size_t *f);
-int rede_tls_receber(RedeTls *t, void *b, size_t n, int e);
-void rede_tls_fechar(RedeTls *t);
+
 
 #endif

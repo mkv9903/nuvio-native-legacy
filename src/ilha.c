@@ -68,10 +68,6 @@ static char atvIcone[32];       // "" = o ponto que respira
 static Uint32 atvVisto;         // SDL_GetTicks da ultima renovacao
 
 static int relogioQuer;
-// Bolinha de acento no relogio em repouso: "ha enquete aberta" (enquete.c).
-static int pontoEnquete;
-static int pontoPediu;
-#define PONTO_ENQ 10.0f
 static int ancDef, ancDir;
 static float ancX, ancY;
 
@@ -398,8 +394,6 @@ void ilha_atividade_carga(const IlhaAtvCarga *c) {
 int ilha_atividade_expansivel(void) { return atvDetalhes[0] && atvVisto && SDL_GetTicks() - atvVisto < 400u; }
 
 void ilha_relogio_visivel(int visivel) { relogioQuer = visivel; }
-void ilha_ponto_enquete(int aberto) { pontoEnquete = aberto ? 1 : 0; if (!pontoEnquete) pontoPediu = 0; }
-int  ilha_ponto_pediu(void) { int p = pontoPediu; pontoPediu = 0; return p; }
 
 void ilha_cartao(int qual, const IlhaCartao *c) {
   if (qual < 0 || qual >= ILHA_N_CARTOES) return;
@@ -469,7 +463,7 @@ static const char *rotuloBotao(int i) {
   if (modalAtividade) return i18n("Fechar");
   if (modalAviso) return modalM.botao[i];
   if (modalQual == ILHA_ESTREIA) return i == 0 ? i18n("Assistir") : i == 1 ? i18n("Depois") : i18n("Dispensar");
-  if (i == 0) return modalQual == ILHA_AMIGO ? i18n("Ver também") : i18n("Retomar");
+  if (i == 0) return i18n("Retomar");
   if (i == 1) return i18n("Detalhes");
   return i18n("Dispensar");   // a mesma palavra do menu do cartao "Retomar agora"
 }
@@ -594,14 +588,6 @@ int ilha_evento(const SDL_Event *e) {
         teclaAzul(e->key.keysym.sym, e->key.keysym.scancode) &&
         A > 0.5f && mostra == M_AVISO && abrirDoAviso())
       return 1;
-    // AZUL/CH+ COM A BOLINHA NO RELOGIO PARADO: reabre a enquete. Quem a tem
-    // (enquete.c) le o pedido por ilha_ponto_pediu e poe o convite de novo.
-    if (e->type == SDL_KEYDOWN && !e->key.repeat && pontoEnquete && relogioQuer &&
-        teclaAzul(e->key.keysym.sym, e->key.keysym.scancode) &&
-        A > 0.5f && mostra == M_RELOGIO) {
-      pontoPediu = 1;
-      return 1;
-    }
     return 0;
   }
   if (e->type != SDL_KEYDOWN) return e->type == SDL_KEYUP;
@@ -1011,7 +997,7 @@ static float larguraConteudo(int m, TxtLinha *t1, TxtLinha *t2) {
   t1->w = t1->h = 0; t2->w = t2->h = 0;
   if (m == M_RELOGIO) {
     *t1 = txt_linha(TXT_PG_RELOGIO, hora, 244, 245, 248, 255);
-    return (float)t1->w + (pontoEnquete ? 12.0f + PONTO_ENQ : 0.0f);
+    return (float)t1->w;
   }
   if (atvV2) {
     // v2: recuo de 30 dos dois lados (a diferenca para PAD_E/PAD_D entra aqui).
@@ -1057,12 +1043,7 @@ static void desenharConteudo(int m, GfxRect r, float a, Uint32 agora) {
     if (bh > 0.0f) yc = r.y + NV_ILHA_H * 0.5f;
     x = dsMostra == DS_GRANDE ? r.x + 28.0f : r.x + (r.w - cw - dw) * 0.5f;
     txt_desenhar_alpha(t1, x, yc - (float)t1.h * 0.5f, a);
-    if (pontoEnquete) {
-      float cr, cg, cb;
-      ajustes_acento(&cr, &cg, &cb);
-      gfx_cor((GfxRect){ x + (float)t1.w + 12.0f, yc - PONTO_ENQ * 0.5f, PONTO_ENQ, PONTO_ENQ }, 0.5f, cr, cg, cb, a);
-    }
-    desempenho_linha(dsMostra, x + (float)t1.w + (pontoEnquete ? 12.0f + PONTO_ENQ : 0.0f), yc, a);
+    desempenho_linha(dsMostra, x + (float)t1.w, yc, a);
     if (bh > 0.0f) desempenho_corpo(dsMostra, (GfxRect){ r.x, r.y + NV_ILHA_H, r.w, r.h - NV_ILHA_H }, a);
     return;
   }
@@ -1118,7 +1099,6 @@ typedef struct { TxtLinha hora, tit, meta; float ds; } LinhasCartao;
 // quando existe; na estreia sao duas partes ja traduzidas juntadas por " · ",
 // que nao e palavra.
 static void metaCartao(const IlhaCartao *c, int qual, char *b, size_t n) {
-  if (qual == ILHA_AMIGO) { snprintf(b, n, i18n("%s · agora"), c->titulo); return; }
   if (qual == ILHA_ESTREIA) {
     char te[32] = "";
     if (c->serie && c->t > 0 && c->e > 0) snprintf(te, sizeof te, i18n("T%dE%d"), c->t, c->e);
@@ -1135,16 +1115,13 @@ static float larguraCartao(const IlhaCartao *c, int qual, LinhasCartao *L) {
   char meta[96];
   float w;
   L->hora = txt_linha(TXT_PG_RELOGIO, hora, 244, 245, 248, 255);
-  // No cartao do amigo o nome vai em destaque e o titulo vira a meta.
-  L->tit = qual == ILHA_AMIGO
-         ? txt_linha_corta(TXT_ILHA_FORTE, c->pessoa, 240, 242, 246, 255, CT_TIT_MAX)
-         : txt_linha_corta(TXT_BODY, c->titulo, 240, 242, 246, 255, CT_TIT_MAX);
+  L->tit = txt_linha_corta(TXT_BODY, c->titulo, 240, 242, 246, 255, CT_TIT_MAX);
   metaCartao(c, qual, meta, sizeof meta);
   L->meta = txt_linha_corta(TXT_CAPTION2, meta, 176, 180, 190, 255, CT_TIT_MAX);
   w = (float)L->hora.w + CT_VAO * 2.0f + 1.5f +
-      (qual == ILHA_VIVO ? CT_CAPA_W : qual == ILHA_AMIGO ? ROSTO + MINI_W - DUO_SOBRE : ICONE) + VAO +
+      (qual == ILHA_VIVO ? CT_CAPA_W : ICONE) + VAO +
       (float)L->tit.w + 10.0f + (float)L->meta.w;
-  if (qual != ILHA_VIVO) w += 12.0f + 10.0f;   // o ponto de nao lido / de "agora"
+  if (qual != ILHA_VIVO) w += 12.0f + 10.0f;   // o ponto de nao lido
   // O medidor em Minimo depois do cartao, so se a pilula ainda couber.
   L->ds = dsCartao ? desempenho_linha_w(DS_MINIMO) : 0.0f;
   if (L->ds > 0.0f && PAD_E + PAD_D + w + L->ds > DS_CARTAO_MAX) L->ds = 0.0f;
@@ -1188,14 +1165,6 @@ static void desenharCartao(const IlhaCartao *c, int qual, GfxRect r, float a) {
       gfx_tex_aspect_atual = 0.0f;
     } else gfx_cor(capa, 6.0f / CT_CAPA_H, NV_COR_ESQUELETO_R, NV_COR_ESQUELETO_G, NV_COR_ESQUELETO_B, a);
     x += CT_CAPA_W + VAO;
-  } else if (qual == ILHA_AMIGO) {
-    Aviso duo;
-    memset(&duo, 0, sizeof duo);
-    snprintf(duo.rosto, sizeof duo.rosto, "%s", c->rosto);
-    snprintf(duo.rostoNome, sizeof duo.rostoNome, "%s", c->pessoa[0] ? c->pessoa : "?");
-    snprintf(duo.capa, sizeof duo.capa, "%s", c->poster[0] ? c->poster : "-");
-    desenharLead(&duo, x, yc, a);
-    x += ROSTO + MINI_W - DUO_SOBRE + VAO;
   } else {
     gfx_icone((GfxRect){ x, yc - ICONE * 0.5f, ICONE, ICONE }, "aj_calendar", cr, cg, cb, a);
     x += ICONE + VAO;
@@ -1207,8 +1176,6 @@ static void desenharCartao(const IlhaCartao *c, int qual, GfxRect r, float a) {
   x += (float)L.meta.w;
   if (qual == ILHA_ESTREIA)
     gfx_cor((GfxRect){ x + 12.0f, yc - 5.0f, 10.0f, 10.0f }, 0.5f, cr, cg, cb, a);
-  else if (qual == ILHA_AMIGO)   // vermelho de "ao vivo", como no aviso
-    gfx_cor((GfxRect){ x + 12.0f, yc - 5.0f, 10.0f, 10.0f }, 0.5f, 1.0f, 0.353f, 0.322f, a);
   if (L.ds > 0.0f) desempenho_linha(DS_MINIMO, x + (qual != ILHA_VIVO ? 22.0f : 0.0f), yc, a);
   if (barra) {
     // A BARRA FINA vai sob o texto (nao sob a capa): ela mede o titulo.
@@ -1631,15 +1598,12 @@ static void desenharModal(GfxRect m, float a) {
     if (modalQual == ILHA_VIVO) {
       int mi = c->restanteMin < 1 ? 1 : c->restanteMin;
       snprintf(b, sizeof b, i18n("%d min restantes"), mi);
-    } else if (modalQual == ILHA_AMIGO) snprintf(b, sizeof b, i18n("%s · agora"), c->pessoa);
-    else if (c->quando[0]) snprintf(b, sizeof b, "%s · %s", i18n("Episódio novo"), c->quando);
+    } else if (c->quando[0]) snprintf(b, sizeof b, "%s · %s", i18n("Episódio novo"), c->quando);
     else snprintf(b, sizeof b, "%s", i18n("Episódio novo"));
     t = txt_linha(TXT_CAPTION, b, 200, 204, 212, 255);
     sy = ay + MD_ARTE_H - (float)t.h;
-    if (modalQual == ILHA_ESTREIA || modalQual == ILHA_AMIGO) {
-      // O ponto: acento no episodio novo, vermelho de "agora" no amigo.
-      if (modalQual == ILHA_AMIGO) gfx_cor((GfxRect){ cx, sy + (float)t.h * 0.5f - 5.0f, 10.0f, 10.0f }, 0.5f, 1.0f, 0.353f, 0.322f, a);
-      else gfx_cor((GfxRect){ cx, sy + (float)t.h * 0.5f - 5.0f, 10.0f, 10.0f }, 0.5f, cr, cg, cb, a);
+    if (modalQual == ILHA_ESTREIA) {
+      gfx_cor((GfxRect){ cx, sy + (float)t.h * 0.5f - 5.0f, 10.0f, 10.0f }, 0.5f, cr, cg, cb, a);
       txt_desenhar_alpha(t, cx + 20.0f, sy, a);
     } else {
       // O trilho de 220 primeiro e o tempo depois (mockup do player, 03/10).

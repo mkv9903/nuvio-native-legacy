@@ -23,7 +23,6 @@ void ajustes_desenhar(Uint32 agora);
 int  ajustes_quer_sair(void);
 // 1 quando a linha "Addons" foi acionada. Lido e zerado na chamada.
 int  ajustes_pediu_addons(void);
-int  ajustes_pediu_novidades20(void);   // OK em Sobre e ajuda › Novidades 2.0: o app.c abre o guia
 int  ajustes_pediu_plugins(void);   // OK em Plugins (F09): o app.c abre a tela   // 1 quando o Back deve fechar a tela
 int  ajustes_pediu_diagnostico(void);
 // OK em "Teste de velocidade" (Ajustes › Diagnóstico). Lido e zerado pelo app.c.
@@ -61,7 +60,6 @@ void ajustes_abrir_na_espera_fonte(void);
 // ganha "Voltar às novidades" e o Voltar dele devolve ao cartao
 // (ajustes_pediu_novidades, lido e zerado pelo app.c).
 void ajustes_abrir_no_guia(int daNovidades);
-int  ajustes_pediu_novidades(void);
 // O guia esta na tela (por cima das ilhas de Ajustes).
 int  ajustes_guia_aberto(void);
 // Os atalhos "Abrir o Guia de TV / a Biblioteca / a Agenda / o Explorar /
@@ -201,7 +199,6 @@ int  ajustes_addons_do_principal(void);
 void ajustes_definir_vidro(int ligado);
 // P2P EXPERIMENTAL (p2p.h). Desligado de fabrica. O endereco (o servidor de
 // streaming do Stremio na rede local) e por aparelho, em p2p.txt.
-int  ajustes_jellyfin_ligado(void);   // F11: personal servers on AND strict HTTP here
 int  ajustes_p2p_ligado(void);
 void ajustes_definir_p2p_ligado(int ligado);
 // Endereco ja normalizado ("http://192.168.1.5:11470"); "" quando nao ha.
@@ -376,10 +373,6 @@ int   ajustes_trailer_qualidade(void); // teto em linhas (1080/720/480); 0 = a m
 int   ajustes_trailer_fonte(void);     // TRF_* de trailerfonte.h; 0 = automatico
 float ajustes_trailer_zoom(void);      // ampliacao do trailer (1.0 = quadro inteiro)
 void  ajustes_definir_envio_auto(int ligado);
-// N3: "Receber enquetes" (padrao ligado). O espelho local do opt-out da conta:
-// enquete.c grava aqui o que o servidor disse, sem refazer o pedido.
-int   ajustes_enquetes(void);
-void  ajustes_espelhar_enquetes(int ligado);
 // Fonte do destaque (ARTEHERO_*) e "Destaque com outra arte", gravados na hora.
 void  ajustes_definir_destaque(int fonte, int diferente);
 // homeImdbRatingsVisibility: 0 SHOW_ALL, 1 HIDE_ALL

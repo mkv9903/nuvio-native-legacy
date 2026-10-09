@@ -152,10 +152,8 @@ static void guiaFechar(void) {
 // Sai pelo Voltar: para o cartao, se veio dele; senao, a linha do guia em
 // Sobre e ajuda.
 static void guiaSair(void) {
-  int nov = gv.daNov;
   guiaFechar();
-  if (nov) pediuNovidades = 1;
-  else focarOpcao(AJ_GUIA);
+  focarOpcao(AJ_GUIA);
 }
 
 // --- GEOMETRIA --------------------------------------------------------------------

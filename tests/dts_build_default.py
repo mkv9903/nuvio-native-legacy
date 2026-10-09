@@ -22,10 +22,8 @@ with tempfile.TemporaryDirectory(prefix='nuvio-dts-default-build-') as temporary
         repository = base / mode
         tools = repository / 'tools'
         tools.mkdir(parents=True)
-        for name in ('arm.sh', 'env.sh', 'tizen-config.xml'):
+        for name in ('arm.sh', 'env.sh'):
             shutil.copy2(ROOT / 'tools' / name, tools / name)
-        (tools / 'p2p-motor').mkdir()
-        shutil.copy2(ROOT / 'tools/p2p-motor/pasta.sh', tools / 'p2p-motor/pasta.sh')
         app = repository / 'deploy/app'
         (app / 'art/marcas').mkdir(parents=True)
         (app / 'fonts').mkdir()
@@ -92,7 +90,8 @@ else:
                                 capture_output=True, text=True)
         if mode == 'tampered':
             assert result.returncode != 0, result.stdout
-            assert 'FALHOU: lib/dts-starfish-webos4.so' in result.stdout, result.stdout + result.stderr
+            assert ('FAILED: lib/dts-starfish-webos4.so' in result.stdout or
+                    'FALHOU: lib/dts-starfish-webos4.so' in result.stdout), result.stdout + result.stderr
             continue
         assert result.returncode == 0, result.stdout + result.stderr
         assert (remote / 'nuvio-proto').read_bytes() == (repository / 'nuvio-proto.arm').read_bytes()

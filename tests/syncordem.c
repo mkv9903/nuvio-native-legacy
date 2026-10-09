@@ -282,6 +282,7 @@ int  ajustes_mesclar_blob(const char *b, char **s) { (void)b; *s = NULL; return 
 void ajustes_tmdb_idioma_relatar(const char *b) { (void)b; }
 void buscasrec_esquecer(void) {}
 void cachearte_limpar_referencias(void) {}
+void psparede_esquecer(void) {}
 int  cat_apagar_cache(void) { return 0; }
 static int colDoOutro, colDoCerto;
 int  col_definir_json(const char *j) {

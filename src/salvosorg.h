@@ -36,8 +36,6 @@ enum { SORG_GRUPO_PROGRESSO = 0, SORG_GRUPO_TIPO, SORG_GRUPO_CATEGORIA,
        SORG_GRUPO_NENHUM, SORG_GRUPO_N };
 enum { SORG_ESTILO_LISTA = 0, SORG_ESTILO_GRADE, SORG_ESTILO_PAISAGEM,
        SORG_ESTILO_N };
-// Aba Social: as recomendacoes na ordem de chegada (padrao) ou por pessoa.
-enum { SORG_SOCIAL_RECENTES = 0, SORG_SOCIAL_PESSOA, SORG_SOCIAL_N };
 
 #define SORG_CAT_MAX   32
 #define SORG_NOME_MAX  32   // bytes, com o NUL; o teclado limita a 24 letras
@@ -52,11 +50,9 @@ unsigned sorg_revisao(void);
 int  sorg_ordem(void);
 int  sorg_grupo(void);
 int  sorg_estilo(void);
-int  sorg_social(void);
 void sorg_definir_ordem(int v);
 void sorg_definir_grupo(int v);
 void sorg_definir_estilo(int v);
-void sorg_definir_social(int v);
 
 // Categorias, na ordem em que foram criadas. O `id` e estavel (renomear nao o
 // muda) e nunca e 0: 0 quer dizer "sem categoria".

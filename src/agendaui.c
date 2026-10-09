@@ -164,7 +164,6 @@
 #include "catalogo.h"
 #include "badges.h"
 #include "descoberta.h"
-#include "leitura.h"
 #include "qr.h"
 #include "visto.h"
 #include "vistoep.h"

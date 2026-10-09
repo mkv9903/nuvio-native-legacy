@@ -54,12 +54,6 @@ char *rede_baixar_com(const char *url, int s, const char *const *cab) {
     dorme(lat("L_PROX", 600));
     return strdup("{\"next_episode\":{\"season\":1,\"number\":2,\"title\":\"x\"}}");
   }
-  if (strstr(url, "/friends/activities") || strstr(url, "/following/activities")) {
-    dorme(lat("L_SOCIAL", 400));
-    return strdup("[{\"action\":\"watch\",\"user\":{\"username\":\"ana\",\"name\":\"Ana\"},"
-      "\"movie\":{\"title\":\"Amigo\",\"year\":2019,\"ids\":{\"imdb\":\"tt8888888\"},"
-      "\"images\":{\"poster\":[\"x.test/p3.jpg\"],\"fanart\":[\"x.test/f3.jpg\"]},\"overview\":\"S.\",\"runtime\":90}}]");
-  }
   return NULL;
 }
 char *rede_baixar(const char *url, int s) {
@@ -108,22 +102,18 @@ int cat_historico_definir_se_geracao(const char *a, const char *b, int c, unsign
 }
 
 int main(void) {
-  static CatItem v[12], s[8];
-  int n, ns, i;
-  double t0, t1, t2;
+  static CatItem v[12];
+  int n, i;
+  double t0, t1;
   trakt_definir("token", "client");
   t0 = agoraMs();
   n = trakt_continuar(v, 12);
   t1 = agoraMs();
-  ns = trakt_social(s, 8);
-  t2 = agoraMs();
-  printf("[arranque-trakt] continuar=%d itens em %.0f ms, social=%d em %.0f ms\n",
-         n, t1 - t0, ns, t2 - t1);
+  printf("[arranque-trakt] continuar=%d itens em %.0f ms\n", n, t1 - t0);
   // 1 pausado + 21 "a seguir" de series diferentes, cortado em 12 (mais recentes).
   { unsigned h = 5381;
     for (i = 0; i < n; i++) { const char *c = v[i].imdb; while (*c) h = h * 33 + (unsigned char)*c++; }
     printf("[arranque-trakt] n=%d hash=%u\n", n, h); }
-  assert(ns == 1 && !strcmp(s[0].imdb, "tt8888888"));
   // ordem: mais recente primeiro (o historico anda de marco 1 a marco 21)
   for (i = 1; i < n; i++) assert(v[i - 1].retomadoMs >= v[i].retomadoMs);
   (void)0;

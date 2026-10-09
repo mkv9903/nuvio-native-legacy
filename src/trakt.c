@@ -132,9 +132,6 @@ void trakt_sessao_morta(void) {
 }
 int trakt_sessao_e_morta(void) { return sessaoMorta; }
 
-// Definida junto de trakt_social; declarada aqui porque trakt_definir a chama.
-void trakt_social_reavaliar(void);
-
 // A CREDENCIAL FOI RECUSADA (HTTP 401). O 401 so chegava ao log — a tela
 // seguia dizendo "conectado" e o dono so percebia quando o "Continuar
 // assistindo" nao vinha. Quem avisa e a camada de rede (rede_avisar_401),
@@ -185,7 +182,6 @@ void trakt_esquecer(void) {
   nUlt = nProxIds = nPlay = 0;
   proxMemLimpar();
   estadoEscrever(&credRecusada, 0);
-  trakt_social_reavaliar();
   printf("[trakt] credencial esquecida\n");
 }
 
@@ -216,7 +212,6 @@ int trakt_definir(const char *tk, const char *cli) {
   // Token NOVO limpa a marca de recusa — e o mesmo caminho por onde a
   // renovacao (traktauth) e o pareamento novo chegam.
   estadoEscrever(&credRecusada, 0);
-  trakt_social_reavaliar();
   rede_avisar_401(avisoHttp401);
   printf("[trakt] credencial da conta: %s\n",
          ativo ? "ativa" : "sem client id do aplicativo (ver tools/env.sh)");
@@ -1492,160 +1487,6 @@ int trakt_continuar(CatItem *saida, int max) {
 }
 
 // Alguns clientes recebem 401 apenas no feed agregado. O grafo e o
-// historico publico dos perfis continuam acessiveis com a mesma credencial.
-static char *socialPorSeguidos(const char *const *cab, int max) {
-  char *lista=rede_baixar_com("https://api.trakt.tv/users/me/following?extended=full",10,cab);
-  if(!lista)return NULL;
-  char *out=calloc(1,262144);size_t used=1;int n=0,consultados=0;
-  if(!out){free(lista);return NULL;}out[0]='[';
-  const char *p=strchr(lista,'[');p=p?p+1:NULL;
-  while(p&&*p&&n<max&&consultados<8) {
-    while(*p&&(unsigned char)*p<=' ')p++;
-    if(*p!='{')break;
-    const char *f=js_fim(p),*u=strstr(p,"\"user\"");
-    if(!u||u>=f){p=js_prox(f);continue;}
-    u=strchr(u,'{');const char *uf=js_fim(u);char id[128]="",url[400];
-    js_texto(u,uf,"slug",id,sizeof id);
-    if(!id[0] || strspn(id,"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_")!=strlen(id)){p=js_prox(f);continue;}
-    consultados++;
-    snprintf(url,sizeof url,"https://api.trakt.tv/users/%s/watching?extended=full",id);
-    char *body=rede_baixar_com(url,8,cab);int agora=body&&strchr(body,'{');
-    if(!agora){free(body);snprintf(url,sizeof url,"https://api.trakt.tv/users/%s/history?limit=1&extended=full",id);body=rede_baixar_com(url,8,cab);}
-    const char *b=body?strchr(body,'{'):NULL,*bf=b?js_fim(b):NULL;
-    if(b&&bf&&bf>b+1) {
-      size_t un=(size_t)(uf-u),bn=(size_t)(bf-b-2);
-      if(used+un+bn+80<262144){
-        int k=snprintf(out+used,262144-used,"%s{\"user\":%.*s,%s%.*s}",n?",":"",(int)un,u,
-            agora?"\"action\":\"watching\",":"",(int)bn,b+1);
-        used+=(size_t)k;n++;
-      }
-    }
-    free(body);p=js_prox(f);
-  }
-  out[used++]=']';out[used]=0;free(lista);
-  printf("[trakt] social: %d seguidos consultados, %d atividades\n",consultados,n);
-  return out;
-}
-
-// Zerada por trakt_definir: credencial nova pode ter o escopo que faltava.
-static volatile int socialSemFeed;
-void trakt_social_reavaliar(void) { socialSemFeed = 0; }
-
-int trakt_social(CatItem *saida, int max) {
-  const char *cab[4];
-  char aut[200], chave[140], *corpo;
-  const char *p;
-  int n = 0;
-  // O FEED AGREGADO NAO EXISTE PARA ESTA CONTA, e isso nao muda no meio da
-  // sessao. MEDIDO na LG: os dois /activities respondem 401 sempre, e o app
-  // pagava os dois em TODO ciclo da home antes de cair no fallback. Um token
-  // novo (trakt_definir) zera a marca, porque ai a resposta pode mudar.
-  if (!ligado || max < 1) return 0;
-  if (!trakt_cabecalhos(cab, aut, sizeof aut, chave, sizeof chave)) return 0;
-  corpo = NULL;
-  if (!socialSemFeed) {
-    corpo = rede_baixar_com(
-      "https://api.trakt.tv/users/me/friends/activities?extended=full&page=1&limit=12",
-      20, cab);
-    // Contas sem o escopo social novo podem receber 401 no grafo `friends`,
-    // embora o token continue valido para historico. `following` e o fallback
-    // honesto: ainda sao pessoas escolhidas pelo dono, nunca atividade global.
-    if (!corpo) corpo = rede_baixar_com(
-      "https://api.trakt.tv/users/me/following/activities?extended=full&page=1&limit=12",
-      20, cab);
-    if (!corpo) {
-      socialSemFeed = 1;
-      printf("[trakt] feed agregado indisponivel nesta conta; usando os seguidos\n");
-      fflush(stdout);
-    }
-  }
-  if (!corpo) corpo=socialPorSeguidos(cab,max);
-  if (!corpo) { printf("[trakt] feed social indisponivel\n"); return 0; }
-  p = strchr(corpo, '['); p = p ? p + 1 : NULL;
-  while (p && *p && n < max) {
-    const char *f, *bu, *bm, *bs, *be, *fb;
-    CatItem *d;
-    char imdb[24] = "", pessoa[64] = "", acao[32] = "";
-    while (*p && (unsigned char)*p <= ' ') p++;
-    if (*p != '{') break;
-    f = js_fim(p);
-    bu = strstr(p, "\"user\"");
-    bm = strstr(p, "\"movie\"");
-    bs = strstr(p, "\"show\"");
-    be = strstr(p, "\"episode\"");
-    if (!bu || bu >= f || ((!bm || bm >= f) && (!bs || bs >= f))) {
-      p = js_prox(f); continue;
-    }
-    d = &saida[n]; memset(d, 0, sizeof *d);
-    fb = js_fim(strchr(bu, '{'));
-    js_texto(bu, fb, "name", pessoa, sizeof pessoa);
-    if (!pessoa[0]) js_texto(bu, fb, "username", pessoa, sizeof pessoa);
-    js_texto(bu, fb, "slug", d->socialSlug, sizeof d->socialSlug);
-    const char *avatar = strstr(bu, "\"avatar\"");
-    if (avatar && avatar < fb) js_texto(avatar, fb, "full", d->socialAvatar, sizeof d->socialAvatar);
-    snprintf(d->socialNome, sizeof d->socialNome, "%s", pessoa[0] ? pessoa : "Amigo");
-    js_texto(p, f, "action", acao, sizeof acao);
-    snprintf(d->pais, sizeof d->pais, "%s", pessoa[0] ? pessoa : "Amigo");
-    snprintf(d->provNome, sizeof d->provNome, "%s",
-             !strcmp(acao,"watching") ? "assistindo agora" :
-             !strcmp(acao, "watch") || !strcmp(acao, "scrobble") ? "assistiu" :
-             !strcmp(acao, "checkin") ? "registrou um check-in" :
-             !strcmp(acao, "rating") ? "avaliou" : "atividade recente");
-    snprintf(d->socialAcao, sizeof d->socialAcao, "%s", d->provNome);
-    if (bs && bs < f) {
-      fb = js_fim(strchr(bs, '{'));
-      js_texto(bs, fb, "title", d->titulo, sizeof d->titulo);
-      js_texto(bs, fb, "imdb", imdb, sizeof imdb);
-      snprintf(d->tipo, sizeof d->tipo, "series");
-      doBlocoTrakt(d, bs, fb, "series");
-      if (be && be < f) {
-        const char *fe = js_fim(strchr(be, '{'));
-        d->temporada = (int)js_num(be, fe, "season", 0);
-        d->episodio = (int)js_num(be, fe, "number", 0);
-        js_texto(be, fe, "title", d->nomeEpisodio, sizeof d->nomeEpisodio);
-        // i18n aqui, num fio de trabalho: e seguro. A tabela e const e
-        // idioma_registrar sai na primeira linha quando NUVIO_TEXTO_DUMP nao
-        // esta ligado. O rotulo fica GUARDADO no item, entao trocar o idioma
-        // exige remontar — e ajustes.c ja chama desc_repetir() nessa troca.
-        snprintf(d->direcao, sizeof d->direcao, i18n("T%dE%d%s%s"), d->temporada,
-                 d->episodio, d->nomeEpisodio[0] ? "  \xc2\xb7  " : "",
-                 d->nomeEpisodio);
-      }
-    } else {
-      fb = js_fim(strchr(bm, '{'));
-      js_texto(bm, fb, "title", d->titulo, sizeof d->titulo);
-      js_texto(bm, fb, "imdb", imdb, sizeof imdb);
-      snprintf(d->tipo, sizeof d->tipo, "movie");
-      doBlocoTrakt(d, bm, fb, "movie");
-      snprintf(d->direcao, sizeof d->direcao, "Filme");
-    }
-    if (!imdb[0]) { p = js_prox(f); continue; }
-    snprintf(d->imdb, sizeof d->imdb, "%s", imdb);
-    n++;
-    p = js_prox(f);
-  }
-  free(corpo);
-  // O feed ja vem ordenado do mais recente. A arte e resolvida em paralelo,
-  // com o mesmo limite de tres conexoes usado pelo Continue Assistindo.
-  if (n > 0) {
-    FilaEnf fila;
-    fila.t = calloc((size_t)n, sizeof *fila.t);
-    fila.n = n;
-    if (fila.t) {
-      int q;
-      for (q = 0; q < n; q++) {
-        fila.t[q].d = &saida[q];
-        snprintf(fila.t[q].tipo, sizeof fila.t[q].tipo, "%s", saida[q].tipo);
-      }
-      enfeitarFila(&fila);
-      // Arte indisponivel nao pode apagar uma pessoa real do feed.
-      free(fila.t);
-    }
-  }
-  printf("[trakt] %d atividades de amigos\n", n); fflush(stdout);
-  return n;
-}
-
 static void perfilGenero(PerfilDados *d, const char *nome) {
   int i;
   if (!nome || !*nome) return;

@@ -16,7 +16,7 @@ args = parser.parse_args()
 fonte = Path(args.fonte).read_text(encoding="utf-8")
 catalogo = Path(args.catalogo).read_text(encoding="utf-8")
 
-enum = re.search(r"typedef enum \{(.*?)\n\} OpcaoId;", fonte, re.S)
+enum = re.search(r"typedef enum \{([^}]*?)\}\s*OpcaoId;", fonte, re.S)
 if not enum:
     sys.exit("FALHA: enum OpcaoId nao encontrado em " + args.fonte)
 corpo = re.sub(r"//[^\n]*", "", enum.group(1))

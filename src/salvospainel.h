@@ -47,10 +47,6 @@ void spainel_desenhar(Uint32 agora);
 void spainel_fundo(int podeParar, unsigned rev, void (*fundo)(void *), void *ctx);
 // Quantas vezes a lista foi montada desde o arranque (tests/salvospainel.sh).
 int  spainel_n_reconstrucoes(void);
-// Para os testes de captura: o tipo da linha em foco na aba Amigos ("pedido",
-// "encontrar", "adicionar", "previa", "alcance", "trakt", "simkl",
-// "letterboxd", "aparecer", "amigo", "rec", "sug", "" fora da lista).
-const char *spainel_foco_social(void);
 // Quantas vezes o fundo parado foi pintado no FBO.
 int  spainel_n_fundos(void);
 // Quantas linhas da aba Salvos estao em "Continuar" (com progresso). Testes.

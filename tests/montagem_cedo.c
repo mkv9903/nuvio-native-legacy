@@ -198,9 +198,7 @@ int trakt_lista(const char *q, CatItem *s, int m) {
 enum { S_NADA, S_ADDONS, S_CREDENCIAL };
 static volatile int armadoSocial = S_NADA;
 // O servico social proprio (recomenda.c) fica fora deste teste: a uniao e so o que o Trakt trouxe.
-int   recomenda_social_mesclar(CatItem *i, int nTrakt, int max) { (void)i; (void)max; return nTrakt; }
 unsigned recomenda_geracao(void) { return 1; }
-int trakt_social(CatItem *s, int m) {
   int a = armadoSocial;
   (void)s; (void)m;
   armadoSocial = S_NADA;
