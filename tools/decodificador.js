@@ -1,48 +1,46 @@
-// DECODIFICADOR DE IMAGEM FORA DO FIO PRINCIPAL (alvo Tizen).
+// OFF-MAIN-THREAD IMAGE DECODER (Tizen target).
 //
-// Ate a 1.3.2 o navegador decodificava a imagem no FIO PRINCIPAL: o
-// createImageBitmap ate corria fora dele, mas o drawImage reduzido e o
-// getImageData que trazem os pixels para o heap corriam no `then`, entre um
-// quadro e outro do app. No AU7000 (#72) isso apareceu como `swap=1004` ms no
-// [quadro] e FPS=2 enquanto uma fileira carregava: cada arte custava ate 1 s
-// de fio principal parado, e uma fileira tem seis.
+// Up to 1.3.2 the browser decoded the image on the MAIN THREAD: createImageBitmap
+// did run off-thread, but the downscaled drawImage and getImageData that bring
+// pixels to the heap ran in `then`, between one app frame and another. On AU7000 (#72)
+// this appeared as `swap=1004` ms in [frame] and FPS=2 while a row was loading:
+// each artwork cost up to 1 s of frozen main thread, and a row has six.
 //
-// Este Worker faz tudo isso aqui: recebe o pedido, le os bytes comprimidos
-// DIRETO da memoria compartilhada do WASM, decodifica e reduz num
-// OffscreenCanvas e escreve os pixels no bloco que o C JA ALOCOU. O fio
-// principal so repassa o pedido (um postMessage) e nao toca em pixel nenhum.
+// This Worker does all of that here: receives the request, reads compressed bytes
+// DIRECTLY from WASM shared memory, decodes and scales on an OffscreenCanvas,
+// and writes pixels into the buffer that C ALREADY ALLOCATED. The main
+// thread only forwards the request (a postMessage) and doesn't touch any pixel.
 //
-// ESTE WORKER NUNCA ESPERA NINGUEM (22/09/2026). Ate a 1.4.1 ele pedia o
-// bloco ao C depois do decode e ficava em Atomics.wait ate 8 s pela resposta;
-// quando o C ja tinha desistido do pedido, eram 8 s parados por ninguem, com a
-// fila inteira atras (icone de 128x128 levando 17 s na Samsung). Agora o C
-// aloca tudo antes, pelo tamanho do cabecalho, e o Worker so fecha o job.
+// THIS WORKER NEVER WAITS FOR ANYONE (09/22/2026). Up to 1.4.1 it asked C for the
+// buffer after decode and stayed in Atomics.wait up to 8 s for the reply;
+// when C had already given up on the request, that was 8 s blocked for nobody,
+// with the entire queue behind it (128x128 icon taking 17 s on Samsung). Now C
+// allocates everything beforehand based on header size, and the Worker only closes the job.
 //
-// PROTOCOLO, em job[0] (int32 na memoria compartilhada; o layout completo
-// esta em src/webp.c, enum J_*):
-//   0  aberto: o C espera
-//   1  pronto: job[1]=w job[2]=h (0 = falhou) job[4]=ow job[5]=oh; pixels em
-//      job[3], que tem job[8] bytes — nunca se escreve alem disso
-//   4  o C desistiu: nada foi liberado, o job ainda e nosso
-//   5  largado: terminamos um job abandonado; so agora o C o libera
-// job[7] e o numero do pedido: se nao bate com a mensagem, o job nao e mais
-// este pedido e nao se toca em nada.
+// PROTOCOL, in job[0] (int32 in shared memory; full layout
+// is in src/webp.c, enum J_*):
+//   0  open: C is waiting
+//   1  ready: job[1]=w job[2]=h (0 = failed) job[4]=ow job[5]=oh; pixels in
+//      job[3], which has job[8] bytes — never write beyond this
+//   4  C gave up: nothing was freed, the job is still ours
+//   5  dropped: we finished an abandoned job; only now C frees it
+// job[7] is the request sequence: if it doesn't match the message, the job is
+// no longer this request and nothing is touched.
 //
-// DOIS PAPEIS, UM ARQUIVO (23/09/2026). src/webp.c cria este arquivo DUAS
-// vezes no arranque (navegador_iniciar):
-//   - o DECODIFICADOR, que recebe pedidos pelo fio principal (caminho antigo)
-//     ou por uma MessagePort (`porta`, canal direto);
-//   - a SENTINELA (`sentinela: 1`), que dorme em Atomics.wait no topo de uma
-//     pilha de jobs na memoria compartilhada, desempilha o que os fios de
-//     decode do C empilharam e repassa pela outra ponta da porta. Ela nunca
-//     volta ao laco de eventos, e por isso existe: o decodificador precisa do
-//     laco dele livre para as promessas do createImageBitmap.
-// Com isso um pedido vai do fio de decode ao decodificador sem passar pelo
-// fio principal, que nos logs da Samsung fica 1 a 31 s ocupado. Cada papel
-// liga um bit em canalEstado quando esta de pe; o C so usa o canal com os
-// dois ligados.
+// TWO ROLES, ONE FILE (09/23/2026). src/webp.c creates this file TWICE
+// at startup (navegador_iniciar):
+//   - the DECODER, which receives requests via main thread (legacy path)
+//     or via a MessagePort (`porta`, direct channel);
+//   - the SENTINEL (`sentinela: 1`), which sleeps in Atomics.wait at the top of a
+//     job stack in shared memory, pops what the C decode threads
+//     pushed and forwards through the other end of the port. It never
+//     returns to the event loop, and that's why it exists: the decoder needs its
+//     event loop free for createImageBitmap promises.
+// With this, a request goes from the decode thread to the decoder without passing
+// through the main thread, which in Samsung logs stays 1 to 31 s busy. Each role
+// sets a bit in canalEstado when up; C only uses the channel with both set.
 //
-// So ES5: o Chromium da TV (76) nao passa pelo esbuild aqui.
+// ES5 only: TV Chromium (76) does not go through esbuild here.
 'use strict';
 var HEAP32 = null, HEAPU8 = null;
 
@@ -51,12 +49,12 @@ function vivo(pJob, seq) {
   return HEAP32[pJob + 7] === seq && (e === 0 || e === 4);
 }
 
-// `direto`: veio pelo canal direto, e o fio principal nao guarda nada dele —
-// nao ha `feito` a avisar (seria so trabalho a mais la).
+// `direto`: came through direct channel, and main thread stores nothing of it —
+// no `feito` notification needed (would just be extra work there).
 function fim(pJob, seq, w, h, ow, oh, direto) {
   HEAP32[pJob + 1] = w; HEAP32[pJob + 2] = h;
   HEAP32[pJob + 4] = ow; HEAP32[pJob + 5] = oh;
-  // 0 -> 1 entrega ao C; se ele ja desistiu (4), 4 -> 5 larga o job.
+  // 0 -> 1 delivers to C; if C already gave up (4), 4 -> 5 drops the job.
   if (Atomics.compareExchange(HEAP32, pJob, 0, 1) === 4) Atomics.compareExchange(HEAP32, pJob, 4, 5);
   Atomics.notify(HEAP32, pJob);
   if (!direto) self.postMessage({ feito: seq });
@@ -66,10 +64,10 @@ function decodificar(m) {
   var pJob = m.job >> 2, seq = m.seq;
   var largMax = m.largMax, d = !!m.direto;
   if (!vivo(pJob, seq)) return;
-  // Abandonado antes de comecar: nao gasta decode, so larga.
+  // Abandoned before starting: do not waste decode, just drop.
   if (Atomics.load(HEAP32, pJob) === 4) { fim(pJob, seq, 0, 0, 0, 0, d); return; }
-  // `slice`: copia para um ArrayBuffer comum. O Blob nao aceita vista sobre
-  // SharedArrayBuffer. job[9]/job[10] e a COPIA do C, que vive com o job.
+  // `slice`: copies to a standard ArrayBuffer. Blob doesn't accept view over
+  // SharedArrayBuffer. job[9]/job[10] is the C COPY, which lives with the job.
   var bytes = HEAPU8.slice(HEAP32[pJob + 9], HEAP32[pJob + 9] + HEAP32[pJob + 10]);
   createImageBitmap(new Blob([bytes], { type: m.mime })).then(function (bmp) {
     var ow = bmp.width, oh = bmp.height, w = ow, h = oh;
@@ -93,18 +91,18 @@ function decodificar(m) {
   }).catch(function () { if (vivo(pJob, seq)) fim(pJob, seq, 0, 0, 0, 0, d); });
 }
 
-// GIF ANIMADO: nao passa mais por aqui (1.4.7, #84). O Worker compunha os
-// quadros que o fio principal fatiava; desde entao o GIF e decodificado em C,
-// num pthread do app (src/gif.c), e este arquivo so decodifica imagem parada.
+// ANIMATED GIF: no longer goes through here (1.4.7, #84). The Worker composed the
+// frames that the main thread sliced; since then GIF is decoded in C,
+// in an app pthread (src/gif.c), and this file only decodes still images.
 
-// Layout do job que a sentinela le (espelho do enum J_* de src/webp.c).
+// Job layout read by sentinel (mirror of enum J_* in src/webp.c).
 var J_SEQ = 7, J_FILA = 12, J_MIME = 13, J_LARG = 14;
 
-// SENTINELA. Pilha de Treiber: os fios do C empilham por CAS em job[J_FILA];
-// aqui se pega a pilha INTEIRA de uma vez (exchange por 0), e por isso nao ha
-// ABA. A pilha sai do mais novo para o mais velho; repassa na ordem de chegada.
-// Os campos de um job so sao lidos ANTES de ele ser repassado: depois disso o
-// decodificador pode fecha-lo e o C pode libera-lo.
+// SENTINEL. Treiber stack: C threads push via CAS in job[J_FILA];
+// here we take the ENTIRE stack at once (exchange with 0), hence no
+// ABA. The stack comes out from newest to oldest; forwards in arrival order.
+// Job fields are only read BEFORE it is forwarded: after that the
+// decoder can close it and C can free it.
 function sentinela(m) {
   var H = new Int32Array(m.memoria);
   var cab = m.cab >> 2, porta = m.porta;

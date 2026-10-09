@@ -1,46 +1,46 @@
 #!/usr/bin/env python3
-"""Acha texto de interface que NAO passa pela tabela de traducao.
+"""Finds interface text that DOES NOT pass through the translation table.
 
-POR QUE EXISTE. Tres rodadas do issue #12 foram resolvidas a mao, e a cada
-release o relator mandava foto de mais uma tela em portugues. Varredura a mao
-nao termina: erra o literal partido em dois, erra o acento escrito como \\uXXXX,
-e nao sabe dizer se a chave existe na tabela.
+WHY IT EXISTS. Three rounds of issue #12 were resolved manually, and with each
+release the reporter sent a photo of yet another screen in Portuguese. Manual
+scanning never finishes: misses split literals, misses accents written as \\uXXXX,
+and cannot tell whether the key exists in the table.
 
-DUAS FAMILIAS DE DEFEITO, e elas se consertam de formas diferentes:
+TWO FLAW FAMILIES, fixed in different ways:
 
-  1. LITERAL DESENHADO SEM CHAVE. text.c chama i18n() em tudo que desenha, entao
-     um literal solto TRADUZ — se a chave estiver na tabela. Sem a chave ele
-     aparece em portugues. Conserto: acrescentar a linha em idioma_tab.h.
+  1. DRAWN LITERAL WITHOUT KEY. text.c calls i18n() on everything it draws, so
+     a loose literal TRANSLATES — if the key is in the table. Without the key it
+     appears in Portuguese. Fix: add the line in idioma_tab.h.
 
-  2. FRASE MONTADA COM snprintf. A string final ("Retomar T1E1") nunca casa com
-     chave nenhuma. Conserto: envolver o FORMATO — snprintf(b, n, i18n("..."), x)
-     — que e como as telas ja consertadas fazem.
+  2. SENTENCE ASSEMBLED WITH snprintf. The final string ("Resume S1E1") never
+     matches any key. Fix: wrap the FORMAT — snprintf(b, n, i18n("..."), x)
+     — which is what already-fixed screens do.
 
-Uso:
-    python3 tools/varredura-i18n.py          # lista o que falta
-    python3 tools/varredura-i18n.py --tabela # so as linhas prontas para colar
+Usage:
+    python3 tools/varredura-i18n.py          # lists what is missing
+    python3 tools/varredura-i18n.py --tabela # only lines ready to paste
 """
 import re, sys, pathlib, unicodedata
 
 RAIZ = pathlib.Path(__file__).resolve().parent.parent
 
-# As funcoes de text.c que chamam i18n() no argumento `s`. txt_tracking esta na
-# lista de proposito: ela mede E desenha, e nao passava por i18n.
+# text.c functions that call i18n() on parameter `s`. txt_tracking is on the
+# list on purpose: it measures AND draws, and was not passing through i18n.
 DESENHO = ("txt_linha", "txt_linha_corta", "txt_linha_familia",
            "txt_linha_corta_familia", "txt_bloco", "txt_bloco_dir",
            "txt_tracking",
-           # Os atalhos do registro do app (registro_ilha.inc, registro_envio.inc,
-           # desempenho.c, telemetria.c): todos passam o texto por txt_linha /
-           # txt_bloco / txt_tracking, que traduzem.
+           # App log shortcuts (registro_ilha.inc, registro_envio.inc,
+           # desempenho.c, telemetria.c): all pass text through txt_linha /
+           # txt_bloco / txt_tracking, which translate.
            "rgT", "rgTC", "rgTT", "rgBloco", "rgKicker", "rgK2", "rgCaps",
            "rgStat", "rgCartNota", "rgBotao", "rgKbdTexto", "rgCabecalho",
            "rgSeguindo", "rgBlocoAltura", "dsT", "tlT", "tlCaps", "tlBotao")
 
-# Um literal em C pode vir partido ("abc" "def") e com escapes. Junta e decodifica.
+# A C literal can come split ("abc" "def") and with escapes. Joins and decodes.
 LIT = re.compile(r'"((?:[^"\\]|\\.)*)"(?:\s*"((?:[^"\\]|\\.)*)")*')
 
 def literais_colados(texto, i):
-    """Le a sequencia de literais adjacentes que comeca em `texto[i]` == '"'."""
+    """Reads sequence of adjacent literals starting at `texto[i]` == '"'."""
     partes, n = [], len(texto)
     while i < n:
         while i < n and texto[i] in " \t\n\r\\":
@@ -60,7 +60,7 @@ def literais_colados(texto, i):
     return "".join(partes), i
 
 def decodificar(s):
-    # \xNN, \uNNNN e os escapes simples. bytes -> utf-8, que e como a tabela guarda.
+    # \xNN, \uNNNN and simple escapes. bytes -> utf-8, which is how table stores them.
     out, i, n = bytearray(), 0, len(s)
     simples = {"n": 10, "t": 9, "r": 13, "0": 0, '"': 34, "\\": 92, "'": 39}
     while i < n:
@@ -93,9 +93,9 @@ def chaves_da_tabela():
         if m: chaves.add(decodificar(m.group(1)))
     return chaves
 
-# Palavras e marcas que so aparecem em portugues. Nao serve para decidir o que
-# TRADUZIR (todo literal desenhado e interface); serve para escolher, entre os
-# muitos snprintf do codigo, quais sao frase de tela e quais sao log.
+# Words and tokens that only appear in Portuguese. Does not serve to decide what
+# to TRANSLATE (every drawn literal is interface); serves to pick, among the
+# many snprintf in the code, which are UI strings and which are logs.
 PT = re.compile(
     r"[áàâãéêíóôõúçÁÀÂÃÉÊÍÓÔÕÚÇ]|"
     r"\b(de|da|do|das|dos|em|para|com|sem|que|nao|não|uma|um|os|as|ao|à|"
@@ -103,87 +103,87 @@ PT = re.compile(
     r"episódio|episodio|temporada|fonte|fontes|legenda|legendas|assistir|"
     r"assistindo|reproduzir|adicionar|remover|buscar|carregando|erro|"
     r"agora|depois|antes|entre|sobre|desde|ainda|apenas|somente|"
-    # Palavras SEM acento que o app usa e que nao tem stopword nenhuma na
-    # frase: "A seguir" e "Personalizar" passaram batido na primeira versao
-    # desta lista, e sao justamente duas das telas da foto do issue #12.
+    # Words WITHOUT accents that the app uses and have no stopwords in
+    # phrase: "A seguir" and "Personalizar" went unnoticed in first version
+    # of this list, and are two screens from photo in issue #12.
     r"seguir|personalizar|marcar|desmarcar|restaurar|padrao|padrão|opcoes|"
     r"opções|biblioteca|conta|perfil|tela|catalogo|catálogo|fileira|fileiras|"
     r"poster|pôster|destaque|amigos|historico|histórico|informacao|"
     r"informação|aguarde|selecionar|navegar|fechar|"
-    # Palavras das TRES frases que vazaram na v1.0.35 ("Conhecido por %s",
-    # "%d curtidas", "0 a %d por dia"): nenhuma delas tinha stopword da lista
-    # acima, entao a porta 2 nao as viu e elas foram para a TV em portugues.
+    # Words from the THREE strings leaked in v1.0.35 ("Conhecido por %s",
+    # "%d curtidas", "0 a %d por dia"): none had stopwords from list
+    # above, so gate 2 didn't see them and they reached TV in Portuguese.
     r"por|dia|dias|curtidas|conhecido|título|titulo|títulos|titulos|"
     r"coleção|colecao|gênero|genero|nudez|leve|moderado|severo)\b",
     re.IGNORECASE)
 
 def eh_frase(s):
-    """Tem cara de frase de interface? Descarta formato puro, id, url, chave JSON."""
+    """Looks like interface text? Discards raw format, id, url, JSON key."""
     if len(s) < 3: return False
     if s.startswith(("http", "/", "tt", "{", "[", "#")): return False
-    # CAMINHO E URL montados com %s. So o startswith nao pega "%s/catalogo.txt"
-    # nem "luna://com.webos.media/%s", e depois que a regra de formato passou a
-    # deixar frases com "%" entrarem, os quatro viraram ruido fixo.
+    # PATH AND URL assembled with %s. startswith alone does not catch "%s/catalogo.txt"
+    # nor "luna://com.webos.media/%s", and after format rules allowed strings with
+    # "%" in, those four became fixed noise.
     if "://" in s: return False
     if re.search(r"/[A-Za-z0-9._-]+\.[A-Za-z]{2,4}$", s): return False
-    # FORMATO PURO x FRASE QUE CONTEM FORMATO, e a diferenca custou tres
-    # frases em portugues na v1.0.35. A regra antiga descartava todo literal
-    # ASCII com "%" dentro — e "Conhecido por  %s", "%d curtidas" e
-    # "0 a %d por dia" sao exatamente isso: sem acento, so letras e um
-    # especificador. Agora tira os especificadores e pergunta se SOBROU
-    # palavra; se nao sobrou, ai sim e formato puro ("%s/%s", "%d de %d").
+    # RAW FORMAT vs STRING CONTAINING FORMAT, and the difference cost three
+    # Portuguese strings in v1.0.35. The old rule discarded every ASCII literal
+    # with "%" inside — and "Conhecido por  %s", "%d curtidas" and
+    # "0 a %d por dia" are exactly that: unaccented, letters and a specifier.
+    # Now strips specifiers and checks if words REMAIN; if none remain,
+    # then it is a raw format ("%s/%s", "%d de %d").
     if "%" in s:
         resto = re.sub(r"%[-+0-9.*# ]*[a-zA-Z]", " ", s)
         if not re.search(r"[a-zA-ZáàâãéêíóôõúçÁ-Ú]{3}", resto): return False
     if not re.search(r"[a-zA-ZáàâãéêíóôõúçÁ-Ú]{3}", s): return False
     return True
 
-# TERCEIRA FAMILIA DE DEFEITO, achada no menu de legendas/audio do player
-# (issues #41/#42): FUNCAO QUE DEVOLVE ROTULO JA EM PORTUGUES, chamada sem
-# i18n() em volta. ling_nome() (linguas.c) e o caso medido — devolve
-# "Português", "Inglês" etc de uma tabela propria, e nao de idioma_tab.h — mas
-# a lista cobre qualquer funcao assim que aparecer.
+# THIRD DEFECT FAMILY, found in player subtitle/audio menu
+# (issues #41/#42): FUNCTION RETURNING LABEL ALREADY IN PORTUGUESE, called without
+# enclosing i18n(). ling_nome() (linguas.c) is the measured case — returns
+# "Português", "Inglês" etc from its own table, not from idioma_tab.h — but
+# the list covers any such function that appears.
 #
-# POR QUE A VARREDURA DE CIMA NAO PEGA ISTO: aquela olha literais de string.
-# `ling_nome(f->idioma)` nao e um literal, e uma chamada — o texto que ela
-# devolve so existe em tempo de execucao. Uma chamada direta a uma funcao de
-# desenho (`txt_linha_corta(TXT_X, ling_nome(c), ...)`) ainda traduz, porque
-# text.c aplica i18n() em CIMA do que a funcao devolver, seja literal ou nao.
-# O buraco e o INVERSO: `ling_nome(...)` jogado dentro de um snprintf/vsnprintf
-# que MONTA uma string composta ("%s  ·  %s") sem passar aquele pedaco por
-# i18n() antes — a string final nunca bate com chave nenhuma da tabela, e nunca
-# vai bater, entao fica em portugues para sempre. Ver video.c/video_tizen.c
-# (rotulo de faixa de audio) e addons.c (rotulo de legenda do OpenSubtitles):
-# os tres tinham exatamente este buraco.
+# WHY THE SCAN ABOVE DOES NOT CATCH THIS: that one looks at string literals.
+# `ling_nome(f->idioma)` is not a literal, it's a call — text it returns
+# exists only at runtime. A direct call to a drawing function
+# (`txt_linha_corta(TXT_X, ling_nome(c), ...)`) still translates, because
+# text.c applies i18n() ON TOP of what function returns, literal or not.
+# The hole is the REVERSE: `ling_nome(...)` passed inside a snprintf/vsnprintf
+# that ASSEMBLES a compound string ("%s  ·  %s") without passing that piece
+# through i18n() first — the final string never matches any table key, and never
+# will, so it remains in Portuguese forever. See video.c/video_tizen.c
+# (audio track label) and addons.c (OpenSubtitles subtitle label):
+# all three had exactly this gap.
 FUNCOES_ROTULO_PT = ("ling_nome",)
 
 RE_FUNC_ROTULO = re.compile(
     r"(?<![A-Za-z0-9_])(" + "|".join(FUNCOES_ROTULO_PT) + r")\s*\(")
-# i18n( imediatamente antes da chamada: i18n(ling_nome(...)) esta correto.
+# i18n( immediately before call: i18n(ling_nome(...)) is correct.
 RE_I18N_ANTES = re.compile(r"i18n\s*\(\s*$")
 
-# CONFERIDAS UMA A UMA, cada uma com o motivo — mesma disciplina da IGNORAR lá
-# em cima. Sem esta lista a secao (3) não pode virar teste (achar_rotulo_
-# sem_i18n() sozinha nao sabe separar "seguro" de "esqueceram").
+# VERIFIED ONE BY ONE, each with reason — same discipline as IGNORAR above.
+# Without this list section (3) cannot become a test (achar_rotulo_sem_i18n()
+# alone cannot distinguish safe from forgotten).
 IGNORAR_FUNCAO = {
-    # A propria DEFINICAO de ling_nome() em linguas.c contem "ling_nome(" no
-    # cabecalho (`const char *ling_nome(const char *c) {`) — nao e uma
-    # CHAMADA, e o regex nao distingue. So existe uma vez neste arquivo.
+    # The DEFINITION itself of ling_nome() in linguas.c contains "ling_nome(" in
+    # header (`const char *ling_nome(const char *c) {`) — not a
+    # CALL, and regex doesn't distinguish. Exists only once in this file.
     "linguas.c",
-    # ajustes.c:167 guarda ling_nome() CRU de proposito: rotulosDeIdioma() roda
-    # uma vez por abertura da tela, nao por quadro. Quem traduz de verdade e
-    # desenhaLinha->txt_linha_corta, a cada quadro, com o idioma CORRENTE —
-    # exatamente como os outros rotulos desta tela (V_QUALIDADE etc.), que
-    # tambem ficam em portugues no vetor e so viram ingles no desenho. i18n()
-    # aqui prenderia a lista no idioma de quando a tela abriu.
+    # ajustes.c:167 keeps RAW ling_nome() on purpose: rotulosDeIdioma() runs
+    # once when screen opens, not per frame. What truly translates is
+    # desenhaLinha->txt_linha_corta, each frame, with CURRENT language —
+    # exactly like other labels in this screen (V_QUALIDADE etc.), which
+    # also stay in Portuguese in array and only become English at drawing. i18n()
+    # here would lock list in the language of when screen opened.
     "ajustes.c:167",
 }
 
 def achar_rotulo_sem_i18n(txt, linha_de, ctx_fn, re_desenho, re_nao_e_tela, nome_arq):
-    """Toda chamada a uma FUNCOES_ROTULO_PT que nem e i18n(...), nem e
-    argumento DIRETO de uma funcao de desenho, nem log/comparacao — as tres
-    formas seguras. O resto e uma string que vai ser MONTADA (snprintf) sem
-    traducao, o buraco desta secao."""
+    """Every call to a FUNCOES_ROTULO_PT that is neither i18n(...), nor a DIRECT
+    argument to a drawing function, nor log/comparison — the three safe forms.
+    The rest is a string that will be ASSEMBLED (snprintf) without translation,
+    the gap in this section."""
     achados = []
     if nome_arq in IGNORAR_FUNCAO:
         return achados
@@ -203,60 +203,58 @@ def achar_rotulo_sem_i18n(txt, linha_de, ctx_fn, re_desenho, re_nao_e_tela, nome
         achados.append((m.group(1), ln))
     return achados
 
-# Chamadas cujo texto NAO vai para a tela: log, comparacao, arquivo, rede.
-# E a lista que separa "[rede] OpenSSL travado para %d regioes" (log, fica em
-# portugues de proposito) de "Nenhuma fonte" (interface, tem de traduzir).
+# Calls whose text DOES NOT go to the screen: log, comparison, file, network.
+# This list separates "[rede] OpenSSL locked for %d regions" (log, stays in
+# Portuguese on purpose) from "Nenhuma fonte" (interface, must translate).
 NAO_E_TELA = ("printf", "fprintf", "puts", "fputs", "perror", "marco",
               "strcmp", "strncmp", "strcasecmp", "strstr", "strchr", "strrchr",
               "getenv", "setenv", "fopen", "unlink", "remove", "rename",
               "mkdir", "system", "dlopen", "dlsym", "js_", "jsw_", "rede_",
               "curl_", "SDL_Log",
-              # motivo de log da fonte guardada (fontevolta.h): nunca tela
+              # saved source log reason (fontevolta.h): never UI
               "fontevolta_", "addons_buscar", "cat_indice_por",
               "idioma_registrar", "assert", "_Static_assert",
               "EM_ASM", "MAIN_THREAD",
-              # NOME DE ICONE NAO E TEXTO. gfx_icone recebe o basename do SVG
-              # rasterizado ("guia-fontes", "menu_home"), e a heuristica de
-              # portugues casou com "fontes" — a ferramenta pedia traducao para
-              # um nome de arquivo. Acusar o que nao e defeito ensina a ignorar
-              # o teste, que e como esta classe de defeito sobrevive.
+              # ICON NAME IS NOT TEXT. gfx_icone receives rasterized SVG basename
+              # ("guia-fontes", "menu_home"), and Portuguese heuristic matched
+              # "fontes" — tool was asking translation for a filename. Reporting
+              # non-defects teaches ignoring the test, which is how this defect class survives.
               "gfx_icone", "gfx_icones_dir", "extras_caminho_marca_nome",
               "tex_obter", "tex_arquivo",
-              # DADO DE MENTIRA da central de avisos (NUVIO_AVISOS_DEMO): imita
-              # o que a rede traria, nao e rotulo de tela.
+              # DEMO DATA from notification center (NUVIO_AVISOS_DEMO): mocks
+              # what network returns, not a UI label.
               "demoAviso",
-              # LEITOR DE JSON de recomenda.c: objeto(r, "agora") e chave da
-              # resposta do servidor, nao rotulo.
+              # JSON READER in recomenda.c: objeto(r, "agora") is server response
+              # key, not label.
               "objeto(")
 
 RE_DESENHO = re.compile(
     r"(?<![A-Za-z0-9_])(" + "|".join(DESENHO) + r")\s*\(")
 
-# i18n( logo antes do literal. O autor JA DISSE que aquilo e tela — nao ha o que
-# heuristicar depois disso.
+# i18n( right before literal. The author ALREADY STATED that it is UI — nothing
+# left to guess afterwards.
 RE_I18N = re.compile(r"(?<![A-Za-z0-9_])i18n\s*\(\s*$")
 
 RE_NAO_E_TELA = re.compile(
     r"(?<![A-Za-z0-9_])(" + "|".join(re.escape(f) for f in NAO_E_TELA) + r")")
 
-# CABECALHO DE HTTP NAO E TELA, e a forma dele e inconfundivel: "Nome: valor",
-# com o nome em ASCII e hifen. Foi preciso porque a heuristica de portugues casa
-# com pedacos de User-Agent — o MAG250 do stalker.c manda "... ver: 2 rev: 250",
-# e `ver` esta na lista de palavras de interface. Um cabecalho marcado como
-# texto de tela faria a suite acusar uma traducao que nao existe, e teste que
-# acusa o que nao e defeito ensina a ignorar o teste.
+# HTTP HEADER IS NOT SCREEN TEXT, and its shape is unmistakable: "Name: value",
+# with name in ASCII and hyphen. Needed because Portuguese heuristic matched
+# parts of User-Agent — MAG250 in stalker.c sends "... ver: 2 rev: 250",
+# and `ver` is in interface word list. A header flagged as UI text would make
+# the suite report non-existent translation, and false positives teach ignoring tests.
 RE_CABECALHO_HTTP = re.compile(r"^[A-Za-z][A-Za-z0-9-]{1,40}: ")
 
 def contexto(txt, i):
-    """O trecho de codigo que antecede o literal, ate o comeco da instrucao."""
+    """The code snippet preceding literal up to start of statement."""
     j = i
     while j > 0 and txt[j-1] not in ";{}":
         j -= 1
     return txt[j:i]
 
-# NAO E INTERFACE, conferido um a um. Cada entrada aqui e uma decisao, nao um
-# "nao sei o que e": sem esta lista a ferramenta nao pode virar teste, e sem
-# virar teste ela nao impede a proxima regressao.
+# NOT INTERFACE, verified one by one. Each entry here is a decision, not an
+# "unknown": without this list the tool cannot be a test, and without becoming
+# a test it doesn't prevent regressions.
 IGNORAR = {
     # RC 1.8 triage, each checked in the source:
     # - sync.c NOME[] are the labels of the "[sync] etapas" LOG line; "ver" is a
@@ -272,28 +270,28 @@ IGNORAR = {
     # - salvospainel.c: the format sits in a CtxExtra initializer and ctxmenu.c
     #   (ctx confirmation, i18n(x0->pergunta)) translates it; the key is in idioma_tab.h.
     "Remover %s dos amigos?",
-    # Registro do app (03/10): etiquetas de area do log ([fonte], [legendas])
-    # que registro.c procura para agrupar as linhas, icones passados aos
-    # atalhos de desenho, e nomes proprios/arquivos que nao se traduzem.
+    # App log (10/03): log area labels ([fonte], [legendas])
+    # that registro.c looks for to group lines, icons passed to
+    # drawing shortcuts, and proper names/files that are not translated.
     "fonte", "legendas", "aj_info", "aj_rotate-cw", "nuvio.log", "libcurl",
     "Mac", "webOS", "Samsung .wgt", "Samsung",
-    # Ajustes no Glass UI (03/10): a unidade "Mbps" e universal (mesma em
-    # todas as linguas); a chave de fileira de mentira da captura de Ajustes
-    # (ajustes_teste_quadro) e a subpasta da arte embarcada (ajArte) nao sao
-    # texto de tela.
+    # Glass UI Settings (10/03): "Mbps" unit is universal (same in
+    # all languages); mockup row key from Settings capture
+    # (ajustes_teste_quadro) and embedded art subfolder (ajArte) are not
+    # UI text.
     "Mbps", "com.linvo.cinemeta_movie_top", "poster/",
-    # Guia de uso (03/10): ids dos quadros do mockup em ajustesTesteGuia e o
-    # id de entrada do guia.json que eles apontam. So a captura usa; nunca
-    # vao para a tela.
+    # Usage guide (10/03): mockup frame IDs in ajustesTesteGuia and
+    # guide.json entry ID they point to. Only capture uses them; they
+    # never go to screen.
     "guia-fontes", "guia-fileiras", "guia-legendas", "guia-vindo-do-whatsnew",
     "h-fileiras",
-    # Palavra que a folha de Fontes PROCURA no nome/descricao do arquivo para
-    # saber se ha audio em portugues (streams.c, idiomaDa). Dado de comparacao,
-    # nunca texto desenhado.
+    # Word that Sources sheet LOOKS FOR in file name/description to
+    # know if there is Portuguese audio (streams.c, idiomaDa). Comparison data,
+    # never drawn text.
     "português",
     # Trailer diagnostic gate IDs are log codes, never UI labels.
     "dynamic-poster-hidden", "poster-wait",
-    # Identificadores de aplicativos; nunca apresentados como texto da interface.
+    # Application identifiers; never presented as UI text.
     'br.com.claro-now',
     'br.com.claro.now.smarttvclient',
     'com.amazon.amazonvideo.livingroom',
@@ -306,126 +304,122 @@ IGNORAR = {
     'com.netflix.ninja',
     'com.wbd.stream',
 
-    # Motivos do vigia da fonte guardada (fontevolta.c, fontevolta_decidir):
-    # vao so para o log "[voltafonte] recuo para a busca: <motivo>".
+    # Saved source watchdog reasons (fontevolta.c, fontevolta_decidir):
+    # only go to log "[voltafonte] recuo para a busca: <motivo>".
     "erro do player", "clipe curto", "conferencia falhou",
-    # Hosts de provedor de poster/meta que levam a config no caminho
-    # (redeurl.c, rede_url_log): dado de comparacao, nunca tela. "com" casou
-    # com a lista de palavras de portugues.
+    # Poster/meta provider hosts carrying config in path
+    # (redeurl.c, rede_url_log): comparison data, never UI. "com" matched
+    # Portuguese word list.
     "elfhosted.com", "ratingposterdb.com", "top-poster", "top-posters.com",
     "toposters.com",
-    # Atalhos de e-mail do teclado (teclado.c, #216): digitam o pedaco de
-    # endereco, igual em toda lingua.
+    # Keyboard email shortcuts (teclado.c, #216): type address snippet,
+    # identical in all languages.
     ".com", "@gmail.com", "@hotmail.com", "@outlook.com",
-    # Cartao da 1.7.2 (novidades172.c): a marca, igual em toda lingua, e o
-    # endereco de exemplo digitado na previa do login por e-mail.
+    # 1.7.2 card (novidades172.c): brand name, same in all languages, and
+    # sample address typed in email login preview.
     "NUVIO LEGACY", "voce@gmail.com",
-    # Pedaco do printf "[tmdb] idioma dos metadados" (ajustes.c,
-    # ajustes_tmdb_idioma_relatar): o ternario fica numa linha sem o printf,
-    # entao NAO_E_TELA nao o ve. So log.
+    # Part of printf "[tmdb] idioma dos metadados" (ajustes.c,
+    # ajustes_tmdb_idioma_relatar): ternary sits on line without printf,
+    # so NAO_E_TELA doesn't see it. Log only.
     "da interface",
-    # Palavras que o nome PUBLICO do catalogo tem quando ele e um ranking; sao
-    # dado de comparacao de home.c (sinalRanking, layout Dinamica), nunca texto
-    # desenhado. "top", "popular" e "trending" ja nao acusam por serem ASCII.
+    # Words in PUBLIC catalog name when it's a ranking; comparison
+    # data in home.c (sinalRanking, Dynamic layout), never drawn text.
+    # "top", "popular" and "trending" already don't match because ASCII.
     "em alta", "mais vist", "tendência",
-    "-perfil",                      # sufixo de nome de arquivo (ajustes.c)
-    "recomendacoes-perfil.txt",     # nome de arquivo do perfil publico (recomenda.c)
-    "amigos-vistos.txt",            # nome de arquivo das novidades vistas (socialvis.c)
-    "%s/poster/%02d.jpg",           # caminho da arte dos dados de exemplo (socialvis.c, so teste)
+    "-perfil",                      # filename suffix (ajustes.c)
+    "recomendacoes-perfil.txt",     # public profile filename (recomenda.c)
+    "amigos-vistos.txt",            # watched updates filename (socialvis.c)
+    "%s/poster/%02d.jpg",           # sample data artwork path (socialvis.c, test only)
     "biblioteca.h", "catalogo.h", "fileiras.h", "perfil.h", "legenda.h",
-    "perfil.txt",                   # #include e nome de arquivo
-    "com.webos.media.client.nuvio", # id do cliente LS2
-    "abrir", "buscar", "erro",      # nomes de operacao do bridge JS (video_tizen.c)
-    "fontes", "legenda", "mais", "nao", "poster",  # chaves internas, nao rotulo
-    "fileiras", "ordem-da-conta",  # partes do contexto no log de homeestado.c
-    # motivo do degrau no log "[gpu-nivel] nivel 1 -> 2 (...)" (gpunivel.c aplicar)
+    "perfil.txt",                   # #include and filename
+    "com.webos.media.client.nuvio", # LS2 client ID
+    "abrir", "buscar", "erro",      # JS bridge operation names (video_tizen.c)
+    "fontes", "legenda", "mais", "nao", "poster",  # internal keys, not labels
+    "fileiras", "ordem-da-conta",  # context parts in homeestado.c log
+    # reason for GPU step down in log "[gpu-nivel] nivel 1 -> 2 (...)" (gpunivel.c aplicar)
     "GPU presa mesmo com efeitos leves: efeitos minimos",
-    # Pontos de parada da volta condenada (descoberta.c, CONDENADA): so log.
+    # Stop points in condemned loop (descoberta.c, CONDENADA): log only.
     "antes de pedir os catalogos", "depois da atividade dos amigos",
     "depois do continuar assistindo", "depois dos catalogos",
     "depois dos manifestos", "esperando os catalogos", "lendo os manifestos",
-    # Motivos e origens do nivel de GPU (gpunivel.c): so vao ao nuvio.log.
+    # Reasons and origins of GPU level (gpunivel.c): only go to nuvio.log.
     "definido por gpun_definir_nivel", "nenhum", "padrao", "sem alvo interno",
     "teto de tempo de medida",
     "lento pela CPU ou pelo resto, nao pela GPU: menos pixel nao ajuda",
-    # .tpk: so vao ao nuvio.log / erro de compilacao / nome de arquivo.
+    # .tpk: only go to nuvio.log / compile error / filename.
     "NV_TPK40 e so da libnuvio.so do Tizen 4/5; nunca junto com Emscripten",
     "libEGL nao encontrada na TV", "libnuvio.staged.ver",
     "sem recorte em 2 s, mostra assim", "sem tocando, mostra assim",
     "sem recorte",
     "eglMakeCurrent no fio do app falhou: 0x%x",
-    "crédit", "crédito",            # palavra procurada no capitulo do MKV
-    "episodio", "episódio",         # palavra procurada no nome do video TMDB (extras.c)
-    "película",                     # palavra de apoio da busca de manchetes em espanhol (noticias.c, PAR)
-    "seriál",                       # idem em tcheco e eslovaco (noticias.c, PAR)
-    # Nome NATIVO de um idioma no seletor (ajustes.c, V_IDIOMA): sem i18n de
-    # proposito, quem trocou para uma lingua que nao le precisa achar a sua.
+    "crédit", "crédito",            # word searched in MKV chapter
+    "episodio", "episódio",         # word searched in TMDB video name (extras.c)
+    "película",                     # support word for Spanish headlines search (noticias.c, PAR)
+    "seriál",                       # ditto in Czech and Slovak (noticias.c, PAR)
+    # NATIVE language name in selector (ajustes.c, V_IDIOMA): without i18n
+    # on purpose, users who switched to unreadable language need to find theirs.
     "Türkçe",
-    # "Ola" escrito em cada idioma (novidades160.c, OLA): a cena dos idiomas
-    # mostra cada lingua nela mesma, sem traducao de proposito.
+    # "Hello" written in each language (novidades160.c, OLA): language scene
+    # displays each language in itself, without translation on purpose.
     "Olá", "Xin chào",
-    # #158: dados, nao rotulo. A tabela de letras modificadoras (U+1D2C..)
-    # da normalizacao de nome de canal (epg.c) e uma palavra procurada no nome
-    # de categoria do Xtream para achar o pais da grade (guia.c).
+    # #158: data, not label. Modifier letters table (U+1D2C..)
+    # from channel name normalization (epg.c) and word searched in Xtream
+    # category name to find country grid (guia.c).
     "a?b?de?ghijklmn?o?prtuw", "românia",
-    # Nome proprio e sigla: iguais nos dois idiomas.
+    # Proper name and acronym: identical in both languages.
     "IMDb", "Trakt", "YouTube", "PIN", "AI-powered", "NUVIO",
-    # Tabela de acentos -> letra base da normalizacao de titulo (trailerapple.c):
-    # dado, nao rotulo.
+    # Accents -> base letter table for title normalization (trailerapple.c):
+    # data, not label.
     "ÀÁÂÃÄÅàáâãäåÈÉÊËèéêëÌÍÎÏìíîïÒÓÔÕÖØòóôõöøÙÚÛÜùúûüÝýÿÑñÇç",
-    # ISO 639-2 do portugues (linguas.c). Virou candidato quando "por" entrou
-    # na lista de palavras de portugues; e codigo de idioma, nao rotulo.
+    # ISO 639-2 for Portuguese (linguas.c). Became candidate when "por" entered
+    # Portuguese word list; language code, not label.
     "por",
-    # O MESMO CODIGO EM MAIUSCULA (fontepref.c). E o valor da tabela TERMOS,
-    # que traduz "portugues"/"brazilian"/"nacional" num codigo de idioma para
-    # COMPARAR duas fontes entre si. Nunca chega na tela: a assinatura inteira
-    # ("BR+DUB+POR") so aparece em printf de diagnostico.
+    # SAME CODE IN UPPERCASE (fontepref.c). Value of TERMOS table,
+    # translating "portugues"/"brazilian"/"nacional" to language code to
+    # COMPARE two sources. Never reaches screen: entire signature
+    # ("BR+DUB+POR") only appears in diagnostic printf.
     "POR",
-    # Nao sao tela: cabecalho do arquivo de preferencias e duas linhas de log
-    # que a heuristica de portugues nao tem como distinguir das frases.
+    # Not UI: preferences file header and two log lines
+    # that Portuguese heuristic cannot distinguish from phrases.
     "# Fileiras da Home, escolha DESTE aparelho. Nunca e enviada para\n"
     "# a conta nem para o Trakt.\n",
     "%d addons · %d progressos · %d vistos · %d na lista · %d coleções%s",
-    # #215: as duas variantes do mesmo resumo de sync acima (servidor da conta
-    # fora do ar), o nome de arquivo da copia local (contacache.c) e a chave
-    # do aviso na ilha (app.c) — chave interna, nao rotulo.
+    # #215: two variants of sync summary above (account server down),
+    # local copy filename (contacache.c) and notification key in island (app.c) —
+    # internal key, not label.
     "servidor da conta fora do ar (HTTP %d) · usando a cópia de %s",
     "servidor da conta fora do ar (HTTP %d) · sem cópia salva",
     "conta-%s-p%d.json", "conta-fora",
-    "conta-addons-pend-",  # prefixo de arquivo da fila offline, nunca texto de tela
+    "conta-addons-pend-",  # offline queue file prefix, never UI text
     "hdr do pipeline: %s (fonte DV=%d)",
-    # Tres marcos de video.c/video_tizen.c. O buffer e montado numa instrucao
-    # e entregue a marco() na SEGUINTE, entao marco — que ja esta em
-    # NAO_E_TELA — fica fora do contexto que a varredura le. Sao log.
+    # Three video.c/video_tizen.c milestones. Buffer is assembled in one statement
+    # and delivered to marco() in NEXT, so marco — which is already in
+    # NAO_E_TELA — is outside context read by scan. Log messages.
     "pipeline erro: %.60s",
-    # Marcador de cabecalho do sidecar de fontes do mkvass (arquivo em disco) e
-    # a linha de estado do assrender, que so vai para o log. "fontes" casou
-    # com a lista de palavras de portugues; nenhum dos dois chega na tela.
+    # Header marker of mkvass font sidecar (file on disk) and
+    # assrender status line, which only goes to log. "fontes" matched
+    # Portuguese word list; neither reaches screen.
     "NVASS-FONTES-1\n",
     "%s; eventos=%d fontes=%d fontselect=%d cobertura=%lld-%lldms render=%lluus quadro=%zuB",
     "mkv: %d faixas lidas, %d legendas com idioma",
     "seek para %ds",
-    # Os quatro motivos do diagnostico [col] (descoberta.c). Sao DADOS DE UM
-    # VETOR, e nao argumento de printf: a varredura olha o que vem antes do
-    # literal e ali so ha uma chave de inicializacao, entao NAO_E_TELA nao tem
-    # como reconhece-los. Ficam em portugues de proposito — quem le e quem
-    # abre uma issue, e a linha inteira em volta deles ja e portugues.
+    # Four diagnostic reasons in [col] (descoberta.c). ARRAY DATA,
+    # not printf argument: scan looks at what precedes literal
+    # and there is only an initializer brace, so NAO_E_TELA cannot
+    # recognize them. Kept in Portuguese on purpose — for issue reports.
     "nenhuma colecao usa este addon",
     "colecao tem o addon, mas com outro tipo",
     "colecao tem addon e tipo, mas outro id de catalogo",
     "CASOU — nao engoliu porque o grupo esta oculto",
-    # Os motivos de motivoTV() (faixas.c, #92): por que a faixa ASS ficou com
-    # a TV em vez do overlay do app. Sao `return "..."` de uma funcao e so vao
-    # para o printf "[legenda] faixa N -> TV: motivo" — o mesmo caso dos
-    # motivos do [col] acima: log em portugues de proposito, para quem manda
-    # o registro na issue.
-    # #92, v1.4.7: se o VIDEO ja estava aberto quando um Range do mkvass
-    # falhou (momentoVideo, mkvass.c), e o porque do video solto na linha da
-    # pre-busca (player.c). Os dois so vao a printf de diagnostico, por um
-    # `return`/ternario que a varredura nao liga ao printf.
-    # Os motivos de gifcol_motivo_texto() (gifcolecao.c, #141): por que o
-    # cartaz de colecao em foco nao anima. `return "..."` que so vai ao
-    # printf "[gif] cartaz ... nao anima: motivo" — log para a issue.
+    # motivoTV() reasons (faixas.c, #92): why ASS track stayed with
+    # TV instead of app overlay. Function `return "..."` and only go
+    # to printf "[legenda] faixa N -> TV: motivo" — log for issue reports.
+    # #92, v1.4.7: if VIDEO was already open when mkvass Range failed
+    # (momentoVideo, mkvass.c), and reason for orphan video in pre-search line (player.c).
+    # Both only go to diagnostic printf.
+    # gifcol_motivo_texto() reasons (gifcolecao.c, #141): why focused collection
+    # poster does not animate. `return "..."` that only goes to
+    # printf "[gif] cartaz ... nao anima: motivo" — log for issue reports.
     "sem focusGifUrl e a capa nao e GIF",
     "sem focusGifUrl e a capa ainda nao chegou",
     "arquivo do GIF ainda nao chegou",
@@ -445,20 +439,20 @@ IGNORAR = {
     "sonda voltou sem par para esta faixa (ver [mkv] legendas da TV x arquivo)",
     "codec nao e ASS/SSA: a TV desenha bem",
     "sem ordinal no arquivo",
-    # Os de motivoNoGo() (faixas.c): o mesmo caso, para a linha "[legenda]
-    # mkvass no-go N (motivo)". O que vai a TELA sao os avisos com i18n().
+    # motivoNoGo() reasons (faixas.c): same case, for line "[legenda]
+    # mkvass no-go N (motivo)". What goes to SCREEN are warnings with i18n().
     "nao e MKV",
     "servidor sem Range",
     "faixa nao e ASS",
     "sem indice da faixa",
     "sem CueRelativePosition",
-    # Chave do JSON do worker (noticia.c, /v1/noticia) e fragmento de class
-    # HTML que o extrator descarta (leitura.c, "saiba-mais"): dado, nao rotulo.
+    # Worker JSON key (noticia.c, /v1/noticia) and HTML class fragment
+    # discarded by scraper (leitura.c, "saiba-mais"): data, not label.
     '"titulo"', "saiba-mais",
-    # novidades20.c: textos da tabela CAP[] (e a lista B[] do resumo) com "%" no
-    # meio da frase ("200%"). Nao sao formato de snprintf: sao chaves, e o desenho
-    # passa cada uma por i18n() (novidades20.c, linhas de `i18n(e->t)`). Todas
-    # tem entrada em idioma_tab.h. "poster/%s.jpg" e um caminho de arquivo.
+    # novidades20.c: texts from CAP[] table (and summary list B[]) with "%"
+    # in middle of sentence ("200%"). Not snprintf formats: they are keys, and
+    # drawing passes each through i18n() (novidades20.c, lines of `i18n(e->t)`).
+    # All have entries in idioma_tab.h. "poster/%s.jpg" is a filepath.
     "Volume até 200%", "Tamanho padrão 80%", "Continuar assistindo · 58%",
     "Cache de busca e volume até 200%", "poster/%s.jpg",
 }
@@ -467,21 +461,24 @@ def sem_corpo_em_js(txt):
     """Apaga o corpo dos EM_JS/EM_ASM, trocando por espaco e mantendo o \n.
 
     O corpo de um EM_JS e JAVASCRIPT escrito dentro de um arquivo .c, e esta
-    varredura le C. As aspas simples do JS ("don't", 'texto') nao sao literais
-    de caractere, e os literais de string que estao la sao codigo de ponte —
-    nunca texto de tela, porque quem desenha e o lado C.
+    """Erases EM_JS/EM_ASM body, replacing with spaces and keeping \n.
 
-    Sem isto, cada comentario ou string nova dentro do EM_JS de video_tizen.c
-    virava um "literal desenhado sem chave na tabela". Aconteceu em 17/09 com
-    nove achados de uma vez, todos falsos, e o sinal verdadeiro se perde no meio
-    de ruido assim.
+    The body of an EM_JS is JAVASCRIPT written inside a .c file, and this
+    scanner reads C. Single quotes in JS ("don't", 'text') are not character
+    literals, and the string literals inside are bridge code —
+    never UI text, because drawing is on the C side.
 
-    Troca por espacos em vez de remover para que os deslocamentos — e portanto
-    os numeros de linha de todo o resto do arquivo — continuem valendo.
+    Without this, every comment or new string inside EM_JS of video_tizen.c
+    became a "drawn literal without key in table". Happened on 09/17 with
+    nine findings at once, all false, and real signals get lost in
+    such noise.
+
+    Replaces with spaces instead of removing so offsets — and therefore
+    line numbers across rest of file — remain valid.
     """
     saida = list(txt)
     for m in re.finditer(r"(?<![A-Za-z0-9_])EM_(?:JS|ASM|ASM_INT|ASM_DOUBLE)\s*\(", txt):
-        i = m.end() - 1          # no "(" de abertura
+        i = m.end() - 1          # at "(" opener
         nivel, j = 0, i
         while j < len(txt):
             if txt[j] == "(": nivel += 1
@@ -510,7 +507,7 @@ def varrer():
             continue
         txt = arq.read_text(encoding="utf-8")
         txt = sem_corpo_em_js(txt)
-        # numero da linha por deslocamento
+        # line number by offset
         quebras = [0]
         for k, c in enumerate(txt):
             if c == "\n":
@@ -527,8 +524,8 @@ def varrer():
                                               RE_NAO_E_TELA, arq.name):
             faltando_funcao.setdefault(nome, []).append(f"{arq.name}:{ln}")
 
-        # Fora de comentario e fora de #include: percorre e pega cada bloco de
-        # literais adjacentes uma vez so.
+        # Outside comments and outside #include: iterate and grab each block of
+        # adjacent literals once.
         i, n = 0, len(txt)
         while i < n:
             c = txt[i]
@@ -547,45 +544,45 @@ def varrer():
                 continue
             if ("gl_FragColor" in s or "uniform " in s or "varying " in s
                     or "void main()" in s):
-                continue                      # codigo de shader (gfx.c)
+                continue                      # shader code (gfx.c)
             ctx = contexto(txt, ini)
-            # DUAS CAMADAS, e a diferenca entre elas ja custou uma regressao
-            # nesta ferramenta.
+            # TWO LAYERS, and the difference between them already caused a regression
+            # in this tool.
             #
-            # Literal entregue DIRETO a uma funcao de desenho e interface por
-            # definicao: nao ha o que heuristicar, ou esta na tabela ou esta em
-            # IGNORAR. Foi ao exigir "cara de portugues" tambem aqui que
-            # "↑ Voltar aos filtros · Voltar: menu" (biblioteca.c) — que a
-            # primeira versao pegava — voltou a passar batido.
+            # Literal delivered DIRECTLY to a drawing function is UI by
+            # definition: no heuristics needed, either it is in the table or in
+            # IGNORAR. By requiring "looks like Portuguese" here too,
+            # "↑ Voltar aos filtros · Voltar: menu" (biblioteca.c) — which
+            # the first version caught — went unnoticed again.
             #
-            # Fora do desenho (snprintf para um buffer que sera desenhado) nao
-            # da para saber pelo contexto se e tela ou log, e ai sim vale a
-            # heuristica de portugues.
+            # Outside drawing (snprintf into a buffer that will be drawn) context
+            # alone cannot distinguish screen from log, and then Portuguese
+            # heuristic applies.
             #
-            # TERCEIRA PORTA, e ela existe por um caso medido: um literal
-            # dentro de i18n() que NAO vai direto a uma funcao de desenho
-            # (tipicamente `snprintf(buf, tam, "%s", i18n("..."))`) so era
-            # conferido se a heuristica de portugues gostasse dele. Ela nao
-            # gostou de "Setas: mover  ·  OK: entrar" — sem marcador de PT
-            # obvio — e a chave saiu da tela em portugues no ingles inteiro.
-            # Escrever i18n( E a declaracao de que aquilo e interface; depois
-            # dela, adivinhar o idioma so serve para errar.
+            # THIRD GATE, which exists due to a measured case: a literal
+            # inside i18n() that DOES NOT go directly to a drawing function
+            # (typically `snprintf(buf, size, "%s", i18n("..."))`) was only
+            # checked if Portuguese heuristic liked it. It didn't like
+            # "Setas: mover  ·  OK: entrar" — lacking obvious Portuguese markers —
+            # and the key appeared on screen in Portuguese across English UI.
+            # Writing i18n( IS the declaration that it is interface text;
+            # guessing language afterwards only causes errors.
             direto = (RE_DESENHO.search(ctx) is not None
                       or RE_I18N.search(ctx) is not None)
             if not direto and not PT.search(s):
                 continue
-            # POR NOME INTEIRO, e nao por substring: "printf" casa dentro de
-            # "snprintf", e foi assim que "A seguir" (posplay.c) — uma das
-            # telas da foto do #12 — passou batido nesta propria ferramenta.
-            # Todo texto montado com snprintf estava sendo descartado calado.
+            # BY FULL NAME, not substring: "printf" matches inside
+            # "snprintf", which is how "A seguir" (posplay.c) — one of the
+            # screens in issue #12 photo — slipped through in this very tool.
+            # All text assembled with snprintf was being silently discarded.
             if RE_NAO_E_TELA.search(ctx):
                 continue
             if RE_CABECALHO_HTTP.match(s):
                 continue
             onde = f"{arq.name}:{linha_de(ini)}"
-            # MONTAGEM: o formato tem de ser envolvido na origem, porque a
-            # string final nunca casa com chave. Sem "%", o literal chega
-            # inteiro na tela e basta a chave.
+            # ASSEMBLY: format must be wrapped at origin, because the final
+            # string never matches a key. Without "%", literal reaches screen
+            # as a whole and key alone suffices.
             if "%" in s and "i18n" not in ctx.split("(")[0][-40:] and "i18n" not in ctx:
                 if s not in IGNORAR:
                     faltando_i18n.setdefault(s, []).append(onde)
@@ -595,18 +592,18 @@ def varrer():
 
 if __name__ == "__main__":
     tab, fmt, func = varrer()
-    if "--tabela" in sys.argv:
+    if "--tabela" in sys.argv or "--table" in sys.argv:
         for s in sorted(tab): print('  { "%s", "" },' % s.replace('"', '\\"'))
         sys.exit(0)
-    print("=== (1) literal desenhado SEM chave na tabela: %d ===" % len(tab))
+    print("=== (1) literal drawn WITHOUT key in table: %d ===" % len(tab))
     for s in sorted(tab):
         print("  %-72s %s" % (repr(s)[:72], ", ".join(tab[s][:3])))
     print()
-    print("=== (2) snprintf em portugues SEM i18n no formato: %d ===" % len(fmt))
+    print("=== (2) snprintf in Portuguese WITHOUT i18n in format: %d ===" % len(fmt))
     for s in sorted(fmt):
         print("  %-72s %s" % (repr(s)[:72], ", ".join(fmt[s][:3])))
     print()
-    print("=== (3) funcao que devolve rotulo em portugues, chamada sem i18n(): %d ===" % len(func))
+    print("=== (3) function returning label in Portuguese, called without i18n(): %d ===" % len(func))
     for s in sorted(func):
         print("  %-72s %s" % (s, ", ".join(func[s][:6])))
     sys.exit(1 if (tab or fmt or func) else 0)

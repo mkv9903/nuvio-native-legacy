@@ -1,35 +1,32 @@
 #!/bin/bash
-# Compila para ARM e instala na TV por COPIA DIRETA. Ciclo completo (~30s).
+# Compiles for ARM and installs on TV via DIRECT COPY. Full cycle (~30s).
 #
-#   bash tools/arm.sh            # compila, copia, confere e lanca
-#   bash tools/arm.sh --build    # so compila
-#   bash tools/arm.sh --ipk      # tambem gera o .ipk (para distribuir)
+#   bash tools/arm.sh            # compile, copy, verify, and launch
+#   bash tools/arm.sh --build    # compile only
+#   bash tools/arm.sh --ipk      # also generate .ipk (for distribution)
 #   bash tools/arm.sh --ipk --build
-#                                # gera o .ipk e PARA: nao toca na TV. E o modo
-#                                # para empacotar uma variante (webos3, alto
-#                                # cache) sem derrubar o que esta instalado.
-#   bash tools/arm.sh --high-cache [--ipk|--build]   (--alto-cache ainda vale)
-#                                # variante ALTO CACHE: orcamento de texturas
-#                                # cravado em 300 MB (NV_TEX_MB_FIXO), para TV
-#                                # com muita RAM. O .ipk sai com sufixo
-#                                # -highcache e o titulo carimbado diz "high
-#                                # cache". A build comum decide o orcamento no
-#                                # arranque pela RAM (ver orcamentoMB em
-#                                # src/tex_cache.c).
+#                                # generate .ipk and STOP: do not touch TV.
+#                                # Mode for packaging a variant (webos3, high
+#                                # cache) without disturbing installed app.
+#   bash tools/arm.sh --high-cache [--ipk|--build]   (--alto-cache also accepted)
+#                                # HIGH CACHE variant: texture budget locked
+#                                # to 300 MB (NV_TEX_MB_FIXO), for TVs with
+#                                # ample RAM. .ipk gets suffix -highcache and
+#                                # title stamp indicates "high cache".
+#                                # Standard build calculates budget dynamically
+#                                # at launch from RAM.
 #
-# NAO usa o appInstallService, e a razao esta escrita no ponto do envio: ele
-# responde sucesso e nao troca o binario.
+# Does NOT use appInstallService: it reports success without replacing the binary.
 #
-# A imagem vem de tools/Dockerfile:
+# Image comes from tools/Dockerfile:
 #   docker build --platform linux/arm64 -t nuvio-webos-sdk tools/
 #
-# -ldl e obrigatorio: video.c abre libluna-service2 por dlopen. A linha de
-# compilacao do runbook antigo nao tinha, e o link falhava em 'dlsym@@GLIBC_2.4'.
+# -ldl is required: video.c opens libluna-service2 via dlopen.
 #
-# NAO acrescente -lcurl. rede.c abre libcurl por dlopen em execucao, tentando
-# so.5 e depois so.4. Linkar curl cria dependencia rigida na libcurl.so.4 do
-# SDK, e a TV so tem /usr/lib/libcurl.so.5 — o binario nem inicia, com
-# "libcurl.so.4 => not found" e nenhuma mensagem visivel na tela.
+# Do NOT add -lcurl. rede.c opens libcurl via dlopen at runtime, trying so.5
+# and then so.4. Linking curl introduces hard dependency on libcurl.so.4 in
+# SDK, but TV only provides /usr/lib/libcurl.so.5 — binary fails to launch with
+# "libcurl.so.4 => not found" with no visible error message on screen.
 set -e
 cd "$(dirname "$0")/.."
 
@@ -40,61 +37,47 @@ ARES="${NUVIO_ARES_PACKAGE:-../NuvioWeb-0.3.38-beta/node_modules/.bin/ares-packa
 CONTAINER_RUNTIME="${NUVIO_CONTAINER_RUNTIME:-docker}"
 BUILD_PLATFORM="${NUVIO_BUILD_PLATFORM:-linux/arm64}"
 SDK_IMAGE="${NUVIO_SDK_IMAGE:-nuvio-webos-sdk}"
-# DTS (PR #259): o FFmpeg mora na IMAGEM. Por padrao a build exige a
-# conversao e falha se o FFmpeg estiver ausente; reconstrua a imagem nesse caso.
-# NUVIO_DTS_FFMPEG=0 compila sem conversao; auto consulta a imagem e permite
-# compilar sem ela quando o FFmpeg nao estiver disponivel.
+# DTS (PR #259): FFmpeg lives inside IMAGE. By default build requires
+# conversion and fails if FFmpeg is missing; rebuild image in that case.
+# NUVIO_DTS_FFMPEG=0 compiles without conversion; auto queries image and allows
+# building without it when FFmpeg is unavailable.
 DTS_ENABLED="${NUVIO_DTS_FFMPEG:-1}"
-case "$DTS_ENABLED" in 0|1|auto) ;; *) echo 'NUVIO_DTS_FFMPEG deve ser 0, 1 ou auto' >&2; exit 2;; esac
+case "$DTS_ENABLED" in 0|1|auto) ;; *) echo 'NUVIO_DTS_FFMPEG must be 0, 1 or auto' >&2; exit 2;; esac
 if [ "$DTS_ENABLED" = auto ]; then
   if "$CONTAINER_RUNTIME" run --rm --platform "$BUILD_PLATFORM" "$SDK_IMAGE" \
        sh -c 'test -f "${NUVIO_DTS_ROOT:-/opt/nuvio-dts}/include/libavcodec/avcodec.h"' 2>/dev/null; then
     DTS_ENABLED=1
   else
     DTS_ENABLED=0
-    echo "==> ATENCAO: a imagem $SDK_IMAGE nao tem o FFmpeg do DTS; build SEM a conversao de DTS"
-    echo "    (docker build --platform linux/arm64 -t $SDK_IMAGE tools/  para incluir)"
+    echo "==> WARNING: image $SDK_IMAGE lacks DTS FFmpeg; building WITHOUT DTS conversion"
+    echo "    (docker build --platform linux/arm64 -t $SDK_IMAGE tools/  to include)"
   fi
 fi
 
-# --high-cache pode vir antes ou depois de --build/--ipk. So muda uma -D e os
-# nomes; o codigo e o mesmo — e por isso a variante nao precisa de branch.
+# --high-cache can come before or after --build/--ipk. Only alters a -D and names;
+# code remains identical — variant does not require separate branch.
 VARIANTE=""
 if [ "$1" = "--alto-cache" ] || [ "$1" = "--high-cache" ]; then shift; VARIANTE="highcache"; fi
 if [ "$2" = "--alto-cache" ] || [ "$2" = "--high-cache" ]; then set -- "$1"; VARIANTE="highcache"; fi
 if [ "$3" = "--alto-cache" ] || [ "$3" = "--high-cache" ]; then set -- "$1" "$2"; VARIANTE="highcache"; fi
 if [ "$VARIANTE" = "highcache" ]; then
   export NUVIO_EXTRA_CFLAGS="${NUVIO_EXTRA_CFLAGS:-} -DNV_TEX_MB_FIXO=300"
-  echo "==> variante ALTO CACHE (300 MB de texturas)"
+  echo "==> HIGH CACHE variant (300 MB textures)"
 fi
 
-echo "==> compilando para ARM"
-# A configuracao do servidor entra por VARIAVEL DE AMBIENTE e os -D sao montados
-# dentro do container. Passa-los na linha de `sh -c` exigiria aspas dentro de
-# aspas e o erro seria MUDO: a macro chega vazia, o binario compila, instala,
-# abre — e a tela de login diz "pacote montado sem servidor". Foi o que
-# aconteceu no primeiro deploy desta funcionalidade.
-# Uma limpeza SO, com tudo dentro: `trap` nao acumula — um segundo `trap ... EXIT`
-# substitui o primeiro, e o arquivo com a chave anonima ficaria para tras em
-# /tmp toda vez que o modo --ipk fosse usado.
-LIXO=""
-limpar() { [ -n "$LIXO" ] && rm -rf $LIXO; }
-trap limpar EXIT
-ENVF=$(mktemp "${TMPDIR:-/tmp}/nuvio-arm-env.XXXXXXXX"); LIXO="$LIXO $ENVF"
+echo "==> compiling for ARM"
+# Server configuration enters via ENVIRONMENT VARIABLES and -Ds are assembled
+# inside container. Passing them via `sh -c` command line would require nested quotes
+# and fail silently: empty macro, binary builds and installs, login screen says
+# "package assembled without server".
+# Single cleanup function handles temporary files:
+CLEANUP_FILES=""
+cleanup() { [ -n "$CLEANUP_FILES" ] && rm -rf $CLEANUP_FILES; }
+trap cleanup EXIT
+ENVF=$(mktemp "${TMPDIR:-/tmp}/nuvio-arm-env.XXXXXXXX"); CLEANUP_FILES="$CLEANUP_FILES $ENVF"
 tools/env.sh --env-file "$ENVF"
-# NUVIO_EXTRA_CFLAGS: bandeiras a mais para uma build de teste, sem tocar no
-# codigo. Nasceu para o -DNV_PEDIR_4K do issue #28, que so existe para uma
-# pessoa medir numa TV que nao temos aqui.
-#
-# VAI POR -e E NAO PELO ENV-FILE. O env-file e lido pela conferencia logo
-# abaixo, que exige encontrar o VALOR de cada chave dentro do binario — e uma
-# bandeira de compilacao nao e uma string do binario. Posta la, ela derrubava a
-# build com "ABORTADO: NUVIO_EXTRA_CFLAGS nao entrou no binario ARM", que e a
-# guarda funcionando sobre a coisa errada.
-# Motor P2P embutido (src/p2pmotor.h): a pasta <raiz>/arm e a de trabalho de
-# tools/p2p-motor/build-arm.sh (nuvio-engine + libtorrent + OpenSSL ja
-# compilados para ARM), achada por tools/p2p-motor/pasta.sh (NUVIO_P2P_MOTOR,
-# ou a pasta padrao; =none compila sem). Incompleta = erro.
+
+# Embedded P2P engine (src/p2pmotor.h):
 . tools/p2p-motor/pasta.sh
 nv_p2p_resolver arm
 P2P_VOL=""
@@ -114,7 +97,7 @@ if [ -n "${NUVIO_DTS_ROOT:-}" ]; then DTS_ENV=(-e "NUVIO_DTS_ROOT=$NUVIO_DTS_ROO
   ASS_CFLAGS=""
   ASS_LIBS=""
   if [ "${NUVIO_ASS_LIBASS:-1}" = "1" ]; then
-    [ -f "$ASS/include/ass/ass.h" ] || { echo "libass ARM ausente na imagem; reconstrua tools/Dockerfile ou use NUVIO_ASS_LIBASS=0" >&2; exit 2; }
+    [ -f "$ASS/include/ass/ass.h" ] || { echo "libass ARM missing in image; rebuild tools/Dockerfile or use NUVIO_ASS_LIBASS=0" >&2; exit 2; }
     ASS_CFLAGS="-DNV_ASS_LIBASS -I$ASS/include"
     ASS_LIBS="-L$ASS/lib -Wl,--start-group -lass -lharfbuzz -lfribidi -lfreetype -Wl,--end-group"
   fi
@@ -122,27 +105,17 @@ if [ -n "${NUVIO_DTS_ROOT:-}" ]; then DTS_ENV=(-e "NUVIO_DTS_ROOT=$NUVIO_DTS_ROO
   DTS_LIBS=""
   if [ "${NUVIO_DTS_FFMPEG:-1}" = "1" ]; then
     DTS=${NUVIO_DTS_ROOT:-/opt/nuvio-dts}
-    [ -f "$DTS/include/libavcodec/avcodec.h" ] || { echo "FFmpeg DTS ausente; reconstrua tools/Dockerfile ou use NUVIO_DTS_FFMPEG=0" >&2; exit 2; }
+    [ -f "$DTS/include/libavcodec/avcodec.h" ] || { echo "FFmpeg DTS missing; rebuild tools/Dockerfile or use NUVIO_DTS_FFMPEG=0" >&2; exit 2; }
     DTS_CFLAGS="-DNV_DTS_FFMPEG -I$DTS/include"
     DTS_LIBS="-L$DTS/lib -Wl,--start-group -lavformat -lavcodec -lswresample -lavutil -Wl,--end-group -lpthread -lm"
   fi
-  # -DNV_WEBOS: a identidade do alvo tem que vir daqui, porque o compilador
-  # webos define __linux__ igual a qualquer Linux e a toolchain nao tem macro
-  # propria (src/ajustes.c separa o locale da TV por ela, como NV_TPK e
-  # NV_ANDROID fazem nos outros alvos).
   P2P_CFLAGS=""
   P2P_LIBS=""
   if [ "${NUVIO_P2P_MOTOR:-}" = "1" ]; then
     P2P_CFLAGS="-DNV_P2P_MOTOR -I/p2p/nuvio-engine/include"
-    # C++, libatomic e libgcc estaticos: o firmware da TV tem libstdc++ de outra
-    # versao (ou nenhuma), e libatomic.so.1 nao e garantida.
     P2P_LIBS="/p2p/build-arm/libnuvio_engine.a /p2p/build-arm/_deps/nuvio_libtorrent-build/libtorrent-rasterbar.a $SR/usr/lib/libssl.a $SR/usr/lib/libcrypto.a -static-libgcc -Wl,-Bstatic -lstdc++ -latomic -Wl,-Bdynamic -lrt -Wl,--gc-sections"
   fi
-  # #297: p2pmotor.c vai num objeto proprio com -D_FILE_OFFSET_BITS=64. O webOS
-  # e ARM de 32 bits: sem a flag o lstat/readdir falham (EOVERFLOW) num arquivo
-  # de torrent acima de 2 GB e o cache nunca era contado nem apagado. So este
-  # arquivo: o header dele so expoe tipos de largura fixa (uint64_t), entao o
-  # resto do binario segue sem a flag. O _Static_assert do .c barra o esquecimento.
+  # #297: p2pmotor.c built in separate object with -D_FILE_OFFSET_BITS=64 for 32-bit ARM webOS.
   arm-webos-linux-gnueabi-gcc -c src/p2pmotor.c -o /tmp/p2pmotor.o -O2 -DNV_WEBOS -D_FILE_OFFSET_BITS=64 $NUVIO_EXTRA_CFLAGS $P2P_CFLAGS \
     -I$SR/usr/include -I$SR/usr/include/SDL2
   arm-webos-linux-gnueabi-gcc $(ls src/*.c | grep -v "^src/p2pmotor\.c$") src/dts/*.c /tmp/p2pmotor.o -o nuvio-proto.arm -O2 -DNV_WEBOS $NUVIO_EXTRA_CFLAGS $ASS_CFLAGS $P2P_CFLAGS $DTS_CFLAGS \
@@ -161,9 +134,7 @@ if [ -n "${NUVIO_DTS_ROOT:-}" ]; then DTS_ENV=(-e "NUVIO_DTS_ROOT=$NUVIO_DTS_ROO
     -I$SR/usr/include -I$SR/usr/include/SDL2 \
     -lSDL2 -lSDL2_image -lSDL2_ttf -lGLESv2 -lEGL $P2P_LIBS -ldl -lpthread -lz -lm $ASS_LIBS $DTS_LIBS \
     -Wl,--export-dynamic-symbol=pthread_create
-  # src/dts/rt_shim.c: the LG audio sink (KADP_OSA_CreateThread) must bind to
-  # our pthread_create, which retries its real-time thread with default
-  # attributes instead of letting the firmware crash on EINVAL (LG C9 core).
+  # src/dts/rt_shim.c: LG audio sink (KADP_OSA_CreateThread) binds to our pthread_create
   mkdir -p deploy/app/lib
   find deploy/app/lib -maxdepth 1 -type f -name "dts-starfish-webos*.so" -delete
   if [ -d deploy/app/licenses/dts ]; then
@@ -176,25 +147,15 @@ if [ -n "${NUVIO_DTS_ROOT:-}" ]; then DTS_ENV=(-e "NUVIO_DTS_ROOT=$NUVIO_DTS_ROO
     cp "$DTS/COPYING.LGPLv2.1" "$DTS/SOURCE.txt" deploy/app/licenses/dts/
   fi'
 
-# CONFERE que a configuracao entrou MESMO no binario. Sem isto o unico sintoma
-# e a tela de login dizendo que o pacote saiu sem servidor, ja na TV.
-# A conferencia checa CADA chave, lendo os VALORES DO ENV-FILE.
-#
-# Ela ja leu do ambiente do SHELL, e isso a tornava inutil sem parecer: as
-# variaveis so existem DENTRO do container (o --env-file as injeta la), entao
-# no host todas davam vazias, cada uma caia no "aviso: vazio" e a checagem era
-# PULADA. Uma guarda que se auto-desliga e pior que guarda nenhuma, porque
-# tranquiliza.
-while IFS='=' read -r NOME VALOR; do
-  [ -z "$NOME" ] && continue
+# Verify configuration arrived in binary.
+while IFS='=' read -r NAME VALOR; do
+  [ -z "$NAME" ] && continue
   if [ -z "$VALOR" ]; then
-    echo "    aviso: $NOME vazio em local.properties"
+    echo "    warning: $NAME empty in local.properties"
     continue
   fi
-  # `--` antes do padrao: um valor comecando por "-" viraria opcao do grep
-  # ("grep: unknown --devices option" foi como isso apareceu).
   if ! strings nuvio-proto.arm 2>/dev/null | grep -qF -- "$VALOR"; then
-    echo "    ABORTADO: $NOME nao entrou no binario ARM"
+    echo "    ABORTED: $NAME not found in ARM binary"
     exit 1
   fi
 done < "$ENVF"
@@ -202,272 +163,122 @@ done < "$ENVF"
 cp nuvio-proto.arm deploy/app/nuvio-proto
 rm -f ./*.ipk
 
-# O .ipk so interessa para DISTRIBUIR (instalar em outra TV, publicar). O ciclo
-# de desenvolvimento nao passa por ele — ver a nota abaixo.
-#
-# EMPACOTA DE UMA COPIA LIMPA, nunca de deploy/app direto. Motivo concreto:
-# `ares-package deploy/app` leva a pasta INTEIRA, e art/ tem credencial de
-# PESSOA — o token do Trakt, as URLs de addon com a chave do debrid embutida, a
-# chave do TMDB e a do mdblist (esta ate com modo 0600, de tao secreta). Um
-# .ipk gerado assim entrega tudo isso para quem instalar. Ate a versao com
-# login isso nao tinha como ser diferente, porque o app dependia dos arquivos;
-# agora ele nao depende mais, e continuar embarcando-os seria so descuido.
-#
-# ajustes.txt sai pelo mesmo motivo, com dano menor: e a preferencia de LAYOUT
-# de quem montou, e ela chegaria como se fosse a de quem instalou.
-#
-# debrid.txt e a CHAVE de debrid digitada na TV do dono (Ajustes > Integracoes >
-# Debrid): "alldebrid=<chave>", "torbox=<chave>"... Credencial de conta paga —
-# quem instalasse tocaria torrent na assinatura do dono. fanart.txt (chave
-# pessoal) e p2p.txt (IP da rede do dono) tinham a mesma sina e tambem nao
-# estavam na lista.
-ARQ_DE_PESSOA="trakt.txt addons.txt tmdb.txt mdblist.txt ajustes.txt
-               progresso.txt nuvem.txt sessao.txt perfil.txt cliente.txt
-               listas.txt guia-fav.txt debrid.txt fanart.txt p2p.txt"
+# Package from clean copy, never deploy/app directly:
+USER_FILES="trakt.txt addons.txt tmdb.txt mdblist.txt ajustes.txt
+            progresso.txt nuvem.txt sessao.txt perfil.txt cliente.txt
+            listas.txt guia-fav.txt debrid.txt fanart.txt p2p.txt"
 
-# UM POR PERFIL, entao o nome nao e fixo: stalker-p1.txt, stalker-p2.txt...
-# Estes guardam o MAC do portal IPTV, que autentica a assinatura de quem
-# configurou — credencial, do mesmo grau do trakt.txt. A lista acima e por NOME
-# e por isso nao os alcanca; um glob proprio alcanca. Ver a licao registrada
-# quando o collections.json vazou: lista de exclusao por nome envelhece, e a
-# conferencia tem de ser sobre o que NAO PODE SAIR.
-# trakt-p*/trakt-fluxo*/simkl*: o vinculo do Trakt e do Simkl passou a ser um
-# arquivo POR PERFIL (traktauth.c, simklauth.c) — o trakt.txt da lista de nomes
-# acima deixou de alcancar o token quando a pasta de dados cai na da arte.
-GLOB_DE_PESSOA="stalker-p*.txt xtream-p*.txt listas-p*.txt trakt-p*.txt trakt-fluxo*.txt simkl*.txt conta-*.txt conta-*.txt.tmp discord-p*.txt discord-p*.txt.tmp jellyfin-p*.txt jellyfin-p*.txt.tmp emby-p*.txt emby-p*.txt.tmp plex-p*.txt plex-p*.txt.tmp"
+USER_GLOBS="stalker-p*.txt xtream-p*.txt listas-p*.txt trakt-p*.txt trakt-fluxo*.txt simkl*.txt conta-*.txt conta-*.txt.tmp discord-p*.txt discord-p*.txt.tmp jellyfin-p*.txt jellyfin-p*.txt.tmp emby-p*.txt emby-p*.txt.tmp plex-p*.txt plex-p*.txt.tmp"
 
-# O ACERVO DE QUEM EMPACOTOU, que nao e credencial de login e vaza igual.
-#
-# collections.json E CREDENCIAL, apesar da extensao. Cada fonte de pasta guarda
-# a URL do addon do dono, e nessas URLs a chave viaja no CAMINHO
-# ("https://host/manifest/<pid>/<jwt>"). Um .ipk publicado com esse arquivo
-# entrega a instalacao de addon do dono a todo mundo que instalar. A lista de
-# .txt acima nunca o pegou porque ele nao termina em .txt — e a conferencia
-# tambem nao, porque ela so procurava aquela lista. Isto e o mesmo defeito que
-# ja custou o vazamento de art/trakt.txt uma vez, com outra extensao.
-#
-# collections/ sao 165 MB de quadros de animacao do catalogo CURADO do dono:
-# quem instalasse veria a colecao de outra pessoa como se fosse sua. Era
-# pendencia conhecida deste .ipk (tools/tizen-art.sh ja a recusa no .wgt e diz
-# isso por escrito) e sai agora.
-#
-# NAO E PERDA DE FUNCIONALIDADE: sem collections.json o app nao tem pasta LOCAL
-# nenhuma e as colecoes passam a vir so da CONTA, que e exatamente como o alvo
-# Tizen ja funciona. A arte editorial embarcada tambem so era usada por pastas
-# locais (col_definir_json reaproveita arte apenas do que tem `local`), e as
-# chaves dela sao os ids das colecoes DO DONO — para outra conta ela nunca
-# casaria.
-#
-# catalogo-rede.bin CONTINUA NA LISTA, e agora tambem o .tmp dele.
-#
-# O cache do catalogo passou a ser gravado em dados_dir() e nao mais na pasta da
-# arte (ver a nota em caminhoCache, src/catalogo.c), o que em quase todo
-# aparelho ja o tira daqui sozinho. "Quase" nao serve para uma conferencia de
-# credencial: dados_iniciar tem `dirArte` como ULTIMO candidato, entao num
-# aparelho onde nenhuma outra pasta aceita escrita o arquivo volta a nascer
-# exatamente aqui. Alem disso qualquer .ipk montado de uma copia antiga do
-# deploy/ ainda tem o arquivo velho no lugar velho.
-#
-# O .tmp e novo na lista e nao e zelo excessivo: cat_gravar_cache escreve num
-# temporario e renomeia, e uma escrita interrompida deixa um
-# catalogo-rede.bin.tmp com as fileiras — e portanto com a `base` de cada
-# catalogo, que no Xperience leva um JWT dentro do CAMINHO. A conferencia casa
-# nome exato ("art/$f$"), entao o .tmp precisava do proprio item; foi assim que
-# collections.json escapou uma vez.
-ACERVO_DE_PESSOA="collections.json catalogo-rede.bin catalogo-rede.bin.tmp"
-DIR_DE_PESSOA="collections"
+USER_COLLECTIONS="collections.json catalogo-rede.bin catalogo-rede.bin.tmp"
+USER_DIRS="collections"
 
 if [ "$1" = "--ipk" ]; then
-  echo "==> empacotando (sem credenciais)"
-  PALCO=$(mktemp -d "${TMPDIR:-/tmp}/nuvio-arm-pacote.XXXXXXXX"); LIXO="$LIXO $PALCO"
-  cp -R deploy/app "$PALCO/app"
-  # cache/ e cache de EXECUCAO, nao arte do pacote: sao megabytes de imagem
-  # baixada que o app rebaixa sozinho.
-  rm -rf "$PALCO/app/art/cache"
-  for f in $ARQ_DE_PESSOA $ACERVO_DE_PESSOA; do rm -f "$PALCO/app/art/$f"; done
-  for g in $GLOB_DE_PESSOA; do rm -f "$PALCO"/app/art/$g; done
-  for d in $DIR_DE_PESSOA; do rm -rf "$PALCO/app/art/$d"; done
-  # MODO DO BINARIO: o ares-package copia o modo do arquivo, e o `cp` la de cima
-  # SOBRESCREVE um deploy/app/nuvio-proto existente mantendo o modo ANTIGO dele.
-  # A 1.7.1 saiu assim com -rwx---r--: o app roda como uid 5152, que nao e dono
-  # nem grupo, entao sem x para "outros" o webOS nao executa e o app fecha ao
-  # abrir em toda TV (#224, #225). A C9 do dono nao pegou porque la o binario e
-  # trocado com chmod 755 a mao.
-  chmod 755 "$PALCO/app/nuvio-proto"
+  echo "==> packaging (without credentials)"
+  STAGING=$(mktemp -d "${TMPDIR:-/tmp}/nuvio-arm-pacote.XXXXXXXX"); CLEANUP_FILES="$CLEANUP_FILES $STAGING"
+  cp -R deploy/app "$STAGING/app"
+  rm -rf "$STAGING/app/art/cache"
+  for f in $USER_FILES $USER_COLLECTIONS; do rm -f "$STAGING/app/art/$f"; done
+  for g in $USER_GLOBS; do rm -f "$STAGING"/app/art/$g; done
+  for d in $USER_DIRS; do rm -rf "$STAGING/app/art/$d"; done
+  chmod 755 "$STAGING/app/nuvio-proto"
 
-  "$ARES" "$PALCO/app" -o .
+  "$ARES" "$STAGING/app" -o .
   IPK=$(ls -t ./*.ipk | head -1)
-  # A variante ganha o nome no ARQUIVO: dois .ipk com o mesmo nome e md5
-  # diferente e exatamente o que ja publicou build errada uma vez.
   if [ -n "$VARIANTE" ]; then
     NOVO="${IPK%.ipk}-$VARIANTE.ipk"
     mv -f "$IPK" "$NOVO"; IPK="$NOVO"
   fi
 
-  # CONFERE o pacote PRONTO, e nao a pasta de onde ele saiu. A lista de
-  # exclusao acima e uma intencao; o teste abaixo e o fato.
-  #
-  # ARMADILHA MEDIDA: o .ipk e um pacote Debian (arquivo `ar` com
-  # debian-binary + control.tar.gz + data.tar.gz). `tar tzf pacote.ipk` LISTA,
-  # sem erro nenhum, apenas esses tres nomes — nunca os arquivos do app. Uma
-  # conferencia escrita assim passa sempre, inclusive quando o segredo esta
-  # dentro. Tem de desempacotar o `ar` e listar o data.tar.gz.
-  LISTA=$(cd "$PALCO" && ar x "$OLDPWD/$IPK" 2>/dev/null && tar tzf data.tar.gz 2>/dev/null)
-  if [ -z "$LISTA" ]; then
-    echo "    ABORTADO: nao consegui LER o pacote para conferir; nao vou dizer que esta limpo"
+  # Verify finished package contents:
+  PKG_LIST=$(cd "$STAGING" && ar x "$OLDPWD/$IPK" 2>/dev/null && tar tzf data.tar.gz 2>/dev/null)
+  if [ -z "$PKG_LIST" ]; then
+    echo "    ABORTED: could not read package contents to verify; will not claim it is clean"
     rm -f "$IPK"
     exit 1
   fi
-  VAZOU=""
-  for f in $ARQ_DE_PESSOA $ACERVO_DE_PESSOA; do
-    printf '%s\n' "$LISTA" | grep -q "art/$f$" && VAZOU="$VAZOU $f"
+  LEAKED=""
+  for f in $USER_FILES $USER_COLLECTIONS; do
+    printf '%s\n' "$PKG_LIST" | grep -q "art/$f$" && LEAKED="$LEAKED $f"
   done
-  # POR PREFIXO, e nao por nome: os arquivos por perfil sao stalker-p1.txt,
-  # stalker-p2.txt e assim por diante, e a lista acima so casa nome exato. Um
-  # prefixo cobre qualquer numero de perfil, inclusive os que ainda nao existem.
   for pre in stalker-p xtream-p listas-p trakt-p trakt-fluxo-p simkl-p; do
-    printf '%s\n' "$LISTA" | grep -qE "art/$pre[0-9]+\.txt$" && VAZOU="$VAZOU $pre*.txt"
+    printf '%s\n' "$PKG_LIST" | grep -qE "art/$pre[0-9]+\.txt$" && LEAKED="$LEAKED $pre*.txt"
   done
-  printf '%s\n' "$LISTA" | grep -qE "art/(trakt-fluxo|simkl)\.txt$" && VAZOU="$VAZOU trakt-fluxo.txt/simkl.txt"
-  printf '%s\n' "$LISTA" | grep -qE '(^|/)conta-[^/]*\.txt(\.tmp)?$' && VAZOU="$VAZOU conta-*.txt/conta-*.txt.tmp"
-  printf '%s\n' "$LISTA" | grep -qE '(^|/)discord-p[^/]*\.txt(\.tmp)?$' && VAZOU="$VAZOU discord profile tokens"
-  printf '%s\n' "$LISTA" | grep -qE '(^|/)(jellyfin|emby|plex)-p[^/]*\.txt(\.tmp)?$' && VAZOU="$VAZOU media-server profile tokens"
-  # Diretorio: qualquer caminho DENTRO dele conta como vazamento, nao so a
-  # entrada da pasta — o tar pode listar os arquivos sem listar o diretorio.
-  for d in $DIR_DE_PESSOA; do
-    printf '%s\n' "$LISTA" | grep -q "art/$d/" && VAZOU="$VAZOU $d/"
+  printf '%s\n' "$PKG_LIST" | grep -qE "art/(trakt-fluxo|simkl)\.txt$" && LEAKED="$LEAKED trakt-fluxo.txt/simkl.txt"
+  printf '%s\n' "$PKG_LIST" | grep -qE '(^|/)conta-[^/]*\.txt(\.tmp)?$' && LEAKED="$LEAKED conta-*.txt/conta-*.txt.tmp"
+  printf '%s\n' "$PKG_LIST" | grep -qE '(^|/)discord-p[^/]*\.txt(\.tmp)?$' && LEAKED="$LEAKED discord profile tokens"
+  printf '%s\n' "$PKG_LIST" | grep -qE '(^|/)(jellyfin|emby|plex)-p[^/]*\.txt(\.tmp)?$' && LEAKED="$LEAKED media-server profile tokens"
+  for d in $USER_DIRS; do
+    printf '%s\n' "$PKG_LIST" | grep -q "art/$d/" && LEAKED="$LEAKED $d/"
   done
-  if [ -n "$VAZOU" ]; then
-    echo "    ABORTADO: o pacote leva credencial ->$VAZOU"
+  if [ -n "$LEAKED" ]; then
+    echo "    ABORTED: package contains credentials ->$LEAKED"
     rm -f "$IPK"
     exit 1
   fi
-  # O chmod acima e a intencao; o modo DENTRO do pacote e o fato (#224).
-  MODO=$(cd "$PALCO" && tar tvzf data.tar.gz 2>/dev/null | awk '/\/nuvio-proto$/ {print $1}')
-  if [ "$MODO" != "-rwxr-xr-x" ]; then
-    echo "    ABORTADO: nuvio-proto no pacote com modo '${MODO:-ausente}', esperado -rwxr-xr-x (o webOS nao executa)"
+  PKG_MODE=$(cd "$STAGING" && tar tvzf data.tar.gz 2>/dev/null | awk '/\/nuvio-proto$/ {print $1}')
+  if [ "$PKG_MODE" != "-rwxr-xr-x" ]; then
+    echo "    ABORTED: nuvio-proto in package has mode '${PKG_MODE:-missing}', expected -rwxr-xr-x (webOS will not execute)"
     rm -f "$IPK"
     exit 1
   fi
-  # DTS: com a conversao, os dois adaptadores e o aviso LGPL do FFmpeg TEM de
-  # estar no pacote; sem ela, nenhum (um adaptador sem o FFmpeg no binario e
-  # lixo, e o aviso sem o FFmpeg e mentira).
   for f in lib/dts-starfish-webos3.so lib/dts-starfish-webos4.so licenses/dts/COPYING.LGPLv2.1 licenses/dts/SOURCE.txt; do
-    if printf '%s\n' "$LISTA" | grep -qE "(^|/)$f$"; then tem=1; else tem=0; fi
-    if [ "$tem" != "$DTS_ENABLED" ]; then
-      echo "    ABORTADO: DTS=$DTS_ENABLED e o pacote $([ $tem = 1 ] && echo leva || echo nao leva) $f"; rm -f "$IPK"; exit 1
+    if printf '%s\n' "$PKG_LIST" | grep -qE "(^|/)$f$"; then has=1; else has=0; fi
+    if [ "$has" != "$DTS_ENABLED" ]; then
+      echo "    ABORTED: DTS=$DTS_ENABLED and package $([ $has = 1 ] && echo includes || echo does not include) $f"; rm -f "$IPK"; exit 1
     fi
   done
-  echo "    DTS: $([ "$DTS_ENABLED" = 1 ] && echo 'conversao incluida (adaptadores + aviso LGPL)' || echo 'sem conversao')"
-  # AVISOS DE LICENCA do motor (libtorrent, Boost, OpenSSL, nuvio-engine).
-  printf '%s\n' "$LISTA" | grep -qE 'licencas/p2p-avisos\.txt$' || {
-    echo "    ABORTADO: o pacote nao leva licencas/p2p-avisos.txt"; rm -f "$IPK"; exit 1; }
-  # MOTOR P2P: pasta achada = o binario DENTRO do pacote tem de te-lo (marca "Nuvio Engine/", simbolos da API sao ocultos). A guarda
-  # fica no arquivo pronto, nao no flag que se passou ao compilador.
+  echo "    DTS: $([ "$DTS_ENABLED" = 1 ] && echo 'conversion included (adapters + LGPL notice)' || echo 'without conversion')"
+  printf '%s\n' "$PKG_LIST" | grep -qE 'licencas/p2p-avisos\.txt$' || {
+    echo "    ABORTED: package missing licencas/p2p-avisos.txt"; rm -f "$IPK"; exit 1; }
   if [ -n "$NV_P2P_DIR" ]; then
-    mkdir -p "$PALCO/x" && tar xzf "$PALCO/data.tar.gz" -C "$PALCO/x" 2>/dev/null
-    MOT=$(find "$PALCO/x" -name nuvio-proto -type f | head -1)
+    mkdir -p "$STAGING/x" && tar xzf "$STAGING/data.tar.gz" -C "$STAGING/x" 2>/dev/null
+    MOT=$(find "$STAGING/x" -name nuvio-proto -type f | head -1)
     if [ -z "$MOT" ] || [ "$(strings "$MOT" | grep -c 'Nuvio Engine/')" -lt 1 ]; then
-      echo "    ABORTADO: o nuvio-proto do pacote nao tem o motor P2P (marca "Nuvio Engine/")"; rm -f "$IPK"; exit 1
+      echo "    ABORTED: nuvio-proto in package lacks P2P engine (tag \"Nuvio Engine/\")"; rm -f "$IPK"; exit 1
     fi
-    echo "    motor P2P dentro do nuvio-proto do pacote"
+    echo "    P2P engine present in packaged nuvio-proto"
   else
-    echo "    ATENCAO: pacote SEM motor P2P (NUVIO_P2P_MOTOR=none ou sem pasta)"
+    echo "    WARNING: package WITHOUT P2P engine (NUVIO_P2P_MOTOR=none or missing folder)"
   fi
-  echo "    $IPK ($(du -h "$IPK" | cut -f1)) — sem art/{$(echo $ARQ_DE_PESSOA $GLOB_DE_PESSOA $ACERVO_DE_PESSOA $DIR_DE_PESSOA | tr ' ' ',')}"
+  echo "    $IPK ($(du -h "$IPK" | cut -f1)) — without art/{$(echo $USER_FILES $USER_GLOBS $USER_COLLECTIONS $USER_DIRS | tr ' ' ',')}"
 fi
 
 if [ "$1" = "--build" ] || [ "$2" = "--build" ]; then exit 0; fi
 
-# A TV ESTA ROOTEADA: copia direta, sem passar pelo instalador.
-#
-# O appInstallService responde `"returnValue": true` e `statusValue: 264`
-# (instalado) e NAO SUBSTITUI O BINARIO — escreve art/, deixa nuvio-proto e
-# appinfo.json intactos. Perdi tres deploys achando que tinha subido: o app na
-# TV ficou 2h30 rodando uma versao antiga enquanto o log dizia sucesso.
-#
-# Com root nao ha motivo para o intermediario. scp + mv + chmod faz o mesmo em
-# dois segundos, e o md5 no fim PROVA que subiu — a licao real e essa: deploy
-# sem verificacao e torcida, nao entrega.
-#
-# ares-install tambem nao serve aqui: ele espera prisoner@<ip>:9922 do Developer
-# Mode, e esta TV nao roda o Developer Mode — e root na 22 com senha alpine.
+# Direct SSH deploy to rooted TV:
 APPDIR=/media/developer/apps/usr/palm/applications/$APP_ID
-# NUVIO_SSH_OPTS: o ~/.ssh/config manda a TV por ProxyJump zimaos (Tailscale);
-# com o Tailscale parado o salto morre em "Operation timed out" e a TV parece
-# fora. Na mesma LAN: NUVIO_SSH_OPTS="-o ProxyJump=none" vai direto.
 SSH="sshpass -p $TV_PASS ssh -o StrictHostKeyChecking=no ${NUVIO_SSH_OPTS:-}"
 SCP="sshpass -p $TV_PASS scp -o StrictHostKeyChecking=no -q ${NUVIO_SSH_OPTS:-}"
 
-# O DIRETORIO PODE NAO EXISTIR: o dono pode ter desinstalado o app pela TV, e
-# ai todo scp abaixo falha com "No such file or directory" — que foi exatamente
-# o que aconteceu. Criar antes torna o deploy capaz de REINSTALAR, nao so
-# atualizar.
 $SSH "root@$TV_IP" "mkdir -p $APPDIR"
 
 DTS_PAYLOAD=()
 if [ "$DTS_ENABLED" = 1 ]; then
   DTS_PAYLOAD=(lib/dts-starfish-webos3.so lib/dts-starfish-webos4.so
                licenses/dts/COPYING.LGPLv2.1 licenses/dts/SOURCE.txt)
-  echo "==> enviando adaptadores DTS e avisos de licenca"
+  echo "==> deploying DTS adapters and license notices"
   $SSH "root@$TV_IP" "mkdir -p $APPDIR/lib $APPDIR/licenses/dts"
   for arquivo in "${DTS_PAYLOAD[@]}"; do
     $SCP "deploy/app/$arquivo" "root@$TV_IP:$APPDIR/$arquivo.novo"
-    # Existing processes retain their mapped adapter until the app restarts.
     $SSH "root@$TV_IP" "mv -f $APPDIR/$arquivo.novo $APPDIR/$arquivo && chmod 644 $APPDIR/$arquivo"
   done
 fi
 
-echo "==> enviando binario para $TV_IP"
+echo "==> deploying binary to $TV_IP"
 $SCP nuvio-proto.arm "root@$TV_IP:$APPDIR/nuvio-proto.novo"
-# Renomear em vez de sobrescrever: se o app estiver rodando, o executavel esta
-# mapeado e a escrita direta falha com ETXTBSY. O rename troca o inode.
 $SSH "root@$TV_IP" "cd $APPDIR && mv -f nuvio-proto.novo nuvio-proto && chmod 755 nuvio-proto"
 
-# A ARTE muda pouco, mas quando muda (icone novo, fonte) tem de ir junto.
-# CARIMBO DE BUILD NO TITULO.
-#
-# "ainda e build antiga" nao tem como ser respondido olhando a tela: o md5 do
-# binario prova o que esta no DISCO, nao o que foi LANCADO, e a TV tem dois apps
-# Nuvio (este e o web "Nuvio TV") — abrir o tile errado da exatamente o mesmo
-# sintoma. Com os 8 primeiros digitos do md5 no titulo, o launcher responde
-# sozinho qual build esta ali.
-echo "==> carimbando titulo com a build"
+echo "==> stamping title with build"
 STAMP=$(md5 -q nuvio-proto.arm 2>/dev/null || md5sum nuvio-proto.arm | cut -d' ' -f1)
 STAMP=${STAMP:0:8}
 [ -n "$VARIANTE" ] && STAMP="$STAMP high cache"
-# CARIMBO POR ACRESCIMO, e nao por substituicao de "(BUILD)".
-#
-# O titulo do pacote publicado e so "Nuvio Legacy" — e o nome que a pessoa ve na TV, e
-# nele nao cabe nome de build. Mas a INSTALACAO DE DESENVOLVIMENTO precisa dizer
-# qual binario esta ali, entao o carimbo entra ao lado do nome so no caminho do
-# deploy por ssh: "Nuvio Legacy (08cd72a3)". O pacote de release nunca passa por aqui.
-#
-# A conferencia de verdade continua sendo /proc/<pid>/exe: o app manager cacheia
-# o appinfo ate reinstalar, e ja aconteceu de o titulo mostrar a build anterior.
 sed "s/\(\"title\": \"[^\"]*\)\"/\1 ($STAMP)\"/" deploy/app/appinfo.json > /tmp/appinfo.stamped.json
 cp /tmp/appinfo.stamped.json deploy/app/appinfo.json.stamped
 
 $SCP /tmp/appinfo.stamped.json "root@$TV_IP:$APPDIR/appinfo.json"
 
-echo "==> sincronizando arte"
-# --exclude art/cache: e CACHE DE EXECUCAO, nao arte do pacote. Com ele o tar
-# passava de 49 MB (27 MB so de posteres baixados no Mac) e a extracao no
-# busybox da TV morria no meio — e o que vinha DEPOIS de "cache/" na ordem
-# alfabetica, "marcas/" inclusive, sumia em silencio. Foi assim que o wordmark
-# do Trakt "subiu" tres vezes sem nunca chegar la.
-#
-# Sem o cache o tar cai para poucos MB. A TV reconstroi o dela sozinha, e nao
-# herda mais o uid do Mac — a mesma armadilha que o chown abaixo remedia.
-#
-# 2>&1 e nao 2>/dev/null: erro de tar escondido foi exatamente o que fez o
-# deploy mentir. A licao ja estava escrita aqui para o binario (o md5 no fim) e
-# a arte tinha ficado de fora dela.
-# O filtro do ruido de xattr fica no MAC: a sh da TV e busybox ash e nao tem
-# PIPESTATUS — tentar usar la dava "bad substitution" e derrubava o deploy.
-#
-# E o status vem de um `set -o pipefail` local em torno do pipe, nao de indices
-# de PIPESTATUS, que ficam ambiguos assim que se acrescenta um `|| true`.
+echo "==> synchronizing art"
 if ! ( set -o pipefail
        tar czf - -C deploy/app --exclude 'art/cache' \
            --exclude 'appinfo.json.stamped' \
@@ -477,28 +288,18 @@ if ! ( set -o pipefail
   :
 fi
 if ! $SSH "root@$TV_IP" "test -f $APPDIR/art/marcas/trakt.png && test -f $APPDIR/art/marcas/logo-novo-marca.png && test -f $APPDIR/art/marcas/abertura.jpg && test -f $APPDIR/art/marcas/login-fundo.jpg"; then
-  echo "    FALHOU: a arte nao chegou na TV"; exit 1
+  echo "    FAILED: art did not reach TV"; exit 1
 fi
 rm -f deploy/app/appinfo.json.stamped
-# O `core` de um crash antigo fica no diretorio do app e pesa 118 MB numa
-# particao de 4,2 G. Nao serve para nada depois que o relatorio foi gerado.
 $SSH "root@$TV_IP" "rm -f $APPDIR/core; rm -f /tmp/nuvio-shot-req /tmp/nuvio-shot.bmp" || true
 
-# DONO DA PASTA DE CACHE. O tar e feito no Mac e extraido como ROOT na TV, entao
-# art/cache herda o uid do Mac (13888160) com modo 755. O app roda como uid 5152
-# e NAO CONSEGUE GRAVAR ali: toda imagem baixada era descartada em silencio, e os
-# dois fios de decode ficavam rebaixando o que nunca poderia ser guardado.
-#
-# MEDIDO: 91 "decode falhou" no log com ZERO erro de rede. Depois do chown, 15 —
-# e as texturas subiram de 87 para 99. Sem esta linha o defeito volta a cada
-# deploy, e o sintoma e "poster que nao aparece", que ja custou meia sessao.
 $SSH "root@$TV_IP" "mkdir -p $APPDIR/art/cache && chown -R 5152:5000 $APPDIR/art && chmod -R u+rwX $APPDIR/art"
 
-echo "==> conferindo"
+echo "==> verifying"
 LOCAL=$(md5 -q nuvio-proto.arm 2>/dev/null || md5sum nuvio-proto.arm | cut -d' ' -f1)
 REMOTO=$($SSH "root@$TV_IP" "md5sum $APPDIR/nuvio-proto | cut -d' ' -f1" 2>/dev/null | tr -d '\r')
 if [ "$LOCAL" != "$REMOTO" ]; then
-  echo "    FALHOU: local $LOCAL != TV $REMOTO"
+  echo "    FAILED: local $LOCAL != TV $REMOTO"
   exit 1
 fi
 echo "    ok ($LOCAL)"
@@ -506,17 +307,14 @@ for arquivo in "${DTS_PAYLOAD[@]}"; do
   LOCAL=$(md5 -q "deploy/app/$arquivo" 2>/dev/null || md5sum "deploy/app/$arquivo" | cut -d' ' -f1)
   REMOTO=$($SSH "root@$TV_IP" "md5sum $APPDIR/$arquivo | cut -d' ' -f1" | tr -d '\r')
   if [ "$LOCAL" != "$REMOTO" ]; then
-    echo "    FALHOU: $arquivo local $LOCAL != TV $REMOTO"; exit 1
+    echo "    FAILED: $arquivo local $LOCAL != TV $REMOTO"; exit 1
   fi
   echo "    ok ($arquivo)"
 done
 
-# launch NAO reinicia um app que ja esta rodando: so o traz para frente (ver
-# FERRAMENTAS.md). Dois deploys desta tarde foram lidos no log de um processo
-# antigo por isso. Matar antes; o SAM relanca o binario novo.
 PID=$($SSH "root@$TV_IP" "pidof nuvio-proto" 2>/dev/null | tr -d "\r")
 if [ -n "$PID" ]; then
-  echo "==> encerrando processo antigo ($PID)"
+  echo "==> stopping old process ($PID)"
   $SSH "root@$TV_IP" "kill $PID"
   for _ in 1 2 3 4 5 6 7 8 9 10; do
     sleep 1
@@ -525,13 +323,9 @@ if [ -n "$PID" ]; then
   done
   sleep 4
 fi
-echo "==> lancando"
+echo "==> launching"
 ( sleep 2
   printf 'luna-send -n 1 -f luna://com.webos.applicationManager/launch '"'"'{"id":"%s"}'"'"'\n' "$APP_ID"
   sleep 3
   printf 'exit\n'
 ) | nc -w20 "$TV_IP" 23 | LC_ALL=C tr -d '\0' | grep -a returnValue
-# LC_ALL=C no tr, e grep -a: a resposta do telnet traz bytes fora de UTF-8 e,
-# com o locale do Mac, o tr morre com "Illegal byte sequence" DEPOIS de o app
-# ja ter sido lancado — o deploy saia como falho com a TV rodando a build nova.
-# Medido em 18/09.

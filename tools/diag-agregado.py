@@ -1,27 +1,26 @@
 #!/usr/bin/env python3
-"""O MELHOR CENARIO PARA TODO MUNDO: agrega os relatorios do diagnostico.
+"""THE BEST SCENARIO FOR EVERYONE: aggregates diagnostic reports.
 
-Le os relatorios `diagnostico=v1|v2` que as TVs mandaram (tabela `registro`
-do D1 nuvio-recomendacoes, via wrangler, SO LEITURA) e agrega por plataforma e
-faixa de RAM — as mesmas faixas da tabela de src/perfiltv.c:
+Reads `diagnostico=v1|v2` reports sent by TVs (table `registro`
+in D1 nuvio-recomendacoes, via wrangler, READ ONLY) and aggregates by platform
+and RAM range — the same ranges as the table in src/perfiltv.c:
 
-  - tempo medio por arte de cada fonte de arte (consulta + download), falhas
-    e em quantos titulos ela repetiu a imagem do card (igual_ao_card);
-  - perfil de textura/fios/heroi: o que valia, o candidato e o que aconteceu
-    (aplicado, mantido, restaurado, ja no perfil);
-  - e PROPOE a linha da tabela de perfiltv.c e a fonte padrao do destaque por
-    plataforma (a mais rapida entre as que nao repetem o card).
+  - average time per artwork for each artwork source (query + download), failures,
+    and in how many titles it repeated the card image (same_as_card);
+  - texture/threads/hero profile: baseline, candidate, and outcome
+    (applied, kept, restored, already in profile);
+  - and PROPOSES the table row in perfiltv.c and the default hero source per
+    platform (the fastest among those that do not repeat the card).
 
-Com poucos relatorios a proposta diz isso em vez de inventar numero: a regra
-e a mesma de sempre no app, "nao afirmar sem medida".
+With few reports the proposal states this instead of inventing numbers: the rule
+is the same as always in the app, "do not claim without measuring".
 
-  python3 tools/diag-agregado.py                 # consulta o D1 (wrangler)
-  python3 tools/diag-agregado.py --arquivo x.json  # le um dump local
-  python3 tools/diag-agregado.py --json          # saida em JSON
+  python3 tools/diag-agregado.py                 # queries D1 (wrangler)
+  python3 tools/diag-agregado.py --file x.json   # reads a local dump
+  python3 tools/diag-agregado.py --json          # JSON output
 
-Nunca imprime `pessoa`, token, nem a lista de addons: so plataforma, versao,
-RAM e numeros. O wrangler usa o login proprio dele; nada de credencial passa
-por aqui.
+Never prints user identity, token, or addon list: only platform, version,
+RAM and numbers. Wrangler uses its own login; no credentials pass through here.
 """
 import argparse
 import json
@@ -32,30 +31,30 @@ from collections import defaultdict
 
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SERVIDOR = os.path.join(RAIZ, "servidor", "recomendacoes")
-# `pessoa` vem so para CONTAR aparelhos distintos (vira hash aqui e nunca e
-# impresso): tres relatorios da mesma TV nao sao "todo mundo".
+# `pessoa` comes only to COUNT distinct devices (hashed here and never
+# printed): three reports from the same TV are not "everyone".
 CONSULTA = ("SELECT id, pessoa, plataforma, versao, criado, texto FROM registro "
             "WHERE texto LIKE 'diagnostico=v%' ORDER BY id")
 
-# Fontes de fundo, na ordem do contrato ARTEHERO_* (o logo nao e fundo).
+# Background sources, in order of ARTEHERO_* contract (logo is not a background).
 FUNDOS = ["catalog", "metahub", "tmdb", "trakt", "apple", "fanart", "anime", "tmdb_outro"]
 AJUSTE_DE = {"catalog": 1, "metahub": 2, "tmdb": 3, "trakt": 4, "apple": 5,
              "fanart": 6, "anime": 7, "tmdb_outro": 3}
-ROTULO_AJUSTE = {0: "Automatico", 1: "Catalogo", 2: "Metahub", 3: "TMDB", 4: "Trakt",
+ROTULO_AJUSTE = {0: "Automatic", 1: "Catalog", 2: "Metahub", 3: "TMDB", 4: "Trakt",
                  5: "Apple TV", 6: "fanart.tv", 7: "Anime"}
 MIN_APARELHOS = 3
 
 
 def tabela_atual(plataforma, mem):
-    """Replica de ptv_tex_auto_mb/ptv_tex_teto_mb/ptv_padrao (src/perfiltv.c)."""
+    """Mirror of ptv_tex_auto_mb/ptv_tex_teto_mb/ptv_padrao (src/perfiltv.c)."""
     tizen = plataforma.lower().startswith("tizen") or plataforma.lower() == "samsung"
     if tizen:
         auto = 96 if not mem else 64 if mem <= 1024 else 96 if mem < 4096 else 128
         return {"tex_mb": auto, "teto_mb": auto, "fios_rede": 2, "heroi": 1280}
     if not mem:
         return {"tex_mb": 96, "teto_mb": 160, "fios_rede": 4, "heroi": 1920}
-    # 23/09: a replica ainda dizia 64/96 abaixo de 1,2 GB (o C desceu para
-    # 48/64 em be3d473) e por isso propunha 96 para a faixa. 1,2-2 GB: 128.
+    # 09/23: replica previously said 64/96 below 1.2 GB (C dropped to
+    # 48/64 in be3d473) and thus proposed 96 for the range. 1.2-2 GB: 128.
     auto = 48 if mem < 1200 else 128 if mem < 3000 else 192
     teto = 64 if mem < 1200 else 160 if mem < 2000 else 300 if mem < 3000 else 512
     return {"tex_mb": auto, "teto_mb": teto, "fios_rede": 2 if mem < 1200 else 4,
@@ -63,16 +62,16 @@ def tabela_atual(plataforma, mem):
 
 
 def faixa(plataforma, mem):
-    """A faixa de RAM de perfiltv.c (ptv_tex_auto_mb)."""
+    """The RAM range of perfiltv.c (ptv_tex_auto_mb)."""
     tizen = plataforma.lower().startswith("tizen") or plataforma.lower() == "samsung"
     if not mem:
-        return ("tizen" if tizen else "lg") + " sem RAM"
+        return ("tizen" if tizen else "lg") + " no RAM"
     if tizen:
         return "tizen <=1GB" if mem <= 1024 else "tizen <4GB" if mem < 4096 else "tizen >=4GB"
     if mem < 800:
         return "lg <800MB"
     if mem < 1200:
-        return "lg <1,2GB"
+        return "lg <1.2GB"
     if mem < 2000:
         return "lg <2GB"
     if mem < 3000:
@@ -85,9 +84,9 @@ def ler_d1():
            "--remote", "--json", "--command", CONSULTA]
     p = subprocess.run(cmd, cwd=SERVIDOR, capture_output=True, text=True, timeout=180)
     if p.returncode != 0:
-        # stderr do wrangler pode ter caminho de config; so a ultima linha.
+        # wrangler stderr might contain config path; show last line only.
         ult = (p.stderr.strip().splitlines() or ["?"])[-1]
-        sys.exit("diag-agregado: wrangler falhou: %s" % ult[:200])
+        sys.exit("diag-agregado: wrangler failed: %s" % ult[:200])
     saida = p.stdout[p.stdout.find("["):]
     return json.loads(saida)[0]["results"]
 
@@ -142,7 +141,7 @@ def analisar(texto):
         elif k in ("perfil_antes", "perfil_candidato"):
             r[k] = [num(x) for x in v.split("|")]
         elif k == "addon":
-            continue          # lista de addons da pessoa: fora do agregado
+            continue          # user addons list: excluded from aggregation
         else:
             r[k] = v
     return r
@@ -172,7 +171,7 @@ def agregar(linhas):
         g["aparelhos"].add(hash(linha.get("pessoa") or linha.get("id")))
         if mem:
             g["mem"].append(mem)
-        # despejos_quentes_antes/_sessao so existem desde 23/09 (num() da 0).
+        # despejos_quentes_antes/_sessao only exist since 09/23 (num() returns 0).
         g["despejos"].append(num(r.get("despejos_quentes_depois")) + num(r.get("tex_quentes")) +
                              num(r.get("despejos_quentes_antes")) + num(r.get("despejos_quentes_sessao")))
         g["versoes"].add(linha.get("versao") or r.get("versao") or "?")
@@ -194,7 +193,7 @@ def agregar(linhas):
             f = g["fontes"][nome]
             ok, fal = num(kv.get("ok")), num(kv.get("falhas"))
             if not ok and not fal:
-                continue          # nao medida neste aparelho (sem chave, sem anime...)
+                continue          # not measured on this device (no key, no anime...)
             f["relatorios"] += 1
             f["ok"] += ok
             f["falhas"] += fal
@@ -202,10 +201,11 @@ def agregar(linhas):
             f["bytes"] += num(kv.get("bytes"))
             f["larg"] = max(f["larg"], num(kv.get("largura")))
             f["alt"] = max(f["alt"], num(kv.get("altura")))
-            # v2 antigo nao tem iguais/igual_ao_card: fica "nao se sabe" (-1).
+            # old v2 does not have iguais/igual_ao_card: remains unknown (-1).
             if "iguais" in kv or "igual_ao_card" in kv:
                 f["medidas"] += 1
                 f["iguais"] += num(kv.get("iguais"), num(kv.get("igual_ao_card")))
+    return grupos
     return grupos
 
 
@@ -214,10 +214,10 @@ def media(v):
 
 
 def propor(g, plat):
-    """Proposta de linha da tabela de perfiltv.c e da fonte do destaque."""
+    """Proposal of perfiltv.c table row and hero source."""
     prop = {}
     n = g["n"]
-    # Fonte do destaque: mais rapida por arte, sem falha majoritaria.
+    # Hero source: fastest per art, without majority failure.
     candidatas = []
     for nome in FUNDOS:
         f = g["fontes"].get(nome)
@@ -232,13 +232,13 @@ def propor(g, plat):
     prop["destaque_mesma_foto"] = mesma[0][1] if mesma else None
     prop["destaque_outra_arte"] = diferentes[0][1] if diferentes else None
     if not any(c[3]["medidas"] for c in mesma):
-        prop["destaque_outra_arte_obs"] = ("nenhum relatorio com igual_ao_card ainda "
-                                           "(so a versao nova mede): sem proposta")
-    # Perfil de textura. Um cache ENCHE ate o orcamento (a C9 com 300 MB
-    # chega a ~200 MB numa sessao longa), entao o pico nao e necessidade. O
-    # sinal de que falta e arte VISIVEL despejada (tex_quentes /
-    # despejos_quentes_depois): sem nenhuma, a tabela fica; com alguma, um
-    # degrau acima, dentro do teto da faixa.
+        prop["destaque_outra_arte_obs"] = ("no report with same_as_card yet "
+                                           "(only new version measures): no proposal")
+    # Texture profile. A cache FILLS up to the budget (C9 with 300 MB
+    # reaches ~200 MB in a long session), so peak is not requirement. The
+    # signal of shortfall is VISIBLE art evicted (tex_quentes /
+    # despejos_quentes_depois): without any, table stays; with some, one
+    # step up, within the range ceiling.
     tab = tabela_atual(plat, max(g["mem"]) if g["mem"] else 0)
     prop["tabela_atual"] = tab
     usados = [b / 1048576.0 for b in g["tex_bytes"] if b]
@@ -248,23 +248,23 @@ def propor(g, plat):
     if any(g["despejos"]):
         acima = [e for e in escada if e > tab["tex_mb"] and e <= tab["teto_mb"]]
         prop["tex_mb"] = acima[0] if acima else tab["tex_mb"]
-        prop["tex_motivo"] = "arte visivel despejada em %d relatorio(s)" % sum(1 for x in g["despejos"] if x)
+        prop["tex_motivo"] = "visible art evicted in %d report(s)" % sum(1 for x in g["despejos"] if x)
     else:
         prop["tex_mb"] = tab["tex_mb"]
-        prop["tex_motivo"] = "nenhuma arte visivel despejada em %d relatorio(s)" % n
-    # Nomes de aplicacaoNome() em diagnostico.c.
+        prop["tex_motivo"] = "no visible art evicted in %d report(s)" % n
+    # Names from aplicacaoNome() in diagnostico.c.
     aplicados = g["aplicacao"].get("aplicada", 0)
     restaurados = sum(v for k, v in g["aplicacao"].items() if k.startswith("restaurada"))
     iguais = g["aplicacao"].get("ja_no_perfil", 0)
-    # mantido_ruido (23/09): testado, nao piorou, mas sem ganho alem da margem
-    # de ptv_decidir; o anterior voltou. Conta a parte: nao e "igual" nem
-    # "restaurado por piorar".
+    # mantido_ruido (09/23): tested, did not degrade, but without gain beyond margin
+    # of ptv_decidir; previous returned. Counted separately: not "same" nor
+    # "restored due to worsening".
     ruido = g["aplicacao"].get("mantido_ruido", 0)
     if not aplicados and not restaurados and not ruido:
-        prop["perfil"] = ("manter a tabela (candidato igual ao perfil em %d de %d)" % (iguais, n)
-                          if iguais else "manter a tabela (nenhum candidato testado)")
+        prop["perfil"] = ("keep table (candidate matches profile in %d of %d)" % (iguais, n)
+                          if iguais else "keep table (no candidate tested)")
     else:
-        prop["perfil"] = "candidato mantido em %d, restaurado em %d, dentro do ruido em %d de %d" % (
+        prop["perfil"] = "candidate kept in %d, restored in %d, within noise in %d of %d" % (
             aplicados, restaurados, ruido, n)
     if g["perfil_antes"]:
         ult = g["perfil_antes"][-1]
@@ -276,69 +276,69 @@ def propor(g, plat):
 
 def imprimir(grupos):
     total = sum(g["n"] for g in grupos.values())
-    print("relatorios diagnostico: %d em %d grupo(s) (plataforma x RAM)" % (total, len(grupos)))
+    print("diagnostic reports: %d in %d group(s) (platform x RAM)" % (total, len(grupos)))
     if not total:
         return
     for (plat, fx), g in sorted(grupos.items()):
         print()
-        print("== %s | %s | %d relatorio(s) de %d aparelho(s) | versoes %s | ids %s" % (
+        print("== %s | %s | %d report(s) from %d device(s) | versions %s | ids %s" % (
             plat, fx, g["n"], len(g["aparelhos"]), ",".join(sorted(g["versoes"])),
             ",".join(str(i) for i in g["ids"][-6:])))
-        print("  modos: %s | aplicacao: %s" % (dict(g["modos"]), dict(g["aplicacao"])))
+        print("  modes: %s | application: %s" % (dict(g["modos"]), dict(g["aplicacao"])))
         if g["perfil_antes"]:
-            print("  perfil antes (tex|fios|heroi): %s" % ["|".join(map(str, p)) for p in g["perfil_antes"]])
-            print("  perfil candidato:              %s" % ["|".join(map(str, p)) for p in g["perfil_candidato"]])
+            print("  profile before (tex|threads|hero): %s" % ["|".join(map(str, p)) for p in g["perfil_antes"]])
+            print("  candidate profile:                 %s" % ["|".join(map(str, p)) for p in g["perfil_candidato"]])
         if g["tex_bytes"]:
-            print("  texturas: pico %.1f MB de %.0f MB | pendentes %s | quentes %s" % (
+            print("  textures: peak %.1f MB of %.0f MB | pending %s | hot %s" % (
                 max(g["tex_bytes"]) / 1048576.0,
                 max(g["tex_limite"] or [0]) / 1048576.0,
                 max(g["tex_pendentes"] or [0]), max(g["tex_quentes"] or [0])))
         if g["artes_antes_ms"]:
-            print("  artes pelo cache (quente): antes %.0f ms, depois %.0f ms, pior quadro %.0f ms" % (
+            print("  art via cache (hot): before %.0f ms, after %.0f ms, worst frame %.0f ms" % (
                 media(g["artes_antes_ms"]), media([x for x in g["artes_depois_ms"] if x]) or 0,
                 media(g["pior_quadro_antes_ms"]) or 0))
-        print("  destaque (fonte/diferente): %s" % dict(g["destaque"]))
-        print("  %-11s %9s %7s %8s %10s %10s %s" % ("fonte", "ms/arte", "ok", "falhas", "KB/arte", "maior", "igual ao card"))
+        print("  hero (source/different): %s" % dict(g["destaque"]))
+        print("  %-11s %9s %7s %8s %10s %10s %s" % ("source", "ms/art", "ok", "failures", "KB/art", "max", "same as card"))
         for nome in FUNDOS + ["logo"]:
             f = g["fontes"].get(nome)
             if not f or (not f["ok"] and not f["falhas"]):
                 continue
             ms = "%.0f" % (f["ms"] / f["ok"]) if f["ok"] else "-"
             kb = "%.0f" % (f["bytes"] / f["ok"] / 1024.0) if f["ok"] else "-"
-            igual = ("%d titulo(s) em %d rel." % (f["iguais"], f["medidas"])) if f["medidas"] else "nao medido"
+            igual = ("%d title(s) in %d rep." % (f["iguais"], f["medidas"])) if f["medidas"] else "not measured"
             if nome == "logo":
                 igual = "-"
             print("  %-11s %9s %7d %8d %10s %10s %s" % (nome, ms, f["ok"], f["falhas"], kb,
                                                      "%dx%d" % (f["larg"], f["alt"]) if f["larg"] else "-", igual))
         for s in g["sugestoes"]:
-            print("  sugestao enviada: %s" % "|".join("%s:%s" % kv for kv in s.items()))
+            print("  sent suggestion: %s" % "|".join("%s:%s" % kv for kv in s.items()))
         p = propor(g, plat)
-        print("  PROPOSTA%s:" % ("" if p["suficiente"] else
-              " (%d aparelho(s): indicativa, nao mude a tabela antes de %d)" % (p["aparelhos"], MIN_APARELHOS)))
+        print("  PROPOSAL%s:" % ("" if p["suficiente"] else
+              " (%d device(s): indicative, do not change table before %d)" % (p["aparelhos"], MIN_APARELHOS)))
         tab = p["tabela_atual"]
-        print("    perfiltv.c hoje nesta faixa: textura %d MB (teto %d), %d fios, heroi %d" % (
+        print("    perfiltv.c today in this range: texture %d MB (cap %d), %d threads, hero %d" % (
             tab["tex_mb"], tab["teto_mb"], tab["fios_rede"], tab["heroi"]))
-        print("    perfiltv.c proposto: textura %d MB, %d fios, heroi %d — %s%s" % (
+        print("    perfiltv.c proposed: texture %d MB, %d threads, hero %d — %s%s" % (
             p["tex_mb"], tab["fios_rede"], tab["heroi"], p["tex_motivo"],
-            "" if "tex_pico_mb" not in p else "; pico usado %.1f MB" % p["tex_pico_mb"]))
+            "" if "tex_pico_mb" not in p else "; peak used %.1f MB" % p["tex_pico_mb"]))
         if p.get("perfil_visto"):
-            print("    perfil em vigor no aparelho: %d MB, %d fios, heroi %d" % (
+            print("    active profile on device: %d MB, %d threads, hero %d" % (
                 p["perfil_visto"]["tex_mb"], p["perfil_visto"]["fios_rede"], p["perfil_visto"]["heroi"]))
-        print("    perfil: %s" % p["perfil"])
+        print("    profile: %s" % p["perfil"])
         ms = p["destaque_mesma_foto"]
-        print("    destaque, mesma foto do card (padrao): %s" % (
-            "%s (Background do hero = %s)" % (ms, ROTULO_AJUSTE[AJUSTE_DE[ms]]) if ms else "sem medida"))
+        print("    hero, same photo as card (default): %s" % (
+            "%s (Hero background = %s)" % (ms, ROTULO_AJUSTE[AJUSTE_DE[ms]]) if ms else "not measured"))
         od = p["destaque_outra_arte"]
         if od:
-            print("    destaque com outra arte: %s (Background do hero = %s)" % (od, ROTULO_AJUSTE[AJUSTE_DE[od]]))
+            print("    hero with different artwork: %s (Hero background = %s)" % (od, ROTULO_AJUSTE[AJUSTE_DE[od]]))
         else:
-            print("    destaque com outra arte: %s" % p.get("destaque_outra_arte_obs", "nenhuma fonte diferente do card medida"))
+            print("    hero with different artwork: %s" % p.get("destaque_outra_arte_obs", "no source different from card measured"))
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("--arquivo", help="dump JSON local (saida do wrangler --json ou lista de linhas)")
-    ap.add_argument("--json", action="store_true", help="saida em JSON")
+    ap.add_argument("--arquivo", "--file", dest="arquivo", help="local JSON dump (wrangler --json output or line list)")
+    ap.add_argument("--json", action="store_true", help="JSON output")
     a = ap.parse_args()
     linhas = ler_arquivo(a.arquivo) if a.arquivo else ler_d1()
     grupos = agregar(linhas)

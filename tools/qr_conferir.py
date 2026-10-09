@@ -1,20 +1,12 @@
 #!/usr/bin/env python3
-"""Confere o gerador de QR DECODIFICANDO o que ele desenha.
+"""Verifies the QR generator by DECODING what it renders.
 
-Comparar com outra implementacao nao serve como prova: dois simbolos podem
-diferir modulo a modulo (enchimento diferente, outra mascara escolhida) e os
-dois serem validos. O que importa e uma so pergunta — um leitor de verdade le?
-Por isso a conferencia decodifica com o OpenCV em vez de comparar matrizes.
+Comparing with another implementation is insufficient proof: two symbols may
+differ module by module (different padding, different mask chosen) and both
+remain valid. The only meaningful question is: can a real decoder read it?
+Hence this verification decodes using OpenCV rather than comparing matrices.
 
-Isto NAO e paranoia: um QR errado nao da erro. Ele desenha, fica bonito na
-tela, os localizadores estao no lugar, e nenhum celular decodifica. Foi
-exatamente o que aconteceu aqui — a ordem dos bits do formato estava invertida
-e so o decodificador acusou.
-
-Preparo (uma vez):
-    python3 -m venv /tmp/qrvenv && /tmp/qrvenv/bin/pip install opencv-python-headless numpy
-
-Uso:
+Usage:
     cc tools/qr_despejo.c src/qr.c -o /tmp/qr_despejo -Isrc
     /tmp/qrvenv/bin/python tools/qr_conferir.py /tmp/qr_despejo
 """
@@ -24,66 +16,65 @@ import sys
 import cv2
 import numpy as np
 
-# Um caso por motivo, nao por capricho:
-CASOS = [
-    "https://nuvio.tv/tv-login?code=fa0010cad8b5d2f512e58646ab82ca6b",  # o caso real
-    "https://nuvio.tv/tv-login?code=00000000000000000000000000000000",  # dados quase todos iguais
-    "A",                    # a menor entrada possivel
+CASES = [
+    "https://nuvio.tv/tv-login?code=fa0010cad8b5d2f512e58646ab82ca6b",  # real case
+    "https://nuvio.tv/tv-login?code=00000000000000000000000000000000",  # near-identical data
+    "A",                    # smallest input
     "HELLO WORLD",
     "12345678901234567",
-    "x" * 53,               # ultimo que cabe na versao 3
-    "y" * 54,               # o primeiro que forca a versao 4
-    "z" * 78,               # ultimo da versao 4
-    "w" * 106,              # versao 5
-    "k" * 134,              # versao 6, o limite do modulo
+    "x" * 53,               # last fitting in version 3
+    "y" * 54,               # first forcing version 4
+    "z" * 78,               # last of version 4
+    "w" * 106,              # version 5
+    "k" * 134,              # version 6, module limit
 ]
-# Acima do limite o app TEM de recusar em vez de desenhar algo truncado.
-CASOS_QUE_DEVEM_FALHAR = ["q" * 135, ""]
+# Beyond limit app must reject rather than drawing truncated.
+CASES_SHOULD_FAIL = ["q" * 135, ""]
 
 
-def matriz(binario, texto):
-    saida = subprocess.run([binario, texto], capture_output=True, text=True)
-    linhas = saida.stdout.strip().splitlines()
-    if not linhas or linhas[0].startswith("nao coube"):
+def matrix(binary, text):
+    out = subprocess.run([binary, text], capture_output=True, text=True)
+    lines = out.stdout.strip().splitlines()
+    if not lines or lines[0].startswith("overflow") or lines[0].startswith("nao coube"):
         return None
-    return [l.strip() for l in linhas[1:]]
+    return [l.strip() for l in lines[1:]]
 
 
-def decodificar(m, escala=8, quieta=4):
-    lado = len(m)
-    img = np.full((lado + 2 * quieta, lado + 2 * quieta), 255, dtype=np.uint8)
-    img[quieta:quieta + lado, quieta:quieta + lado] = np.array(
-        [[0 if c == "1" else 255 for c in linha] for linha in m], dtype=np.uint8
+def decode_qr(m, scale=8, quiet=4):
+    side = len(m)
+    img = np.full((side + 2 * quiet, side + 2 * quiet), 255, dtype=np.uint8)
+    img[quiet:quiet + side, quiet:quiet + side] = np.array(
+        [[0 if c == "1" else 255 for c in line] for line in m], dtype=np.uint8
     )
-    img = cv2.resize(img, None, fx=escala, fy=escala, interpolation=cv2.INTER_NEAREST)
-    texto, _, _ = cv2.QRCodeDetector().detectAndDecode(img)
-    return texto
+    img = cv2.resize(img, None, fx=scale, fy=scale, interpolation=cv2.INTER_NEAREST)
+    text, _, _ = cv2.QRCodeDetector().detectAndDecode(img)
+    return text
 
 
 def main():
-    binario = sys.argv[1] if len(sys.argv) > 1 else "/tmp/qr_despejo"
-    falhas = 0
-    for texto in CASOS:
-        m = matriz(binario, texto)
-        rot = texto if len(texto) <= 34 else f"{texto[:10]}…({len(texto)}B)"
+    binary = sys.argv[1] if len(sys.argv) > 1 else "/tmp/qr_despejo"
+    failures = 0
+    for text in CASES:
+        m = matrix(binary, text)
+        label = text if len(text) <= 34 else f"{text[:10]}…({len(text)}B)"
         if m is None:
-            print(f"FALHA  {rot}: o app recusou, mas isto cabe")
-            falhas += 1
+            print(f"FAIL   {label}: rejected by app, but this fits")
+            failures += 1
             continue
-        lido = decodificar(m)
-        if lido == texto:
-            print(f"ok     {rot}: {len(m)}x{len(m)} decodificado igual")
+        read = decode_qr(m)
+        if read == text:
+            print(f"ok     {label}: {len(m)}x{len(m)} decoded identically")
         else:
-            print(f"FALHA  {rot}: {len(m)}x{len(m)} decodificou como {lido[:34]!r}")
-            falhas += 1
-    for texto in CASOS_QUE_DEVEM_FALHAR:
-        if matriz(binario, texto) is None:
-            print(f"ok     ({len(texto)}B): recusado, como esperado")
+            print(f"FAIL   {label}: {len(m)}x{len(m)} decoded as {read[:34]!r}")
+            failures += 1
+    for text in CASES_SHOULD_FAIL:
+        if matrix(binary, text) is None:
+            print(f"ok     ({len(text)}B): rejected as expected")
         else:
-            print(f"FALHA  ({len(texto)}B): devia ter sido recusado")
-            falhas += 1
-    print("\n" + ("TODOS LEGIVEIS" if not falhas else f"{falhas} FALHA(S)"))
-    return 1 if falhas else 0
+            print(f"FAIL   ({len(text)}B): should have been rejected")
+            failures += 1
+    print("\n" + ("ALL READABLE" if not failures else f"{failures} FAILURE(S)"))
+    return 1 if failures else 0
 
 
 if __name__ == "__main__":

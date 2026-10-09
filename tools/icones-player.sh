@@ -1,17 +1,10 @@
 #!/bin/bash
-# Icones do PLAYER no Glass UI (mockup aprovado em 03/10, player-mockup.html).
+# PLAYER icons in Glass UI (approved mockup from 10/03, player-mockup.html).
 #
-# Os SVG de deploy/app/art/icones/player/ sao os do mockup: desenhos do Lucide
-# (lucide.dev, licenca ISC — deploy/app/art/icones/lucide/LICENSE) mais tres
-# do proprio mockup (play-f e pause-f cheios, ratio). Traco 2 (2,4 no check e
-# nas setas, como no mockup) em grade 24.
+# Rasterizes each into deploy/app/art/icones/pl_<nome>.png, 128x128, WHITE
+# on transparent with shape in ALPHA. Prefix pl_ separates them from other screens.
 #
-# Rasteriza cada um em deploy/app/art/icones/pl_<nome>.png, 128x128, BRANCO
-# sobre transparente com a forma no ALFA — o mesmo caminho de
-# tools/icones-lucide.sh (gfx_icone tinge pelo alfa). O prefixo pl_ separa
-# estes dos de outras telas.
-#
-# Uso: bash tools/icones-player.sh      Precisa de: sips (macOS), magick.
+# Usage: bash tools/icones-player.sh      Requires: sips (macOS), magick.
 set -e
 cd "$(dirname "$0")/.."
 DIR="deploy/app/art/icones"
@@ -26,8 +19,8 @@ for f in "$DIR"/player/*.svg; do
   magick -size 128x128 xc:white "$TMP/m.png" -alpha off -compose CopyOpacity \
     -composite -strip -define png:color-type=6 "$DIR/pl_$n.png"
 done
-USADOS=$(grep -ho '"pl_[a-z0-9-]*"' src/*.c | tr -d '"' | sed 's/^pl_//' | sort -u)
+USADOS=$(grep -ho '"pl_[a-z0-9-]*"' src/*.c 2>/dev/null | tr -d '"' | sed 's/^pl_//' | sort -u)
 for n in $USADOS; do
-  [ -f "$DIR/player/$n.svg" ] || { echo "icones-player: src/ usa pl_$n sem SVG" >&2; exit 1; }
+  [ -f "$DIR/player/$n.svg" ] || { echo "icones-player: src/ uses pl_$n without SVG" >&2; exit 1; }
 done
-echo "icones-player: $(ls "$DIR"/player/*.svg | wc -l | tr -d ' ') icones em $DIR/pl_*.png"
+echo "icones-player: $(ls "$DIR"/player/*.svg | wc -l | tr -d ' ') icons in $DIR/pl_*.png"

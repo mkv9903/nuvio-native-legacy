@@ -2,8 +2,8 @@
 """Rebuild deploy/app/art/selos/ from the two Xperience badge packs.
 
   padrao.json   default pack  (kingsize, white monochrome art, tinted by the app)
-  colorido.json colored pack  (elite, full-colour art, used when "Selos
-                               coloridos" is on)
+  colorido.json colored pack  (elite, full-colour art, used when "Colored badges"
+                               is on)
 
 The JSONs are the packs exactly as published (groups + filters, patterns and
 CDN imageURLs untouched) minus the filters whose regex cannot be used (see

@@ -1,23 +1,23 @@
 #!/bin/bash
-# REPOSITORIO DO HOMEBREW CHANNEL (webOS), gerado a cada release.
+# HOMEBREW CHANNEL (webOS) REPOSITORY, generated for each release.
 #
-# O Homebrew Channel aceita repositorios extras: uma URL que devolve um JSON
-# com `packages[]`, cada um com o manifesto do app (id, versao, ipkUrl,
-# sha256). Mesmo formato do repositorio oficial (repo.webosbrew.org/api/apps.json).
+# The Homebrew Channel accepts extra repositories: a URL returning JSON
+# with `packages[]`, each with the app manifest (id, version, ipkUrl,
+# sha256). Same format as official repository (repo.webosbrew.org/api/apps.json).
 #
-# SEM SERVIDOR: os dois arquivos vao ANEXADOS a release, e a URL que a pessoa
-# cadastra no canal e a de "ultima release" do GitHub, que redireciona sempre
-# para a mais nova:
+# SERVERLESS: the two files are ATTACHED to the release, and the URL users
+# register in the channel is the GitHub "latest release" URL, which always redirects
+# to the newest one:
 #   https://github.com/iqui27/nuvio-native-legacy/releases/latest/download/repo.json
 #
-# Uso: bash tools/hb-repo.sh <pacote.ipk> <pasta-de-saida>
-# Gera <saida>/webosbrew.manifest.json e <saida>/repo.json. Publica-los e
-# trabalho do `gh release create/upload` da receita de release.
+# Usage: bash tools/hb-repo.sh <package.ipk> <output-folder>
+# Generates <output>/webosbrew.manifest.json and <output>/repo.json. Publishing them
+# is the job of `gh release create/upload` in the release recipe.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-IPK="${1:?uso: hb-repo.sh <pacote.ipk> <saida>}"
-SAIDA="${2:?uso: hb-repo.sh <pacote.ipk> <saida>}"
+IPK="${1:?usage: hb-repo.sh <package.ipk> <output>}"
+SAIDA="${2:?usage: hb-repo.sh <package.ipk> <output>}"
 REPO="iqui27/nuvio-native-legacy"
 mkdir -p "$SAIDA"
 
@@ -27,10 +27,10 @@ ipk, saida, repo = sys.argv[1], sys.argv[2], sys.argv[3]
 app = json.load(open("deploy/app/appinfo.json"))
 versao = app["version"]
 nome = os.path.basename(ipk)
-# O nome do anexo tem de ser o do arquivo publicado: e dele que sai a ipkUrl.
+# The attachment name must be that of the published file: ipkUrl is derived from it.
 esperado = f"{app['id']}_{versao}_arm.ipk"
 if nome != esperado:
-    sys.exit(f"hb-repo.sh: esperava {esperado}, recebi {nome}")
+    sys.exit(f"hb-repo.sh: expected {esperado}, got {nome}")
 h = hashlib.sha256(open(ipk, "rb").read()).hexdigest()
 base = f"https://github.com/{repo}/releases/download/v{versao}"
 icone = f"https://raw.githubusercontent.com/{repo}/v{versao}/deploy/app/icon-large-20.png"
@@ -42,8 +42,8 @@ manifesto = {
     "appDescription": "Unofficial native Nuvio client for LG webOS",
     "iconUri": icone,
     "sourceUrl": f"https://github.com/{repo}",
-    # O app roda sem root (uid do jail); o que depende de root e so o video
-    # em algumas TVs, e isso o canal nao tem como saber. Ver INSTALL.md.
+    # The app runs without root (jail uid); only video depends on root
+    # on some TVs, which the channel cannot know. See INSTALL.md.
     "rootRequired": False,
     "ipkUrl": f"{base}/{nome}",
     "ipkHash": {"sha256": h},

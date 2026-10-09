@@ -1,22 +1,21 @@
-# Funcoes para achar o motor P2P ja compilado. Quem usa: tools/android.sh,
-# tools/arm.sh, tools/tpk.sh (e, por eles, release-android.sh/release-samsung.sh).
+# Functions to locate precompiled P2P engine. Used by: tools/android.sh,
+# tools/arm.sh, tools/tpk.sh (and through them release scripts).
 #
 #   . tools/p2p-motor/pasta.sh
-#   nv_p2p_resolver android     # define NV_P2P_DIR (pasta da plataforma) ou ""
+#   nv_p2p_resolver android     # sets NV_P2P_DIR (platform folder) or ""
 #
-# A RAIZ tem uma subpasta por plataforma, cada uma montada pelo seu build-*.sh:
-#   <raiz>/android/{lib/<abi>/*.a, include/}      tools/p2p-motor/build-android.sh
-#   <raiz>/arm/{build-arm/..., nuvio-engine/include/}   build-arm.sh (LG webOS)
-#   <raiz>/tpk/{libnuvio_engine.so, include/}     build-tpk.sh (Tizen 6+)
-#   <raiz>/licenses/                              avisos que o motor exige
+# ROOT has one subfolder per platform, assembled by respective build-*.sh:
+#   <root>/android/{lib/<abi>/*.a, include/}      tools/p2p-motor/build-android.sh
+#   <root>/arm/{build-arm/..., nuvio-engine/include/}   build-arm.sh (LG webOS)
+#   <root>/tpk/{libnuvio_engine.so, include/}     build-tpk.sh (Tizen 6+)
+#   <root>/licenses/                              notices required by engine
 #
-# QUAL RAIZ: $NUVIO_P2P_MOTOR; sem ela, ~/.nuvio-p2p-motor ou
-# /Volumes/ExternalSSD/nuvio-p2p-motor, a primeira que existir. NUVIO_P2P_MOTOR=none
-# compila SEM motor de proposito (build de desenvolvimento). Nenhuma raiz
-# achada = sem motor, como antes do F10.
+# WHICH ROOT: $NUVIO_P2P_MOTOR; if unset, ~/.nuvio-p2p-motor or
+# /Volumes/ExternalSSD/nuvio-p2p-motor, first existing. NUVIO_P2P_MOTOR=none
+# compiles WITHOUT engine on purpose (dev build). No root found = no engine.
 #
-# FALHA ALTO: raiz configurada (ou achada) mas faltando uma biblioteca da
-# plataforma = exit 2. Nunca publicar um pacote sem motor por engano.
+# FAIL LOUD: configured root missing a platform library = exit 2.
+# Never publish package without engine by mistake.
 
 nv_p2p_raiz() {
   NV_P2P_RAIZ=""
@@ -34,24 +33,24 @@ nv_p2p_raiz() {
 nv_p2p_resolver() {  # $1 = android | arm | tpk
   nv_p2p_raiz
   NV_P2P_DIR=""
-  [ -n "$NV_P2P_RAIZ" ] || { echo "  motor P2P: DESLIGADO (sem pasta; NUVIO_P2P_MOTOR=${NUVIO_P2P_MOTOR:-<vazio>})" >&2; return 0; }
-  local d="$NV_P2P_RAIZ/$1" f falta=""
+  [ -n "$NV_P2P_RAIZ" ] || { echo "  P2P engine: DISABLED (no directory; NUVIO_P2P_MOTOR=${NUVIO_P2P_MOTOR:-<empty>})" >&2; return 0; }
+  local d="$NV_P2P_RAIZ/$1" f missing=""
   case "$1" in
     android) for f in arm64-v8a armeabi-v7a; do
                for l in libnuvio_engine.a libtorrent-rasterbar.a libssl.a libcrypto.a; do
-                 [ -s "$d/lib/$f/$l" ] || falta="$falta lib/$f/$l"; done; done
-             [ -s "$d/include/nuvio_engine/nuvio_engine.h" ] || falta="$falta include/nuvio_engine/nuvio_engine.h" ;;
+                 [ -s "$d/lib/$f/$l" ] || missing="$missing lib/$f/$l"; done; done
+             [ -s "$d/include/nuvio_engine/nuvio_engine.h" ] || missing="$missing include/nuvio_engine/nuvio_engine.h" ;;
     arm)     for l in build-arm/libnuvio_engine.a build-arm/_deps/nuvio_libtorrent-build/libtorrent-rasterbar.a \
                       nuvio-engine/include/nuvio_engine/nuvio_engine.h; do
-               [ -s "$d/$l" ] || falta="$falta $l"; done ;;
+               [ -s "$d/$l" ] || missing="$missing $l"; done ;;
     tpk)     for l in libnuvio_engine.so include/nuvio_engine/nuvio_engine.h; do
-               [ -s "$d/$l" ] || falta="$falta $l"; done ;;
+               [ -s "$d/$l" ] || missing="$missing $l"; done ;;
   esac
-  if [ -n "$falta" ]; then
-    echo "motor P2P: $d incompleta, faltando:$falta" >&2
-    echo "  rode tools/p2p-motor/build-$1.sh, ou NUVIO_P2P_MOTOR=none para compilar SEM motor de proposito" >&2
+  if [ -n "$missing" ]; then
+    echo "P2P engine: $d incomplete, missing:$missing" >&2
+    echo "  run tools/p2p-motor/build-$1.sh, or NUVIO_P2P_MOTOR=none to compile WITHOUT engine intentionally" >&2
     exit 2
   fi
   NV_P2P_DIR="$d"
-  echo "  motor P2P: LIGADO ($d)" >&2
+  echo "  P2P engine: ENABLED ($d)" >&2
 }

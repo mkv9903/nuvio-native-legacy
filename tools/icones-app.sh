@@ -1,26 +1,22 @@
 #!/bin/bash
-# ICONES ALTERNATIVOS DO APP (apoiadores, ver src/iconeapp.h).
+# ALTERNATIVE APP ICONS (supporters, see src/iconeapp.h).
 #
-# Fonte: design/icones-apoio/1..7 (as imagens do dono, sem editar). A 7 e uma
-# folha com tres logos-adesivo e legenda; este script recorta cada adesivo, sem
-# a legenda, e tira o fundo escuro da folha (mascara = tudo o que nao e a cor do
-# fundo, com os buracos de dentro preenchidos: o azul-marinho DENTRO do adesivo
-# tem a mesma cor do fundo e um flood fill simples o comia).
+# Source: design/icones-apoio/1..7 (owner artwork, unedited). Sheet 7 contains
+# three sticker logos with labels; this script crops each sticker without the label,
+# removing dark sheet background.
 #
-# Saidas (todas regeneraveis; o script e idempotente):
-#   design/icones-apoio/recortes/7{a,b,c}.png  os tres adesivos, fundo transparente
-#   deploy/app/art/icones-app/<id>.png        256x256, MARCA com fundo transparente,
-#                                             no enquadramento do original (a marca
-#                                             ocupa 78% da altura, centrada). O app
-#                                             desenha o ladrilho escuro por baixo.
-#   android/.../mipmap-nodpi/ic_launcher_<id>.png  192x192, ladrilho #0D101E cheio,
-#                                             igual ao ic_launcher original
-#   android/.../drawable-nodpi/banner_<id>.png     320x180, marca a 50% da altura
+# Outputs (all regenerable; idempotent):
+#   design/icones-apoio/recortes/7{a,b,c}.png  three stickers, transparent background
+#   deploy/app/art/icones-app/<id>.png        256x256, BRAND with transparent background,
+#                                             matching original framing (brand occupies
+#                                             78% of height, centered).
+#   android/.../mipmap-nodpi/ic_launcher_<id>.png  192x192, solid #0D101E tile
+#   android/.../drawable-nodpi/banner_<id>.png     320x180, brand at 50% height
 #
-# Original follows the current deploy/app/icon.png branding.
+# Original follows current deploy/app/icon.png branding.
 # Package launcher assets remain unchanged.
 #
-# Requer ImageMagick 7 (magick).
+# Requires ImageMagick 7 (magick).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 SRC=design/icones-apoio
@@ -30,9 +26,9 @@ RES=android/app/src/main/res
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 mkdir -p "$REC" "$ART"
-FUNDO='rgb(13,16,30)'     # o fundo do icone original (ic_launcher, icon.png)
+BG_COLOR='rgb(13,16,30)'     # original icon background
 
-# --- recorte da folha 7 -------------------------------------------------------
+# --- Crop sheet 7 -------------------------------------------------------------
 magick "$SRC/7.webp" "$TMP/folha.png"
 for spec in "a 25 60 590 690" "b 612 90 650 650" "c 1262 100 615 640"; do
   set -- $spec
@@ -47,31 +43,31 @@ for spec in "a 25 60 590 690" "b 612 90 650 650" "c 1262 100 615 640"; do
     -composite -trim +repage -strip "$REC/7$1.png"
 done
 
-# Preserve the current package branding; Original is never regenerated from an old logo.
+# Preserve current package branding; Original is never regenerated from old logo.
 magick deploy/app/icon.png -resize 256x256 -strip "$ART/original.png"
 
-# Alternative IDs match src/iconeapp.c; Original was generated above.
+# Alternative IDs match src/iconeapp.c; Original generated above.
 LISTA="fenix:$SRC/1.webp nverde:$SRC/2.webp
 tvlaranja:$SRC/3.webp npixel:$SRC/4.png tricolor:$SRC/5.webp arco:$SRC/6.png
 tvviva:$REC/7a.png cluberetro:$REC/7b.png arcaden:$REC/7c.png"
 
-# Marca centrada num quadrado de lado L ocupando `pct` do lado.
-marca() {  # fonte lado pct fundo saida
-  local alvo=$(( $2 * $3 / 100 ))
-  magick "$1" -trim +repage -resize "${alvo}x${alvo}" -background "$4" \
+# Brand centered in square of size L occupying `pct` percentage of side.
+center_brand() {  # source side pct bg output
+  local target=$(( $2 * $3 / 100 ))
+  magick "$1" -trim +repage -resize "${target}x${target}" -background "$4" \
     -gravity center -extent "$2x$2" "$5"
 }
 
-for par in $LISTA; do
-  id=${par%%:*}; f=${par#*:}
-  marca "$f" 256 78 none "$TMP/$id.png"
+for item in $LISTA; do
+  id=${item%%:*}; f=${item#*:}
+  center_brand "$f" 256 78 none "$TMP/$id.png"
   magick "$TMP/$id.png" -strip -define png:compression-level=9 "$ART/$id.png"
-  marca "$f" 192 78 "$FUNDO" "$TMP/l.png"
-  magick "$TMP/l.png" -strip -define png:compression-level=9 \
-    "$RES/mipmap-nodpi/ic_launcher_$id.png"
+  center_brand "$f" 192 78 "$BG_COLOR" "$TMP/l.png"
+  [ -d "$RES/mipmap-nodpi" ] && magick "$TMP/l.png" -strip -define png:compression-level=9 \
+    "$RES/mipmap-nodpi/ic_launcher_$id.png" || true
   magick "$f" -trim +repage -resize x90 -resize '220x90>' "$TMP/b.png"
-  magick -size 320x180 "xc:$FUNDO" "$TMP/b.png" -gravity center -composite \
+  [ -d "$RES/drawable-nodpi" ] && magick -size 320x180 "xc:$BG_COLOR" "$TMP/b.png" -gravity center -composite \
     -alpha off -strip -define png:compression-level=9 \
-    "$RES/drawable-nodpi/banner_$id.png"
+    "$RES/drawable-nodpi/banner_$id.png" || true
 done
-du -ch "$ART"/*.png "$RES"/mipmap-nodpi/ic_launcher_*.png "$RES"/drawable-nodpi/banner_*.png | tail -1
+du -ch "$ART"/*.png 2>/dev/null | tail -1 || true

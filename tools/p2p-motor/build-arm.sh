@@ -1,12 +1,12 @@
 #!/bin/bash
-# Compila o motor P2P (nuvio-engine + libtorrent 2.0.12 + OpenSSL 3 estatico)
-# para webOS ARMv7 no docker do tools/Dockerfile, e liga o PoC (poc.c) como
-# binario estatico de C++ para medir o tamanho.
+# Compiles P2P engine (nuvio-engine + libtorrent 2.0.12 + static OpenSSL 3)
+# for webOS ARMv7 using docker from tools/Dockerfile, and links PoC (poc.c)
+# as static C++ binary to measure footprint.
 #
-#   bash tools/p2p-motor/build-arm.sh [pasta-de-trabalho]
+#   bash tools/p2p-motor/build-arm.sh [working-directory]
 #
-# A pasta de trabalho (padrao <raiz>/arm, ver pasta.sh) recebe o clone do
-# nuvio-engine no commit fixado e o build; nada vai para o repositorio.
+# Working directory (defaults to <root>/arm, see pasta.sh) receives clone of
+# nuvio-engine at pinned commit and build output; nothing commits to repository.
 set -eu
 cd "$(dirname "$0")/../.."
 . tools/p2p-motor/pasta.sh; nv_p2p_raiz
@@ -18,7 +18,7 @@ if [ ! -d "$W/nuvio-engine/.git" ]; then
 fi
 git -C "$W/nuvio-engine" checkout -q "$COMMIT"
 cp tools/p2p-motor/poc.c "$W/poc.c"
-# -j baixo: com -j$(nproc) o cc1plus do libtorrent estoura a RAM do docker (Killed).
+# Lower -j: with -j$(nproc), libtorrent cc1plus exceeds docker RAM (Killed).
 docker run --rm --platform linux/arm64 -e NV_JOBS="${NV_JOBS:-2}" -v "$W":/w nuvio-webos-sdk sh -c '
   set -e
   command -v cmake >/dev/null 2>&1 && cmake --version >/dev/null 2>&1 || {

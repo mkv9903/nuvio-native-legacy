@@ -1,7 +1,7 @@
 #!/bin/bash
-# Build de verificacao local no Mac. Existe como arquivo porque o `eval` da
-# linha de comando do FERRAMENTAS.md nao passa pela checagem de isolamento do
-# worktree. Mesmas flags, credenciais vazias (o binario local nao faz login).
+# Local verification build on Mac. Exists as a file because the command line
+# `eval` in TOOLS.md does not pass worktree isolation checks. Same flags,
+# empty credentials (local binary does not log in).
 set -e
 cd "$(dirname "$0")/.."
 cc src/*.c src/dts/*.c -o /tmp/nvbuild -O1 \

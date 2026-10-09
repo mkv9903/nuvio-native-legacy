@@ -1,16 +1,16 @@
-// DUBLE DE webapis.avplay para o alvo Tizen.
+// webapis.avplay STUB for Tizen target.
 //
-// Nao ha TV Samsung nesta bancada e webapis.avplay nao existe no Chrome, entao
-// o video_tizen.c nunca tinha sido EXECUTADO — so compilado. Este duble nao
-// prova que o video toca; prova que o app fala com o AVPlay na ORDEM e com os
-// ARGUMENTOS que a Samsung documenta. E o que da para verificar aqui.
+// There is no Samsung TV in this testbench and webapis.avplay does not exist in Chrome, so
+// video_tizen.c had never been EXECUTED — only compiled. This stub does not
+// prove that video plays; it proves that the app speaks to AVPlay in the ORDER and with the
+// ARGUMENTS that Samsung documents. That is what can be verified here.
 (function () {
-  // SO NO FIO PRINCIPAL. O --pre-js e prependado ao glue do Emscripten, e esse
-  // mesmo glue roda DENTRO DE CADA WORKER de pthread — onde `window` nao
-  // existe. A primeira versao disto referenciava `window` direto e derrubava
-  // todos os workers com "Uncaught ReferenceError: window is not defined" no
-  // arranque; o app nao chegava a desenhar um quadro e o teste parecia nao
-  // fazer nada. O duble so faz sentido onde o DOM existe.
+  // MAIN THREAD ONLY. --pre-js is prepended to Emscripten glue, and that
+  // same glue runs INSIDE EACH pthread WORKER — where `window` does not
+  // exist. The first version referenced `window` directly and crashed
+  // all workers with "Uncaught ReferenceError: window is not defined" at
+  // startup; the app did not even draw a frame and test seemed to do
+  // nothing. The stub only makes sense where DOM exists.
   if (typeof window === "undefined" || typeof document === "undefined") return;
 
   var reg = [];
@@ -64,7 +64,7 @@
     }
   };
   window.__avReg = function () { return reg; };
-  // O listener instalado, para o teste disparar onsubtitlechange (#122).
+  // Installed listener, for test to trigger onsubtitlechange (#122).
   window.__avOuvinte = function () { return ouvinte; };
   window.__avLimpar = function () { reg = []; };
 })();

@@ -1,11 +1,11 @@
 #!/bin/bash
-# Le local.properties (o MESMO arquivo do app web) e imprime os -D que a
-# compilacao precisa. Nada de segredo entra em arquivo de codigo: o valor viaja
-# da propriedade direto para a linha de comando do compilador.
+# Reads local.properties (the SAME file as the web app) and prints the -Ds
+# that compilation needs. No secrets enter code files: the value travels
+# from the property directly to the compiler command line.
 #
-# A anon key do Supabase e publica por projeto — e o que o RLS espera receber, e
-# o app web ja a publica no bundle. Quem NAO pode entrar no pacote e o que hoje
-# esta em art/trakt.txt e art/addons.txt: aquilo e credencial de PESSOA.
+# The Supabase anon key is public per project — it is what RLS expects to receive,
+# and the web app already publishes it in the bundle. What CANNOT enter the package
+# is what used to live in art/trakt.txt and art/addons.txt: those are USER credentials.
 #
 #   eval "cc src/*.c src/dts/*.c $(tools/env.sh) ..."
 set -e
@@ -18,7 +18,7 @@ case "${1:-}" in
   --allow-unconfigured) ALLOW_UNCONFIGURED=1 ;;
   --env-file) ;;
   *)
-    echo "env.sh: opcao desconhecida: $1" >&2
+    echo "env.sh: unknown option: $1" >&2
     exit 2
     ;;
 esac
@@ -30,41 +30,41 @@ else
   PROP="${NUVIO_PROPERTIES:-$(cd "$(dirname "$0")/../.." && pwd)/NuvioWeb-0.3.38-beta/local.properties}"
 fi
 
-valor() {
+val() {
   [ -f "$PROP" ] || return 0
   sed -n "s/^$1=//p" "$PROP" | head -1 | tr -d '\r'
 }
 
-URL=$(valor NUVIO_SUPABASE_URL)
-KEY=$(valor NUVIO_SUPABASE_ANON_KEY)
-TVB=$(valor TV_LOGIN_WEB_BASE_URL)
-TRK=$(valor TRAKT_CLIENT_ID)
-TRS=$(valor TRAKT_CLIENT_SECRET)
-SMK=$(valor SIMKL_CLIENT_ID)
-SMA=$(valor SIMKL_APP_NAME)
-TMD=$(valor TMDB_API_KEY)
-# Chave do Seekr (miniaturas da barra de tempo) DO DONO, embutida no pacote
-# como a do TMDB. Vazia = o app pede a chave de cada pessoa nos Ajustes.
-SKR=$(valor SEEKR_API_KEY)
-# Servico de recomendacoes entre amigos (servidor/recomendacoes). VAZIO E UM
-# ESTADO VALIDO E E O PADRAO: sem ele o app nao mostra a aba Social, nao mostra
-# o item "Recomendar a um amigo" e nao abre conexao nenhuma. O dono publica
-# builds com isto desligado, entao "esqueci de configurar" tem de ser invisivel
-# e nao um botao que da erro.
-REC=$(valor NUVIO_REC_URL)
-# Discord Rich Presence (discord.c, #222). Vazio = a linha nos Ajustes diz
-# "indisponivel" e nada fala com o Discord. E so o client id: o app do Discord
-# e Public Client, sem segredo no binario.
-DSC=$(valor DISCORD_CLIENT_ID)
-# A versao do app sai do appinfo.json — FONTE UNICA. Ela ja vivia em tres
-# lugares (appinfo.json, tizen-config.xml e um #define em ajustes.c) e o
-# terceiro ficou parado em 1.0.44 por nove releases: a tela de Ajustes mentia
-# a versao. O binario recebe -DNV_VERSAO e a conferencia do arm.sh exige
-# encontrar o valor dentro dele, como com as demais chaves.
-RAIZ="$(cd "$(dirname "$0")/.." && pwd)"
-VER=$(sed -n 's/^[[:space:]]*"version":[[:space:]]*"\([^"]*\)".*/\1/p' "$RAIZ/deploy/app/appinfo.json" | head -1)
+URL=$(val NUVIO_SUPABASE_URL)
+KEY=$(val NUVIO_SUPABASE_ANON_KEY)
+TVB=$(val TV_LOGIN_WEB_BASE_URL)
+TRK=$(val TRAKT_CLIENT_ID)
+TRS=$(val TRAKT_CLIENT_SECRET)
+SMK=$(val SIMKL_CLIENT_ID)
+SMA=$(val SIMKL_APP_NAME)
+TMD=$(val TMDB_API_KEY)
+# Seekr key (timeline scrubber thumbnails) OF OWNER, embedded in package
+# like TMDB. Empty = app prompts each user for key in Settings.
+SKR=$(val SEEKR_API_KEY)
+# Friend recommendations service (servidor/recomendacoes). EMPTY IS A
+# VALID STATE AND IS THE DEFAULT: without it app hides Social tab, hides
+# "Recommend to friend" item and opens no connections. Owner publishes
+# builds with this disabled, so "forgot to configure" must be invisible
+# rather than an erroring button.
+REC=$(val NUVIO_REC_URL)
+# Discord Rich Presence (discord.c, #222). Empty = Settings line says
+# "unavailable" and does not communicate with Discord. Only the client id:
+# the Discord app is a Public Client, with no secret in binary.
+DSC=$(val DISCORD_CLIENT_ID)
+# App version comes from appinfo.json — SINGLE SOURCE OF TRUTH. It used to live
+# in three places (appinfo.json, tizen-config.xml and a #define in ajustes.c) and
+# the third stayed stuck on 1.0.44 for nine releases: Settings screen reported
+# wrong version. Binary receives -DNV_VERSAO and arm.sh check requires finding
+# value inside it, matching all other keys.
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+VER=$(sed -n 's/^[[:space:]]*"version":[[:space:]]*"\([^"]*\)".*/\1/p' "$ROOT/deploy/app/appinfo.json" | head -1)
 if [ -z "$VER" ]; then
-  echo "env.sh: nao achei \"version\" em deploy/app/appinfo.json" >&2; exit 2
+  echo "env.sh: \"version\" not found in deploy/app/appinfo.json" >&2; exit 2
 fi
 
 MISSING_CORE=()
@@ -73,23 +73,22 @@ MISSING_CORE=()
 [ -n "$TVB" ] || MISSING_CORE+=(TV_LOGIN_WEB_BASE_URL)
 if [ "${#MISSING_CORE[@]}" -gt 0 ]; then
   if [ "$REQUIRE_CORE" -eq 1 ]; then
-    # A build produtiva nao pode instalar e so descobrir na tela de login que
-    # recebeu macros vazias. Liste apenas nomes, nunca valores ou caminhos.
-    echo "env.sh: configuracao obrigatoria ausente: ${MISSING_CORE[*]}" >&2
+    # Production build cannot install and discover on login screen that it received empty macros.
+    # List only names, never values or paths.
+    echo "env.sh: mandatory configuration missing: ${MISSING_CORE[*]}" >&2
     exit 3
   elif [ "$ALLOW_UNCONFIGURED" -eq 0 ]; then
-    # O modo permissivo permanece para harnesses diagnosticos explicitos.
-    echo "env.sh: configuracao de servidor incompleta; use --require-core na release" >&2
+    # Permissive mode remains for explicit diagnostic harnesses.
+    echo "env.sh: incomplete server configuration; use --require-core in release" >&2
   fi
 fi
 
-# --env-file: escreve as variaveis num arquivo para o `docker run --env-file`.
-# Existe porque a compilacao ARM roda DENTRO de um container: passar os -D na
-# linha de comando exigiria aspas dentro de aspas dentro de `sh -c`, e o erro
-# ali e mudo — o compilador recebe a macro vazia e o app sai SEM LOGIN, que foi
-# exatamente o que aconteceu no primeiro deploy para a TV.
+# --env-file: writes variables to file for `docker run --env-file`.
+# Needed because ARM compilation runs INSIDE a container: passing -Ds on command
+# line would require nested quotes within `sh -c`, which fails silently — compiler
+# receives empty macro and app ships WITHOUT LOGIN, which happened on first TV deploy.
 if [ "$1" = "--env-file" ]; then
-  [ -n "$2" ] || { echo "env.sh --env-file precisa do caminho" >&2; exit 2; }
+  [ -n "$2" ] || { echo "env.sh --env-file requires path" >&2; exit 2; }
   {
     printf 'NV_SUPABASE_URL=%s\n' "$URL"
     printf 'NV_SUPABASE_ANON_KEY=%s\n' "$KEY"

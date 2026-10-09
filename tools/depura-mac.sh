@@ -1,9 +1,9 @@
 #!/bin/bash
-# Reproducao local do travamento, com NUVIO_DADOS DESCARTAVEL.
+# Local crash reproduction, with DISPOSABLE NUVIO_DATA.
 #
-# NUNCA ~/.nuvio: aquela e a pasta real do dono e um teste ja destruiu o perfil
-# dele uma vez. O argumento de dados_iniciar e a pasta de ARTE, nao a de dados —
-# quem manda na pasta de dados e a variavel de ambiente.
+# NEVER ~/.nuvio: that is the real user folder and a test previously destroyed
+# their profile once. The argument to data_init is the ART folder, not data —
+# what determines the data folder is the environment variable.
 set -e
 cd "$(dirname "$0")"
 export NUVIO_DADOS=/tmp/nuvio-crash-$$
@@ -15,5 +15,6 @@ cc src/*.c src/dts/*.c -o /tmp/nuvio-crash -O0 -g \
   -I/opt/homebrew/include -I/opt/homebrew/include/SDL2 \
   -L/opt/homebrew/lib -lSDL2 -lSDL2_image -lSDL2_ttf \
   -framework OpenGL -Wno-deprecated-declarations 2>/dev/null
-echo "dados descartaveis em $NUVIO_DADOS"
+echo "disposable data in $NUVIO_DADOS"
 lldb -b -o run -o "bt all" -o quit -- /tmp/nuvio-crash "$(pwd)/deploy/app/art" 2>&1
+

@@ -272,7 +272,7 @@ a piece of `src/` on the host with the network or the TV faked.
 
 Server URLs and client ids are **not in the source**. They come from a
 `local.properties` file through `tools/env.sh`. The build refuses to package any
-credential file and deletes the `.ipk` if one shows up (`tools/testa-ipk.sh`
+credential file and deletes the `.ipk` if one shows up (`tools/test-ipk.sh`
 checks by extracting the `ar` archive).
 
 ---

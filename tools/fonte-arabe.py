@@ -1,36 +1,36 @@
 #!/usr/bin/env python3
-"""Regera deploy/app/fonts/NotoNaskhArabic-Subset.ttf, a fonte arabe embarcada.
+"""Regenerates deploy/app/fonts/NotoNaskhArabic-Subset.ttf, the embedded Arabic font.
 
-POR QUE EXISTE. text.c manda arabe para uma fonte de RESERVA. Na LG, no Android
-e no Mac ela vem do sistema; na Samsung nao ha fonte arabe nenhuma e o texto
-saia em quadradinhos (#253, #258). Ver docs/fontes/README.md.
+WHY IT EXISTS: text.c routes Arabic to a FALLBACK font. On LG, Android,
+and Mac it comes from the system; on Samsung there is no Arabic font and text
+rendered as missing glyph boxes (#253, #258). See docs/fonts/README.md.
 
-O QUE TEM DE TER. Nao ha HarfBuzz: src/bidi.c faz a juncao trocando cada letra
-pela FORMA DE APRESENTACAO (U+FE70-FEFF, e U+FB50-FDFF para persa/urdu). O
-recorte precisa desses dois blocos, nao so do bloco base U+0600-06FF.
+REQUIREMENTS: Without HarfBuzz, src/bidi.c shapes Arabic by swapping each letter
+to its PRESENTATION FORM (U+FE70-FEFF, and U+FB50-FDFF for Persian/Urdu). The
+subset requires these two blocks, not just the base block U+0600-06FF.
 
-ENTRADA. Noto Naskh Arabic Regular (OFL 1.1), de github.com/notofonts/arabic:
+INPUT: Noto Naskh Arabic Regular (OFL 1.1), from github.com/notofonts/arabic:
     fonts/NotoNaskhArabic/hinted/ttf/NotoNaskhArabic-Regular.ttf
-SAIDA. Sem hinting e sem tabelas de layout (ninguem as le aqui).
+OUTPUT: Without hinting and without layout tables (unused here).
 
-Uso:  python3 tools/fonte-arabe.py /caminho/NotoNaskhArabic-Regular.ttf
-Precisa de fontTools (pip install fonttools).
+Usage:  python3 tools/fonte-arabe.py /path/to/NotoNaskhArabic-Regular.ttf
+Requires fontTools (pip install fonttools).
 """
 import pathlib, subprocess, sys
 
-RAIZ = pathlib.Path(__file__).resolve().parent.parent
-DESTINO = RAIZ / "deploy" / "app" / "fonts" / "NotoNaskhArabic-Subset.ttf"
-FAIXAS = ("U+0020-007F,U+00A0,U+0600-06FF,U+0750-077F,U+FB50-FDFF,U+FE70-FEFF,"
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+DEST = ROOT / "deploy" / "app" / "fonts" / "NotoNaskhArabic-Subset.ttf"
+RANGES = ("U+0020-007F,U+00A0,U+0600-06FF,U+0750-077F,U+FB50-FDFF,U+FE70-FEFF,"
           "U+200C-200F,U+2010-2027")
 
 def main():
     if len(sys.argv) != 2:
         raise SystemExit(__doc__)
     subprocess.check_call([sys.executable, "-m", "fontTools.subset", sys.argv[1],
-                           "--unicodes=%s" % FAIXAS, "--output-file=%s" % DESTINO,
+                           "--unicodes=%s" % RANGES, "--output-file=%s" % DEST,
                            "--no-hinting", "--desubroutinize", "--layout-features=",
                            "--notdef-outline", "--drop-tables+=DSIG"])
-    print("%s: %d bytes" % (DESTINO, DESTINO.stat().st_size))
+    print("%s: %d bytes" % (DEST, DEST.stat().st_size))
 
 if __name__ == "__main__":
     main()
