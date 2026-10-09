@@ -6,25 +6,13 @@
 #include "dts/dts_pipeline.h"
 #endif
 #include <SDL2/SDL.h>
-#include "tpkteclas.h"
 #include "central.h"
 #include "sdlcompat.h"
 #include <SDL2/SDL_image.h>
 #include "gl_compat.h"
-#ifdef __EMSCRIPTEN__
-#include <emscripten.h>
-#include <emscripten/heap.h>
-#include <malloc.h>
-#endif
-// Alvos SEM webOS. O Mac ja pulava estes trechos por um ifndef __APPLE__;
-// o alvo Tizen (WASM) precisa pular exatamente os mesmos. Nomear a condicao
-// evita ter de lembrar de dois simbolos em cada ponto - sem isto o primeiro
-// build para o navegador ainda tentava abrir libwayland-client.so.0.
-#if defined(__APPLE__) || defined(NV_LINUX_DESKTOP) || defined(__EMSCRIPTEN__) || defined(NV_TPK) || defined(NV_ANDROID)
+// Alvos SEM webOS (Linux desktop / macOS).
+#if defined(__APPLE__) || defined(NV_LINUX_DESKTOP)
 #define NV_SEM_WEBOS 1
-#endif
-#ifdef NV_ANDROID
-#include "android.h"
 #endif
 #include <stdio.h>
 #include <locale.h>
@@ -424,21 +412,6 @@ static void teclasInjetadas(void (*entregar)(const SDL_Event *)) {
       continue;
     }
 
-    // NOME DE TECLA DA SAMSUNG ("XF86Blue", "XF86RaiseChannel", "XF86ChannelGuide"...):
-    // a mesma tabela do .tpk (tpkteclas.c) e o mesmo remapeamento de CH+/CH-
-    // do laco principal (remapCanal). E o simulador da Samsung no Mac.
-    if (!strncmp(linha, "XF86", 4)) {
-      SDL_Event t;
-      if (tpkteclas_evento(linha, 1, &t)) {
-        remapCanal(&t);
-        printf("[tecla] injetada %s -> sym=%d scancode=%d\n", linha,
-               (int)t.key.keysym.sym, (int)t.key.keysym.scancode);
-        fflush(stdout);
-        entregar(&t);
-      }
-      if (tpkteclas_evento(linha, 0, &t)) { remapCanal(&t); entregar(&t); }
-      continue;
-    }
     SDL_Keycode k = codigoDaTecla(linha);
     if (!k) continue;
     SDL_Event e; SDL_zero(e);

@@ -31,10 +31,7 @@
 #include "idiomacod.h"
 #include "plrui.h"
 #include "qr.h"
-#ifdef NV_ANDROID
-#include "android.h"
-#include <sys/stat.h>
-#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

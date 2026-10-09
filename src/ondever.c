@@ -15,9 +15,6 @@
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 #endif
-#ifdef __ANDROID__
-#include "android.h"
-#endif
 
 #define TMDB "https://api.themoviedb.org/3"
 // Uma semana: o pais muda quando a TV muda de casa, nao a cada arranque.

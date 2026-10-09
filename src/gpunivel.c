@@ -11,10 +11,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#ifdef NV_TPK
-#include <dlfcn.h>
-#include "tpk_egl.h"
-#endif
+
 
 #define GPUN_NIVEL_AUTO_MAX 2   // efeitos minimos; o 3 (720p) so forcado, ver gpun_medir
 #define GPUN_ARQ "gpu-nivel.txt"

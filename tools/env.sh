@@ -63,12 +63,8 @@ DSC=$(valor DISCORD_CLIENT_ID)
 # encontrar o valor dentro dele, como com as demais chaves.
 RAIZ="$(cd "$(dirname "$0")/.." && pwd)"
 VER=$(sed -n 's/^[[:space:]]*"version":[[:space:]]*"\([^"]*\)".*/\1/p' "$RAIZ/deploy/app/appinfo.json" | head -1)
-VERT=$(grep -v "<?xml" "$RAIZ/tools/tizen-config.xml" | sed -n 's/.*[[:space:]]version="\([0-9.]*\)".*/\1/p' | head -1)
 if [ -z "$VER" ]; then
   echo "env.sh: nao achei \"version\" em deploy/app/appinfo.json" >&2; exit 2
-fi
-if [ "$VER" != "$VERT" ]; then
-  echo "env.sh: appinfo.json diz $VER e tizen-config.xml diz $VERT -- alinhe antes de compilar" >&2; exit 2
 fi
 
 MISSING_CORE=()

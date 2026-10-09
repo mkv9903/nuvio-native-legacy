@@ -1,6 +1,5 @@
 #include "avisos.h"
 #include "queda.h"
-#include "saidaandroid.h"
 #include "ilha.h"
 #include "ilhasalvar.h"
 #define AV_ILHA_CHAVE "avisos"   // o "N avisos novos" da central na ilha (ilha.c junta)
@@ -697,17 +696,6 @@ void avisos_iniciar(void) {
       fflush(stdout);
       free(m); m = NULL;
     } }
-#ifdef NV_ANDROID
-  // MARCA PRESENTE NAO E CRASH quando o proprio Android diz que matou o
-  // processo por atualizacao, parada forcada ou o app arrastado para fora dos
-  // recentes (saidaandroid.h). Sem isto essas saidas acendiam o aviso de queda
-  // e, abaixo de 60 s, empurravam o modo seguro.
-  if (m && saida_android_nao_foi_queda(getenv("NUVIO_SAIDA_ANTERIOR"))) {
-    printf("[avisos] marca da sessao anterior presente, mas o Android a encerrou sem queda: nao e crash\n");
-    fflush(stdout);
-    free(m); m = NULL;
-  }
-#endif
   if (m) {
     char v[24] = "", sinal[96] = "";
     const char *nl;
