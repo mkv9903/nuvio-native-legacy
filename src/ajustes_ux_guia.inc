@@ -19,8 +19,6 @@
 // legenda ASS, o mesmo painel em vidro e solido, o proprio guia, e as cenas
 // das Novidades. Sem imagem propria, a previa da opcao-alvo em Ajustes.
 // Incluido por ajustes_ux_desenho.inc, depois das pecas e das previas.
-#include "novidades170.h"
-#include "novidades180.h"
 #include "spotlight.h"
 #include "buscanorm.h"
 
@@ -37,14 +35,7 @@ typedef struct {
   int alvo, tela, exemplo, visual;
 } GuiaEnt;
 #include "ajustes_ux_guia_dados.inc"
-#include "p2pmotor.h"
-
-// O cartao do P2P (gerado de guia.json) descreve so o servidor da rede. Num
-// pacote com o motor embutido (p2pmotor.h) isso seria falso: a TV baixa e
-// compartilha. A busca continua sobre o texto gerado (nao abre o motor).
 static const char *guiaTxt(const GuiaEnt *g) {
-  if (g->alvo == AJ_P2P_LIGADO && p2pmotor_disponivel())
-    return "Toca torrents sem link. Sem servidor na rede, o próprio aparelho baixa e compartilha enquanto toca, com teto de disco, e apaga tudo ao fechar o player. O automático nunca escolhe P2P.";
   return g->txt;
 }
 
@@ -546,7 +537,6 @@ static int guiaMiniCena(GfxMini *m, int tipo, int ent, GfxRect r, float x0, floa
       filFoco = f0; filCampo = c0; filAba = a0; filTopo = t0; filNaBarra = b0;
     } break;
     case GV_N170_SPOT: case GV_N170_ILHA:
-      novidades170_cena_desenhar(tipo == GV_N170_SPOT ? 1 : 0, 0, 0, tipo == GV_N170_SPOT ? 5.6f : 8.0f);
       break;
     default: break;
   }
@@ -568,12 +558,8 @@ static float guiaVisual(int tipo, int ent, float x, float y, float w) {
     case GV_FONTES:   return guiaMiniCena(&guiaMiniVis, tipo, ent, (GfxRect){ x, y, w, 440 }, 1020, 40, w / 860.0f, 22, 1) ? 440 : 0;
     case GV_ILHA:     return guiaMiniCena(&guiaMiniVis, tipo, ent, (GfxRect){ x, y, w, 400 }, 0, 10, w / 1140.0f, 22, 1) ? 400 : 0;
     case GV_FILEIRAS: return guiaMiniCena(&guiaMiniVis, tipo, ent, (GfxRect){ x, y, w, 400 }, 60, 120, w / 1160.0f, 22, 1) ? 400 : 0;
-    case GV_N170_SPOT: case GV_N170_ILHA: {
-      // A cena da 1.7 e de pe (760 de largura): inteira pela altura, centrada.
-      float h = 440, esc = h / N170_PREVIA_H, cw = N170_PREVIA_W * esc;
-      gfx_cor((GfxRect){ x, y, w, h }, 22 / h, 0.047f, 0.051f, 0.063f, 1);
-      return guiaMiniCena(&guiaMiniVis, tipo, ent, (GfxRect){ x + (w - cw) * 0.5f, y, cw, h }, 0, 0, esc, 22, 0) ? h : 0;
-    }
+    case GV_N170_SPOT: case GV_N170_ILHA:
+      return 0;
     default: break;
   }
   if (ent >= 0 && GUIA_ENT[ent].alvo >= 0 && !guiaDesenhandoMini) return ajPrevia(GUIA_ENT[ent].alvo, x, y, w);
@@ -838,8 +824,7 @@ static void guiaDesenharExemplo(void) {
   float esc, cw, ch;
   GfxRect m, pv;
   const char *tit = gv.ent >= 0 ? GUIA_ENT[gv.ent].titulo : "";
-  if (c == GX_N180_FONTES || c == GX_N180_ILHA) { esc = 0.72f; cw = N180_CENA_W * esc; ch = N180_CENA_H * esc; }
-  else { esc = 1.0f; cw = N170_PREVIA_W; ch = N170_PREVIA_H; }
+  esc = 1.0f; cw = 760.0f; ch = 520.0f;
   ajVeuModal();
   m = (GfxRect){ (NV_VTELA_W - (cw + 80)) * 0.5f, (NV_VTELA_H - (ch + 150)) * 0.5f, cw + 80, ch + 150 };
   if (m.y < 24) { float k = (NV_VTELA_H - 48 - 150) / ch; esc *= k; cw *= k; ch *= k;
@@ -851,9 +836,6 @@ static void guiaDesenharExemplo(void) {
   if (gfx_mini_alvo(&guiaMiniEx, (int)cw, (int)ch)) {
     gfx_mini_comecar(&guiaMiniEx, 0, 0, esc);
     gfx_cor((GfxRect){ 0, 0, cw / esc, ch / esc }, 0, 0.051f, 0.055f, 0.067f, 1);
-    if (c == GX_N180_FONTES) novidades180_cena_desenhar(N180_CENA_FONTES, guiaExT);
-    else if (c == GX_N180_ILHA) novidades180_cena_desenhar(N180_CENA_ILHA, guiaExT);
-    else novidades170_cena_desenhar(c == GX_N170_SPOT ? 1 : 0, 0, 0, guiaExT);
     gfx_mini_terminar();
     gfx_mini_desenhar(&guiaMiniEx, pv, 28, 1);
   }

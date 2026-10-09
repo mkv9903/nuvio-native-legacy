@@ -8,7 +8,6 @@
 #include "trailerfonte.h"   // NV_TRAILER_CONTINUA_DETALHE, nas ajudas do trailer
 #include "dados.h"
 #include "resolucao.h"
-#include "enquete.h"
 #include "stalker.h"
 #include "xtream.h"
 #include "xtepg.h"
@@ -35,7 +34,15 @@
 #include "perfis.h"
 #include "traktauth.h"
 #include "simklauth.h"
-#include "discord.h"
+typedef enum { DIS_DESLIGADO = 0, DIS_PEDINDO, DIS_AGUARDANDO, DIS_LIGADO, DIS_ERRO, DIS_INVALIDO } DisEstado;
+static inline int discord_disponivel(void) { return 0; }
+static inline DisEstado discord_estado(void) { return DIS_DESLIGADO; }
+static inline void discord_comecar(void) {}
+static inline void discord_cancelar(void) {}
+static inline void discord_esquecer(void) {}
+static inline const char *discord_codigo(void) { return ""; }
+static inline const char *discord_url(void) { return ""; }
+static inline const char *discord_erro(void) { return ""; }
 #include "simkl.h"
 #include "qr.h"
 #include "atualizacao.h"
@@ -51,10 +58,16 @@
 #include "artereserva.h"
 #include "corviva.h"
 #include "fundo.h"
-#include "p2p.h"
-#include "p2pmotor.h"
-#include "pessoas.h"
-#include "recomenda.h"
+static inline int p2pmotor_disponivel(void) { return 0; }
+static inline unsigned p2pmotor_teto_mb(void) { return 0; }
+static inline int p2p_normalizar_url(const char *in, char *out, size_t sz) { (void)in; (void)out; (void)sz; return 0; }
+static inline int p2p_testar(char *v, size_t sz) { (void)v; (void)sz; return 1; }
+#define P2P_OK 0
+#define P2P_ERR_SERVIDOR 1
+#define P2P_ERR_SEM_ESPACO 2
+#define P2P_ERR_DISCO 3
+#define P2P_ERR_DESLIGADO 4
+#define P2P_ERR_NAO_STREMIO 5
 #include "posterprov.h"
 #include "rede.h"
 #include "debrid.h"
@@ -1786,12 +1799,12 @@ int ajustes_720p(void)                { return valor[AJ_RESOLUCAO] == RES_720 &&
 int ajustes_dolby_vision(void)        { return lig(AJ_DV); }
 int ajustes_dolby_atmos(void)         { return lig(AJ_ATMOS); }
 int ajustes_pausa_overlay(void)       { return lig(AJ_PAUSA_OVERLAY); }
-int ajustes_reacao_creditos(void)     { return lig(AJ_REACAO_CREDITOS); }
+int ajustes_reacao_creditos(void)     { return 0; }
 int ajustes_medidor_desempenho(void)  { return valor[AJ_MEDIDOR]; }
 int ajustes_fonte_manual(void)        { return lig(AJ_FONTE_MANUAL); }
 int ajustes_fonte_primeira(void)      { return valor[AJ_FONTE_AUTO] == 1; }
 int ajustes_fonte_prioridade(void) { int v = valor[AJ_FONTE_PRIORIDADE]; return v < 0 || v > 2 ? 0 : v; }
-int ajustes_enquetes(void)         { return lig(AJ_ENQUETES); }
+int ajustes_enquetes(void)         { return 0; }
 int ajustes_busca_cinemeta(void)   { return lig(AJ_BUSCA_CINEMETA); }
 int ajustes_esmaecer(void)         { int v = valor[AJ_ESMAECER]; return v < 0 || v > 5 ? 3 : v; }
 int ajustes_descanso_estilo(void)  { int v = valor[AJ_DESCANSO_ESTILO]; return v < 0 || v > 2 ? 0 : v; }
@@ -2219,7 +2232,7 @@ int ajustes_ps_continuar(void)        { return lig(AJ_PS_CONTINUAR); }
 int ajustes_dts_ac3(void)             { return valor[AJ_DTS_AC3] == 1; }
 int ajustes_dv_mkv(void)              { return lig(AJ_DV_MKV); }
 int ajustes_hist_conta(void)          { return lig(AJ_HIST_CONTA); }
-int ajustes_social(void)              { return lig(AJ_SOCIAL); }
+int ajustes_social(void)              { return 0; }
 // Espaco da Home em fracao do valor medido. Fora da faixa do NUM (arquivo torto)
 // volta para dentro dela; 0 (arquivo sem a chave) nao chega aqui: o padrao e 100.
 float ajustes_espaco_fator(int pct) {
@@ -4511,11 +4524,7 @@ static const char *textoLeitura(int op) {
     return selospacote_da_tv(a) ? i18n("OK remove") : i18n("só na conta, no Nuvio web");
   }
   if (op == AJ_PERFIL_EDITAR) {
-    // static: o texto devolvido e lido DEPOIS do return (era endereco de
-    // variavel local, -Wreturn-stack-address).
-    static RecPerfil pf;
-    recomenda_perfil(&pf);
-    return pf.apelido[0] ? pf.apelido : i18n("Não configurado");
+    return i18n("Não configurado");
   }
   if (op == AJ_FONTE_ORDEM) return frOrdemResumo();
   if (op == AJ_FONTE_ADDONS_PERM) return frResumo(0);
@@ -4791,7 +4800,7 @@ static int visivel(int i) {
   }
   if (TELA[i].tipo == IT_OPC) {
     int op = TELA[i].op;
-    if ((op == AJ_PERFIL_PESQ || op == AJ_PERFIL_EDITAR) && !recomenda_ativo()) return 0;
+    if (op == AJ_PERFIL_PESQ || op == AJ_PERFIL_EDITAR || op == AJ_SOCIAL) return 0;
     if (uxAvancada(op) && !lig(AJ_AVANCADAS)) return 0;
   }
   return 1;
@@ -6015,10 +6024,7 @@ static int definirValorDireto(int op, int novo) {
   if (op < 0 || op >= AJ_N ||
       (OPCOES[op].tipo != OP_ESCOLHA && OPCOES[op].tipo != OP_NUMERO)) return 0;
   novo = limita(op, novo);
-  if (op == AJ_PERFIL_PESQ) {
-    pessoas_definir_pesquisavel(novo == 0);
-    return 1;
-  }
+  if (op == AJ_PERFIL_PESQ) return 1;
   antes = valor[op];
   if (novo == antes) return 1;
   valor[op] = novo;
@@ -6046,7 +6052,6 @@ static int definirValorDireto(int op, int novo) {
   }
   // Back to Automatic = measure again at the next launch.
   if (op == AJ_RESOLUCAO && novo == RES_AUTO) dados_apagar(RES_ARQ_AUTO);
-  if (op == AJ_ENQUETES) enquete_definir_optout(novo != 0);
   if (op == AJ_ADDONS_PRINCIPAL) sync_iniciar();
   if (op == AJ_SELOS_PACOTE) { selospacote_escolher(novo - 1); spEspelhar(); }
   // Modelo de regex (#202): escolher um troca o padrao; "Personalizado" so
@@ -6259,7 +6264,7 @@ static void eventoTela(const SDL_Event *e) {
     if (focoOp >= AJ_JF_SERVIDOR && focoOp <= AJ_JF_SAIR) { jfAtivar(focoOp); return; }
     if (focoOp >= AJ_EM_SERVIDOR && focoOp <= AJ_EM_SAIR) { emAtivar(focoOp); return; }
     if (focoOp >= AJ_PX_ENTRAR && focoOp <= AJ_PX_SAIR) { pxAtivar(focoOp); return; }
-    if (focoOp == AJ_PERFIL_EDITAR) { pessoas_abrir_perfil(); return; }
+    if (focoOp == AJ_PERFIL_EDITAR) { return; }
     if (focoOp == AJ_P2P_TESTAR) { p2pTesteIniciar(); return; }
     if (focoOp >= AJ_POSTER_INST && focoOp <= AJ_POSTER_TESTAR) { pstAtivar(focoOp); return; }
     if (debIdx(focoOp) >= 0) {
@@ -6314,22 +6319,18 @@ void ajustes_atualizar(float dt, Uint32 agora) {
   guiaAtualizar(dt);
   if (uxAviso[0] && SDL_TICKS_PASSED(agora, uxAvisoAte)) uxAviso[0] = 0;
   montarTela();
-  valor[AJ_PERFIL_PESQ] = recomenda_pesquisavel() ? 0 : 1;   // V_LIGA: 0 = Ligado
+  valor[AJ_PERFIL_PESQ] = 1;
   valor[AJ_FONTE_REGEX_MODELO] = fonteregra_modelo_atual();   // espelho do padrao (#202)
   p2pTesteRecolher();
   pstTesteRecolher();
   adTesteRecolher();
   skTesteRecolher();
   spRecolher();
-  // "Procurar atualização" achou versao nova: abre o cartao por cima dos
-  // Ajustes, como o OK em "Atualizar o aplicativo" ja fazia.
   if (atualizacao_busca_achou() && !atualizacao_aberta()) atualizacao_abrir();
-  if (teclado_aberto() && !pessoas_aberto()) teclado_atualizar(dt, agora);
+  if (teclado_aberto()) teclado_atualizar(dt, agora);
   // O resultado e CONSUMIDO NA LEITURA (ver teclado.h): ler duas vezes daria
   // TECLADO_NADA na segunda, e por isso a gravacao acontece aqui, uma vez.
-  // COM A MODAL DE PESSOAS ABERTA O TECLADO E DELA: ler aqui consumiria o
-  // resultado antes de ela ver (e o apelido digitado se perderia em silencio).
-  { int r = pessoas_aberto() ? TECLADO_NADA : teclado_resultado();
+  { int r = teclado_resultado();
     if (r == TECLADO_PRONTO && stCampo) {
       if (stCampo == AJ_STALKER_MAC) stalker_definir_mac(teclado_texto());
       else if (stCampo == AJ_XTREAM_SERVIDOR) xtream_definir_servidor(teclado_texto());

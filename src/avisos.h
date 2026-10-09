@@ -74,9 +74,7 @@ int  avisos_cartao_aberto(void);
 // ACOES PEDIDAS PELO PAINEL, entregues a app.c uma vez cada (o mesmo contrato
 // de spainel_pediu_abrir): o IMDb de um titulo a abrir, ou um dos codigos.
 const char *avisos_pediu_abrir(void);
-// AVISOS_ABRIR_AMIGOS: a linha dos pedidos de amizade (o painel vai para a
-// aba Amigos, onde cada pedido tem Aceitar e Recusar).
-enum { AVISOS_NADA = 0, AVISOS_ABRIR_SALVOS, AVISOS_ABRIR_ATUALIZACAO, AVISOS_ABRIR_AMIGOS };
+enum { AVISOS_NADA = 0, AVISOS_ABRIR_SALVOS, AVISOS_ABRIR_ATUALIZACAO };
 int  avisos_pediu(void);
 
 // ENVIO MANUAL DO REGISTRO DESTA SESSAO, pela linha "Enviar registro" dos

@@ -307,7 +307,7 @@ int net_request(const NetRequest *p, NetResponse *r) {
       REQ_OPT(OPT_SSL_VERIFYPEER, is_personal ? 0L : 1L);
       REQ_OPT(OPT_SSL_VERIFYHOST, is_personal ? 0L : 2L);
     }
-    if (p->ca_file || net_discord_ca_bundle[0]) REQ_OPT(OPT_CAINFO, p->ca_file ? p->ca_file : net_discord_ca_bundle);
+    if (p->ca_file) REQ_OPT(OPT_CAINFO, p->ca_file);
     REQ_OPT(OPT_USERAGENT, "Nuvio/1.8");
     /* Media diagnostics measure the player's wire body, without transparent
      * gzip inflation. Buffered requests retain negotiated decompression. */

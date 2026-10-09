@@ -43,7 +43,6 @@
 #include "detail.h"
 #include "dados.h"
 #include "negcache.h"
-#include "p2pmotor.h"
 #include <pthread.h>
 #include <stdatomic.h>
 #include <time.h>
@@ -432,34 +431,6 @@ static void teclasInjetadas(void (*entregar)(const SDL_Event *)) {
 // viewport.
 static int capW = (int)NV_TELA_W, capH = (int)NV_TELA_H;
 
-// PORTA DE TESTE DO MOTOR P2P: "p2p:<infoHash>" no pedido de video resolve o
-// torrent pelo motor embutido (num fio: metadados, pares, primeiros bytes) e
-// toca a URL local, cronometrando do pedido ate a URL. "-" para o video e
-// solta o motor (app.c o para como se o player tivesse fechado). So torrent
-// legal: Big Buck Bunny (dd8255ecdc7ca55fb0bbf81323d87062db1f6d1c), Sintel.
-static char p2pTesteUrl[600];
-static _Atomic int p2pTesteEstado;   // 0 nada, 1 resolvendo, 2 pronto (url ou erro)
-static char p2pTesteHash[48];
-static struct timespec p2pTesteT0;
-static void *p2pTesteFio(void *x) {
-  int e;
-  (void)x;
-  e = p2pmotor_resolver(p2pTesteHash, -1, "", 0, 0, p2pTesteUrl, sizeof p2pTesteUrl);
-  if (e) printf("[p2p-teste] erro %d\n", e);
-  atomic_store(&p2pTesteEstado, 2);
-  return NULL;
-}
-static void p2pTesteBombear(void) {
-  struct timespec a;
-  if (atomic_load(&p2pTesteEstado) != 2) return;
-  atomic_store(&p2pTesteEstado, 0);
-  clock_gettime(CLOCK_MONOTONIC, &a);
-  printf("[p2p-teste] url em %.1f s\n", (double)(a.tv_sec - p2pTesteT0.tv_sec) +
-         (double)(a.tv_nsec - p2pTesteT0.tv_nsec) / 1e9);
-  fflush(stdout);
-  if (p2pTesteUrl[0]) { video_tocar(p2pTesteUrl); video_janela(0, 0, 1920, 1080); }
-  else p2pmotor_segurar(0);
-}
 // No Android nao ha /tmp: o pedido mora na pasta de dados (adb run-as).
 static const char *pedidoVideo(void) {
 #ifdef NV_ANDROID
@@ -514,45 +485,14 @@ static void *pedVidFio(void *x) {
 static void videoSeSolicitado(void) {
   static time_t bloqueado;
   char url[1024];
-  FILE *f;
-  p2pTesteBombear();
-#ifndef __EMSCRIPTEN__
-  { static int tentou;
-    if (!tentou) {
-      pthread_t t;
-      tentou = 1;
-      pedidoVideo();   // monta o caminho aqui, antes do fio ler
-      atomic_store(&pedVidTam, -1L);
-      if (pthread_create(&t, NULL, pedVidFio, NULL) == 0) { pthread_detach(t); atomic_store(&pedVidFioOk, 1); }
-    }
-    if (atomic_load(&pedVidFioOk)) {
-      // Mesma regra de pedidoNovo, com o que o fio viu.
-      if (atomic_load(&pedVidTam) <= 0) return;
-      if (bloqueado && (time_t)atomic_load(&pedVidMtime) == bloqueado) return;
-      bloqueado = 0;
-      atomic_store(&pedVidTam, -1L);   // atendido; o fio volta a olhar em 250 ms
-    } else if (!pedidoNovo(pedidoVideo(), &bloqueado)) return;
-  }
-#else
-  if (!pedidoNovo(pedidoVideo(), &bloqueado)) return;
-#endif
-  f = fopen(pedidoVideo(), "r");
+  FILE *f = fopen(pedidoVideo(), "r");
   if (!f) return;
   if (fgets(url, sizeof url, f)) {
     char *fim = url + strlen(url);
     while (fim > url && (fim[-1] == '\n' || fim[-1] == '\r')) *--fim = 0;
     { char pub[120]; printf("[video] pedido: %s\n", rede_url_publica(url, pub, sizeof pub)); }
     fflush(stdout);
-    if (url[0] == '-') { video_parar(); p2pmotor_segurar(0); }
-    else if (!strncmp(url, "p2p:", 4) && p2pmotor_disponivel() && atomic_load(&p2pTesteEstado) == 0) {
-      pthread_t t;
-      snprintf(p2pTesteHash, sizeof p2pTesteHash, "%s", url + 4);
-      clock_gettime(CLOCK_MONOTONIC, &p2pTesteT0);
-      p2pmotor_segurar(1);
-      atomic_store(&p2pTesteEstado, 1);
-      if (pthread_create(&t, NULL, p2pTesteFio, NULL) == 0) pthread_detach(t);
-      else { atomic_store(&p2pTesteEstado, 0); p2pmotor_segurar(0); }
-    }
+    if (url[0] == '-') video_parar();
     else { video_tocar(url); video_janela(0, 0, 1920, 1080); }
   }
   fclose(f);
@@ -1112,27 +1052,6 @@ int main(int argc, char **argv) {
   printf("[arranque] rede_preparar\n"); fflush(stdout);
   NV_ETAPA("rede_preparar");
   // ANTES de tex_iniciar e de app_iniciar, que sao quem cria os fios de rede.
-  // Discord alone uses the bundled Mozilla roots on native TV builds.
-  char discordCa[4096];
-  snprintf(discordCa, sizeof discordCa, "%s/discord-ca.pem", dirArte);
-#if (defined(__APPLE__) || defined(NV_LINUX_DESKTOP)) && !defined(NV_ANDROID) && !defined(NV_TPK)
-  FILE *discordRoots = fopen(discordCa, "rb");
-  if (discordRoots) fclose(discordRoots);
-  else discordCa[0] = 0; // Desktop development can use system trust.
-#endif
-#ifdef NV_TPK
-  // #290: the .tpk in-app update replaces only libnuvio.so; res/art is the
-  // one from the installed package, and discord-ca.pem only ships since
-  // 1.7.4. A CAINFO pointing at a missing file makes curl fail every verified
-  // https request at once (CURLE_SSL_CACERT_BADFILE). Without the bundle,
-  // fall back to the TV's own trust store.
-  if (access(discordCa, R_OK) != 0) {
-    printf("[rede] %s missing from the package: using the TV's CA store\n", discordCa);
-    fflush(stdout);
-    discordCa[0] = 0;
-  }
-#endif
-  rede_discord_ca(discordCa);
   rede_preparar();
   // NIVEL DE GPU (gpunivel.h): le GL_*, marca a GPU fraca no perfil e decide
   // o nivel de partida ANTES de tex_iniciar, que tira o perfil do aparelho.
@@ -1982,9 +1901,6 @@ int main(int argc, char **argv) {
   gfx_borrao_encerrar();
   gfx_snap_encerrar();
   app_encerrar();
-  // Motor P2P embutido: cancela e espera o destroy por ate P2PM_SAIDA_MS; o
-  // cache so e apagado depois do destroy (ou no proximo inicio). No-op sem motor.
-  p2pmotor_saida();
   corviva_gravar_se_preciso(1);
   tex_encerrar();
   txt_encerrar();

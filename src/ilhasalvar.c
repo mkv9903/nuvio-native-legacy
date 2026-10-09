@@ -4,7 +4,6 @@
 #include "ilha.h"
 #include "ilhaacao.h"
 #include "ajustes.h"
-#include "atividade.h"
 #include "dados.h"
 #include "descoberta.h"
 #include "idioma.h"
@@ -48,7 +47,6 @@ typedef struct { CatItem ci; int entrou; } SalvarCtx;
 
 static void gravarLista(const CatItem *ci, int entrar) {
   salvos_definir(ci, entrar);
-  atividade_salvo(ci, entrar);
   if (ajustes_salvos_no_trakt() && trakt_ativo()) trakt_watchlist_tipo(ci->imdb, ci->tipo, entrar);
   else if (ajustes_salvos_no_simkl() && simkl_ativo()) simkl_lista_tipo(ci->imdb, ci->tipo, entrar);
   cat_definir_na_lista_imdb(ci->imdb, entrar);

@@ -21,7 +21,6 @@
 #include "gfx.h"
 #include "layout.h"
 #include "menu.h"
-#include "recomenda.h"
 #include "salvosintro.h"
 #include "text.h"
 #include "plrui.h"
@@ -788,14 +787,49 @@ static void fraseDesenhar(const Frase *f, float x, float yc, float a) {
     txt_desenhar_alpha(f->l[i], x + f->x[i], yc - (float)f->l[i].h * 0.5f, a);
 }
 
-// O ROSTO de 36 (ou o do modal): a foto, ou a inicial num disco com a cor da
-// pessoa — rec_avatar, o MESMO desenho da aba Social, para a mesma pessoa ter
-// a mesma cor nas duas superficies.
-static void rostoEm(GfxRect r, const char *url, const char *nome, float a) {
-  // A letra acompanha o disco: 15 Bold no de 28-36, 28 no de 64, 48 Bold no
-  // de 150 (o mockup: 13-16/700, 26/700, 60/700).
-  int es = r.w >= 100.0f ? TXT_TITULO3 : r.w >= 48.0f ? TXT_CALLOUT : TXT_MINI;
-  rec_avatar_estilo(r, url, nome && nome[0] ? nome : "?", nome, a, es);
+static void recCorDoId(const char *id, float *r, float *g, float *b) {
+  static const float PALETA[6][3] = {
+    { 0.180f, 0.490f, 0.910f },
+    { 0.400f, 0.733f, 0.416f },
+    { 0.855f, 0.420f, 0.290f },
+    { 0.560f, 0.420f, 0.850f },
+    { 0.910f, 0.650f, 0.200f },
+    { 0.180f, 0.680f, 0.700f },
+  };
+  unsigned h = 2166136261u;
+  const char *p = id ? id : "";
+  for (; *p; p++) { h ^= (unsigned char)*p; h *= 16777619u; }
+  h %= 6u;
+  *r = PALETA[h][0]; *g = PALETA[h][1]; *b = PALETA[h][2];
+}
+
+static void recInicial(const char *nome, char *dst, size_t tam) {
+  size_t z = 1;
+  if (tam < 5) { if (tam) dst[0] = 0; return; }
+  if (!nome || !nome[0]) { dst[0] = '?'; dst[1] = 0; return; }
+  while (z < 4 && (nome[z] & 0xc0) == 0x80) z++;
+  memcpy(dst, nome, z);
+  dst[z] = 0;
+}
+
+static void rostoEm(GfxRect a, const char *url, const char *nome, float alfa) {
+  GLuint foto = (url && url[0]) ? tex_obter_larg(url, a.w) : 0;
+  gfx_rect(a, 0, GFX_DISCO, 0, 0, 0, 0, 0.09f, 0.09f, 0.10f, alfa);
+  if (foto) {
+    gfx_tex_aspect_atual = tex_aspecto(url);
+    gfx_rect(a, foto, GFX_AVATAR, 0, 0, 0, 0, 1, 1, 1, alfa);
+    gfx_tex_aspect_atual = 0.0f;
+    return;
+  }
+  { float cr, cg, cb;
+    char ini[8];
+    TxtLinha l;
+    recCorDoId(nome && nome[0] ? nome : "?", &cr, &cg, &cb);
+    gfx_rect(a, 0, GFX_DISCO, 0, 0, 0, 0, cr, cg, cb, alfa);
+    recInicial(nome, ini, sizeof ini);
+    int es = a.w >= 100.0f ? TXT_TITULO3 : a.w >= 48.0f ? TXT_CALLOUT : TXT_MINI;
+    l = txt_linha((TxtEstilo)es, ini, 255, 255, 255, 255);
+    txt_desenhar_alpha(l, a.x + (a.w - l.w) * 0.5f, a.y + (a.h - l.h) * 0.5f, alfa); }
 }
 static void capaEm(GfxRect r, const char *url, float a) {
   // "-" = lugar de capa sem url (o duo do cartao do amigo): so o esqueleto.

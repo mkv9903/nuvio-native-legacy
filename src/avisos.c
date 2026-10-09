@@ -14,7 +14,6 @@
 #include "layout.h"
 #include "idioma.h"
 #include "ajustes.h"
-#include "recomenda.h"
 #include "atualizacao.h"
 #include "salvosintro.h"
 #include "registro.h"
@@ -72,7 +71,7 @@
 // olhando um card do outro lado da tela leva um tempo para notar o canto.
 #define AV_TOAST_MS   20000.0f
 
-enum { AV_REC, AV_AGENDA, AV_UPDATE, AV_CANAL, AV_CRASH, AV_PEDIDO };
+enum { AV_AGENDA, AV_UPDATE, AV_CANAL, AV_CRASH };
 typedef struct {
   char id[72];
   int  tipo;
@@ -99,7 +98,6 @@ static Uint32 okDesde;              // OK afundado numa linha da central (soltar
 static void soltarOk(int longo);
 static float entrada, rol;
 static int   toastN;
-static long long recAnunciada = -1;   // id da ultima recomendacao dita na ilha
 static int   vistosSujos;
 
 // Acoes entregues a app.c.
@@ -736,8 +734,6 @@ void avisos_iniciar(void) {
       // DADO DE MENTIRA, nao rotulo: os textos abaixo imitam o que a rede
       // traria (nome de amigo, titulo, aviso do dono), por isso passam por
       // demoAviso e nao por i18n — a varredura de i18n sabe disso.
-      novos += demoAviso("demo:rec", AV_REC, i18n("Recomendação de amigo"),
-                   "Gustavo recomendou \"The Gentlemen\": \"vale cada minuto\". Abra Salvos para ver.", NULL);
       novos += demoAviso("demo:agenda", AV_AGENDA, i18n("Episódio novo"),
                    "Outlander — T7E9 · Unfinished Business", "tt3006802");
       novos += demoAviso("demo:update", AV_UPDATE, i18n("Atualização disponível"),
@@ -851,43 +847,6 @@ void avisos_encerrar(void) {
 static void colherLocais(void) {
   int novos = 0;
   pthread_mutex_lock(&trava);
-  // Recomendacoes
-  { int k = recomenda_ativo() ? recomenda_n_novas() : 0;
-    if (k > 0) {
-      char txt[200];
-      RecItem r;
-      snprintf(txt, sizeof txt, k == 1 ? i18n("%d recomendação nova de um amigo. Abra Salvos para ver.")
-                                       : i18n("%d recomendações novas de amigos. Abra Salvos para ver."), k);
-      novos += por("rec", AV_REC, i18n("Recomendação de amigo"), txt, NULL);
-      // UMA VEZ POR RECOMENDACAO, nao por item da lista: o item "rec" e um so
-      // (a contagem troca no lugar), mas cada recomendacao nova que chega e um
-      // assunto novo para a ilha ("Ana recomendou Fallout"). Guarda o id da
-      // ultima anunciada; a mais nova diferente dela e ainda nao vista anuncia.
-      if (recomenda_item(0, &r) && !r.visto && r.id != recAnunciada) {
-        int i;
-        recAnunciada = r.id;
-        for (i = 0; i < n; i++) if (!strcmp(itens[i].id, "rec")) {
-          if (!itens[i].anunciar) { itens[i].anunciar = 1; novos++; }
-        }
-      }
-    } else tirar("rec"); }
-  // PEDIDOS DE AMIZADE: uma linha so, com a contagem, que leva a aba Amigos.
-  // A chave e o pedido mais novo: um pedido novo acende o ponto de "novo" de
-  // novo; o mesmo pedido relido nao. A ilha ja disse o assunto
-  // (ilhasinais.c), entao a linha nao vai para a ilha (anunciar = 0).
-  { int k = recomenda_ativo() ? recomenda_n_pedidos() : 0, i;
-    char id[40] = "";
-    RecPessoa p;
-    if (k > 0 && recomenda_pedido(0, &p) && p.pub[0]) snprintf(id, sizeof id, "pedidos:%s", p.pub);
-    for (i = n - 1; i >= 0; i--)
-      if (!strncmp(itens[i].id, "pedidos:", 8) && strcmp(itens[i].id, id)) tirar(itens[i].id);
-    if (id[0]) {
-      char txt[200];
-      snprintf(txt, sizeof txt, k == 1 ? i18n("%d pessoa quer ser sua amiga.")
-                                       : i18n("%d pessoas querem ser suas amigas."), k);
-      (void)por(id, AV_PEDIDO, i18n("Pedidos de amizade"), txt, NULL);
-      for (i = 0; i < n; i++) if (!strcmp(itens[i].id, id)) itens[i].anunciar = 0;
-    } }
   // Atualizacao
   { const char *v = atualizacao_nova();
     if (v && v[0]) {
@@ -1015,18 +974,16 @@ int avisos_evento(const SDL_Event *e) {
 
 static const char *icone(int tipo) {
   switch (tipo) {
-    case AV_REC:    return "recomendar";
     case AV_AGENDA: return "lembrete";
     case AV_UPDATE: return "avancar";
     case AV_CRASH:  return "fluxo";
-    case AV_PEDIDO: return "aj_users";
     default:        return "menu_settings";
   }
 }
 
 // O TOAST MORA NA ILHA (01/10/2026, pedido do dono), e desde 02/10 ele DIZ O
-// ASSUNTO (mockup aprovado): em vez de "1 aviso novo", "Ana recomendou
-// Fallout", "Saiu T2E5 de The Bear", "Versão 1.7.2 chegou". Cada item novo
+// ASSUNTO (mockup aprovado): em vez de "1 aviso novo",
+// "Saiu T2E5 de The Bear", "Versão 1.7.2 chegou". Cada item novo
 // entra na ilha como um aviso da CENTRAL (grupo = 1, chave "av:<id>"); quando
 // chegam varios juntos, ilha.c deixa o primeiro dizer o seu e junta os que
 // esperam num "N avisos novos" que abre esta lista — o mesmo toast de antes,
@@ -1034,13 +991,12 @@ static const char *icone(int tipo) {
 // fechada e sem o cartao do crash na frente (avisos_desenhar).
 //
 // Os que tem para onde ir levam o MODAL da ilha (a pilula cresce, AZUL/CH+):
-// recomendacao (Ver / Salvar / Dispensar), versao nova (Atualizar / Depois),
+// versao nova (Atualizar / Depois),
 // queda (Enviar registro / Agora não / Dispensar) e o aviso do dono (o texto
 // inteiro; Fechar / Dispensar). Voltar recolhe sem mudar nada; "Dispensar"
 // tira o item da lista de vez (avisos_dispensar, avisodisp.h). O
 // episodio novo abre o modal do cartao de estreia (ilhacart.c), quando ele
 // esta na pilula. Quem executa o botao e avisos_ilha_acao.
-static RecItem recDaIlha;              // a recomendacao que o modal mostra
 static void anunciarItem(const Aviso *it) {
   char chave[96], txt[240], f1[200], f2[200];
   IlhaAvisoEx e;
@@ -1050,37 +1006,6 @@ static void anunciarItem(const Aviso *it) {
   snprintf(chave, sizeof chave, "av:%s", it->id);
   e.chave = chave; e.grupo = 1; e.texto = txt;
   switch (it->tipo) {
-    case AV_REC: {
-      RecItem *r = &recDaIlha;
-      int idx;
-      if (!recomenda_item(0, r) || !r->titulo[0]) { snprintf(txt, sizeof txt, "%s", it->texto); e.tipo = ILHA_ACENTO; e.icone = "recomendar"; e.tecla = 1; e.ms = 8000u; break; }
-      snprintf(txt, sizeof txt, i18n("%s recomendou %s"),
-               ilha_forte(f1, sizeof f1, r->deNome[0] ? r->deNome : "?"), ilha_forte(f2, sizeof f2, r->titulo));
-      e.tipo = ILHA_ACENTO; e.ms = 8000u;
-      e.rosto = r->deAvatar; e.rostoNome = r->deNome[0] ? r->deNome : "?"; e.capa = r->poster;
-      snprintf(m.kicker, sizeof m.kicker, i18n("Recomendação de %s"), r->deNome[0] ? r->deNome : "?");
-      snprintf(m.titulo, sizeof m.titulo, "%s", r->titulo);
-      { char nota[24] = "";
-        if (r->nota > 0) snprintf(nota, sizeof nota, " · IMDb %d,%d", r->nota / 10, r->nota % 10);
-        snprintf(m.linha, sizeof m.linha, "%s%s%s%s", i18n(!strncmp(r->tipo, "series", 6) ? "Série" : "Filme"),
-                 r->ano[0] ? " · " : "", r->ano, nota); }
-      { const char *fr = rec_frase(r);
-        if (fr && fr[0]) snprintf(m.fala, sizeof m.fala, "\xe2\x80\x9c%s\xe2\x80\x9d", fr); }
-      if (r->criado > 0) rec_quando_texto(m.estado, sizeof m.estado, r->criado);
-      // A ARTE 16:9 do titulo quando ele esta no catalogo; senao o cartaz.
-      idx = r->imdb[0] ? cat_indice_por_imdb(r->imdb) : -1;
-      { const CatItem *ci = idx >= 0 ? cat_item(idx) : NULL;
-        snprintf(m.arte, sizeof m.arte, "%s", ci && ci->backdrop[0] ? ci->backdrop : r->poster); }
-      snprintf(m.rosto, sizeof m.rosto, "%s", r->deAvatar);
-      snprintf(m.rostoNome, sizeof m.rostoNome, "%s", r->deNome[0] ? r->deNome : "?");
-      m.salvos = 1; m.nBotoes = 3;
-      snprintf(m.botao[0], sizeof m.botao[0], "%s", i18n("Ver"));
-      snprintf(m.botaoIcone[0], sizeof m.botaoIcone[0], "play");
-      snprintf(m.botao[1], sizeof m.botao[1], "%s", i18n("Salvar"));
-      snprintf(m.botaoIcone[1], sizeof m.botaoIcone[1], "aj_bookmark");
-      snprintf(m.botao[2], sizeof m.botao[2], "%s", i18n("Dispensar"));
-      e.modal = &m;
-      break; }
     case AV_AGENDA: {
       const AgItem *ag = it->alvo[0] ? agenda_registro(it->alvo) : NULL;
       const char *tit = ag && ag->titulo[0] ? ag->titulo : it->texto;
@@ -1172,7 +1097,7 @@ static void anunciarNaIlha(void) {
     char ch[96];
     itens[i].anunciar = 0;
     snprintf(ch, sizeof ch, "av:%s", itens[i].id);
-    if (strcmp(itens[i].id, "rec") && avisodisp_sessao_tem(ch)) continue;
+    if (avisodisp_sessao_tem(ch)) continue;
     avisodisp_sessao_por(ch);
     copia[k++] = itens[i];
   }
@@ -1194,34 +1119,7 @@ void avisos_ilha_acao(const char *chave, int botao) {
   const char *id;
   if (!chave || strncmp(chave, "av:", 3)) return;
   id = chave + 3;
-  if (!strcmp(id, "rec")) {
-    if (botao == 1 && recDaIlha.imdb[0]) snprintf(pediuAbrir, sizeof pediuAbrir, "%s", recDaIlha.imdb);
-    else if (botao == 2 && recDaIlha.imdb[0]) {
-      // SALVAR: o titulo do catalogo quando existe, senao o que a
-      // recomendacao trouxe (o mesmo minimo que salvos.c guarda).
-      int idx = cat_indice_por_imdb(recDaIlha.imdb);
-      const CatItem *ci = idx >= 0 ? cat_item(idx) : NULL;
-      static CatItem tmp;
-      if (!ci) {
-        memset(&tmp, 0, sizeof tmp);
-        snprintf(tmp.imdb, sizeof tmp.imdb, "%s", recDaIlha.imdb);
-        snprintf(tmp.tipo, sizeof tmp.tipo, "%s", recDaIlha.tipo);
-        snprintf(tmp.titulo, sizeof tmp.titulo, "%s", recDaIlha.titulo);
-        snprintf(tmp.poster, sizeof tmp.poster, "%s", recDaIlha.poster);
-        ci = &tmp;
-      }
-      // Primeira vez: a ilha pergunta onde o + salva e grava depois (ilhasalvar.c).
-      if (!ilhasalvar_perguntar(ci, 1)) {
-        salvos_definir(ci, 1);
-        // O Trakt so se a pessoa pediu (o mesmo criterio do "+", app.c).
-        if (ajustes_salvos_no_trakt()) trakt_watchlist(ci->imdb, 1);
-        ilhasalvar_aviso(ci, 1);
-      }
-    }
-    // As tres respondem a recomendacao: o selo apaga (o mesmo que abrir Salvos).
-    recomenda_marcar_vistas();
-    if (botao == 3) { avisos_dispensar(id); return; }
-  } else if (!strncmp(id, "update:", 7)) {
+  if (!strncmp(id, "update:", 7)) {
     if (botao == 1) pediuCodigo = AVISOS_ABRIR_ATUALIZACAO;
   } else if (!strncmp(id, "crash:", 6)) {
     if (botao == 1) enviarAgora();
@@ -1262,8 +1160,7 @@ static int ehCanalExpansivel(int i) { return i >= 0 && i < n && itens[i].tipo ==
 // primeiro, a da aba Avisos do painel Social.
 static float larguraTextoAviso = 610.0f;
 static int temAcaoAviso(const Aviso *av) {
-  return av->tipo == AV_REC || av->tipo == AV_AGENDA || av->tipo == AV_UPDATE || av->tipo == AV_CRASH ||
-         av->tipo == AV_PEDIDO;
+  return av->tipo == AV_AGENDA || av->tipo == AV_UPDATE || av->tipo == AV_CRASH;
 }
 // A LINHA EM FOCO SEMPRE TEM A LINHA DE ACAO (06/10): e onde mora "Segure OK
 // para dispensar". Fora do foco so quem tem acao a desenha.
@@ -1356,8 +1253,6 @@ void avisos_lista_desenhar(float x, float y0, float w, float a, int focoLinha) {
     }
     else txt_bloco(TXT_ILHA_SUB, av->texto, 243, 242, 239, tx, y + 51.0f, tw, 25.0f, a * 0.62f, 2);
     switch (av->tipo) {
-      case AV_REC:    acao = i18n("OK abre Salvos"); break;
-      case AV_PEDIDO: acao = i18n("OK abre Amigos para aceitar"); break;
       case AV_AGENDA: acao = i18n("OK abre o título"); break;
       case AV_UPDATE: acao = i18n("OK abre a atualização"); break;
       case AV_CRASH:  acao = envioEstado == 1 ? i18n("Enviando…") : envioEstado == 2 ? i18n("Registro enviado. Obrigado.")
@@ -1410,9 +1305,6 @@ int avisos_lista_ok(int linha) {
     return 0;
   }
   switch (a.tipo) {
-    case AV_REC:    pediuCodigo = AVISOS_ABRIR_SALVOS; return 1;
-    // 2 = o painel fica aberto (so troca de aba); a central fecha como sempre.
-    case AV_PEDIDO: pediuCodigo = AVISOS_ABRIR_AMIGOS; return 2;
     case AV_UPDATE: pediuCodigo = AVISOS_ABRIR_ATUALIZACAO; return 1;
     case AV_AGENDA: snprintf(pediuAbrir, sizeof pediuAbrir, "%s", a.alvo); return 1;
     case AV_CRASH:
@@ -1481,8 +1373,7 @@ void avisos_dispensar(const char *id) {
     break;
   }
   pthread_mutex_unlock(&trava);
-  if (!strcmp(ch, "rec")) recomenda_marcar_vistas();
-  else avisodisp_por(ch);
+  avisodisp_por(ch);
   if ((tipo == AV_AGENDA || (tipo < 0 && !strncmp(ch, "agenda:", 7))) && imdb[0]) agenda_marcar_avisado(imdb);
   pthread_mutex_lock(&trava);
   marcarVisto(ch);

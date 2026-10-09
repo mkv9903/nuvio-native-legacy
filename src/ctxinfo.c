@@ -3,7 +3,6 @@
 #include "extras.h"
 #include "notasui.h"
 #include "imdbnota.h"
-#include "amigostitulo.h"
 #include "agenda.h"
 #include "logotitulo.h"
 #include "descoberta.h"
@@ -207,9 +206,7 @@ static void montar(const CatItem *ci, const CtxInfoEstado *st, Modelo *m) {
       if (ci->nomeEpisodio[0]) juntar(m->prog, sizeof m->prog, ci->nomeEpisodio);
     } }
 
-  { AmigosTitulo t;
-    if (temId(ci) && amigostitulo_obter(ci->imdb, &t))
-      amigostitulo_linha_ilha(&t, m->amigos, sizeof m->amigos); }
+  m->amigos[0] = 0;
   if (serie && temId(ci)) agenda_frase(ci->imdb, m->agenda, sizeof m->agenda);
   m->salvo = st && st->salvo;
   m->visto = st && st->visto == 1;

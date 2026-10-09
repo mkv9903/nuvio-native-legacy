@@ -462,9 +462,6 @@ char *net_post_st(const char *url, int seconds, const char *const *headers,
               body ? body : "", NULL, status);
   if (!r && status && *status > 0) return strdup("");
   return r;
-}
-
-void net_discord_ca(const char *path) { (void)path; }
 const char *net_last_error(void) { return ""; }
 
 char *net_post_secure_st(const char *url, int seconds, const char *const *headers,
@@ -649,8 +646,6 @@ static _Thread_local int net_curl_local;
 static _Thread_local char net_err_txt[200];
 static _Thread_local char net_err_buf[256]; /* CURLOPT_ERRORBUFFER (>= 256 bytes) */
 #endif
-
-static char net_discord_ca_bundle[600];
 
 #ifndef NV_TPK40
 static _Thread_local char *net_final_dst;
@@ -901,7 +896,6 @@ static void common_options(void *c, unsigned long timeout_ms) {
   curl_setopt(c, OPT_SSL_VERIFYPEER, (long)0);
   curl_setopt(c, OPT_SSL_VERIFYHOST, (long)0);
   curl_setopt(c, OPT_USERAGENT, "Nuvio/1.0 (webOS)");
-  if (net_discord_ca_bundle[0]) curl_setopt(c, OPT_CAINFO, net_discord_ca_bundle);
   net_err_buf[0] = 0;
   net_err_txt[0] = 0;
   curl_setopt(c, OPT_ERRORBUFFER, net_err_buf);
@@ -1513,10 +1507,6 @@ char *net_delete(const char *url, int seconds, const char *const *headers,
   return bucket_finish(&b);
 }
 
-void net_discord_ca(const char *path) {
-  snprintf(net_discord_ca_bundle, sizeof net_discord_ca_bundle, "%s", path ? path : "");
-}
-
 static char *post_native(const char *url, int seconds, const char *const *headers,
                          const char *body, int *status, int secure) {
   Bucket b = {0};
@@ -1533,7 +1523,6 @@ static char *post_native(const char *url, int seconds, const char *const *header
   if (secure) {
     curl_setopt(c, OPT_SSL_VERIFYPEER, (long)1);
     curl_setopt(c, OPT_SSL_VERIFYHOST, (long)2);
-    if (net_discord_ca_bundle[0]) curl_setopt(c, OPT_CAINFO, net_discord_ca_bundle);
     curl_setopt(c, OPT_FOLLOWLOCATION, (long)0);
   }
   curl_setopt(c, OPT_POST, (long)1);
@@ -1788,7 +1777,6 @@ NetTls *net_tls_open(const char *url, int seconds) {
   curl_setopt(c, OPT_TCP_KEEPINTVL, (long)5);
   curl_setopt(c, OPT_SSL_VERIFYPEER, (long)1);
   curl_setopt(c, OPT_SSL_VERIFYHOST, (long)2);
-  if (net_discord_ca_bundle[0]) curl_setopt(c, OPT_CAINFO, net_discord_ca_bundle);
   r = curl_perform(c);
   if (r == 0 && curl_getinfo) curl_getinfo(c, INFO_LASTSOCKET, &fd);
   if (r != 0 || fd < 0) {
@@ -2001,7 +1989,6 @@ char *net_download_range64_final(const char *url, const char *headers,
     common_options(c, 15000);
     curl_setopt(c, OPT_SSL_VERIFYPEER, (long)1);
     curl_setopt(c, OPT_SSL_VERIFYHOST, (long)2);
-    if (net_discord_ca_bundle[0]) curl_setopt(c, OPT_CAINFO, net_discord_ca_bundle);
     curl_setopt(c, OPT_URL, current);
     curl_setopt(c, OPT_RANGE, range);
     curl_setopt(c, OPT_FOLLOWLOCATION, (long)0);
@@ -2375,7 +2362,6 @@ void rede_avisar_host(void (*f)(const char *url, int codigo, int http, unsigned 
 }
 void rede_preparar(void) { net_prepare(); }
 const char *rede_ultimo_erro(void) { return net_last_error(); }
-void rede_discord_ca(const char *p) { net_discord_ca(p); }
 char *rede_postar_seguro_st(const char *u, int s, const char *const *h, const char *c, int *st) {
   return net_post_secure_st(u, s, h, c, st);
 }

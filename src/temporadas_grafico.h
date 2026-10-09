@@ -23,7 +23,6 @@
 // Notas); este modulo so monta os numeros e desenha o bloco.
 #ifndef NV_TEMPORADAS_GRAFICO_H
 #define NV_TEMPORADAS_GRAFICO_H
-#include "amigostitulo.h"
 #include <SDL2/SDL.h>
 
 #define TG_TEMP_MAX 64
@@ -41,43 +40,31 @@ typedef struct {
 } TgTemp;
 
 typedef struct {
-  char id[96], nome[64], avatar[256];
-  int temporada, episodio;
-  int reacao, nota, agora;
-  int frente;      // 1 = adiante de voce
-  int col;         // indice em TgDados.t (-1 = temporada fora do grafico)
-} TgAmigo;
-
-typedef struct {
   char imdb[24];
   int n;                     // temporadas no grafico
   TgTemp t[TG_TEMP_MAX];
   int sabe;                  // ha mapa do vistoep desta serie
   int vistos, exibidos, total, completas;
   int meuT, meuE;            // o episodio visto mais adiante (0 = nenhum)
-  int nAmg, nFrente, nAtras; // amigos com posicao conhecida
-  int totalAmg;              // amigos no titulo (pode passar de AMT_MAX)
-  TgAmigo amg[AMT_MAX];      // os da frente primeiro, cada grupo do mais adiantado ao menos
 } TgDados;
 
 // PURO (sem GL, sem catalogo): o que os testes usam. (agT, agE) e o proximo
 // episodio a ir ao ar (0 = nao se sabe: tudo conta como exibido). Especiais
-// (temporada 0) so entram com `especiais`. `amg` pode ser NULL. Devolve d->n.
+// (temporada 0) so entram com `especiais`. Devolve d->n.
 int  tgraf_montar(TgDados *d, const TgEp *eps, int n, int sabe, int agT, int agE,
-                  int especiais, const AmigosTitulo *amg);
+                  int especiais);
 
 // O bloco existe? Precisa de temporada e de algo a dizer: voce viu ao menos
-// um episodio, ou ha amigo com posicao conhecida.
+// um episodio.
 int  tgraf_existe(const TgDados *d);
 
 // Os dados da serie `idxCatalogo` aberta na pagina, refeitos so quando o
-// catalogo, o vistoep, os amigos ou a agenda mudam. Nunca NULL.
+// catalogo, o vistoep ou a agenda mudam. Nunca NULL.
 const TgDados *tgraf_dados(int idxCatalogo);
 
 // Indice da coluna da temporada `numero` (-1 = nao esta no grafico).
 int  tgraf_coluna(const TgDados *d, int numero);
 
-// Frase do cartao dos amigos: "Ana e mais 2 estão na sua frente". "" sem amigos.
 void tgraf_frase_amigos(const TgDados *d, char *dst, size_t tam);
 
 float tgraf_altura(void);

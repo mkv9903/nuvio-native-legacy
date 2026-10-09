@@ -160,12 +160,10 @@
 #include "layout.h"
 #include "ajustes.h"
 #include "idioma.h"
-#include "noticias.h"
 #include "idiomacod.h"
 #include "catalogo.h"
 #include "badges.h"
 #include "descoberta.h"
-#include "noticia.h"
 #include "leitura.h"
 #include "qr.h"
 #include "visto.h"
@@ -474,22 +472,13 @@ static float scrollY;
 static float velY;
 static int   sair;
 // O MODAL DA LINHA (qualquer OK numa linha, ver agendaui_evento). `ctxAberto`
-// 1 = modal da serie (acoes + historico), 2 = manchetes, 3 = a noticia aberta.
-static int    ctxAberto, ctxFoco, ctxItem, notFoco;
+// 1 = modal da serie (acoes + historico).
+static int    ctxAberto, ctxFoco, ctxItem;
 // O painel que estava aberto por ultimo: com ctxAberto ja 0, o esvanecimento
-// de saida ainda desenha ELE, e nao o modal da serie por cima.
+// de saida ainda desenha ELE.
 static int    ctxUltimo;
 static float  ctxA;
 static char   pediuAbrir[40];
-// Manchetes e noticia: quando o foco parou na linha (o trecho so e pedido
-// depois de AGN_ESPERA_MS), a rolagem do texto e os portoes de texto.
-static Uint32 notDesde;
-static float  notRol, notRolAlvo, notRolMax, notVel;
-static TextoGate notGate, notTrechoGate;
-static float  notGateA, notTrechoA;
-// A altura do painel da noticia anda por mola ate o alvo do estado (900 com
-// texto ou carregando, AGL_H_FALHA no fallback). 0 = encaixa no primeiro quadro.
-static float  notH, notHAlvo = 900.0f;
 // A esquerda da C1: o item em foco e o anterior (copias), e o esvanecer entre
 // as duas artes (0 = so a anterior, 1 = so a atual).
 static AgItem arteCur, arteAnt;
@@ -664,8 +653,7 @@ int agendaui_iniciar(void) {
     int a = agenda_ano(h), m = agenda_mes(h), d = agenda_dia(h);
     selecionaData(a ? a : 2026, m ? m : 1, d ? d : 1); }
   scrollY = 0.0f; velY = 0.0f;
-  ctxAberto = 0; ctxUltimo = 0; ctxFoco = 0; ctxA = 0.0f; notFoco = 0;
-  notRol = notRolAlvo = notRolMax = notVel = 0.0f;
+  ctxAberto = 0; ctxUltimo = 0; ctxFoco = 0; ctxA = 0.0f;
   for (i = 0; i < AG_MAX; i++) animFoco[i] = 0.0f;
   memset(&arteCur, 0, sizeof arteCur); memset(&arteAnt, 0, sizeof arteAnt);
   arteT = 1.0f;
@@ -676,13 +664,6 @@ int agendaui_iniciar(void) {
   // registro faltando ou velho. Ver a nota longa em agenda.c: este e o unico
   // pedido do recurso que nao vem de graca.
   agenda_atualizar_seguidas();
-  // As manchetes de cada titulo, em fio proprio e com cache de 6 h: e o que a
-  // citacao da linha e o painel do menu de contexto mostram.
-  { int i, n = agenda_n();
-    for (i = 0; i < n && i < 16; i++) {
-      const AgItem *it = agenda_lista(i);
-      if (it && it->imdb[0] && it->titulo[0]) noticias_pedir(it->imdb, it->titulo, it->rede, 1);
-    } }
   return 1;
 }
 
@@ -717,7 +698,7 @@ static void alternarLembrete(void) {
 //   Marcar ... como assistido os lancados que o mapa ainda nao tem como vistos
 //   Lembrar-me / Desligar      so quando da para ligar, ou quando esta ligado
 //                              (um lembrete de data vencida tem de poder sair)
-enum { AC_ASSISTIR, AC_ABRIR, AC_NOTICIAS, AC_VISTOS, AC_LEMBRETE, AC_N };
+enum { AC_ASSISTIR, AC_ABRIR, AC_VISTOS, AC_LEMBRETE, AC_N };
 
 #define AG_HIST_VIS 6
 
@@ -743,7 +724,6 @@ static void montaModal(const AgItem *it, AgModal *m) {
   }
   if (m->proximo >= 0) m->ac[m->nAc++] = AC_ASSISTIR;
   m->ac[m->nAc++] = AC_ABRIR;
-  m->ac[m->nAc++] = AC_NOTICIAS;
   if (m->naoVistos > 0) m->ac[m->nAc++] = AC_VISTOS;
   if (it->lembrete || agenda_pode_lembrar(it->imdb)) m->ac[m->nAc++] = AC_LEMBRETE;
 }
@@ -755,11 +735,8 @@ static void abrirModal(int i) {
   const AgItem *it = agenda_lista(i);
   if (!it) return;
   ctxAberto = 1; ctxFoco = 0; ctxItem = i;
-  // Os dois pedidos de rede do modal saem AQUI e so aqui: a grade de episodios
-  // (um GET ao Cinemeta, 30 min de memoria) e as manchetes (cache de 6 h, na
-  // pratica ja pedidas ao abrir a tela).
+  // O pedido de rede do modal: a grade de episodios (um GET ao Cinemeta, 30 min de memoria).
   agenda_historico_pedir(it->imdb);
-  noticias_pedir(it->imdb, it->titulo, it->rede, 1);
 }
 
 // MARCAR COMO ASSISTIDO: os lancados da janela que o mapa nao tem como vistos.
@@ -798,9 +775,6 @@ static void acaoModal(int ac) {
       snprintf(pediuAbrir, sizeof pediuAbrir, "%s", it->imdb);
       ctxAberto = 0;
       break;
-    case AC_NOTICIAS:
-      ctxAberto = 2; notFoco = 0; notDesde = SDL_GetTicks();
-      break;
     case AC_VISTOS:
       marcarVistos(it, &m);
       break;
@@ -822,33 +796,6 @@ void agendaui_evento(const SDL_Event *e) {
   volta = (k == SDLK_AC_BACK || k == SDLK_ESCAPE || k == SDLK_BACKSPACE || k == SDLK_DELETE);
   ok = (k == SDLK_RETURN || k == SDLK_KP_ENTER);
   if (e->type != SDL_KEYDOWN) return;
-  if (ctxAberto == 3) {           // a noticia aberta
-    if (volta || k == SDLK_LEFT) { ctxAberto = 2; return; }
-    if (k == SDLK_DOWN) notRolAlvo += 132.0f;
-    else if (k == SDLK_UP) { notRolAlvo -= 132.0f; if (notRolAlvo < 0.0f) notRolAlvo = 0.0f; }
-    return;
-  }
-  if (ctxAberto == 2) {           // a lista de manchetes
-    const AgItem *it = agenda_lista(ctxItem);
-    int nn = noticias_n(it ? it->imdb : "");
-    if (volta) { ctxAberto = 1; return; }
-    if ((k == SDLK_DOWN && notFoco < nn - 1) || (k == SDLK_UP && notFoco > 0)) {
-      notFoco += k == SDLK_DOWN ? 1 : -1;
-      notDesde = SDL_GetTicks();
-      textogate_reiniciar(&notTrechoGate); notTrechoA = 0.0f;
-    }
-    else if (ok && !e->key.repeat && it) {
-      const Noticia *nt = noticias_item(it->imdb, notFoco);
-      if (nt) {
-        ctxAberto = 3;
-        notRol = notRolAlvo = 0.0f;
-        notH = 0.0f;
-        textogate_reiniciar(&notGate);
-        if (nt->link[0]) noticia_pedir(nt->link);
-      }
-    }
-    return;
-  }
   if (ctxAberto == 1) {
     const AgItem *it = agenda_lista(ctxItem);
     AgModal m;
@@ -1023,12 +970,6 @@ void agendaui_atualizar(float dt, Uint32 agora) {
   int reduz = ajustes_animacoes_reduzidas();
   ctxA = reduz ? (ctxAberto ? 1.0f : 0.0f) : anim_mola(ctxA, ctxAberto ? 1.0f : 0.0f, dt, 18.0f);
   if (ctxAberto) ctxUltimo = ctxAberto;
-  // A rolagem da noticia: o alvo anda 132 px por tecla e para no fim do texto
-  // (notRolMax, medido no desenho); a mesma mola 2 da lista.
-  if (notRolAlvo > notRolMax) notRolAlvo = notRolMax;
-  if (notRolAlvo < 0.0f) notRolAlvo = 0.0f;
-  notRol = anim_mola2_reduzida(&notVel, notRol, notRolAlvo, dt, NV_MOLA2_SCROLL, reduz);
-  notH = (reduz || notH <= 0.0f) ? notHAlvo : anim_mola(notH, notHAlvo, dt, 18.0f);
   if (foco >= n) foco = n > 0 ? n - 1 : 0;
   for (i = 0; i < n && i < AG_MAX; i++) {
     float a = (i == foco) ? 1.0f : 0.0f;
@@ -1404,26 +1345,13 @@ static void desenhaEsquerda(const AgC1 *L, float a) {
       y += hC1(TXT_V2_24, 24, 24.0f, 179) + P(12);
     } }
 
-  // A sinopse (21, ate 3 linhas) e, quando ha, a ultima manchete como citacao
-  // com a dica de abrir — o que o cartao focado dizia antes. OK abre o modal
-  // da linha, e "Ultimas noticias" mora nele.
-  { const Noticia *nt = noticias_item(it->imdb, 0);
-    int temNot = nt && nt->titulo[0];
-    maxSin = temNot ? 2 : 3;
-    if (aviso) maxSin--;
-    if (it->sinopse[0]) {
-      int k = blocoC1(TXT_AJ_ESTADO, 18, it->sinopse, L->x0, y, 21.0f, w, 30.0f, maxSin, AG_INK2, a);
-      y += P(30) * (float)k + P(6);
-    }
-    if (temNot) {
-      const char *dica = i18n("OK para ler mais");
-      float dw = txC1(TXT_ILHA_APOIO, 16, dica, AG_INK3, -1.0f, 0, 18.0f, w, 1.0f);
-      float qw;
-      snprintf(buf, sizeof buf, "\xe2\x80\x9c%s\xe2\x80\x9d", nt->titulo);
-      qw = txC1(TXT_AJ_ESTADO, 18, buf, 205, 208, 214, L->x0, y, 21.0f, w - dw - P(14), a);
-      txC1(TXT_ILHA_APOIO, 16, dica, AG_INK3, L->x0 + qw + P(14), y + P(3), 18.0f, dw + 1.0f, a);
-      y += P(30) + P(6);
-    } }
+  // A sinopse (21, ate 3 linhas).
+  maxSin = 3;
+  if (aviso) maxSin--;
+  if (it->sinopse[0]) {
+    int k = blocoC1(TXT_AJ_ESTADO, 18, it->sinopse, L->x0, y, 21.0f, w, 30.0f, maxSin, AG_INK2, a);
+    y += P(30) * (float)k + P(6);
+  }
 
   // Os chips: o estado do lembrete e "Ver serie". Sao ESTADO, nao foco — o
   // D-pad mora na lista; OK abre o modal, onde ligar/desligar e abrir o titulo
@@ -1744,7 +1672,6 @@ static const char *rotuloAcao(const AgItem *it, const AgModal *m, int ac,
                m->eps[m->proximo].episodio);
       return buf;
     case AC_ABRIR:    return i18n("Abrir o título");
-    case AC_NOTICIAS: return i18n("Últimas notícias");
     case AC_VISTOS:
       if (m->naoVistos == 1) {
         int i;
@@ -1958,333 +1885,6 @@ static void desenhaModalSerie(const AgItem *it, float a) {
   desenhaHistorico(it, &m, xHist, yCorpo + 4.0f, wHist, a);
 }
 
-// --- AS MANCHETES ------------------------------------------------------------------
-//
-// PEDIDO DO DONO (29/09/2026): "quando estamos focados, vamos melhorar o
-// layout, deixar mais bonito, com o header e o texto". A linha em foco virou
-// um CARTAO DE LEITURA: a manchete como cabecalho (TXT_HEADLINE, ate duas
-// linhas), veiculo e quando ("IMDb · há 3 h") e um trecho do texto em duas
-// linhas. As outras linhas continuam uma manchete e o veiculo, em 96 px.
-//
-// O TRECHO E DA PAGINA DO VEICULO, e por isso chega depois: o RSS do Google so
-// traz a manchete de novo na <description>. Pedir a pagina de cada manchete ao
-// abrir o painel seria uma dezena de downloads de 500 KB; entao o trecho e
-// pedido (noticia_pedir) quando o foco PARA 350 ms numa linha — a mesma
-// pagina que o OK vai abrir, entao nada e baixado a toa. Enquanto nao chega,
-// o cartao ja tem a altura final e o lugar do trecho e um esqueleto de duas
-// linhas; o texto entra INTEIRO de uma vez (portao de texto, textogate.h).
-// Pagina que nao deu texto: o cartao fica com manchete e veiculo, sem trecho.
-#define AGN_ESPERA_MS 350u
-
-static int alturaManchete(int f) { return f ? (int)AGN_FOCO : (int)AGN_LINHA; }
-
-static void desenhaManchetes(const AgItem *it, float a) {
-  float ar, ag, ab;
-  int n = noticias_n(it->imdb), i, resp = noticias_respondeu(it->imdb);
-  int tf = tintaF(), tf2 = tintaF2();
-  float h = 160.0f + (float)(n > 0 ? (n - 1) * AGN_LINHA + AGN_FOCO : AGN_LINHA) + 40.0f;
-  float maxH = NV_TELA_H - 2.0f * NV_MARGEM_Y, y, yFim;
-  long long agora = (long long)time(NULL);
-  GfxRect r;
-  ajustes_acento(&ar, &ag, &ab);
-  if (h > maxH) h = maxH;
-  r = (GfxRect){ (NV_TELA_W - AGN_W) * 0.5f, (NV_TELA_H - h) * 0.5f + (1.0f - a) * 24.0f, AGN_W, h };
-  painelFlutuante(r, ar, ag, ab, a);
-  y = cabecalho(r.x + 48.0f, r.y + 40.0f, AGN_W - 96.0f, it->titulo,
-                i18n("Últimas notícias · Google News"), a) + 40.0f;
-  if (!resp || n == 0) {
-    TxtLinha t = txt_linha_corta(TXT_BODY, !resp ? i18n("Procurando…")
-                                 : i18n("Nada publicado recentemente sobre este título."),
-                                 170, 174, 184, 255, AGN_W - 96.0f);
-    txt_desenhar_alpha(t, r.x + 48.0f, y + 20.0f, a);
-    return;
-  }
-  if (notFoco >= n) notFoco = n - 1;
-  yFim = r.y + r.h - 24.0f;
-  // A PRIMEIRA LINHA VISIVEL: a menor que ainda deixa a focada inteira dentro
-  // do painel, somando as alturas de verdade (a focada e mais alta).
-  { int ini = notFoco;
-    float soma = (float)alturaManchete(1);
-    while (ini > 0 && soma + (float)alturaManchete(0) <= yFim - y) { ini--; soma += (float)alturaManchete(0); }
-    gfx_recorte(r.x, y, r.w, yFim - y);
-    for (i = ini; i < n && y < yFim; i++) {
-      const Noticia *nt = noticias_item(it->imdb, i);
-      int f = (i == notFoco);
-      float lh = (float)alturaManchete(f);
-      // SO LINHA INTEIRA: a que nao cabe ate o pe do painel fica para a
-      // rolagem, em vez de sair cortada no meio das letras.
-      if (y + lh - 12.0f > yFim) break;
-      GfxRect lr = { r.x + 28.0f, y, r.w - 56.0f, lh - 12.0f };
-      char sub[160], quando[48];
-      float tx = lr.x + 24.0f, tw = lr.w - 48.0f, ty;
-      if (!nt) { y += lh; continue; }
-      noticias_quando(nt, agora, quando, sizeof quando);
-      if (quando[0] && nt->fonte[0]) snprintf(sub, sizeof sub, "%s \xc2\xb7 %s", nt->fonte, quando);
-      else snprintf(sub, sizeof sub, "%s%s", nt->fonte, quando);
-      if (!f) {
-        TxtLinha t = txt_linha_corta(TXT_CALLOUT, nt->titulo, 238, 240, 244, 255, tw);
-        txt_desenhar_alpha(t, tx, y + 14.0f, a);
-        t = txt_linha_corta(TXT_CAPTION, sub, 150, 153, 162, 255, tw);
-        txt_desenhar_alpha(t, tx, y + 14.0f + 40.0f, a);
-        y += lh;
-        continue;
-      }
-      pilulaFoco(lr, ar, ag, ab, a);
-      // O trecho e pedido quando o foco para aqui (ver a nota acima).
-      if (nt->link[0] && SDL_GetTicks() - notDesde >= AGN_ESPERA_MS) noticia_pedir(nt->link);
-      ty = y + 22.0f;
-      { int nl = agendaui_sinopse(TXT_HEADLINE, nt->titulo, tx, ty, tw, 40.0f, 2, tf, tf, tf, a);
-        ty += 40.0f * (float)(nl > 0 ? nl - 1 : 0) + hEstilo(TXT_HEADLINE) + 6.0f; }
-      { TxtLinha s = txt_linha_corta(TXT_CAPTION, sub, tf2, tf2, tf2, 255, tw);
-        txt_desenhar_alpha(s, tx, ty, a);
-        ty += (float)s.h + 12.0f; }
-      { int est = NTC_NADA;
-        const NoticiaTexto *nx = nt->link[0] ? noticia_texto(nt->link, &est) : NULL;
-        const char *trecho = NULL;
-        if (nx && est == NTC_PRONTA) trecho = nx->l.resumo[0] ? nx->l.resumo : (nx->l.n ? nx->l.par[0] : NULL);
-        if (trecho && trecho[0]) {
-          int antes = txt_pendentes;
-          float ga = f ? a * notTrechoA : 0.0f;
-          // O ultimo quadro do portao ja desenhou com opacidade quase nula;
-          // o bloco aparece junto (NV_TXTGATE_AQUECER enquanto fecha).
-          agendaui_sinopse(TXT_CAPTION, trecho, tx, ty, tw, AG_SIN_LD, 2, tf2, tf2, tf2,
-                           ga > NV_TXTGATE_AQUECER ? ga : NV_TXTGATE_AQUECER);
-          notTrechoA = textogate_passo(&notTrechoGate, txt_pendentes - antes, SDL_GetTicks());
-        } else if (nt->link[0] && (est == NTC_BUSCANDO ||
-                                   (est == NTC_NADA && SDL_GetTicks() - notDesde < AGN_ESPERA_MS + 50u))) {
-          int k;
-          textogate_reiniciar(&notTrechoGate); notTrechoA = 0.0f;
-          for (k = 0; k < 2; k++) {
-            GfxRect sk = { tx, ty + AG_SIN_LD * (float)k + 6.0f, tw * (k ? 0.58f : 0.86f), 16.0f };
-            // Esqueleto em cima do realce: a propria tinta secundaria a 22%.
-            gfx_esqueleto(sk, 0.5f, (float)tf2 / 255.0f, (float)tf2 / 255.0f,
-                          (float)tf2 / 255.0f, 0.22f * a);
-          }
-        } else { textogate_reiniciar(&notTrechoGate); notTrechoA = 0.0f; } }
-      y += lh;
-    }
-    gfx_sem_recorte(); }
-}
-
-// --- A NOTICIA -------------------------------------------------------------------
-//
-// O MODAL DE LEITURA: a capa (og:image) e o veiculo a esquerda, o texto a
-// direita. A capa passa por tex_obter_larg NA LARGURA DESENHADA (560), a mesma
-// regra de todo cartaz do app: a decodificacao para no tamanho da tela.
-//
-// TRES ESTADOS, e nenhum finge:
-//   BUSCANDO  manchete do RSS + esqueleto de paragrafos; o texto entra inteiro
-//             pelo portao de texto quando chega.
-//   PRONTA    resumo (og:description) em destaque e ate seis paragrafos,
-//             rolados por CIMA/BAIXO dentro da coluna (recorte, sem degrade).
-//   FALHOU    a manchete, uma frase dizendo que a pagina nao deixou ler, e o QR
-//             "Abrir no celular" grande — o caminho que sobra de verdade.
-// O QR aparece nos dois ultimos estados sempre que a URL cabe nele (sem a
-// query, ate 134 bytes: leitura_url_qr); sem URL, "Leia em <veiculo>".
-static GLuint texQrNot;
-static char   qrNotDe[160];
-
-static GLuint qrTextura(const char *texto) {
-  Qr q; int lado, xq, yq; unsigned char *px;
-  if (!texto || !texto[0]) return 0;
-  if (!strcmp(qrNotDe, texto) && texQrNot) return texQrNot;
-  if (!qr_gerar(&q, texto)) return 0;
-  lado = q.lado + 8;                    // 4 modulos de silencio por lado
-  px = (unsigned char *)malloc((size_t)lado * lado * 3);
-  if (!px) return 0;
-  memset(px, 255, (size_t)lado * lado * 3);
-  for (yq = 0; yq < q.lado; yq++)
-    for (xq = 0; xq < q.lado; xq++)
-      if (qr_modulo(&q, xq, yq)) {
-        size_t k = ((size_t)(yq + 4) * lado + (xq + 4)) * 3;
-        px[k] = px[k + 1] = px[k + 2] = 0;
-      }
-  if (!texQrNot) glGenTextures(1, &texQrNot);
-  glBindTexture(GL_TEXTURE_2D, texQrNot);
-  glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, lado, lado, 0, GL_RGB, GL_UNSIGNED_BYTE, px);
-  // NEAREST: um modulo borrado com o vizinho e ilegivel para a camera.
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-  gfx_tex_esquecer(0);   // o bind acima foi por fora do gfx_rect
-  free(px);
-  snprintf(qrNotDe, sizeof qrNotDe, "%s", texto);
-  return texQrNot;
-}
-
-static void desenhaNoticia(const AgItem *it, float a) {
-  const Noticia *nt = noticias_item(it->imdb, notFoco);
-  float ar, ag, ab, xL, xR, wR, y, yTopo, yFim;
-  int est = NTC_NADA;
-  const NoticiaTexto *nx;
-  GfxRect r;
-  char qrUrl[160] = "", host[120] = "", quando[48] = "";
-  int semCapa = 0;
-  if (!nt) return;
-  ajustes_acento(&ar, &ag, &ab);
-  nx = nt->link[0] ? noticia_texto(nt->link, &est) : NULL;
-  if (!nt->link[0]) est = NTC_FALHOU;
-  notHAlvo = est == NTC_FALHOU ? AGL_H_FALHA : AGL_H;
-  { float h = notH > 0.0f ? notH : notHAlvo;
-    r = (GfxRect){ (NV_TELA_W - AGL_W) * 0.5f, (NV_TELA_H - h) * 0.5f + (1.0f - a) * 24.0f, AGL_W, h }; }
-  painelFlutuante(r, ar, ag, ab, a);
-  xL = r.x + 48.0f;
-  xR = xL + AGL_IMG_W + 44.0f;
-  wR = r.x + r.w - 56.0f - xR;
-  yTopo = r.y + 48.0f;
-  yFim = r.y + r.h - 48.0f;
-  noticias_quando(nt, (long long)time(NULL), quando, sizeof quando);
-  if (nx && nx->url[0]) { leitura_url_qr(nx->url, qrUrl, sizeof qrUrl); leitura_host(nx->url, host, sizeof host); }
-
-  // --- coluna da esquerda: capa, veiculo, QR -----------------------------------
-  y = yTopo;
-  { const char *img = nx ? nx->l.imagem : "";
-    GfxRect cap = { xL, y, AGL_IMG_W, AGL_IMG_W * 9.0f / 16.0f };
-    GLuint tex = img[0] ? tex_obter_larg(img, AGL_IMG_W) : 0;
-    if (tex) {
-      gfx_tex_aspect_atual = 16.0f / 9.0f;
-      gfx_rect(cap, tex, GFX_CARD, 0, 0, 0, 20.0f / cap.h, 0, 0, 0, a);
-      gfx_tex_aspect_atual = 0.0f;
-      y += cap.h + 28.0f;
-    } else if (est == NTC_BUSCANDO || (img[0] && !tex_falhou(img))) {
-      // A capa ainda vindo: o lugar dela ja esta la.
-      gfx_esqueleto(cap, 20.0f / cap.h, NV_COR_ESQUELETO_R, NV_COR_ESQUELETO_G, NV_COR_ESQUELETO_B, a);
-      y += cap.h + 28.0f;
-    } else {
-      semCapa = 1;
-      // SEM CAPA (pagina sem og:image, ou que nem deixou ler): o nome do
-      // veiculo como MANCHETE DE JORNAL no lugar da foto, na superficie
-      // neutra dos cartoes. A coluna nao fica um vao com duas palavras no
-      // topo, e nada ali finge ser a imagem da materia.
-      const char *fonte = (nx && nx->l.site[0]) ? nx->l.site : nt->fonte;
-      TxtLinha t = txt_linha_corta(TXT_TITULO2, fonte, 214, 216, 222, 255, cap.w - 64.0f);
-      gfx_cor(cap, 20.0f / cap.h, 0.10f, 0.11f, 0.13f, a);
-      // O "quando" vai junto, logo abaixo do nome: sozinho embaixo do cartao
-      // ele ficava orfao, uma palavra solta a 100 px de tudo.
-      { TxtLinha q = txt_linha_corta(TXT_CAPTION, quando, 150, 153, 162, 255, cap.w - 64.0f);
-        float hb = (float)t.h + (quando[0] ? 6.0f + (float)q.h : 0.0f);
-        float yb = cap.y + (cap.h - hb) * 0.5f;
-        txt_desenhar_alpha(t, cap.x + (cap.w - (float)t.w) * 0.5f, yb, a);
-        if (quando[0]) txt_desenhar_alpha(q, cap.x + (cap.w - (float)q.w) * 0.5f, yb + (float)t.h + 6.0f, a); }
-      y += cap.h + 28.0f;
-    } }
-  { const char *fonte = (nx && nx->l.site[0]) ? nx->l.site : nt->fonte;
-    TxtLinha t = txt_linha_corta(TXT_CALLOUT, fonte, 238, 240, 244, 255, AGL_IMG_W);
-    // Com a capa de MANCHETE (sem og:image) o veiculo ja esta escrito nela:
-    // repetir embaixo seria o mesmo nome duas vezes a 300 px.
-    if (semCapa) t.w = t.h = 0;
-    else txt_desenhar_alpha(t, xL, y, a);
-    y += (float)t.h + 4.0f;
-    if (quando[0] && !semCapa) {
-      t = txt_linha_corta(TXT_CAPTION, quando, 150, 153, 162, 255, AGL_IMG_W);
-      txt_desenhar_alpha(t, xL, y, a);
-      y += (float)t.h;
-    } }
-  if (est == NTC_PRONTA) {
-    GLuint q = qrUrl[0] ? qrTextura(qrUrl) : 0;
-    float lado = AGL_QR;
-    float yq = yFim - lado;
-    if (q && yq > y + 24.0f) {
-      GfxRect rq = { xL, yq, lado, lado };
-      TxtLinha t;
-      gfx_rect(rq, q, GFX_SNAP, 0, 0.0f, 0.0f, 0.0f, 0, 0, 0, a);
-      t = txt_linha_corta(TXT_CALLOUT, i18n("Abrir no celular"), 238, 240, 244, 255, AGL_IMG_W - lado - 28.0f);
-      txt_desenhar_alpha(t, xL + lado + 28.0f, yq + lado * 0.5f - (float)t.h, a);
-      if (host[0]) {
-        t = txt_linha_corta(TXT_CAPTION, host, 150, 153, 162, 255, AGL_IMG_W - lado - 28.0f);
-        txt_desenhar_alpha(t, xL + lado + 28.0f, yq + lado * 0.5f + 4.0f, a);
-      }
-    } else if (host[0] || nt->fonte[0]) {
-      char leia[200];
-      TxtLinha t;
-      snprintf(leia, sizeof leia, i18n("Leia em %s"), host[0] ? host : nt->fonte);
-      t = txt_linha_corta(TXT_CAPTION, leia, 150, 153, 162, 255, AGL_IMG_W);
-      txt_desenhar_alpha(t, xL, yFim - (float)t.h, a);
-    }
-  }
-
-  // --- coluna da direita: manchete, resumo, paragrafos -------------------------
-  gfx_recorte(xR, yTopo - 4.0f, wR + 24.0f, yFim - yTopo + 8.0f);
-  { float yy = yTopo - notRol;
-    int antes = txt_pendentes;
-    float ga = est == NTC_PRONTA ? notGateA : 1.0f;
-    const char *titulo = (nx && nx->l.titulo[0]) ? nx->l.titulo : nt->titulo;
-    float gAlpha = a * (ga > NV_TXTGATE_AQUECER ? ga : NV_TXTGATE_AQUECER);
-    // A manchete do RSS primeiro (ja esta na mao); com a pagina pronta, o
-    // og:title — que vem sem o " - Veiculo" e as vezes mais completo.
-    yy += txt_bloco_corta(TXT_TITULO3, est == NTC_PRONTA ? titulo : nt->titulo,
-                          246, 247, 250, xR, yy, wR, 58.0f, est == NTC_PRONTA ? gAlpha : a, 3);
-    yy += 22.0f;
-    if (est == NTC_PRONTA && nx) {
-      int k;
-      if (nx->l.resumo[0]) {
-        yy += txt_bloco_corta(TXT_CALLOUT, nx->l.resumo, 214, 216, 222, xR, yy, wR, 38.0f, gAlpha, 4);
-        yy += 26.0f;
-      }
-      for (k = 0; k < nx->l.n; k++) {
-        yy += txt_bloco_corta(TXT_BODY, nx->l.par[k], 196, 198, 206, xR, yy, wR, 36.0f, gAlpha, 0);
-        yy += 22.0f;
-      }
-      notGateA = textogate_passo(&notGate, txt_pendentes - antes, SDL_GetTicks());
-      // O teto da rolagem: o fim do texto encosta no pe da coluna.
-      { float total = yy + notRol - yTopo, cabe = yFim - yTopo;
-        notRolMax = total > cabe ? total - cabe : 0.0f; }
-    } else if (est == NTC_BUSCANDO || est == NTC_NADA) {
-      int k;
-      TxtLinha t = txt_linha_corta(TXT_CAPTION, i18n("Carregando a notícia…"), 150, 153, 162, 255, wR);
-      txt_desenhar_alpha(t, xR, yy, a);
-      yy += (float)t.h + 22.0f;
-      for (k = 0; k < 7; k++) {
-        GfxRect sk = { xR, yy + 40.0f * (float)k, wR * (k % 3 == 2 ? 0.64f : 0.94f), 20.0f };
-        gfx_esqueleto(sk, 0.5f, NV_COR_ESQUELETO_R, NV_COR_ESQUELETO_G, NV_COR_ESQUELETO_B, a);
-      }
-      notRolMax = 0.0f;
-    } else {
-      // O FALLBACK: a frase, e o QR GRANDE logo abaixo dela, na coluna do
-      // texto — e o caminho que sobra para ler a materia, entao e ele que
-      // ocupa o lugar do texto. Sem URL que caiba no QR, "Leia em <veiculo>".
-      GLuint q = qrUrl[0] ? qrTextura(qrUrl) : 0;
-      yy += txt_bloco_corta(TXT_CALLOUT, i18n("Não deu para trazer o texto desta página."),
-                            214, 216, 222, xR, yy, wR, 38.0f, a, 2);
-      yy += 36.0f;
-      if (q) {
-        float lado = AGL_QR + 40.0f, xq = xR + lado + 32.0f, wq = wR - lado - 32.0f;
-        GfxRect rq = { xR, yy, lado, lado };
-        TxtLinha t;
-        gfx_rect(rq, q, GFX_SNAP, 0, 0.0f, 0.0f, 0.0f, 0, 0, 0, a);
-        t = txt_linha_corta(TXT_HEADLINE, i18n("Abrir no celular"), 238, 240, 244, 255, wq);
-        txt_desenhar_alpha(t, xq, yy + 20.0f, a);
-        { float hb = txt_bloco_corta(TXT_CAPTION, i18n("Aponte a câmera do celular para ler a matéria completa."),
-                                     150, 153, 162, xq, yy + 20.0f + (float)t.h + 10.0f, wq, 32.0f, a, 3);
-          if (host[0]) {
-            TxtLinha hl = txt_linha_corta(TXT_CAPTION, host, 150, 153, 162, 255, wq);
-            txt_desenhar_alpha(hl, xq, yy + 20.0f + (float)t.h + 10.0f + hb + 8.0f, a);
-          } }
-      } else if (host[0] || nt->fonte[0]) {
-        char leia[200];
-        TxtLinha t;
-        snprintf(leia, sizeof leia, i18n("Leia em %s"), host[0] ? host : nt->fonte);
-        t = txt_linha_corta(TXT_CALLOUT, leia, 170, 174, 184, 255, wR);
-        txt_desenhar_alpha(t, xR, yy, a);
-      }
-      notRolMax = 0.0f;
-    } }
-  gfx_sem_recorte();
-  // O FIO DE ROLAGEM: so quando ha o que rolar, fino e neutro, na borda da
-  // coluna — diz "tem mais" sem degrade por cima do texto.
-  if (notRolMax > 1.0f) {
-    float trilho = yFim - yTopo, fr = trilho / (trilho + notRolMax);
-    GfxRect tr = { r.x + r.w - 30.0f, yTopo, 4.0f, trilho };
-    GfxRect ba = { tr.x, yTopo + (trilho - trilho * fr) * (notRol / notRolMax), 4.0f, trilho * fr };
-    // O raio e FRACAO DA ALTURA: 0,5 num trilho de 4 x 700 virava uma lente
-    // afilada nas pontas (trilho sumido, barra em dois gomos). 2 px / h e o
-    // meio da largura — a capsula de 4 px que se queria.
-    gfx_cor(tr, 2.0f / tr.h, 1.0f, 1.0f, 1.0f, 0.14f * a);
-    gfx_cor(ba, 2.0f / ba.h, 0.59f, 0.59f, 0.59f, a);
-  }
-}
 
 static void desenhaContexto(float a) {
   const AgItem *it = agenda_lista(ctxItem);
@@ -2294,8 +1894,6 @@ static void desenhaContexto(float a) {
   // atras ainda liam como texto concorrente nas bordas do painel (critica de
   // 29/09/2026). Com vidro, mais ainda: o painel deixa passar o fundo.
   gfx_cor(tela, 0.0f, 0.0f, 0.0f, 0.0f, (ajustes_vidro() ? 0.82f : 0.74f) * a);
-  if (ctxAberto == 3 || (ctxAberto == 0 && ctxUltimo == 3)) { desenhaNoticia(it, a); return; }
-  if (ctxAberto == 2 || (ctxAberto == 0 && ctxUltimo == 2)) { desenhaManchetes(it, a); return; }
   desenhaModalSerie(it, a);
 }
 

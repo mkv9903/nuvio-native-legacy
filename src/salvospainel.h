@@ -60,19 +60,12 @@ int  spainel_n_continuar(void);
 // o id no catalogo e abre o detalhe e o roteador (app.c) — o painel nao conhece
 // nem detail.c nem a descoberta, exatamente como perfil.c nao conhecia.
 const char *spainel_pediu_abrir(void);
-// OK na linha de um amigo (aba Amigos): o id da pessoa, uma vez, para app.c
-// abrir o perfil (amigoperfil.h). O painel ja fechou.
-int spainel_pediu_perfil(char *id, size_t tam);
 // 1 uma vez quando a pessoa pediu a tela Agenda completa pela aba Agenda.
 int spainel_pediu_agenda(void);
-// Para os testes: abre direto numa aba (0 Salvos, 1 Atividade, 2 Amigos,
-// 3 Avisos), com o foco na primeira linha da lista.
+// Para os testes: abre direto numa aba (0 Salvos, 1 Avisos), com o foco na primeira linha da lista.
 void spainel_ir_aba(int aba);
 // Testes: a aba aberta e o indice do foco (< 0: abas ou barra).
 int spainel_aba_atual(void);
 int spainel_foco_indice(void);
-// Abre (se preciso) na aba Atividade e poe o foco no primeiro evento de amigo
-// do titulo `imdb` (a lista rola ate ele). Sem evento desse titulo, so a aba.
-void spainel_abrir_titulo(const char *imdb);
 
 #endif

@@ -18,7 +18,6 @@ void servidores_esquecer_todos(void);   // servidores.c: wipe every profile's to
 #include "salvosorg.h"
 #include "salvos.h"
 #include "mapa.h"
-#include "recomenda.h"
 #include "fontepref.h"
 #include "buscasrec.h"
 #include "trakt.h"
@@ -1978,10 +1977,6 @@ void sync_esquecer_usuario(void) {
   agenda_esquecer();
   // E os lembretes de programa do guia, pelo mesmo motivo.
   lembrete_esquecer_todos();
-  // E AS RECOMENDACOES, pela mesma razao com um agravante proprio: elas trazem
-  // o NOME de quem mandou. Sem esta linha a proxima pessoa a entrar abriria a
-  // aba Social com a lista de amigos de quem saiu.
-  recomenda_esquecer();
   // E A FONTE LEMBRADA DE CADA TITULO. Ela nao chega a ser um segredo, mas diz
   // o que a pessoa assistiu e em que idioma — e, como a lista de salvos, ela
   // nao depende de conta nenhuma para existir, entao sem esta linha ela

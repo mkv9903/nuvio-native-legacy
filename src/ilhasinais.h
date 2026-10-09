@@ -52,7 +52,5 @@ void ilhasinais_perfil_trocado(void);
 void ilhasinais_debrid_baixando(const char *servico, const char *titulo);
 // app.c: o "Reconectar" do Trakt pediu os Ajustes (consumido uma vez).
 int  ilhasinais_pediu_trakt(void);
-// OK no aviso agregado "N pedidos de amizade": app.c abre a aba Amigos.
-int  ilhasinais_pediu_amigos(void);
 
 #endif

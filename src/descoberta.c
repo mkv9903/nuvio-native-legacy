@@ -16,7 +16,6 @@
 #include "nuvem.h"
 #include "cwordem.h"
 #include "js.h"
-#include "recomenda.h"
 #include "trakt.h"
 #include "simkl.h"
 #include "progresso.h"
@@ -3447,8 +3446,7 @@ static int estruturaNovaPedeRede(const CatFileira *fils, int nFils,
   if (qual && tamQual) qual[0] = 0;
   if (nDeclsMontagem < 1) return 0;
   for (t = 0; t < nFils; t++)
-    if (!strcmp(fils[t].chave, "continue_watching") ||
-        !strcmp(fils[t].chave, "social_activity")) nFixas++;
+    if (!strcmp(fils[t].chave, "continue_watching")) nFixas++;
   lerPrefs();
   nOrdem = ordenarCandidatos(declsMontagem, nDeclsMontagem, ordem, nFixas, 0, &teto);
   cheias = nFixas;
@@ -3589,24 +3587,13 @@ static void publicarParcial(CatItem **lote, int *cap, int n,
   parcialNaTela = 1;
 }
 
-typedef struct { pthread_t fio; int viva, n; CatItem itens[8]; } SocialFio;
-static void *fioSocial(void *u) {
-  SocialFio *f = (SocialFio *)u;
-  // "Recursos sociais" desligado: sem feed do Trakt, sem amigos do Nuvio.
-  if (!ajustes_social()) { f->n = 0; return NULL; }
-  f->n = trakt_social(f->itens, 8);
-  f->n = recomenda_social_mesclar(f->itens, f->n, 8);
-  return NULL;
-}
-
 static void *montar(void *u) {
   // O lote tambem cresce: era dimensionado por CAT_MAX e por isso herdava o
   // mesmo teto arbitrario.
   int cap = 128;
   CatItem *lote = malloc(sizeof(CatItem) * (size_t)cap);
   int n = 0, i;
-  int nContinuar = 0, nSocial = 0;
-  unsigned socialGeracao;
+  int nContinuar = 0;
   unsigned minhaGeracao = montagemGeracao;
   // O CONTEXTO EM QUE ESTA VOLTA BUSCA, em partes (ver homeestado.h). A
   // identidade vale do inicio: o Trakt e lido logo abaixo. Os addons sao
@@ -3713,36 +3700,13 @@ static void *montar(void *u) {
   // Android 2,7 s, em cima de 9-18 s do Continuar) e os catalogos esperam os
   // dois. Nao dependem um do outro: o social vai para um buffer proprio num fio
   // e entra no lote logo depois do Continuar, na mesma ordem de antes.
-  socialGeracao = recomenda_geracao();
-  SocialFio socFio;
-  memset(&socFio, 0, sizeof socFio);
-  socFio.viva = pthread_create(&socFio.fio, NULL, fioSocial, &socFio) == 0;
   pthread_mutex_lock(&contTrava);
   nContinuar = montarContinuar(lote, CONT_MAX);
   cwGerMontar = cwGer;
   n += nContinuar;
-  marco("trakt continuar assistindo");
-  if (CONDENADA("depois do continuar assistindo")) {
-    pthread_mutex_unlock(&contTrava);
-    if (socFio.viva) pthread_join(socFio.fio, NULL);
-    goto condenada;
-  }
-  // O feed social oficial e uma fileira propria, logo depois do retorno ao
-  // que estava sendo visto. Ele vem cedo para nao depender dos manifestos dos
-  // addons e usa a mesma credencial Trakt ja carregada.
-  // Sob a MESMA trava: trakt_social e montarContinuar compartilham os buffers
-  // de trakt_enfeitar_lote com o fio de desc_refazer_continuar.
-  // ... E OS AMIGOS DO NUVIO. 251 das 310 contas do servico social nao tem
-  // Trakt (docs/ANALISE-ADDONS-AMIGOS.md): para elas a fileira so existia vazia.
-  // A uniao (Trakt + amigos mutuos do nosso servico) ja vem pronta do fio.
   pthread_mutex_unlock(&contTrava);
-  if (socFio.viva) pthread_join(socFio.fio, NULL);
-  else fioSocial(&socFio);
-  nSocial = socFio.n;
-  if (nSocial > 0) memcpy(lote + n, socFio.itens, sizeof(CatItem) * (size_t)nSocial);
-  n += nSocial;
-  marco("trakt atividade dos amigos");
-  if (CONDENADA("depois da atividade dos amigos")) goto condenada;
+  marco("trakt continuar assistindo");
+  if (CONDENADA("depois do continuar assistindo")) goto condenada;
   // O historico do Trakt e a PRIMEIRA fileira da home e chega ~1,6 s antes dos
   // manifestos. Publicar aqui poe conteudo na tela nesse instante em vez de
   // segurar tudo ate o fim.
@@ -3757,15 +3721,6 @@ static void *montar(void *u) {
       snprintf(f0->titulo, sizeof f0->titulo, "Continuar assistindo");
       snprintf(f0->tipo,   sizeof f0->tipo,   "movie");
       f0->ini = 0; f0->n = nContinuar;
-    }
-    if (nSocial > 0) {
-      CatFileira *fs = &filsMontadas[nf++];
-      memset(fs, 0, sizeof *fs);
-      snprintf(fs->chave, sizeof fs->chave, "social_activity");
-      snprintf(fs->titulo, sizeof fs->titulo, "Amigos assistindo");
-      snprintf(fs->tipo, sizeof fs->tipo, "social");
-      fs->ini = nContinuar; fs->n = nSocial;
-      fs->socialGeracao = socialGeracao;
     }
     nFileirasMontadas = nf;
     nPublicado = n;
@@ -3805,15 +3760,6 @@ static void *montar(void *u) {
       snprintf(f0->titulo, sizeof f0->titulo, "Continuar assistindo");
       snprintf(f0->tipo,   sizeof f0->tipo,   "movie");
       f0->ini = 0; f0->n = nContinuar;
-    }
-    if (nSocial > 0) {
-      CatFileira *fs = &fil[nFil++];
-      memset(fs, 0, sizeof *fs);
-      snprintf(fs->chave, sizeof fs->chave, "social_activity");
-      snprintf(fs->titulo, sizeof fs->titulo, "Amigos assistindo");
-      snprintf(fs->tipo, sizeof fs->tipo, "social");
-      fs->ini = nContinuar; fs->n = nSocial;
-      fs->socialGeracao = socialGeracao;
     }
 
     lerPrefs();

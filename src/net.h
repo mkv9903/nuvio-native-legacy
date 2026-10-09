@@ -389,10 +389,6 @@ int net_segment_is_suspicious(const char *s, unsigned n);
 // RAW TLS CONNECTION, without HTTP. For Discord websocket (discordws.c):
 // TV libcurl (7.53.1) lacks websocket support, but opens TLS and delivers channel
 // with CONNECT_ONLY. `url` is "https://host:port/" — only host and port matter.
-// Blocks until connected or `seconds` expires. NULL = no connection. Always NULL in browser.
-// Startup only: optional trusted CA bundle for Discord OAuth and Gateway.
-// Empty uses libcurl system trust; never disables certificate verification.
-void net_discord_ca(const char *pem_path);
 // OAuth POST: verified TLS, dedicated handle, no native redirects.
 char *net_post_secure_st(const char *url, int seconds, const char *const *headers,
                          const char *body, int *status);
@@ -510,7 +506,6 @@ int rede_aquecer_lote(const char *const *origens, int n, unsigned *ms);
 const char *rede_url_publica(const char *url, char *dst, unsigned tam);
 const char *rede_url_log(const char *url, char *dst, unsigned tam);
 int rede_segmento_suspeito(const char *s, unsigned n);
-void rede_discord_ca(const char *p);
 char *rede_postar_seguro_st(const char *u, int s, const char *const *h, const char *c, int *st);
 RedeTls *rede_tls_abrir(const char *u, int s);
 int rede_tls_enviar(RedeTls *t, const void *b, size_t n);

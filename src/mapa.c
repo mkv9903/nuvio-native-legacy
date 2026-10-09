@@ -18,7 +18,6 @@
 #include "salvos.h"
 #include "dados.h"
 #include "rede.h"
-#include "amigostitulo.h"
 #include <pthread.h>
 #endif
 
@@ -1934,33 +1933,8 @@ static int vizColetarPool(const MapaSemente *foco, MapaVizCand *pool, int max) {
 // O que os amigos gostaram: os titulos do feed (socialvis) que o indice de
 // amigostitulo marca com "gostou". O mais novo primeiro, um por titulo.
 static int vizColetarAmigos(MapaVizAmigo *a, int max) {
-  int n = 0, i, k, total;
-  amigostitulo_atualizar();
-  total = socialvis_n_eventos();
-  for (i = 0; i < total && n < max; i++) {
-    const SvEvento *ev = socialvis_evento(i);
-    AmigosTitulo t;
-    int idx;
-    if (!ev || !ev->imdb[0] || !ev->titulo[0]) continue;
-    if (!amigostitulo_obter(ev->imdb, &t) || t.nGostou <= 0 || t.n <= 0 || !t.a[0].gostou) continue;
-    for (k = 0; k < n; k++) if (!strcmp(a[k].obra.imdb, ev->imdb)) break;
-    if (k < n) continue;
-    memset(&a[n], 0, sizeof a[n]);
-    idx = itemPorImdb(ev->imdb);
-    if (idx >= 0) obraDoItem(cat_item(idx), idx, &a[n].obra);
-    else {
-      snprintf(a[n].obra.imdb, sizeof a[n].obra.imdb, "%s", ev->imdb);
-      snprintf(a[n].obra.tipo, sizeof a[n].obra.tipo, "%s", !strcmp(ev->tipo, "series") ? "series" : "movie");
-      copiaLimpa(a[n].obra.titulo, sizeof a[n].obra.titulo, ev->titulo);
-      snprintf(a[n].obra.poster, sizeof a[n].obra.poster, "%s", ev->poster);
-      snprintf(a[n].obra.fundo, sizeof a[n].obra.fundo, "%s", ev->arte);
-      a[n].obra.catIndice = -1;
-    }
-    if (!a[n].obra.poster[0]) continue;
-    amigostitulo_primeiro_nome(t.a[0].nome, a[n].quem, sizeof a[n].quem);
-    n++;
-  }
-  return n;
+  (void)a; (void)max;
+  return 0;
 }
 
 static int vizColetarVistos(unsigned *v, int max) {

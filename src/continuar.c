@@ -2,7 +2,6 @@
 #include "ajustes.h"
 #include "idioma.h"
 #include "layout.h"
-#include "recomenda.h"
 #include "badges.h"
 #include "text.h"
 #include "anim.h"

@@ -19,9 +19,6 @@
 #include "ilhasalvar.h"
 #include "ilhaacao.h"
 #include "ilha.h"
-#include "recomenda.h"
-#include "atividade.h"
-#include "recenviar.h"
 #include "botoes.h"
 #include "badges.h"
 #include "idioma.h"
@@ -448,13 +445,6 @@ static void montar(void) {
   // assistido): esta e a de baixo sao acoes do cartaz da home.
   if (!doPainel && ci->progresso > 0 && ci->imdb[0]) {
     juntar("Tirar de Continuar assistindo", OP_TIRAR_CONTINUAR);
-  }
-  // SO EXISTE SE O PACOTE TEM O SERVICO. Sem NUVIO_REC_URL compilada,
-  // recomenda_ativo() e 0 e esta linha nunca aparece — o dono publica builds
-  // assim, e um item de menu que so da erro e pior que item nenhum.
-  if (!doPainel && recomenda_ativo() && ci->imdb[0] &&
-      (!strcmp(ci->tipo, "movie") || !strcmp(ci->tipo, "series"))) {
-    juntar("Recomendar a um amigo", OP_RECOMENDAR);
   }
   // Por ULTIMO: e da fileira, nao do titulo. So quando a home disse qual e a
   // fileira e ela tem forma para escolher (Continuar assistindo, Top 10 e o
@@ -888,7 +878,6 @@ static void aplicar(void) {
       // acontece fora do jogo de estados abaixo; ver salvos.h para por que ele
       // e o unico destino que sobrevive ao fechamento do app.
       salvos_definir(ci, intencao);
-      atividade_salvo(ci, intencao);   // ev=salvo para o Social (atividade.h)
       ilhasalvar_aviso(ci, intencao);  // voo da capa + "Salvo em ..." / "Removido da lista"
 
       // TRAKT ESCOLHIDO E SEM VINCULO cai no ramo local, como o Simkl sem
@@ -934,13 +923,6 @@ static void aplicar(void) {
     case OP_CATEGORIA:
       snprintf(pedCategoriaImdb, sizeof pedCategoriaImdb, "%s", ci->imdb);
       aberto = 0;
-      break;
-    case OP_RECOMENDAR:
-      // FECHA ESTE MODAL E ABRE O COMPARTILHADO. O menu do cartaz falou de um
-      // INDICE da home; dali em diante quem manda e uma copia do CatItem, pela
-      // mesma razao que salvospainel.c copia: o vetor do catalogo troca de
-      // bloco a cada republicacao da descoberta.
-      if (recenviar_abrir(ci)) aberto = 0;
       break;
     case OP_DISPENSAR:
       home_retomar_dispensar();

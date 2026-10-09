@@ -63,9 +63,6 @@
 #include "detmais.h"
 #include "catalogo.h"
 #include "artehero.h"
-#include "recomenda.h"
-#include "reacao.h"
-#include "recenviar.h"
 #include "serieaud.h"
 #include "seriefrases.h"
 #include "fundo.h"
@@ -76,9 +73,6 @@
 #include <math.h>
 #include "ponteiro.h"
 #include "plrui.h"
-#include "svdesenho.h"
-#include "amigostitulo.h"
-#include "amigostitulo_ui.h"
 #include "temporadas_grafico.h"
 static void ponteiroDetalhe(int r, int c);   // ponteiro do Magic Remote (#99)
 static int moverFileira(int dy);
@@ -243,10 +237,7 @@ static int  pedExplorar = 0;   // circular "Explorar": o roteador abre a toca ne
 #define DET_PTR_AMIGOS 99
 #define NV_DETW_AMIGOS_H   76.0f
 #define NV_DETW_AMIGOS_GAP 18.0f
-static int  amigosDoTitulo(AmigosTitulo *t) {
-  const CatItem *c = cat_item(idx);
-  return c && c->imdb[0] && amigostitulo_obter(c->imdb, t);
-}
+static int  amigosDoTitulo(void) { return 0; }
 // O ULTIMO EPISODIO da serie (a ultima temporada que o extras conhece), para
 // "Rafa terminou a série". 0/0 = nao se sabe ainda: a frase nunca e afirmada.
 static void ultimoEpisodio(int *t, int *e);
@@ -1298,7 +1289,6 @@ static void abrirInterno(const HomeItem *it) {
   audAberta = 0; audTempAberta = -1; audTempVista = -1; frasesAberta = 0;
   item = *it;
   aberto = 1; saindo = 0; nivel = 0; botao = 0; focoAmigos = 0;
-  amtui_fechar();
   detmais_zerar();
   heroReiniciar();
   t = 0.0f; pg = 0.0f; scrollY = 0.0f; velY = 0.0f; abaInfo = 0; pessoaAberta = 0;
@@ -2026,9 +2016,7 @@ static int temInicio(void) {
 // E so em filme e serie, como o item de menu: canal e evento nao tem IMDb
 // estavel para o amigo abrir do outro lado.
 static int temRecomendar(void) {
-  const CatItem *ci = cat_item(idx);
-  if (!recomenda_ativo() || !ci || !ci->imdb[0]) return 0;
-  return !strcmp(ci->tipo, "movie") || !strcmp(ci->tipo, "series");
+  return 0;
 }
 // O BOTAO "LEMBRAR-ME", e as duas condicoes para ele existir.
 //
@@ -2264,19 +2252,11 @@ static void executarMais(int dm) {
     // A tela de escolha come o teclado ate fechar (topo de detail_evento).
     trailer_fechar();
     trocaarte_abrir(cat_item(idx));
-  } else if (dm == DMAIS_RECOMENDAR) {
-    // A MESMA MODAL DO MENU DO CARTAZ, e nao uma segunda copia dela: ver
-    // recenviar.h. Aberta, ela fica acima desta tela no roteador de app.c e
-    // recebe o D-pad ate fechar.
-    const CatItem *ci = cat_item(idx);
-    if (ci) recenviar_abrir(ci);
   }
 }
 
 void detail_evento(const SDL_Event *e) {
   if (saindo) return;
-  // O CARTAO "O QUE ACHOU?" aberto pela pagina e modal: a tecla e dele.
-  if (reacao_aberta() && reacao_evento(e, 1)) return;
   // CARROSSEL ANDANDO: as setas laterais continuam andando pela fileira (a
   // pagina do titulo do meio do caminho nem chegou a ser montada); qualquer
   // outra tecla monta a pagina do titulo em cena antes de agir nela.
@@ -2295,8 +2275,6 @@ void detail_evento(const SDL_Event *e) {
   // "TROCAR ARTE" COME TUDO enquanto aberta (#142): e a coisa mais recente na
   // tela, e o Voltar dela fecha so ela.
   if (trocaarte_aberto()) { trocaarte_evento(e); return; }
-  // A LISTA DOS AMIGOS (OK na ilha de amigos) e modal enquanto aberta.
-  if (amtui_aberta()) { amtui_evento(e); return; }
   // "MAIS OPCOES" aberta come o teclado; o OK nela devolve a acao.
   if (detmais_aberto()) {
     int dm = detmais_evento(e);
@@ -2469,16 +2447,7 @@ void detail_evento(const SDL_Event *e) {
     if (!okDesceEm) return;
     dur = SDL_GetTicks() - okDesceEm;
     okDesceEm = 0;
-    if (nivel == 0 && focoAmigos) {
-      // A lista do que cada amigo achou, AQUI (dono, 06/10/2026), e nao mais a
-      // aba Atividade do painel — que repetia so "viu".
-      AmigosTitulo at;
-      int ut, ue;
-      if (amigosDoTitulo(&at)) {
-        ultimoEpisodio(&ut, &ue);
-        amtui_abrir(&at, ut, ue, tituloDe(idx));
-      }
-    } else if (nivel == 0) {
+    if (nivel == 0) {
       // Ordem FIXA: primario, adicionar a lista, marcar como visto, fontes.
       //
       // O botao do olho caia no `else` e abria a folha de FONTES — ele nunca
@@ -2666,17 +2635,6 @@ void detail_evento(const SDL_Event *e) {
     // CIMA na linha de botoes nao fazia nada; com uma reacao pendente ele abre
     // a pergunta (reacao.h). Sem pendencia, continua sem fazer nada.
     // CIMA na ilha de amigos volta ao botao em que estava; BAIXO entra nas secoes;
-    // ESQUERDA pede o menu lateral como o primeiro botao.
-    if (focoAmigos) {
-      if (k == SDLK_UP) { focoAmigos = 0; return; }
-      if (k == SDLK_LEFT) { pediuMenu = 1; return; }
-      if (k != SDLK_DOWN) return;
-      focoAmigos = 0;
-    } else if (k == SDLK_DOWN && !(carro && !carCheia)) {
-      AmigosTitulo at;
-      if (amigosDoTitulo(&at)) { focoAmigos = 1; return; }
-    }
-    if (k == SDLK_UP && reacao_detalhe_abrir(cat_item(idx))) return;
     if (k == SDLK_UP && !e->key.repeat) { pediuSocial = 1; return; }
     // CARROSSEL: a primeira seta para baixo so estica o cartao (ver carCheia).
     if (k == SDLK_DOWN && carro && !carCheia) { carCheia = 1; return; }
@@ -4046,10 +4004,7 @@ static void heroWeb(float a, float desloc) {
   float yMeta2 = NV_DETW2_BASE - NV_DETW2_SELO_H;
   float yMeta1 = yMeta2 - NV_DETW2_META_GAP - NV_DETW2_M1_H;
   float ySin   = yMeta1 - NV_DETW2_GAP_SIN - hSin;
-  AmigosTitulo amg;
-  int temAmg = amigosDoTitulo(&amg);
-  if (!temAmg) focoAmigos = 0;
-  float hAmg = temAmg ? NV_DETW_AMIGOS_H + NV_DETW_AMIGOS_GAP : 0.0f;
+  float hAmg = 0.0f;
   float yAcoes = ySin - NV_DETW2_GAP_ACOES - NV_DETW2_BTN_H - hCaption - hAmg;
   // BLOCO DE LINHAS DE ESTADO, empilhado de baixo para cima logo acima dos
   // botoes. Sao duas, e a ordem tem razao: a retomada explica o BOTAO e fica
@@ -4280,34 +4235,7 @@ static void heroWeb(float a, float desloc) {
     }
   }
 
-  // --- ILHA DE AMIGOS, logo abaixo dos botoes ----------------------------------
-  if (temAmg) {
-    static const float ANEL[3] = { 0.075f, 0.08f, 0.095f };
-    float y0 = yAcoes + NV_DETW2_BTN_H + hCaption + NV_DETW_AMIGOS_GAP;
-    float d = 52.0f, pad = (NV_DETW_AMIGOS_H - d) * 0.5f;
-    int foc = nivel == 0 && focoAmigos;
-    char l1[200], l2[220];
-    TxtLinha t1, t2;
-    float pw, larg, tintaF = ajustes_acento_tinta(NULL, NULL, NULL);
-    int c1 = foc ? (int)(tintaF * 255.0f) : 255, c2 = foc ? (int)(tintaF * 255.0f * 0.85f) : 179;
-    int nr = amg.n < 3 ? amg.n : 3, ut, ue;
-    // Informacao UTIL e nao so "viu" (dono, 06/10/2026): quem recomendou, o
-    // que acharam, ate onde foram — e embaixo o que nao coube na manchete.
-    ultimoEpisodio(&ut, &ue);
-    amigostitulo_resumo(&amg, ut, ue, (long long)time(NULL), l1, sizeof l1, l2, sizeof l2);
-    t1 = txt_linha_corta(TXT_DET_META2, l1, c1, c1, c1, 255, NV_DETW2_TEXTO_W - 200.0f);
-    t2 = txt_linha_corta(TXT_HERO_META, l2, c2, c2, c2, 255, NV_DETW2_TEXTO_W - 200.0f);
-    pw = d + d * 0.71f * (float)(nr - 1);
-    larg = pad + pw + 18.0f + (t1.w > t2.w ? t1.w : t2.w) + 30.0f;
-    { GfxRect ilha = { NV_DETW2_X, y0, larg, NV_DETW_AMIGOS_H };
-      if (foc) plrui_pilula_foco(ilha, a);
-      else plrui_material(ilha, NV_DETW_AMIGOS_H * 0.5f, 0, a);
-      svd_amigos_pilha(ilha.x + pad, y0 + pad, d, &amg, nr, 1, ANEL, a);
-      { float tx = ilha.x + pad + pw + 18.0f;
-        float bloco = t1.h + 2.0f + t2.h, ty = y0 + (NV_DETW_AMIGOS_H - bloco) * 0.5f;
-        txt_desenhar_alpha(t1, tx, ty, a);
-        txt_desenhar_alpha(t2, tx, ty + t1.h + 2.0f, a * (foc ? 0.9f : 0.8f)); }
-      if (a > 0.3f) ponteiro_alvo(ilha.x, ilha.y, ilha.w, ilha.h, ponteiroDetalhe, NULL, -1, DET_PTR_AMIGOS); } }
+
 
   // --- linha da AGENDA ------------------------------------------------------
   // Cor de realce e nao branco: e a unica linha do hero que fala de uma data
@@ -6319,9 +6247,7 @@ static float desenhaFrases(float x, float y, float a) {
 // PONTEIRO (#99). r < 0 = botao `c` do hero (nivel 0); senao secao r, coluna
 // c (nivel 1) — as mesmas variaveis que as setas mexem em detail_evento.
 static void ponteiroDetalhe(int r, int c) {
-  if (r < 0 && c == DET_PTR_AMIGOS) { nivel = 0; focoAmigos = 1; return; }
   if (r < 0) {
-    focoAmigos = 0;
     if (c < 0 || c >= nBotoes()) return;
     nivel = 0; botao = c;
     return;
@@ -6821,16 +6747,6 @@ static void carFundo(void) {
   gfx_janela_atual[2] = gfx_janela_atual[3] = 1.0f;
 }
 
-// "O QUE ACHOU?" AINDA SEM RESPOSTA (reacao.h): uma linha discreta no canto
-// inferior direito, so no topo da pagina e sem nada aberto por cima. CIMA na
-// linha de botoes abre o cartao (detail_evento); aberto, ele desenha aqui.
-static void reacaoPendente(float s) {
-  int livre = nivel == 0 && scrollY < 1.0f && !pessoaAberta && !colListaAberta && !amtui_aberta() &&
-              !detmais_aberto() &&
-              !episodios_menu_aberto() && trocaarte_visivel() < 0.005f;
-  if (!livre && !reacao_aberta()) return;
-  reacao_detalhe_dica(cat_item(idx), livre ? s : 0.0f);
-}
 
 // O FUNDO DA PAGINA DO TITULO, inteiro, numa funcao so.
 //
@@ -6926,7 +6842,6 @@ static void maisDesenhar(void) {
 
 void detail_desenhar(Uint32 agora) {
   if (!aberto) return;
-  amigostitulo_atualizar();   // barato: so remonta quando o feed social mudou
   // COR VIVA: a pagina do titulo manda na cor, acima da home que pode estar
   // desenhada por baixo (a prioridade resolve o mesmo quadro). A chave e a
   // MESMA arte que o fundo pede em tela cheia logo abaixo.
@@ -7003,9 +6918,7 @@ void detail_desenhar(Uint32 agora) {
     if (pessoaAberta) { ponteiro_camada(); desenhaPessoa(s); }
     if (colListaAberta) { ponteiro_camada(); desenhaListaColecao(s); }
     if (episodios_menu_aberto()) ponteiro_camada();
-    reacaoPendente(s);
     maisDesenhar();
-    if (amtui_aberta()) { ponteiro_camada(); amtui_desenhar(agora); }
     return;
   }
   desenhaEsqueletoEpisodios(a2 > pg ? a2 : pg);
@@ -7022,10 +6935,8 @@ void detail_desenhar(Uint32 agora) {
   if (colListaAberta) { ponteiro_camada(); desenhaListaColecao(s); }
   // E o menu de visto por cima da ficha tambem: ele e o ultimo a abrir.
   if (episodios_menu_aberto()) ponteiro_camada();
-  reacaoPendente(s);
   episodios_menu_desenhar();
   maisDesenhar();
-  if (amtui_aberta()) { ponteiro_camada(); amtui_desenhar(agora); }
 }
 
 static void ultimoEpisodio(int *t, int *e) {
@@ -7060,11 +6971,8 @@ void detail_volta_notar(int novo) {
 int detail_pediu_assistido(void) { int v = pedAssistido; pedAssistido = 0; return v; }
 int detail_pediu_marcar(void)     { int v = pedMarcar;     pedMarcar = 0;     return v; }
 int detail_pediu_amigos(char *imdb, size_t tam) {
-  const CatItem *c = cat_item(idx);
-  if (!pedAmigos) return 0;
-  pedAmigos = 0;
-  if (imdb && tam) snprintf(imdb, tam, "%s", c ? c->imdb : "");
-  return 1;
+  (void)imdb; (void)tam;
+  return 0;
 }
 int detail_pediu_fontes(void)     { int v = pedFontes;     pedFontes = 0;     return v; }
 int detail_pediu_explorar(void)   { int v = pedExplorar;   pedExplorar = 0;   return v; }

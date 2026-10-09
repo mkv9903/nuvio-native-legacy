@@ -19,13 +19,9 @@
 #include "salvosorg.h"
 #include "teclado.h"
 #include "simkl.h"
-#include "recomenda.h"
-#include "atividade.h"
 #include "avisos.h"
 #include "agenda.h"
 #include "agendaui.h"
-#include "recenviar.h"
-#include "pessoas.h"
 #include "catalogo.h"
 #include "ctxmenu.h"
 #include "gfx.h"
@@ -37,10 +33,6 @@
 #include "ajustes.h"
 #include "idioma.h"
 #include "botoes.h"
-#include "socialvis.h"
-#include "svdesenho.h"
-#include "recresp.h"
-#include "reacao.h"
 #define NV_ESCALA_TELA   // o arquivo inteiro mede pela tela virtual (escala.h)
 #include "escala.h"
 #include "extras.h"
@@ -258,127 +250,9 @@ enum { SP_ABA_SALVOS = 0, SP_ABA_ATIVIDADE = 1, SP_ABA_SOCIAL = 2, SP_ABA_AVISOS
        SP_ABA_AGENDA = 4, SP_ABA_N = 5 };
 #define SP_FOCO_ABAS (-1)
 static int aba;
-static RecItem recs[REC_MAX];
-static int nRecs;
-// "ASSISTIDAS" (dono, 03/10): a rec marcada com "Ja assisti" (ou concluida no
-// player) desce para um grupo proprio no fim das recomendacoes. Retrato de
-// recresp.h na reconstrucao; `recResp` e a resposta dada (para a 3a linha).
-static unsigned char recVista[REC_MAX];
-static RecResp recResp[REC_MAX];
-static unsigned rrRev;
 
-// A ABA SOCIAL DEIXOU DE SER UMA LISTA SO. Ela tem agora quatro tipos de linha
-// com ALTURAS DIFERENTES, e por isso existe este vetor em vez de um indice
-// direto na lista de recomendacoes: a rolagem, o foco e o desenho tem de
-// concordar sobre onde comeca a linha `i`, e a unica forma de garantir isso e
-// as tres perguntarem ao MESMO lugar.
-//
-//   SPS_CONSENT_NAO / _SIM  as duas respostas da pergunta de primeira entrada
-//   SPS_REC                 uma recomendacao recebida
-//   SPS_SUG                 alguem que a pessoa talvez conheca
-//   SPS_ADICIONAR           "Adicionar um amigo"
-//   SPS_APARECER            o interruptor de "apareco para os outros?"
-//
-// COM A PERGUNTA NA TELA A LISTA TEM SO DUAS LINHAS, as duas respostas. Nao e
-// uma tela separada com laco proprio: o D-pad, a rolagem, a animacao de foco e
-// o recorte do painel ja funcionam para linhas, e uma segunda maquina de estado
-// para duas pilulas divergiria da primeira na primeira correcao.
-//   SPS_ENCONTRAR           "Encontrar pessoas" (busca, perfil, pedidos; pessoas.c)
-//   SPS_AMIGO               um contato ja adicionado (foto + nome), sob o
-//                           cabecalho "Seus amigos" (dono, 20/09/2026)
-enum { SPS_CONSENT_NAO = 0, SPS_CONSENT_SIM, SPS_REC, SPS_SUG,
-       SPS_ADICIONAR, SPS_APARECER, SPS_AMIGO, SPS_ENCONTRAR,
-       // QUEM VE O QUE EU ASSISTO (socialsrv, recomenda_alcance): as tres
-       // respostas da pergunta, a linha que reabre a pergunta e o nome.
-       SPS_ALC_0, SPS_ALC_1, SPS_ALC_2, SPS_ALCANCE, SPS_NOME,
-       // F08: o Trakt ligado a este perfil (unir / separar). So existe com o
-       // servidor que sabe ("identidade1") e com algo a dizer.
-       SPS_IDENT,
-       // F08: Simkl (so com login nesta TV ou ja ligado) e Letterboxd (usuario
-       // DECLARADO, o servidor nao confere). Mesma gramatica da linha do Trakt.
-       SPS_SIMKL, SPS_LETTERBOXD,
-       // PEDIDOS DE AMIZADE RECEBIDOS (06/10, relato do dono: "o pessoal ta
-       // adicionando e nao ta aparecendo para aceitar"). Ate aqui o unico
-       // lugar para aceitar era o modal da pilula, que vive 10 s, e uma pagina
-       // dentro de Encontrar pessoas; esta aba so mostrava "(N)" no fim da
-       // lista. Agora os pedidos abrem a aba, cada um com Aceitar e Recusar.
-       SPS_PEDIDO };
-// A API do alcance e do nome so existe no socialsrv (branch agente/socialsrv).
-// Ate o merge as linhas ficam desligadas; NV_SOCIAL_V2_UI liga so a tela (o
-// teste de captura o usa com a API de mentira).
-#if defined(NV_SOCIAL_V2) || defined(NV_SOCIAL_V2_UI)
-#define SP_V2 1
-#else
-#define SP_V2 0
-#endif
-typedef struct { unsigned char tipo; short idx; } SPSocial;
-#define SP_SOCIAL_MAX (REC_MAX + REC_SUGESTOES_MAX + REC_CONTATOS_MAX + REC_PEDIDOS_MAX + 8)
-static SPSocial social[SP_SOCIAL_MAX];
-static int nSocial;
-static RecSugestao sugs[REC_SUGESTOES_MAX];
-static int nSugs;
-static RecContato ctts[REC_CONTATOS_MAX];
-static int nCtts;
-// Pedidos recebidos (copia, como as outras listas). `pedCol` = a pilula em
-// foco na linha do pedido: 0 Aceitar, 1 Recusar (→ e ← trocam). `pedFeito` =
-// os handles ja respondidos nesta sessao: a linha some NA HORA do OK, sem
-// esperar a volta do servidor (recomenda.c tira da caixa quando ela chega).
-static RecPessoa peds[REC_PEDIDOS_MAX];
-static int nPeds, pedCol;
-// O SEGMENTO EM FOCO no controle de "quem ve" (← →); -1 = o valor de agora.
-static int alcCol = -1;
-static char pedFeito[REC_PEDIDOS_MAX][16];
-static int nPedFeito;
-static int pedJaFeito(const char *pub) {
-  int i;
-  for (i = 0; i < nPedFeito; i++) if (!strcmp(pedFeito[i], pub)) return 1;
-  return 0;
-}
-// Retrato do estado do consentimento na ultima reconstrucao. O fio de rede pode
-// adotar um "sim" respondido em OUTRA TV no meio de um ciclo (ver a
-// reconciliacao em recomenda.c), e sem esta marca a pergunta continuaria na
-// tela depois de ja ter sido respondida.
-static int consentEstado = -1;
-// O nivel na ultima reconstrucao, e 1 enquanto a pessoa reabriu a pergunta.
-#if SP_V2
-static int alcEstado = -2, escolhendoAlcance;
-// A linha do Trakt ligado: o que a reconstrucao viu (situacao*8 + op) e o
-// segundo OK que separa (o primeiro so pergunta).
-// identConfirma guarda (tipo da linha + 1) que espera o segundo OK; 0 = nenhuma.
-static int identVisto = -1, identConfirma, identSeparando;
-static int identChave(void) {
-  int k = recomenda_identidade_situacao() * 8 + recomenda_identidade_op();
-  k = k * 4 + recomenda_identidade_estado(REC_IDENT_SIMKL);
-  k = k * 8 + recomenda_identidade_op_de(REC_IDENT_SIMKL);
-  k = k * 4 + recomenda_identidade_estado(REC_IDENT_LETTERBOXD);
-  k = k * 8 + recomenda_identidade_op_de(REC_IDENT_LETTERBOXD);
-  return k;
-}
-// Simkl/Letterboxd: a linha existe quando da para ligar, ja esta ligada, ou
-// ainda ha um aviso do ultimo pedido para ler (depois do OK ela some, se for o caso).
-static int identServicoVisivel(int prov) {
-  int e = recomenda_identidade_estado(prov), op = recomenda_identidade_op_de(prov);
-  return e == REC_IDENT_E_PODE || e == REC_IDENT_E_LIGADO ||
-         (op != REC_IDENT_OP_NADA && op != REC_IDENT_OP_OK && e != REC_IDENT_E_INDISPONIVEL) ||
-         op == REC_IDENT_OP_SEM_SERVICO;
-}
-#endif
-#define SPS_ALC_TOPO 205.0f   // medido na captura com o corpo da ilha (19/27)
+#define SPS_H_ACAO      72.0f
 
-// A LINHA DO AMIGO SABE O QUE ELE ESTA FAZENDO (tela A, 02/10/2026): o indice
-// dele no modelo do social (socialvis.h; -1 = sem atividade) e se ha uma
-// recomendacao MINHA para ele, que ganha a cadeia "Voce mandou X › viu ›
-// gostou" e por isso uma linha mais alta. Refeito com a lista (reconstruirSocial)
-// e quando o modelo muda.
-static short cttSv[REC_CONTATOS_MAX];
-static unsigned char cttCadeia[REC_CONTATOS_MAX];
-static unsigned svRevSocial = ~0u;
-
-// A ABA ATIVIDADE (tela B): o feed de socialvis, uma linha por evento, com o
-// rotulo do dia ("Agora", "Hoje", "Ontem", a data, "Recentes") antes da
-// primeira linha de cada dia. Os rotulos sao montados aqui, uma vez por
-// mudanca do modelo, e nao por quadro.
-static int nAtv;
 // AGENDA: indices em agenda_lista() dos proximos episodios, mais a linha final
 // "Abrir a agenda completa". So entram series com data de estreia de hoje em
 // diante; o resto (sem data, encerradas) e assunto da tela Agenda.
@@ -397,112 +271,20 @@ static float agAntes(int i);
 static int editando, editLin, editCol;
 // O lapis da faixa tem foco proprio (foco == SP_FOCO_ABAS e editLapis).
 static int editLapis;
-static unsigned char atvDia[SV_EVENTOS_MAX];
-static char atvRot[SV_EVENTOS_MAX][32];
-static unsigned atvRev = ~0u;
-// O perfil pedido pela linha do amigo (spainel_pediu_perfil).
-static char pedidoPerfil[96];
-static int temPedidoPerfil;
-
-// Alturas das linhas novas. A recomendacao mantem SP_POSTER_H + SPS_GAP, que e
-// exatamente o SP_PASSO de antes — a aba nao mudou de ritmo, so ganhou vizinhos.
-// AMIGO E MAIS COMPACTO: ele nao tem poster, selo nem botao, so identidade e a
-// ultima atividade. Dar a ele os mesmos 112px da sugestao fazia uma linha
-// simples parecer um cartao de destaque.
-// GLASS UI (mockup "ilha" tela 3): as linhas se ENCOSTAM — so a focada tem
-// superficie, e os 18 px de recuo de cada uma ja sao o ar entre os textos.
-// Pessoa e recomendacao tem os tres andares do mockup (114); sugestao tem dois
-// (92); as acoes sao chips de 56 com 8 de ar em cima e embaixo; as caixas de
-// ajuste tem 92 com 6 de ar (a caixa aparece em repouso, entao precisa de vao
-// para nao encostar na vizinha).
-#define SPS_GAP          0.0f
-#define SPS_H_CONSENT   84.0f
-#define SPS_H_SUG      SPI_H2
-#define SPS_H_AMIGO    SPI_H
-#define SPS_H_ACAO      72.0f
-#define SPS_H_APARECER 104.0f
-// AS DUAS PORTAS PARA GENTE NOVA (dono, 06/10: "vamos melhorar esses 2
-// botoes"): cartoes com icone num disco, nome e o que cada uma faz — eram
-// chips de 56 iguais no fim da lista. Abrem a aba logo abaixo dos pedidos.
-#define SPS_H_PORTA     88.0f
-// "COMO VOCE APARECE" e "QUEM VE O QUE VOCE ASSISTE" (dono, 06/10: "precisa
-// de destaque"): a previa do cartao que os outros veem e o controle de tres
-// segmentos, cada um com a frase do que ele faz.
-#define SPS_H_PREVIA   128.0f
-#define SPS_H_ALCANCE  156.0f
-// CONTAS LIGADAS (Trakt, Simkl, Letterboxd): cada servico um cartao com a
-// marca, a cor dele quando ligado e a animacao de ligar (identAnim*).
-#define SPS_H_CONTA    112.0f
-// CONTAS LIGADAS EM UMA FILEIRA (06/10, "tudo mais junto"): tres ladrilhos
-// lado a lado e, embaixo, a frase do ladrilho em foco. A altura e da FILEIRA
-// e fica na primeira linha do grupo; as outras duas valem 0 (socialAlt).
-#define SPS_H_CONTAS   150.0f
-#define SPS_CONTA_H     96.0f
-// Alturas dos dois blocos de texto que NAO sao linha e por isso nao recebem
-// foco: o enunciado da pergunta e a explicacao do estado vazio. Sao constantes
-// e nao medidas porque a rolagem precisa delas ANTES do desenho — e as duas
-// foram conferidas na captura, que e o unico juiz util aqui.
-#define SPS_CONSENT_TOPO 345.0f
-#define SPS_VAZIO_TOPO   280.0f
-
-// O INTERRUPTOR DE "APARECER". As medidas sao para TRES METROS, e nao copiadas
-// de um telefone.
-//
-// A conta: numa TV de 55" a 3 m, 80 px ainda deixam a trilha claramente
-// distinguivel, mas tiram o peso de um controle de telefone ampliado. Como o
-// foco da TV transforma a linha inteira em alvo, o switch pode ser visualmente
-// compacto sem reduzir a area de acao.
-//
-// A bola e 30 px com 5 px de folga de cada lado: continua legivel e deixa a
-// capsula respirar sem competir com o titulo.
-#define SPS_SW_W        80.0f
-#define SPS_SW_H        40.0f
-#define SPS_SW_PAD       5.0f
-#define SPS_SW_BOLA    (SPS_SW_H - SPS_SW_PAD * 2.0f)
-#define SPS_SW_GAP      24.0f   // do fim do texto ate a trilha
-// VAO EXTRA ANTES DO INTERRUPTOR. Os 18 px de SPS_GAP separam linhas do MESMO
-// tipo; aqui a lista de gente e de acoes acaba e comeca um ajuste que fica.
-// Sao 10 px, e nao um cabecalho de secao: um rotulo ali repetiria o titulo da
-// propria linha, que e exatamente o ar de formulario que se quer evitar.
-#define SPS_SEP_APARECER 10.0f
-// A linha da Atividade: rosto, cartaz e tres linhas de texto. MAIOR que a
-// linha da ilha (dono, 03/10: "na aba activity eu to achando muito pequeno o
-// poster; vamos tentar primeiro aumentando o texto e o poster"): capa 72x106
-// em vez de 52x76 e o texto na escala _L da lista com capa dos Salvos.
-#define SPA_H        142.0f
-#define SPA_AV        60.0f
-#define SPA_CAP_W     72.0f
-#define SPA_CAP_H    106.0f
-#define SPA_CAP_RAIO  11.0f
-// A cadeia sob a linha do amigo: a pilula (SVD_CHIP_H) e o ar ate ela.
-#define SPS_CADEIA_H    0.0f   // a cadeia virou o terceiro andar da linha
 
 static int aberto, foco, marcaCatN = -1;
 static float entrada, scrollY;
-// O MOVIMENTO e o da ilha (movimento.h). `entradaP` e a mola da abertura SEM
-// recorte (o repique e o "pulo" da forma); `entrada` e a mesma coisa em 0..1.
 static float entradaP, entradaV;
-// TROCA DE ABA (e de/para a folha Editar): `trocaT` vai de 0 a 1 na mola do
-// corpo; a lista entra deslizando do lado em que a aba nova esta (`trocaDir`),
-// o titulo antigo sai para o lado oposto e a pilula do seletor anda ate a aba
-// nova na mola da pilula.
 static float trocaT = 1.0f, trocaV;
 static int trocaDir;
 static char tituloAnt[96];
 static float pilX, pilXv, pilW, pilWv, pilAlvoX, pilAlvoW;
-static int pilIni;     // 0 = a pilula ainda nao tem posicao (cola no alvo)
-#define SP_TROCA_DESLIZE 72.0f   // quanto a lista anda ao entrar
+static int pilIni;
+#define SP_TROCA_DESLIZE 72.0f
 #define SP_TITULO_DESLIZE 28.0f
-// Velocidade da rolagem de 2a ordem (anim_mola2): partida macia, como na home.
 static float velY;
 static float animFoco[SP_MAX];
-// POSICAO DA BOLA DO INTERRUPTOR, 0 = desligado, 1 = ligado. E estado PROPRIO
-// e nao uma leitura direta de recomenda_aparecer() por um motivo que e a razao
-// de ser desta linha inteira: o deslize e a unica coisa na tela que responde
-// "o OK MUDOU alguma coisa" em vez de "o OK ABRIU alguma coisa". Sem ele o
-// desenho pularia entre dois retratos e voltaria a ser um botao.
-// -1 = ainda nao lido; a primeira atualizacao assenta sem deslizar do nada.
-static float animSw = -1.0f;
+
 static char  pedido[24];
 static int   temPedido;
 
@@ -536,23 +318,6 @@ void spainel_ir_aba(int a) {
   if (a < SP_ABA_SALVOS || a >= SP_ABA_N || !abaExiste(a)) return;
   if (a != aba) trocarAba(a);
   foco = nVisiveis() > 0 ? 0 : SP_FOCO_ABAS;
-}
-void spainel_abrir_titulo(const char *imdb) {
-  int i, n;
-  spainel_ir_aba(SP_ABA_ATIVIDADE);
-  if (aba != SP_ABA_ATIVIDADE || !imdb || !imdb[0]) return;
-  socialvis_atualizar();
-  n = socialvis_n_eventos();
-  for (i = 0; i < n; i++) {
-    const SvEvento *ev = socialvis_evento(i);
-    if (ev && !strcmp(ev->imdb, imdb)) { foco = i; break; }
-  }
-}
-int spainel_pediu_perfil(char *id, size_t tam) {
-  if (!temPedidoPerfil) return 0;
-  temPedidoPerfil = 0;
-  if (id && tam) snprintf(id, tam, "%s", pedidoPerfil);
-  return 1;
 }
 int spainel_pediu_agenda(void) {
   if (!temPedidoAgenda) return 0;
@@ -960,19 +725,8 @@ static void organizar(void) {
 // 1 quando o pacote tem o servico de recomendacoes. Com 0 nao ha aba, nao ha
 // selo e nao ha uma linha de rede: o dono publica builds sem NUVIO_REC_URL.
 static int temAbas(void) { return 1; }
-// "RECURSOS SOCIAIS" (opcao dos Ajustes que desliga o lado social do app): com
-// ela desligada as abas Atividade e Amigos NAO EXISTEM — somem da faixa e nem
-// aparecem em Editar, para ninguem ligar o que nao funciona. Um unico ponto de
-// decisao: a opcao "Recursos sociais" do perfil (ajustes_social).
-static int recursosSociais(void) { return ajustes_social(); }
-// A Social so existe com o servico; sem ele as abas sao Salvos e Avisos.
-static int temSocial(void) { return recursosSociais() && recomenda_ativo(); }
-// A Atividade existe quando ha de onde ela vir: o servico, ou o Trakt ja ter
-// trazido gente (socialvis.h).
-static int temAtividade(void) {
-  return recursosSociais() &&
-         (temSocial() || socialvis_n_eventos() > 0 || socialvis_n_amigos() > 0);
-}
+static int temSocial(void) { return 0; }
+static int temAtividade(void) { return 0; }
 // A aba PODE existir neste pacote/estado (nao e o que a pessoa escolheu ver).
 static int abaExiste(int a) {
   if (a == SP_ABA_SOCIAL) return temSocial();
@@ -1060,19 +814,8 @@ static int primeiraAba(void) {
   return SP_ABA_SALVOS;
 }
 
-// Quantas linhas a aba corrente desenha. Uma funcao so para as duas, senao a
-// rolagem e o desenho divergem na primeira mudanca.
 static int nVisiveis(void) {
-  // A ABA SOCIAL TEM SEMPRE UMA LINHA A MAIS: "Adicionar um amigo".
-  //
-  // Vazia, ela era uma frase dizendo que nao havia nada e mais nada — o D-pad
-  // nao tinha para onde descer, e esse e exatamente o estado em que o dono
-  // ficou preso (1 pessoa registrada, 0 contatos no servidor). Cheia, a tela
-  // de amigos so seria alcancavel pelo menu de um cartaz — ou seja, para
-  // adicionar alguem era preciso escolher um filme primeiro.
-  if (aba == SP_ABA_SOCIAL) return nSocial;
   if (aba == SP_ABA_AVISOS) return avisos_lista_linhas();   // + "Dispensar todos"
-  if (aba == SP_ABA_ATIVIDADE) return nAtv;
   if (aba == SP_ABA_AGENDA) return nAg + 1;   // + "Abrir a agenda completa"
   return nLinhas;
 }
@@ -1086,256 +829,7 @@ static int nVisiveis(void) {
 static int temBarra(void);
 static float listaTopo(void) { return SP_LISTA_Y + (temBarra() ? SP_OPC_EXTRA : 0.0f); }
 
-// 1 enquanto a pergunta de primeira entrada esta na tela.
-static int consentindo(void) {
-  return aba == SP_ABA_SOCIAL && nSocial > 0 && social[0].tipo == SPS_CONSENT_NAO;
-}
-// 1 enquanto a pergunta do nivel (alcance) esta na tela.
-static int perguntandoAlcance(void) {
-  return aba == SP_ABA_SOCIAL && nSocial > 0 && social[0].tipo == SPS_ALC_0;
-}
 
-static int spsConta(int t) { return t == SPS_IDENT || t == SPS_SIMKL || t == SPS_LETTERBOXD; }
-static float socialAlt(int i) {
-  if (i < 0 || i >= nSocial) return 0.0f;
-  switch (social[i].tipo) {
-    case SPS_REC:       return SPI_H;
-    case SPS_SUG:       return SPS_H_SUG;
-    case SPS_PEDIDO:    return SPS_H_SUG;
-    case SPS_AMIGO:     return SPS_H_AMIGO +
-                          ((social[i].idx >= 0 && social[i].idx < REC_CONTATOS_MAX &&
-                            cttCadeia[social[i].idx]) ? SPS_CADEIA_H : 0.0f);
-    case SPS_ADICIONAR: return SPS_H_PORTA;
-    case SPS_ENCONTRAR: return SPS_H_PORTA;
-    case SPS_APARECER:  return SPS_H_APARECER;
-    case SPS_ALCANCE:   return SPS_H_ALCANCE;
-    case SPS_NOME:      return SPS_H_PREVIA;
-    case SPS_IDENT:
-    case SPS_SIMKL:
-    case SPS_LETTERBOXD:
-      return (i > 0 && spsConta(social[i - 1].tipo)) ? 0.0f : SPS_H_CONTAS;
-    default:            return SPS_H_CONSENT;
-  }
-}
-
-// Espaco ANTES da linha `i`, quando houver. Sao dois casos, e so um deles
-// carrega texto:
-//   SPS_SUG  o cabecalho que separa as recomendacoes das sugestoes. Sem ele,
-//            um nome desconhecido apareceria logo abaixo de uma recomendacao
-//            de um amigo e leria como remetente.
-//   SPS_APARECER  vao mudo. Ver SPS_SEP_APARECER.
-// Quem desenha tem de olhar o tipo para saber se escreve o rotulo — um vao
-// mudo com o cabecalho das sugestoes por cima seria pior que vao nenhum.
-static float socialTopo(void);
-static float socialAntes(int i) {
-  // A PRIMEIRA SECAO DA LISTA tem 6 px de ar, e nao 22 (ver SP_SECAO_AR1).
-  float sh = (i == 0 && socialTopo() <= 0.0f) ? SP_SECAO_H1 : SP_SECAO_H;
-  if (i < 0 || i >= nSocial) return 0.0f;
-  // POR PESSOA: um rotulo com o nome de quem mandou antes da primeira
-  // recomendacao de cada pessoa.
-  if (social[i].tipo == SPS_REC && recVista[social[i].idx]) {
-    if (i == 0 || social[i - 1].tipo != SPS_REC || !recVista[social[i - 1].idx]) return sh;
-    return 0.0f;
-  }
-  if (social[i].tipo == SPS_REC && sorg_social() == SORG_SOCIAL_PESSOA) {
-    if (i == 0 || social[i - 1].tipo != SPS_REC) return sh;
-    return strcmp(recs[social[i].idx].de, recs[social[i - 1].idx].de) ? sh : 0.0f;
-  }
-  if (social[i].tipo == SPS_APARECER) return SPS_SEP_APARECER;
-  // As secoes de ajuste ganham rotulo: "Voce para os outros" antes da previa
-  // e "Contas ligadas" antes do primeiro servico.
-  if (social[i].tipo == SPS_NOME) return 0.0f;   // o cartao abre a aba, sem rotulo
-  if (spsConta(social[i].tipo)) return (i == 0 || !spsConta(social[i - 1].tipo)) ? sh : 0.0f;
-  // As portas abrem a aba quando nao ha pedido; depois dos pedidos, um vao.
-  if (social[i].tipo == SPS_ENCONTRAR) return i == 0 ? 0.0f : SPS_SEP_APARECER * 1.6f;
-  if (social[i].tipo != SPS_SUG && social[i].tipo != SPS_AMIGO && social[i].tipo != SPS_PEDIDO) return 0.0f;
-  return (i == 0 || social[i - 1].tipo != social[i].tipo) ? sh : 0.0f;
-}
-
-// Altura do bloco de texto que abre a lista e nao recebe foco.
-static float socialTopo(void) {
-  if (aba != SP_ABA_SOCIAL) return 0.0f;
-  if (consentindo()) return SPS_CONSENT_TOPO;
-  if (perguntandoAlcance()) return SPS_ALC_TOPO;
-  // Com pedido esperando, o texto de "nenhuma recomendacao" sai: os pedidos
-  // sao a primeira coisa da aba, e o codigo continua em "Adicionar um amigo".
-  return 0.0f;   // a aba vazia nao tem texto proprio: o cartao e o botao dizem o que fazer
-}
-
-// Copia a lista de recomendacoes para dentro do painel. COPIA, e nao ponteiro:
-// a lista de recomenda.c vive atras de um mutex que o fio de rede reescreve, e
-// e exatamente o erro que derrubou este arquivo antes (ver a nota longa em
-// SPLinha).
-// A caixa de pedidos mudou desde a ultima montagem (o fio de rede releu, ou
-// um aceite pela ilha tirou alguem): conta e handles, na ordem.
-static int pedidosMudaram(void) {
-  int i, n = recomenda_n_pedidos(), k = 0;
-  RecPessoa p;
-  for (i = 0; i < n; i++) {
-    if (!recomenda_pedido(i, &p) || !p.pub[0] || pedJaFeito(p.pub)) continue;
-    if (k >= nPeds || strcmp(peds[k].pub, p.pub)) return 1;
-    k++;
-  }
-  return k != nPeds;
-}
-
-static void reconstruirSocial(void) {
-  int i;
-  nRecs = 0;
-  nSugs = 0;
-  nCtts = 0;
-  nPeds = 0;
-  nSocial = 0;
-  consentEstado = -1;
-  if (!temAbas()) return;
-  consentEstado = recomenda_aparecer();
-
-  // A PERGUNTA VEM ANTES DE TUDO, e ela e a lista inteira enquanto durar. Nao e
-  // um cartaz por cima de uma lista que da para ler por baixo: o pedido foi
-  // "quando entrar a primeira vez, perguntar", e uma pergunta que se pode
-  // ignorar rolando a tela nao foi feita.
-  //
-  // O "NAO" VEM PRIMEIRO. E a resposta padrao, e a primeira linha e a que
-  // recebe o foco quando o D-pad desce — quem apertar OK duas vezes sem ler
-  // acaba em "nao", que e o unico lado em que errar nao custa nada a ninguem.
-  if (consentEstado == REC_APARECER_NAO_PERGUNTADO) {
-    social[nSocial].tipo = SPS_CONSENT_NAO; social[nSocial].idx = 0; nSocial++;
-    social[nSocial].tipo = SPS_CONSENT_SIM; social[nSocial].idx = 0; nSocial++;
-    return;
-  }
-#if SP_V2
-  // A SEGUNDA PERGUNTA, a do NIVEL: quem ve o que eu assisto. Nada sai da TV
-  // antes da resposta (recomenda.h, REC_ALCANCE_NAO_PERGUNTADO), entao ela vem
-  // antes da lista como a primeira — e o "Ninguem" e a primeira linha, pelo
-  // mesmo motivo do "Nao" de la.
-  alcEstado = recomenda_alcance();
-  if (alcEstado == REC_ALCANCE_NAO_PERGUNTADO || escolhendoAlcance) {
-    social[nSocial].tipo = SPS_ALC_0; social[nSocial].idx = 0; nSocial++;
-    social[nSocial].tipo = SPS_ALC_1; social[nSocial].idx = 0; nSocial++;
-    social[nSocial].tipo = SPS_ALC_2; social[nSocial].idx = 0; nSocial++;
-    return;
-  }
-#endif
-
-  for (i = 0; i < REC_MAX && nRecs < REC_MAX; i++)
-    if (recomenda_item(i, &recs[nRecs])) nRecs++;
-    else break;
-  // POR PESSOA (salvosorg.h): as recomendacoes de cada um juntas, as pessoas
-  // em ordem de nome e, dentro de cada uma, a ordem de chegada de sempre.
-  // Insercao estavel: sao no maximo REC_MAX (60) linhas.
-  if (sorg_social() == SORG_SOCIAL_PESSOA) {
-    int j;
-    for (i = 1; i < nRecs; i++) {
-      RecItem t = recs[i];
-      for (j = i; j > 0; j--) {
-        int d = strcasecmp(recs[j - 1].deNome, t.deNome);
-        if (!d) d = strcmp(recs[j - 1].de, t.de);
-        if (d <= 0) break;
-        recs[j] = recs[j - 1];
-      }
-      recs[j] = t;
-    }
-  }
-  // AS ASSISTIDAS VAO PARA O FIM, em grupo proprio, sem mudar a ordem dentro
-  // de cada metade (particao estavel).
-  rrRev = recresp_revisao();
-  { RecItem tmp[REC_MAX];
-    int k = 0, pass;
-    for (pass = 0; pass < 2; pass++)
-      for (i = 0; i < nRecs; i++) {
-        int v = recresp_assistida(recs[i].id);
-        if (v == pass) tmp[k++] = recs[i];
-      }
-    memcpy(recs, tmp, sizeof recs[0] * (size_t)nRecs);
-    for (i = 0; i < nRecs; i++) {
-      memset(&recResp[i], 0, sizeof recResp[i]);
-      recResp[i].reacao = RECRESP_SEM_REACAO;
-      recresp_ler(recs[i].id, &recResp[i]);
-      recVista[i] = (unsigned char)(recResp[i].assistida ? 1 : 0);
-    } }
-  for (i = 0; i < REC_SUGESTOES_MAX && nSugs < REC_SUGESTOES_MAX; i++)
-    if (recomenda_sugestao(i, &sugs[nSugs])) nSugs++;
-    else break;
-
-#if SP_V2
-  // VOCE PARA OS OUTROS: a previa de como os amigos te veem e o nivel de
-  // quem ve o que voce assiste, num cartao so, ANTES dos pedidos.
-  if (nSocial + 1 < SP_SOCIAL_MAX) {
-    social[nSocial].tipo = SPS_NOME; social[nSocial].idx = 0; nSocial++;
-    social[nSocial].tipo = SPS_ALCANCE; social[nSocial].idx = 0; nSocial++;
-  }
-#endif
-  // OS PEDIDOS ABREM A LISTA: sao a unica coisa da aba que espera uma
-  // resposta de quem esta olhando.
-  { int np = recomenda_n_pedidos();
-    for (i = 0; i < np && nPeds < REC_PEDIDOS_MAX; i++)
-      if (recomenda_pedido(i, &peds[nPeds]) && peds[nPeds].pub[0] && !pedJaFeito(peds[nPeds].pub)) nPeds++;
-    for (i = 0; i < nPeds && nSocial < SP_SOCIAL_MAX; i++) {
-      social[nSocial].tipo = SPS_PEDIDO; social[nSocial].idx = (short)i; nSocial++;
-    } }
-  // UM BOTAO SO para gente nova: busca por nome/@apelido e codigo de amigo.
-  if (nSocial < SP_SOCIAL_MAX) {
-    social[nSocial].tipo = SPS_ENCONTRAR; social[nSocial].idx = 0; nSocial++;
-  }
-  for (i = 0; i < nRecs && nSocial < SP_SOCIAL_MAX; i++) {
-    social[nSocial].tipo = SPS_REC; social[nSocial].idx = (short)i; nSocial++;
-  }
-  for (i = 0; i < nSugs && nSocial < SP_SOCIAL_MAX; i++) {
-    social[nSocial].tipo = SPS_SUG; social[nSocial].idx = (short)i; nSocial++;
-  }
-  // OS AMIGOS JA ADICIONADOS, com foto, antes de "Adicionar um amigo": a aba
-  // dizia o codigo e oferecia adicionar, mas nunca mostrava QUEM ja estava
-  // na lista.
-  nCtts = recomenda_contatos(ctts, REC_CONTATOS_MAX);
-  svRevSocial = socialvis_revisao();
-  for (i = 0; i < nCtts; i++) {
-    cttSv[i] = (short)socialvis_amigo_indice(ctts[i].id);
-    cttCadeia[i] = (unsigned char)socialvis_ultima_enviada(ctts[i].id, NULL);
-  }
-  for (i = 0; i < nCtts && nSocial < SP_SOCIAL_MAX; i++) {
-    social[nSocial].tipo = SPS_AMIGO; social[nSocial].idx = (short)i; nSocial++;
-  }
-  // O INTERRUPTOR FECHA A ABA, e nao mora em Ajustes. Ele responde uma pergunta
-  // que so faz sentido olhando para esta lista ("quem me ve?"), e quem quiser
-  // mudar de ideia vai procura-lo onde a pergunta foi feita. A alternativa em
-  // Ajustes esta descrita no relatorio; as duas podem coexistir.
-  // O interruptor fica ANTES das contas: "Contas ligadas" fecha a aba.
-  if (nSocial < SP_SOCIAL_MAX) {
-    social[nSocial].tipo = SPS_APARECER; social[nSocial].idx = 0; nSocial++;
-  }
-#if SP_V2
-  // O TRAKT NESTE PERFIL (F08). Sem servidor novo, ou sem as duas contas no
-  // aparelho e nada ligado, a linha nao existe: nao ha o que oferecer.
-  identVisto = identChave();
-  { int sit = recomenda_identidade_situacao(), op = recomenda_identidade_op();
-    if ((sit == REC_IDENT_PODE_UNIR || sit == REC_IDENT_UNIDA ||
-         op == REC_IDENT_OP_CONFLITO || (op == REC_IDENT_OP_FALHA && sit != REC_IDENT_INDISPONIVEL)) &&
-        nSocial < SP_SOCIAL_MAX) {
-      social[nSocial].tipo = SPS_IDENT; social[nSocial].idx = 0; nSocial++;
-    } }
-  if (identServicoVisivel(REC_IDENT_SIMKL) && nSocial < SP_SOCIAL_MAX) {
-    social[nSocial].tipo = SPS_SIMKL; social[nSocial].idx = 0; nSocial++;
-  }
-  if (identServicoVisivel(REC_IDENT_LETTERBOXD) && nSocial < SP_SOCIAL_MAX) {
-    social[nSocial].tipo = SPS_LETTERBOXD; social[nSocial].idx = 0; nSocial++;
-  }
-#endif
-}
-
-static void reconstruirAtividade(void) {
-  int i;
-  atvRev = socialvis_revisao();
-  nAtv = socialvis_n_eventos();
-  if (nAtv > SV_EVENTOS_MAX) nAtv = SV_EVENTOS_MAX;
-  for (i = 0; i < nAtv; i++)
-    atvDia[i] = (unsigned char)socialvis_dia(socialvis_evento(i), atvRot[i], sizeof atvRot[i]);
-}
-// O rotulo do dia antes da linha `i`, quando o dia muda.
-static float atvAntes(int i) {
-  if (i < 0 || i >= nAtv) return 0.0f;
-  if (i == 0) return SP_SECAO_H1;
-  return (atvDia[i] != atvDia[i - 1] || strcmp(atvRot[i], atvRot[i - 1])) ? SP_SECAO_H : 0.0f;
-}
 
 static float agAntes(int i) {
   if (i < 0 || i >= nAg) return 0.0f;
@@ -1387,24 +881,6 @@ static void trocarAba(int nova) {
   memset(animFoco, 0, sizeof animFoco);
   editLapis = 0;
   if (aba == SP_ABA_AGENDA) { agenda_atualizar_seguidas(); reconstruirAgenda(); }
-  if (aba == SP_ABA_ATIVIDADE) { socialvis_atualizar(); reconstruirAtividade(); }
-  if (aba == SP_ABA_SOCIAL) {
-    // CONSULTA IMEDIATA ao entrar, para nao mostrar lista velha; e o selo some
-    // porque a pessoa esta olhando justamente para ela.
-    //
-    // A ORDEM IMPORTA: a copia acontece ANTES de marcar como vistas, entao o
-    // SELO da aba zera e os PONTOS das linhas ficam. Sao coisas diferentes —
-    // o selo responde "ha algo novo?" e o ponto responde "qual delas e nova?",
-    // e apagar os dois no mesmo instante deixaria a pessoa olhando uma lista
-    // sem saber por que foi avisada. Na proxima abertura do painel a copia ja
-    // le visto=1 e os pontos somem sozinhos.
-    recomenda_pedir_agora();
-    reconstruirSocial();
-    // COM A PERGUNTA NA TELA NADA E MARCADO COMO LIDO. A lista esta atras dela:
-    // apagar o selo agora diria "voce ja viu" sobre uma lista que ninguem viu,
-    // e o aviso nao voltaria.
-    if (!consentindo()) recomenda_marcar_vistas();
-  }
 }
 
 // --- BARRA DE OPCOES, ESCOLHAS E CATEGORIAS -------------------------------
@@ -1438,18 +914,13 @@ static const char *ESTILO_LONGO[SORG_ESTILO_N] = {
   "Lista com capa", "Grade de pôsteres", "Cartões paisagem" };
 static const char *ESTILO_ICONE[SORG_ESTILO_N] = {
   "aj_rows-3", "aj_layout-dashboard", "aj_images" };
-static const char *SOCIAL_CURTO[SORG_SOCIAL_N] = { "Recentes", "Por pessoa" };
-static const char *SOCIAL_LONGO[SORG_SOCIAL_N] = {
-  "Mais recentes primeiro", "Agrupar por pessoa" };
-
 static int temBarra(void) {
   if (aba == SP_ABA_SALVOS) return nLinhas > 0;
-  if (aba == SP_ABA_SOCIAL) return !consentindo() && !perguntandoAlcance() && nRecs >= 2;
   return 0;
 }
-static int nChips(void) { return aba == SP_ABA_SALVOS ? SPB_N : 1; }
+static int nChips(void) { return SPB_N; }
 
-enum { POP_NADA = 0, POP_ORDEM, POP_GRUPO, POP_ESTILO, POP_SOCIAL, POP_CATS,
+enum { POP_NADA = 0, POP_ORDEM, POP_GRUPO, POP_ESTILO, POP_CATS,
        POP_CAT_ACOES, POP_EXCLUIR, POP_MOVER };
 #define POP_MAX (SORG_CAT_MAX + 4)
 #define POP_LINHA_H   64.0f
@@ -1467,7 +938,7 @@ static char  popTitulo[200], popSub[200], popItem[24];
 
 // O TECLADO DO APP (teclado.h) para nome de categoria: letras, numeros,
 // espaco e hifen. A primeira letra sai maiuscula (sorg_nome_limpo).
-enum { TK_NADA = 0, TK_CRIAR, TK_MOVER, TK_RENOMEAR, TK_NOME_SOCIAL, TK_LETTERBOXD };
+enum { TK_NADA = 0, TK_CRIAR, TK_MOVER, TK_RENOMEAR };
 static int tecladoPara;
 static const char *ALFA_NOME = "abcdefghijklmnopqrstuvwxyz0123456789 -";
 #define SP_NOME_LETRAS 24
@@ -1508,10 +979,6 @@ static void popAbrir(int tipo) {
       snprintf(popTitulo, sizeof popTitulo, "%s", "Estilo de exibição");
       for (i = 0; i < SORG_ESTILO_N; i++)
         popLinha(ESTILO_LONGO[i], ESTILO_ICONE[i], i, i == sorg_estilo());
-      break;
-    case POP_SOCIAL:
-      snprintf(popTitulo, sizeof popTitulo, "%s", "Organizar recomendações");
-      for (i = 0; i < SORG_SOCIAL_N; i++) popLinha(SOCIAL_LONGO[i], NULL, i, i == sorg_social());
       break;
     case POP_CATS:
       snprintf(popTitulo, sizeof popTitulo, "%s", "Categorias");
@@ -1586,11 +1053,6 @@ static void popOk(void) {
       // A lista trocou de forma: a rolagem recomeca de onde o foco esta.
       memset(animFoco, 0, sizeof animFoco);
       break;
-    case POP_SOCIAL:
-      sorg_definir_social(v);
-      pop = POP_NADA;
-      reconstruirSocial();
-      break;
     case POP_CATS:
       if (v < 0) tecladoNome(TK_CRIAR, NULL);
       else { popCat = v; popAbrir(POP_CAT_ACOES); }
@@ -1636,7 +1098,6 @@ static void popEvento(const SDL_Event *e) {
 
 // OK numa pilula da barra.
 static void chipOk(void) {
-  if (aba == SP_ABA_SOCIAL) { popAbrir(POP_SOCIAL); return; }
   switch (barraFoco) {
     case SPB_ORDEM:  popAbrir(POP_ORDEM);  break;
     case SPB_GRUPO:  popAbrir(POP_GRUPO);  break;
@@ -1658,20 +1119,6 @@ static void tecladoResultado(void) {
   r = teclado_resultado();
   if (r == TECLADO_NADA) return;
   t = teclado_texto();
-#if SP_V2
-  // O NOME PARA OS AMIGOS: vazio volta ao nome do perfil (recomenda.h).
-  if (tecladoPara == TK_NOME_SOCIAL) {
-    if (r == TECLADO_PRONTO && t) recomenda_definir_nome(t);
-    tecladoPara = TK_NADA;
-    return;
-  }
-  // O USUARIO DO LETTERBOXD: declarado. Vazio ou curto demais nao faz nada.
-  if (tecladoPara == TK_LETTERBOXD) {
-    if (r == TECLADO_PRONTO && t && t[0]) { recomenda_identidade_letterboxd_declarar(t); reconstruirSocial(); }
-    tecladoPara = TK_NADA;
-    return;
-  }
-#endif
   if (r == TECLADO_PRONTO && t && t[0]) {
     if (tecladoPara == TK_RENOMEAR) sorg_renomear_categoria(popCat, t);
     else if ((id = sorg_criar_categoria(t)) != 0) {
@@ -1751,13 +1198,7 @@ void spainel_abrir(void) {
   aba = SP_ABA_SALVOS;
   scrollY = 0.0f; velY = 0.0f;
   memset(animFoco, 0, sizeof animFoco);
-  // O INTERRUPTOR ABRE NO ESTADO, e nao deslizando ate ele. A resposta pode ter
-  // sido reconciliada com o servidor (respondida em OUTRA TV) com o painel
-  // fechado; sem isto a pessoa abriria o painel e veria a bola andar sozinha,
-  // que le como "alguem acabou de mexer aqui".
-  animSw = -1.0f;
   reconstruir();
-  reconstruirSocial();
   reconstruirAgenda();
   // A PRIMEIRA ABA DA FAIXA DO PERFIL, nao sempre Salvos.
   { int primeira = primeiraAba();
@@ -1783,24 +1224,10 @@ static float topoDe(int i) {
   // linhas dela tem quatro alturas diferentes. Era `i * SP_PASSO` enquanto
   // todas eram recomendacoes; com uma sugestao de 112px no meio, a multiplicacao
   // erraria a partir dali e a rolagem pararia o foco meio fora da janela.
-  if (aba == SP_ABA_SOCIAL) {
-    int k;
-    while (i > 0 && i < nSocial && spsConta(social[i].tipo) && spsConta(social[i - 1].tipo)) i--;
-    y = socialTopo();
-    for (k = 0; k < i && k < nSocial; k++)
-      y += socialAntes(k) + socialAlt(k) + SPS_GAP;
-    return y + socialAntes(i);
-  }
   if (aba == SP_ABA_AVISOS) return avisos_lista_y(i, foco);
-  if (aba == SP_ABA_ATIVIDADE) {
-    int k;
-    y = 0.0f;
-    for (k = 0; k < i && k < nAtv; k++) y += atvAntes(k) + SPA_H + SPS_GAP;
-    return y + atvAntes(i);
-  }
   if (aba == SP_ABA_AGENDA) {
     int k;
-    y = 0.0f;
+    float y = 0.0f;
     for (k = 0; k < i && k < nAg; k++) y += agAntes(k) + SPAG_H;
     if (i < nAg) return y + agAntes(i);
     return nAg > 0 ? y + 10.0f : SPAG_VAZIO_H;
@@ -1817,27 +1244,12 @@ static int linhaSeguravel(void) {
   return aba == SP_ABA_SALVOS && foco >= 0 && foco < nLinhas;
 }
 
-// UMA LINHA DAS ABAS ATIVIDADE/AMIGOS que o OK longo segura: titulo do feed,
-// recomendacao recebida ou amigo (dono, 03/10: "falta o menu contextual na
-// aba activity e friends").
-static int linhaSocialSeguravel(void) {
-  if (aba == SP_ABA_ATIVIDADE) {
-    const SvEvento *ev = foco >= 0 ? socialvis_evento(foco) : NULL;
-    return ev && ev->imdb[0];
-  }
-  if (aba == SP_ABA_SOCIAL && foco >= 0 && foco < nSocial)
-    return (social[foco].tipo == SPS_REC && social[foco].idx >= 0 && social[foco].idx < nRecs) ||
-           (social[foco].tipo == SPS_AMIGO && social[foco].idx >= 0 && social[foco].idx < nCtts);
-  return 0;
-}
+static int linhaSocialSeguravel(void) { return 0; }
 
 // O QUE AS EXTRAS DO MENU SOCIAL FAZEM. O menu (ctxmenu.c) so devolve o
 // indice; a acao e a linha ficam guardadas aqui ate ele responder.
-enum { SPX_ASSISTI = 1, SPX_RESPONDER, SPX_PERFIL, SPX_REMOVER,
-       SPX_AV_DISPENSAR, SPX_AV_LEMBRETE, SPX_AV_TODOS };
+enum { SPX_AV_DISPENSAR = 1, SPX_AV_LEMBRETE, SPX_AV_TODOS };
 static int      menuSxAcao[CTX_EXTRAS_MAX];
-static RecItem  menuSxRec;
-static char     menuSxPessoa[96], menuSxNome[64];
 static char     menuAvId[72], menuAvImdb[24];
 
 // SEGURAR OK NUMA LINHA DA ABA AVISOS (06/10, "muito alerta sem dispensar"):
@@ -1874,87 +1286,13 @@ static void abrirMenuAvisos(void) {
   ctx_abrir_social(&c, ex, n);
 }
 
-static void abrirMenuSocial(void) {
-  CatItem c;
-  CtxExtra ex[CTX_EXTRAS_MAX];
-  int n = 0;
-  static const CtxExtra PERFIL = { "Ver perfil", "aj_users", 0, NULL, NULL, NULL };
-  // "Já assisti" TOMA O LUGAR de "Marcar como assistido": faz o historico da
-  // conta e so depois marca a rec e abre o cartao (juntaAssistido, ctxmenu.h).
-  static const CtxExtra ASSISTI = { "Já assisti", "check", 0, NULL, NULL, NULL, 1 };
-  static const CtxExtra RESPONDER = { "Responder", "aj_users", 0, NULL, NULL, NULL };
-  static const CtxExtra REMOVER = { "Remover amigo", "aj_x", 1, "Amigos",
-    "Remover %s dos amigos?",
-    "O vínculo é desfeito nos dois lados e as recomendações não lidas dessa pessoa somem." };
-  if (!linhaSocialSeguravel()) return;
-  memset(&c, 0, sizeof c);
-  memset(&menuSxRec, 0, sizeof menuSxRec);
-  menuSxPessoa[0] = menuSxNome[0] = 0;
-  if (aba == SP_ABA_ATIVIDADE) {
-    const SvEvento *ev = socialvis_evento(foco);
-    snprintf(c.imdb, sizeof c.imdb, "%s", ev->imdb);
-    snprintf(c.tipo, sizeof c.tipo, "%s", ev->tipo[0] ? ev->tipo : "movie");
-    snprintf(c.titulo, sizeof c.titulo, "%s", ev->titulo);
-    snprintf(c.poster, sizeof c.poster, "%s", ev->poster[0] ? ev->poster : ev->arte);
-    if (ev->pessoaId[0]) {
-      snprintf(menuSxPessoa, sizeof menuSxPessoa, "%s", ev->pessoaId);
-      menuSxAcao[n] = SPX_PERFIL; ex[n++] = PERFIL;
-    }
-  } else if (social[foco].tipo == SPS_REC) {
-    const RecItem *r = &recs[social[foco].idx];
-    menuSxRec = *r;
-    snprintf(c.imdb, sizeof c.imdb, "%s", r->imdb);
-    snprintf(c.tipo, sizeof c.tipo, "%s", r->tipo[0] ? r->tipo : "movie");
-    snprintf(c.titulo, sizeof c.titulo, "%s", r->titulo);
-    snprintf(c.poster, sizeof c.poster, "%s", r->poster);
-    c.nota = r->nota;
-    if (!recVista[social[foco].idx]) { menuSxAcao[n] = SPX_ASSISTI; ex[n++] = ASSISTI; }
-    else if (!recResp[social[foco].idx].respondida) { menuSxAcao[n] = SPX_RESPONDER; ex[n++] = RESPONDER; }
-    if (r->de[0]) {
-      snprintf(menuSxPessoa, sizeof menuSxPessoa, "%s", r->de);
-      menuSxAcao[n] = SPX_PERFIL; ex[n++] = PERFIL;
-    }
-    // O titulo aberto a partir daqui (toque) leva a origem.
-    atividade_marcar_origem(r->id, r->imdb, r->deNome);
-  } else {
-    const RecContato *ct = &ctts[social[foco].idx];
-    rec_nome_exibicao(c.titulo, sizeof c.titulo, ct->nome, ct->id);
-    snprintf(c.poster, sizeof c.poster, "%s", ct->avatar);
-    snprintf(menuSxPessoa, sizeof menuSxPessoa, "%s", ct->id);
-    snprintf(menuSxNome, sizeof menuSxNome, "%s", c.titulo);
-    menuSxAcao[n] = SPX_PERFIL; ex[n++] = PERFIL;
-    menuSxAcao[n] = SPX_REMOVER; ex[n++] = REMOVER;
-  }
-  ctx_abrir_social(&c, ex, n);
-}
+static void abrirMenuSocial(void) {}
 
 // A extra escolhida no menu social (por quadro, em spainel_atualizar).
 static void extraSocial(int k) {
   if (k < 0 || k >= CTX_EXTRAS_MAX) return;
   switch (menuSxAcao[k]) {
-    case SPX_ASSISTI:
-      recresp_marcar_assistida(menuSxRec.id);
-      recomenda_pedir_agora();
-      reconstruirSocial();
-      /* fall through: "se quiser, responder" — o mesmo cartao dos creditos */
-    case SPX_RESPONDER:
-      reacao_rec_abrir(menuSxRec.id, menuSxRec.imdb, menuSxRec.titulo, menuSxRec.tipo,
-                       menuSxRec.poster, menuSxRec.deNome, SP_X + SP_W * 0.5f);
-      break;
-    case SPX_PERFIL:
-      if (menuSxPessoa[0]) {
-        snprintf(pedidoPerfil, sizeof pedidoPerfil, "%s", menuSxPessoa);
-        temPedidoPerfil = 1;
-        aberto = 0;
-      }
-      break;
-    case SPX_REMOVER:
-      if (menuSxPessoa[0]) { recomenda_remover_contato(menuSxPessoa); reconstruirSocial(); }
-      if (foco >= nSocial) foco = nSocial > 0 ? nSocial - 1 : 0;
-      break;
     case SPX_AV_LEMBRETE:
-      // Desliga o lembrete (so se ainda ligado: alternar religaria) e cai no
-      // dispensar: o aviso daquele episodio tambem sai.
       if (menuAvImdb[0] && agenda_lembrete(menuAvImdb) == 1) agenda_alternar_lembrete(menuAvImdb);
       /* fall through */
     case SPX_AV_DISPENSAR:
@@ -1975,7 +1313,6 @@ static void extraSocial(int k) {
 static void abrirMenu(void) {
   CatItem c;
   const SPLinha *l;
-  if (aba == SP_ABA_ATIVIDADE || aba == SP_ABA_SOCIAL) { abrirMenuSocial(); return; }
   if (aba == SP_ABA_AVISOS) { abrirMenuAvisos(); return; }
   if (!linhaSeguravel()) return;
   l = &linhas[foco];
@@ -2001,203 +1338,13 @@ static void abrirMenu(void) {
 }
 
 // O toque curto de sempre: entrega o IMDb e fecha, app.c abre o titulo.
-static void okSocial(void);
+static void okSocial(void) {}
 static void abrirLinha(void) {
-  if (aba == SP_ABA_ATIVIDADE || aba == SP_ABA_SOCIAL) { okSocial(); return; }
   if (aba == SP_ABA_AVISOS) { if (avisos_lista_ok(foco) == 1) spainel_fechar(); return; }
   if (foco >= 0 && foco < nLinhas) {
     snprintf(pedido, sizeof pedido, "%s", linhas[foco].id);
     temPedido = 1;
     aberto = 0;
-  }
-}
-
-// O TOQUE CURTO nas abas Atividade e Amigos: o que o KEYDOWN fazia antes de
-// essas linhas ganharem o menu do OK longo (agora decidido na soltura).
-static void okSocial(void) {
-  if (aba == SP_ABA_ATIVIDADE) {
-    const SvEvento *ev = socialvis_evento(foco);
-    if (ev && ev->imdb[0]) {
-      snprintf(pedido, sizeof pedido, "%s", ev->imdb);
-      temPedido = 1;
-      aberto = 0;
-    }
-    return;
-  }
-  if (aba == SP_ABA_SOCIAL) {
-    if (foco < 0 || foco >= nSocial) return;
-    switch (social[foco].tipo) {
-      case SPS_CONSENT_NAO:
-      case SPS_CONSENT_SIM:
-        recomenda_responder_aparecer(social[foco].tipo == SPS_CONSENT_SIM);
-        reconstruirSocial();
-        // A LISTA COMECA DO TOPO depois da resposta. Manter o foco na linha 1
-        // deixaria o dedo em cima de uma sugestao que a pessoa nem viu
-        // aparecer, e o proximo OK a adicionaria como contato.
-        foco = 0;
-        scrollY = 0.0f; velY = 0.0f;
-        memset(animFoco, 0, sizeof animFoco);
-        recomenda_marcar_vistas();
-        return;
-      case SPS_SUG:
-        // UMA ACAO, como o pedido pediu: o OK vincula. O servidor recalcula
-        // as sugestoes antes de aceitar, entao um id que ja nao esta na lista
-        // (a pessoa revogou entre a tela e o OK) volta recusado.
-        if (social[foco].idx >= 0 && social[foco].idx < nSugs)
-          recomenda_adicionar_sugerido(sugs[social[foco].idx].id);
-        reconstruirSocial();
-        if (foco >= nSocial) foco = nSocial > 0 ? nSocial - 1 : 0;
-        return;
-      case SPS_PEDIDO:
-        // UM OK RESPONDE. O pedido sai da lista na hora; se o fio social
-        // estiver ocupado (outra operacao em voo), nada e marcado e o OK
-        // pode ser repetido.
-        if (social[foco].idx >= 0 && social[foco].idx < nPeds) {
-          const RecPessoa *p = &peds[social[foco].idx];
-          int ok = pedCol ? recomenda_recusar(p->pub) : recomenda_aceitar(p->pub);
-          if (ok) {
-            if (nPedFeito == REC_PEDIDOS_MAX) {
-              memmove(pedFeito[0], pedFeito[1], sizeof pedFeito[0] * (REC_PEDIDOS_MAX - 1));
-              nPedFeito--;
-            }
-            snprintf(pedFeito[nPedFeito++], sizeof pedFeito[0], "%s", p->pub);
-            printf("[amigos] pedido %s na aba Amigos\n", pedCol ? "recusado" : "aceito");
-            pedCol = 0;
-            reconstruirSocial();
-            if (foco >= nSocial) foco = nSocial > 0 ? nSocial - 1 : 0;
-          }
-        }
-        return;
-      case SPS_ADICIONAR:
-        // A TELA DE AMIGOS. O painel FICA ABERTO atras: a modal e uma camada
-        // por cima dele e Voltar devolve o foco aqui, em vez de jogar a
-        // pessoa de volta na home.
-        recenviar_abrir_amigos();
-        return;
-      case SPS_ENCONTRAR:
-        // Como a tela de amigos: o painel FICA aberto atras da modal.
-        pessoas_abrir();
-        return;
-      case SPS_AMIGO:
-        // O PERFIL DO AMIGO (amigoperfil.h). app.c abre e o painel fecha.
-        if (social[foco].idx >= 0 && social[foco].idx < nCtts) {
-          snprintf(pedidoPerfil, sizeof pedidoPerfil, "%s", ctts[social[foco].idx].id);
-          temPedidoPerfil = 1;
-          aberto = 0;
-        }
-        return;
-#if SP_V2
-      case SPS_ALC_0:
-      case SPS_ALC_1:
-      case SPS_ALC_2:
-        recomenda_responder_alcance(social[foco].tipo - SPS_ALC_0);
-        escolhendoAlcance = 0;
-        reconstruirSocial();
-        foco = 0;
-        scrollY = 0.0f; velY = 0.0f;
-        memset(animFoco, 0, sizeof animFoco);
-        return;
-      case SPS_ALCANCE: {
-        // OS TRES SEGMENTOS (06/10): OK confirma o que o cursor marca. Sem
-        // cursor (OK direto), ele so acende no valor de agora — trocar de
-        // nivel continua sendo escolher lendo a frase, nao um OK que gira.
-        int n = recomenda_alcance();
-        if (alcCol < 0) { alcCol = (n >= 0 && n <= 2) ? n : 0; return; }
-        if (alcCol != n) {
-          recomenda_responder_alcance(alcCol);
-          printf("[amigos] quem ve: %d\n", alcCol);
-        }
-        return; }
-      case SPS_IDENT: {
-        // UNIR E UM OK; SEPARAR SAO DOIS. Separar nao desfaz o que ja foi
-        // fundido (o contrato diz) e e a direcao que da trabalho de voltar.
-        int sit = recomenda_identidade_situacao();
-        if (recomenda_identidade_op() == REC_IDENT_OP_INDO) return;
-        if (sit == REC_IDENT_UNIDA) {
-          if (identConfirma != SPS_IDENT + 1) { identConfirma = SPS_IDENT + 1; return; }
-          identConfirma = 0; identSeparando = 1;
-          recomenda_identidade_separar();
-        } else if (sit == REC_IDENT_PODE_UNIR) {
-          identSeparando = 0;
-          recomenda_identidade_unir();
-        } else recomenda_identidade_op_limpar();
-        reconstruirSocial();
-        return; }
-      case SPS_SIMKL: {
-        // O token e o do Simkl em Ajustes: nunca e pedido de novo aqui.
-        int op = recomenda_identidade_op_de(REC_IDENT_SIMKL), e;
-        if (op == REC_IDENT_OP_INDO) return;
-        if (op == REC_IDENT_OP_CONFLITO || op == REC_IDENT_OP_RECUSADO || op == REC_IDENT_OP_SEM_SERVICO) {
-          recomenda_identidade_op_limpar_de(REC_IDENT_SIMKL);
-          reconstruirSocial();
-          return;
-        }
-        recomenda_identidade_op_limpar_de(REC_IDENT_SIMKL);
-        e = recomenda_identidade_estado(REC_IDENT_SIMKL);
-        if (e == REC_IDENT_E_LIGADO) {
-          if (identConfirma != SPS_SIMKL + 1) { identConfirma = SPS_SIMKL + 1; return; }
-          identConfirma = 0; identSeparando = 1;
-          recomenda_identidade_simkl_separar();
-        } else if (e == REC_IDENT_E_PODE) {
-          identSeparando = 0;
-          recomenda_identidade_simkl_unir();
-        }
-        reconstruirSocial();
-        return; }
-      case SPS_LETTERBOXD: {
-        int op = recomenda_identidade_op_de(REC_IDENT_LETTERBOXD), e;
-        if (op == REC_IDENT_OP_INDO) return;
-        if (op == REC_IDENT_OP_CONFLITO || op == REC_IDENT_OP_RECUSADO) {
-          recomenda_identidade_op_limpar_de(REC_IDENT_LETTERBOXD);
-          reconstruirSocial();
-          return;
-        }
-        recomenda_identidade_op_limpar_de(REC_IDENT_LETTERBOXD);
-        e = recomenda_identidade_estado(REC_IDENT_LETTERBOXD);
-        if (e == REC_IDENT_E_LIGADO) {
-          if (identConfirma != SPS_LETTERBOXD + 1) { identConfirma = SPS_LETTERBOXD + 1; return; }
-          identConfirma = 0; identSeparando = 1;
-          recomenda_identidade_letterboxd_separar();
-          reconstruirSocial();
-        } else if (e == REC_IDENT_E_PODE) {
-          identSeparando = 0;
-          tecladoPara = TK_LETTERBOXD;
-          teclado_abrir_com("Seu usuário no Letterboxd",
-                            "Só você vê. O servidor não confere se é seu.",
-                            30, "abcdefghijklmnopqrstuvwxyz0123456789_", "");
-        }
-        return; }
-      case SPS_NOME:
-        tecladoPara = TK_NOME_SOCIAL;
-        teclado_abrir_com("Como você aparece",
-                          "Seu nome para os amigos. Vazio usa o nome do perfil.",
-                          32, "abcdefghijklmnopqrstuvwxyz0123456789 -'", recomenda_minha_exibicao());
-        return;
-#else
-      case SPS_ALC_0: case SPS_ALC_1: case SPS_ALC_2: case SPS_ALCANCE: case SPS_NOME: case SPS_IDENT:
-      case SPS_SIMKL: case SPS_LETTERBOXD:
-        return;
-#endif
-      case SPS_APARECER:
-        // MUDAR DE IDEIA CUSTA UM OK, nos dois sentidos. Sem confirmacao de
-        // proposito: desligar e a direcao segura, e pedir "tem certeza?" para
-        // sair de uma lista e o padrao que faz as pessoas desistirem de sair.
-        recomenda_responder_aparecer(recomenda_aparecer() != REC_APARECER_SIM);
-        reconstruirSocial();
-        return;
-      default:
-        // A ACAO QUE IMPORTA E ABRIR O TITULO, e o contrato para isso ja
-        // existe: o painel entrega o IMDb e app.c resolve. Ele nao conhece
-        // detail.c nem a descoberta, exatamente como antes.
-        if (social[foco].idx >= 0 && social[foco].idx < nRecs) {
-          snprintf(pedido, sizeof pedido, "%s", recs[social[foco].idx].imdb);
-          atividade_marcar_origem(recs[social[foco].idx].id, recs[social[foco].idx].imdb,
-                                  recs[social[foco].idx].deNome);
-          temPedido = 1;
-          aberto = 0;
-        }
-        return;
-    }
   }
 }
 
@@ -2273,9 +1420,6 @@ static void trocarAbaDaLista(int d) {
 void spainel_evento(const SDL_Event *e) {
   SDL_Keycode k;
   if (!aberto) return;
-  // O CARTAO "O QUE ACHOU?" de uma rec ("Ja assisti") e modal sobre o painel,
-  // com o teclado dele por cima.
-  if (reacao_painel_aberta()) { reacao_evento(e, 0); return; }
   // O teclado e a escolha aberta ficam POR CIMA da lista: a tecla e deles.
   if (teclado_aberto()) { teclado_evento(e); return; }
   if (pop) { popEvento(e); return; }
@@ -2307,29 +1451,6 @@ void spainel_evento(const SDL_Event *e) {
   // ESQUERDA NA LINHA DE ABAS NAO FECHA SE HA PARA ONDE IR. Fora dela, e fora
   // da primeira aba, ela continua sendo "sair pela borda" — o gesto que
   // perfil.c ja tinha nesta posicao.
-  // Na linha do pedido, ← e → escolhem entre Aceitar e Recusar.
-  if ((k == SDLK_LEFT || k == SDLK_RIGHT) && aba == SP_ABA_SOCIAL && foco >= 0 &&
-      foco < nSocial && social[foco].tipo == SPS_PEDIDO) {
-    if (k == SDLK_RIGHT) { pedCol = 1; return; }
-    if (pedCol) { pedCol = 0; return; }
-  }
-#if SP_V2
-  // No controle de "quem ve", ← e → andam pelos tres segmentos; do primeiro,
-  // ← sai pela borda como em qualquer linha.
-  if ((k == SDLK_LEFT || k == SDLK_RIGHT) && aba == SP_ABA_SOCIAL && foco >= 0 &&
-      foco < nSocial && social[foco].tipo == SPS_ALCANCE) {
-    int cur = recomenda_alcance();
-    if (alcCol < 0) alcCol = (cur >= 0 && cur <= 2) ? cur : 0;
-    if (k == SDLK_RIGHT) { if (alcCol < 2) alcCol++; return; }
-    if (alcCol > 0) { alcCol--; return; }
-  }
-#endif
-  // As contas ligadas sao uma fileira: ← → andam entre os ladrilhos.
-  if ((k == SDLK_LEFT || k == SDLK_RIGHT) && aba == SP_ABA_SOCIAL && foco >= 0 && foco < nSocial &&
-      spsConta(social[foco].tipo)) {
-    int d = k == SDLK_RIGHT ? 1 : -1;
-    if (foco + d >= 0 && foco + d < nSocial && spsConta(social[foco + d].tipo)) { foco += d; return; }
-  }
   if (k == SDLK_LEFT) {
     if (temAbas() && foco == SP_FOCO_ABAS && editLapis) { editLapis = 0; return; }
     if (temAbas() && foco == SP_FOCO_ABAS && proximaAba(aba, -1) != aba) {
@@ -2356,14 +1477,6 @@ void spainel_evento(const SDL_Event *e) {
     // COM O FOCO NA LISTA a direita (na ultima coluna) avanca uma aba.
     else if (foco >= 0 && temAbas() && !ctx_aberto() && proximaAba(aba, 1) != aba) trocarAbaDaLista(1);
     return;
-  }
-  if (k == SDLK_DOWN || k == SDLK_UP) { pedCol = 0; alcCol = -1; }
-  // Dentro da fileira de contas, cima e baixo SAEM dela (a ordem do D-pad e a
-  // do desenho: os tres ladrilhos sao uma linha).
-  if ((k == SDLK_DOWN || k == SDLK_UP) && aba == SP_ABA_SOCIAL && foco > 0 && foco < nSocial &&
-      spsConta(social[foco].tipo)) {
-    if (k == SDLK_UP) { while (foco > 0 && spsConta(social[foco - 1].tipo)) foco--; }
-    else { while (foco + 1 < nSocial && spsConta(social[foco + 1].tipo)) foco++; }
   }
   if (k == SDLK_DOWN) {
     if (foco == SP_FOCO_ABAS) {
@@ -2430,16 +1543,6 @@ void spainel_evento(const SDL_Event *e) {
       } else if (foco == nAg) { temPedidoAgenda = 1; aberto = 0; }
       return;
     }
-    // ATIVIDADE E AMIGOS: titulo e amigo tem menu (OK longo); o resto decide
-    // no KEYDOWN, como sempre.
-    if (aba == SP_ABA_ATIVIDADE || aba == SP_ABA_SOCIAL) {
-      if (linhaSocialSeguravel()) {
-        if (!e->key.repeat && !okDesde) { okDesde = SDL_GetTicks(); if (!okDesde) okDesde = 1; }
-        return;
-      }
-      okSocial();
-      return;
-    }
     // A decisao fica para a soltura (ou para o limiar, em spainel_atualizar).
     // A repeticao automatica do controle nao rearma: o relogio e do primeiro
     // KEYDOWN.
@@ -2456,12 +1559,10 @@ void spainel_atualizar(float dt, Uint32 agora) {
   float alvo, topo, base;
   // A barra de "Segure OK" do menu do cartaz, centrada no painel enquanto ele e
   // dono do D-pad; fora dele, no centro da tela como sempre.
-  ctx_centro_dica(aberto && (aba == SP_ABA_SALVOS || aba == SP_ABA_ATIVIDADE || aba == SP_ABA_SOCIAL ||
+  ctx_centro_dica(aberto && (aba == SP_ABA_SALVOS ||
                              aba == SP_ABA_AVISOS ||
                              aba == SP_ABA_AGENDA)
                   ? SP_X + SP_W * 0.5f : -1.0f);
-  reacao_painel_atualizar(dt, agora);
-  if (!aberto && reacao_painel_aberta()) reacao_fechar();
   if (!aberto) okDesde = 0;
   if (!aberto && entrada < 0.002f) {
     if (entrada != 0.0f) entrada = 0.0f;
@@ -2493,49 +1594,12 @@ void spainel_atualizar(float dt, Uint32 agora) {
   // A acao da linha social escolhida no menu ("Ja assisti", "Ver perfil"...).
   { int k = ctx_pediu_extra();
     if (k >= 0 && aberto) extraSocial(k); }
-  // "Ja assisti"/resposta mudou (aqui, no player ou pelo fio): a lista remonta
-  // e a rec desce para "Assistidas".
-  if (aberto && aba == SP_ABA_SOCIAL && rrRev != recresp_revisao() && !reacao_painel_aberta()) {
-    int f = foco;
-    reconstruirSocial();
-    foco = f < nSocial ? f : (nSocial > 0 ? nSocial - 1 : 0);
-  }
   // O menu saiu e a lista ja remontou o que tinha de remontar: o foco volta a
   // ser por indice, como sempre.
   if (menuId[0] && !ctx_aberto() && !listaVelha()) menuId[0] = menuProximo[0] = 0;
-  // A LISTA SOCIAL TAMBEM MUDA COM O PAINEL ABERTO: o fio de recomenda.c sonda
-  // a cada 60 s, e uma recomendacao que chega enquanto a aba esta na tela tem
-  // de aparecer. A copia e barata (memcpy de ate 60 registros) e so acontece
-  // com a aba Social visivel.
-  // A LISTA SOCIAL TAMBEM MUDA COM O PAINEL ABERTO, e agora por tres motivos e
-  // nao um: chegou recomendacao, chegou (ou saiu) sugestao, ou a resposta sobre
-  // aparecer foi reconciliada com o servidor — esta ultima acontece quando a
-  // pessoa respondeu SIM em outra TV e o registro deste aparelho adotou a
-  // resposta. Sem ela a pergunta continuaria na tela ja respondida.
-  if (aberto && (aba == SP_ABA_SOCIAL || aba == SP_ABA_ATIVIDADE)) socialvis_atualizar();
   if (aberto && agVer != agenda_versao()) {
     reconstruirAgenda();
     if (aba == SP_ABA_AGENDA && foco >= nVisiveis()) foco = nVisiveis() > 0 ? nVisiveis() - 1 : SP_FOCO_ABAS;
-  }
-  if (aberto && aba == SP_ABA_ATIVIDADE && atvRev != socialvis_revisao()) {
-    reconstruirAtividade();
-    if (foco >= nAtv) foco = nAtv > 0 ? nAtv - 1 : SP_FOCO_ABAS;
-  }
-#if SP_V2
-  // O "OK de novo para separar" vale so enquanto o foco esta na linha.
-  if (identConfirma && !(aberto && aba == SP_ABA_SOCIAL && foco >= 0 && foco < nSocial &&
-                         social[foco].tipo + 1 == identConfirma)) identConfirma = 0;
-#endif
-  if (aberto && aba == SP_ABA_SOCIAL &&
-      (nRecs != recomenda_n() || nSugs != recomenda_n_sugestoes() || pedidosMudaram() ||
-       consentEstado != recomenda_aparecer() || svRevSocial != socialvis_revisao()
-#if SP_V2
-       || (consentEstado != REC_APARECER_NAO_PERGUNTADO && alcEstado != recomenda_alcance())
-       || (consentEstado != REC_APARECER_NAO_PERGUNTADO && identVisto != identChave())
-#endif
-       )) {
-    reconstruirSocial();
-    if (foco >= nVisiveis()) foco = nVisiveis() > 0 ? nVisiveis() - 1 : 0;
   }
 
   // A abertura e o fechamento na mola do modal da ilha (~0,7 s, repique curto).
@@ -2553,18 +1617,6 @@ void spainel_atualizar(float dt, Uint32 agora) {
       : anim_mola(animFoco[i], a, dt,
                   a > animFoco[i] ? NV_MOLA_FOCO : SP_MOLA_DESFOCO);
   }
-  // A BOLA DO INTERRUPTOR, na mesma mola do foco (NV_MOLA_FOCO, 95% em 120 ms):
-  // as duas coisas acontecem no mesmo OK e tempos diferentes leriam como bug.
-  //
-  // COM ANIMACOES REDUZIDAS ELE SALTA, e continua legivel — o estado esta na
-  // POSICAO e no preenchimento, nunca no movimento. O deslize so acrescenta a
-  // leitura de "isto MUDOU", que e um ganho para quem pode ve-lo e nao uma
-  // condicao para entender o controle.
-  { float alvoSw = (temAbas() && recomenda_aparecer() == REC_APARECER_SIM)
-                   ? 1.0f : 0.0f;
-    if (animSw < 0.0f) animSw = alvoSw;   // primeira leitura: assenta sem deslizar
-    animSw = ajustes_animacoes_reduzidas()
-           ? alvoSw : anim_mola(animSw, alvoSw, dt, NV_MOLA_FOCO); }
   for (i = 0; i < SPB_N; i++) {
     float a = (aberto && foco == SP_FOCO_BARRA && i == barraFoco && !pop) ? 1.0f : 0.0f;
     animBarra[i] = ajustes_animacoes_reduzidas() ? a
@@ -2593,12 +1645,7 @@ void spainel_atualizar(float dt, Uint32 agora) {
   else if (nVisiveis() > 0 && foco >= 0 && foco < nVisiveis()) {
     float janela = SP_LISTA_BASE - listaTopo();
     topo = topoDe(foco);
-    // A ALTURA DA LINHA FOCADA, e nao SP_POSTER_H sempre: na aba Social a linha
-    // pode ter 84, 112 ou 138px, e usar a maior empurraria a rolagem 54px alem
-    // do necessario num interruptor de 104.
-    base = topo + (aba == SP_ABA_SOCIAL ? (spsConta(social[foco].tipo) ? SPS_H_CONTAS : socialAlt(foco))
-                 : aba == SP_ABA_ATIVIDADE ? SPA_H
-                 : aba == SP_ABA_AGENDA ? (foco < nAg ? SPAG_H : SPS_H_ACAO)
+    base = topo + (aba == SP_ABA_AGENDA ? (foco < nAg ? SPAG_H : SPS_H_ACAO)
                  : aba == SP_ABA_AVISOS ? avisos_lista_altura_linha(foco, foco)
                  : linhas[foco].lh);
     // A linha aberta (acordeao) cresce para baixo: ela inteira tem de caber.
@@ -2787,48 +1834,7 @@ static float nomeVerbo(const char *nome, const char *verbo, float x, float y, fl
                        float v, float a) {
   return nomeVerboEst(TXT_ILHA_NOME, nome, verbo, x, y, larg, v, a);
 }
-// Os tres andares a partir de `tx`, centrados na altura `h` da linha quando
-// faltam andares (o mockup centra o bloco ao lado do rosto, align-items).
-static void andaresIlha(float tx, float y, float h, float larg, float v, float a,
-                        const char *nome, const char *verbo, const char *l2, const char *l3) {
-  float bloco = 29.0f + (l2 && l2[0] ? 27.0f : 0.0f) + (l3 && l3[0] ? 22.0f : 0.0f);
-  float ty = y + (h - bloco) * 0.5f;
-  nomeVerbo(nome, verbo, tx, ty, larg, v, a);
-  ty += 29.0f + 4.0f;
-  if (l2 && l2[0]) {
-    txt_desenhar_alpha(txtIlha(TXT_ILHA_SUB, l2, larg), tx, ty, a * 0.62f);
-    ty += 23.0f + 4.0f;
-  }
-  if (l3 && l3[0]) txt_desenhar_alpha(txtIlha(TXT_ILHA_HORA, l3, larg), tx, ty, a * 0.38f);
-}
-// O ROSTO: a foto, ou o disco na cor da pessoa com a inicial em 20 bold
-// (".av" do mockup). rec_avatar desenha a inicial no CALLOUT de 28, grande
-// demais para o disco de 52 — entao a letra dele vai em branco (" ") e a
-// inicial e escrita aqui. AO VIVO o anel vermelho e o ponto continuam: e
-// estado, e estado e o que leva cor na ilha.
-static void rostoIlha(GfxRect r, const char *url, const char *nome, const char *id,
-                      int vivo, float a, Uint32 agora) {
-  GLuint foto = (url && url[0]) ? tex_obter_larg(url, (int)r.w) : 0;
-  if (vivo) gfx_anel_fora(r, 0.5f, 3.0f, 3.0f, SVD_VIVO_R, SVD_VIVO_G, SVD_VIVO_B, a);
-  rec_avatar(r, url, foto ? nome : " ", id && id[0] ? id : nome, a);
-  if (!foto) {
-    char ini[8];
-    size_t z = 1;
-    TxtLinha l;
-    if (!nome || !nome[0]) nome = "?";
-    while (z < 4 && (nome[z] & 0xc0) == 0x80) z++;
-    memcpy(ini, nome, z);
-    ini[z] = 0;
-    if (ini[0] >= 'a' && ini[0] <= 'z') ini[0] = (char)(ini[0] - 32);
-    l = txt_linha(TXT_ILHA_INICIAL, ini, 255, 255, 255, 255);
-    txt_desenhar_alpha(l, r.x + (r.w - l.w) * 0.5f, r.y + (r.h - l.h) * 0.5f, a);
-  }
-  if (vivo) {
-    float pd = r.w * 0.26f;
-    svd_ponto_vivo(r.x + r.w * 0.5f + r.w * 0.5f * 0.7071f,
-                   r.y + r.h * 0.5f + r.w * 0.5f * 0.7071f, pd, pd * 0.18f, a, agora);
-  }
-}
+
 // A CAPA A DIREITA (".cap"): 52x76, raio 9, com o recuo de 22 da linha.
 // A arte ENCHE a caixa (cover), recortada pelo raio: um cartaz que chega
 // em outra proporcao (arte 16:9 no lugar do 2:3) sairia com faixas pretas
@@ -2846,25 +1852,7 @@ static void capaArte(GfxRect r, const char *url, float raioPx, float a) {
     gfx_cor(r, raio, NV_COR_ESQUELETO_R, NV_COR_ESQUELETO_G, NV_COR_ESQUELETO_B, a);
   }
 }
-// A arte DEITADA de uma recomendacao: o fundo do titulo no catalogo, ou o da
-// metahub pelo id do IMDb (a mesma regra de artemetahub.h). Se ela falhar, o
-// cartaz recortado no mesmo quadro — o cartao continua deitado, de proposito.
-static void capaDeitadaIlha(float dx, float y, float h, const char *imdb, const char *poster, float a) {
-  GfxRect c = { SP_X + dx + SP_LINHA_X + SP_LINHA_W - SP_LINHA_PADX - SPI_CAPD_W,
-                y + (h - SPI_CAP_H) * 0.5f, SPI_CAPD_W, SPI_CAP_H };
-  char arte[512] = "";
-  int k = imdb && imdb[0] ? cat_indice_por_imdb(imdb) : -1;
-  const CatItem *it = k >= 0 ? cat_item(k) : NULL;
-  if (it && it->backdrop[0]) snprintf(arte, sizeof arte, "%s", it->backdrop);
-  else if (imdb && !strncmp(imdb, "tt", 2))
-    snprintf(arte, sizeof arte, "https://images.metahub.space/background/medium/%s/img", imdb);
-  capaArte(c, arte[0] && !tex_falhou(arte) ? arte : poster, SPI_CAP_RAIO, a);
-}
-static void capaIlha(float dx, float y, float h, const char *url, float a) {
-  GfxRect c = { SP_X + dx + SP_LINHA_X + SP_LINHA_W - SP_LINHA_PADX - SPI_CAP_W,
-                y + (h - SPI_CAP_H) * 0.5f, SPI_CAP_W, SPI_CAP_H };
-  capaArte(c, url, SPI_CAP_RAIO, a);
-}
+
 // Nota do IMDb em texto ("IMDb 8,1"), com o separador do idioma.
 static void notaTexto(char *dst, size_t tam, int nota) {
   if (nota <= 0) { dst[0] = 0; return; }
@@ -3094,94 +2082,6 @@ static void desenhaLinha(int i, float dx, float y, float a) {
     } }
 }
 
-// Uma linha da aba Social: cartaz, titulo, a CARA e o nome de quem mandou,
-// filme-ou-serie, a nota do IMDb, a frase — e, quando ainda nao foi lida, a
-// barra de acento na borda esquerda.
-//
-// O cartaz e a MESMA tex_cache do resto do app; a recomendacao guarda a URL do
-// poster, a do avatar e a nota no proprio arquivo (recomenda.h), entao a linha
-// se desenha sem depender do catalogo. ISSO E O PONTO: o titulo recomendado
-// costuma NAO estar no catalogo de quem recebe — se a nota fosse procurada
-// ali, ela apareceria justamente nas linhas em que menos importa.
-//
-// AS QUATRO FAIXAS, dentro dos 138px do cartaz:
-//   +0    titulo                       (TXT_CALLOUT, 28)
-//   +38   disco de 30 + "Nome · há 2 h"
-//   +76   selos: [Filme] [IMDb 8,3]    (REC_SELO_H = 30)
-//   +108  a frase entre aspas          (TXT_CAPTION, 22)
-
-// `linha` e a posicao na lista da aba (de onde sai a animacao de foco) e `idx`
-// a posicao na lista de recomendacoes. Os dois coincidem hoje — as
-// recomendacoes vem primeiro — e sao parametros separados para que continuem
-// coincidindo por construcao e nao por sorte no dia em que algo entrar antes.
-static void desenhaRecLinha(int linha, int idx, float dx, float y, float a, Uint32 agora) {
-  const RecItem *r = &recs[idx];
-  float f = (linha >= 0 && linha < SP_MAX) ? animFoco[linha] : 0.0f, v = focoVisual(f);
-  float px = SP_X + dx + SP_PAD, tx = px + SPI_AV + SPI_AV_GAP;
-  float larg = SP_X + dx + SP_LINHA_X + SP_LINHA_W - SP_LINHA_PADX - SPI_CAPD_W - 18.0f - tx;
-  char l2[256], l3[320], q[64], nota[24];
-  int pct, te, ee, est;
-  { GfxRect c = linhaIlhaRet(dx, y, SPI_H);
-    superficieItem(c, SP_LINHA_RAIO / c.h, f, a); }
-  // "NAO LIDA" E UM PONTO DE ACENTO no recuo esquerdo da linha, e nao mais a
-  // barra de 6x138 de fora: com a linha na gramatica do mockup (rosto a
-  // esquerda, sem cartaz alto) a barra virava um traco solto. O ponto de 8 px
-  // mora nos 22 de recuo, antes do rosto, e e estado — por isso no acento.
-  if (!r->visto) {
-    float ar, ag, ab;
-    ajustes_acento(&ar, &ag, &ab);
-    gfx_cor((GfxRect){ SP_X + dx + SP_LINHA_X + 7.0f, y + SPI_H * 0.5f - 4.0f, 8.0f, 8.0f },
-            0.5f, ar, ag, ab, a);
-  }
-  // O MESMO ROSTO DA ATIVIDADE: quem mandou e o que distingue uma linha da
-  // outra antes de qualquer leitura (o pedido original do dono), e a linha
-  // diz a frase do feed — "Gustavo te mandou" — como a primeira do mockup.
-  rostoIlha((GfxRect){ px, y + (SPI_H - SPI_AV) * 0.5f, SPI_AV, SPI_AV },
-            r->deAvatar, r->deNome, r->de, 0, a, agora);
-  capaDeitadaIlha(dx, y, SPI_H, r->imdb, r->poster, a);
-  // TITULO · FILME OU SERIE · NOTA: o tipo e a nota continuam (a linha nao
-  // dizia se era um filme de duas horas ou oito temporadas), agora em texto.
-  // A nota vem do proprio RecItem: o titulo recomendado costuma NAO estar no
-  // catalogo de quem recebe.
-  snprintf(l2, sizeof l2, "%s", r->titulo);
-  juntar(l2, sizeof l2, i18n(r->tipo[0] && !strncmp(r->tipo, "series", 6) ? "Série" : "Filme"));
-  notaTexto(nota, sizeof nota, r->nota);
-  juntar(l2, sizeof l2, nota);
-  // QUANDO, O MEU ESTADO NO QUE ME MANDARAM (tela A: "Você começou · T1E3")
-  // e a frase dele entre aspas — o andar de baixo do mockup, a 38 %.
-  rec_quando_texto(q, sizeof q, r->criado);
-  snprintf(l3, sizeof l3, "%s", q);
-  est = socialvis_meu_estado(r->imdb, &pct, &te, &ee);
-  if (recVista[idx]) {
-    const RecResp *rr = &recResp[idx];
-    juntar(l3, sizeof l3, i18n("Você assistiu"));
-    juntar(l3, sizeof l3, rr->reacao == 1 ? i18n("Gostou") : rr->reacao == 0 ? i18n("Mais ou menos")
-                         : rr->reacao == -1 ? i18n("Não gostou") : "");
-    if (rr->texto[0]) {
-      char fr[96];
-      snprintf(fr, sizeof fr, "\xe2\x80\x9c%s\xe2\x80\x9d", rr->texto);
-      juntar(l3, sizeof l3, fr);
-    }
-    est = 0;
-  } else
-  if (est == 2) juntar(l3, sizeof l3, i18n("Você viu"));
-  else if (est == 1) {
-    char d[64];
-    if (te > 0 && ee > 0) {
-      char ep[24];
-      snprintf(ep, sizeof ep, i18n("T%dE%d"), te, ee);
-      snprintf(d, sizeof d, "%s %s", i18n("Você começou"), ep);
-    } else snprintf(d, sizeof d, "%s %d%%", i18n("Você começou"), pct);
-    juntar(l3, sizeof l3, d);
-  }
-  { const char *frase = rec_frase(r);
-    if (frase[0]) {
-      char fr[200];
-      snprintf(fr, sizeof fr, "\xe2\x80\x9c%s\xe2\x80\x9d", frase);
-      juntar(l3, sizeof l3, fr);
-    } }
-  andaresIlha(tx, y, SPI_H, larg, v, a, r->deNome, i18n("te mandou"), l2, l3);
-}
 
 // A LINHA DE ABAS. Sem animacao de cor de proposito: a cor faz parte da chave
 // do cache de linhas de text.c, e uma cor por quadro cria uma rasterizacao TTF
@@ -3216,12 +2116,6 @@ static int contaDaAba(int i, int *novo) {
   int n;
   *novo = 0;
   if (i == SP_ABA_SALVOS) return nLinhas;
-  if (i == SP_ABA_SOCIAL) {
-    // PEDIDO DE AMIZADE CONTA COMO NOVIDADE da aba (06/10): o numero aceso no
-    // acento e o primeiro sinal, antes de abrir, de que alguem te adicionou.
-    if ((n = recomenda_n_novas() + recomenda_n_pedidos()) > 0) { *novo = 1; return n; }
-    return socialvis_n_amigos();
-  }
   if (i == SP_ABA_AVISOS) {
     if ((n = avisos_n_novos()) > 0) { *novo = 1; return n; }
     return avisos_lista_n();
@@ -3349,7 +2243,6 @@ static void desenhaAbas(float dx, float a, float larguraDisp) {
 static void chipTextos(int k, const char **cap, const char **val, const char **icone,
                        char *buf, size_t tam) {
   *cap = NULL; *val = NULL; *icone = NULL;
-  if (aba == SP_ABA_SOCIAL) { *cap = "Organizar"; *val = SOCIAL_CURTO[sorg_social()]; return; }
   switch (k) {
     case SPB_ORDEM:  *cap = "Ordenar"; *val = ORDEM_CURTO[sorg_ordem()]; break;
     case SPB_GRUPO:  *cap = "Agrupar"; *val = GRUPO_CURTO[sorg_grupo()]; break;
@@ -3480,92 +2373,7 @@ static void desenhaPop(float a) {
   gfx_sem_recorte();
 }
 
-// O ESTADO VAZIO DIZ POR QUE ESTA VAZIO, e nao so que esta.
-//
-// A versao anterior dizia "quando um amigo mandar um filme, ele aparece aqui",
-// que e verdade e nao ajuda em nada: o dono tinha ZERO contatos e a tela nao
-// dava nenhuma pista de que faltava um passo — o vinculo do Trakt so alcanca
-// quem JA usa o servico, e em 15/09/2026 isso eram zero pessoas. Aqui a tela
-// diz a razao, mostra o codigo que ele precisa ditar e oferece a porta.
-// Devolve o y logo abaixo do texto, para a linha-botao nascer colada nele em
-// vez de boiar no fim do painel.
-// A PERGUNTA DO NIVEL (alcance), por extenso. Mesma forma da pergunta de
-// aparecer: o que cada resposta faz, sem sermao, e onde mudar depois.
-static void desenhaAlcancePergunta(float dx, float y0, float a) {
-  float x = SP_X + dx + SP_PAD, y = y0 + 8.0f;
-  { TxtLinha t = txt_linha(TXT_ILHA_NOME, "Quem vê o que você assiste?", 243, 242, 239, 255);
-    txt_desenhar_alpha(t, x, y, a); y += t.h + 18.0f; }
-  y += txt_bloco(TXT_ILHA_SUB,
-      "Seus amigos podem ver o que você está assistindo, o que terminou e do que gostou. Nada sai desta TV antes de você escolher.",
-      243, 242, 239, x, y, SP_INTERNO, 27.0f, a * 0.62f, 4) + 14.0f;
-  y += txt_bloco(TXT_ILHA_SUB,
-      "Amigos dos seus amigos veem só o título e a ação, sem a sua foto.",
-      243, 242, 239, x, y, SP_INTERNO, 27.0f, a * 0.5f, 2) + 14.0f;
-  txt_bloco(TXT_ILHA_SUB, "Dá para mudar quando quiser, no fim desta aba.",
-            243, 242, 239, x, y, SP_INTERNO, 27.0f, a * 0.42f, 2);
-}
 
-__attribute__((unused)) static void desenhaSocialVazio(float dx, float y0, float a) {
-  float x = SP_X + dx + SP_PAD;
-  float y = y0 + 8.0f;
-  const char *cod = recomenda_meu_codigo();
-  { TxtLinha t = txt_linha(TXT_ILHA_NOME, "Nenhuma recomendação ainda",
-                           243, 242, 239, 255);
-    txt_desenhar_alpha(t, x, y, a); y += t.h + 14.0f; }
-  // EM BLOCO: a coluna do painel tem 688px e a frase tem duas oracoes; numa
-  // linha so, a captura saiu cortada no meio.
-  y += txt_bloco(TXT_ILHA_SUB,
-      "Quando alguém da sua lista te recomendar um filme ou série, ele aparece aqui.",
-      243, 242, 239, x, y, SP_INTERNO, 27.0f, a * 0.5f, 3) + 22.0f;
-  if (cod[0]) {
-    // O CODIGO TAMBEM AQUI, e nao so na tela de amigos: este e o painel que o
-    // dono abre com uma tecla, e ditar seis caracteres ao telefone e a acao que
-    // resolve uma lista vazia sem depender de ninguem ter aceitado aparecer.
-    TxtLinha r = txt_linha(TXT_ILHA_SUB, "Seu código", 243, 242, 239, 255);
-    TxtLinha c = txt_linha(TXT_TITULO2, cod, 243, 242, 239, 255);
-    txt_desenhar_alpha(r, x, y, a * 0.45f);
-    y += r.h + 6.0f;
-    txt_desenhar_alpha(c, x, y, a);
-    y += c.h + 20.0f;
-  }
-  { TxtLinha t = txt_linha_corta(TXT_ILHA_SUB,
-        "Peça o código do seu amigo e adicione-o abaixo.",
-        243, 242, 239, 255, SP_INTERNO);
-    txt_desenhar_alpha(t, x, y, a * 0.42f); }
-}
-
-// A PERGUNTA DA PRIMEIRA ENTRADA, por extenso.
-//
-// AS QUATRO FRASES SAO A FUNCAO INTEIRA, e a ordem delas foi escolhida: o que
-// os OUTROS passam a ver vem primeiro, o que eles NAO veem vem logo depois, o
-// preco de recusar (nenhum) vem em terceiro e a reversibilidade fecha. Quem ler
-// so a primeira ja sabe o essencial; quem ler ate o fim nao encontra nenhuma
-// ressalva que contradiga o comeco. Nao ha frase aqui que o codigo nao cumpra:
-// o servidor so guarda nome, foto e contatos, e a consulta de sugestao filtra
-// por `descobrivel = 1` nos DOIS ramos justamente para esta lista ser verdade.
-static void desenhaConsentimento(float dx, float y0, float a) {
-  float x = SP_X + dx + SP_PAD;
-  float y = y0 + 8.0f;
-  // TXT_ILHA_NOME E NAO TXT_TITULO2. Com o titulo grande a pergunta saiu da
-  // captura como "Aparecer para outras pessoa" — 688px de coluna nao cabem uma
-  // frase de 29 caracteres naquele corpo, e um enunciado cortado ao meio e
-  // pior que um enunciado menor.
-  { TxtLinha t = txt_linha(TXT_ILHA_NOME, "Aparecer para outras pessoas?",
-                           243, 242, 239, 255);
-    txt_desenhar_alpha(t, x, y, a); y += t.h + 18.0f; }
-  y += txt_bloco(TXT_ILHA_SUB,
-      "Se você aceitar, quem já te segue no Trakt e os amigos dos seus amigos passam a ver seu nome e sua foto numa lista de sugestões, e podem te adicionar como contato.",
-      243, 242, 239, x, y, SP_INTERNO, 27.0f, a * 0.62f, 4) + 18.0f;
-  y += txt_bloco(TXT_ILHA_SUB,
-      "Eles não veem o que você assiste, o que você salvou nem o que você recomendou. Nada disso sai desta TV.",
-      243, 242, 239, x, y, SP_INTERNO, 27.0f, a * 0.62f, 3) + 18.0f;
-  y += txt_bloco(TXT_ILHA_SUB,
-      "Se você recusar, continua recebendo e enviando recomendações do mesmo jeito. Você só não aparece na lista de ninguém.",
-      243, 242, 239, x, y, SP_INTERNO, 27.0f, a * 0.5f, 3) + 18.0f;
-  txt_bloco(TXT_ILHA_SUB,
-      "Dá para mudar essa resposta quando quiser, no fim desta aba.",
-      243, 242, 239, x, y, SP_INTERNO, 27.0f, a * 0.42f, 2);
-}
 
 // Uma linha-botao compacta: pilula que inverte no foco, com um subtitulo
 // opcional. A altura e menor que a de um card porque isto e uma acao da lista,
@@ -3606,673 +2414,6 @@ static void desenhaBotaoLinha(int i, float dx, float y, float alt, float a,
   txt_desenhar_alpha(foco, x0, r.y + (r.h - (float)foco.h) * 0.5f, a * v);
 }
 
-// O INTERRUPTOR DE "APARECER PARA OUTRAS PESSOAS", e por que ele deixou de ser
-// mais uma desenhaBotaoLinha.
-//
-// O DEFEITO: ele era a MESMA pilula, do MESMO tamanho, com o MESMO foco
-// invertido de "Adicionar um amigo" e das duas respostas do consentimento. Mas
-// "Adicionar um amigo" e uma ACAO — o OK abre um teclado e alguma coisa
-// acontece — e isto aqui e um ESTADO que fica, o interruptor de privacidade da
-// aba inteira. Duas especies de coisa com a mesma silhueta significa que, do
-// sofa, nao da para saber se o OK vai FAZER ou vai MUDAR. Num controle de
-// privacidade esse e o pior lugar possivel para ficar ambiguo.
-//
-// O QUE FOI REJEITADO, e por que:
-//
-// 1. A CONVENCAO DE AJUSTES — rotulo a esquerda e o valor em texto a direita
-//    ("Ligado"/"Desligado", V_LIGA em ajustes.c:135). Rejeitada por tres
-//    razoes, e a primeira e a que decide: la o valor a direita e uma COLUNA —
-//    TODA linha da tela tem uma, e e a coluna que faz uma palavra ser lida como
-//    valor. Aqui seria uma palavra solta na margem direita de uma lista de
-//    posteres e de rostos, sem nenhuma outra na mesma prumada; ela leria como
-//    um pedaco do subtitulo. Segunda: em Ajustes o OK ENTRA EM EDICAO e sao
-//    ESQUERDA/DIREITA que trocam o valor (o bloco `emEdicao` em ajustes.c:2051).
-//    Aqui o OK inverte na hora. Vestir a roupa de Ajustes com outro gesto e
-//    defeito pior que o que se esta corrigindo. Terceira: "Ligado" nao diz o
-//    que esta ligado.
-// 2. TRILHA SEMPRE EM COR DE ESTADO, como num telefone. A trilha desligada
-//    fica cinza neutro e a ligada usa o accent; a bola branca e a posicao
-//    mantem a leitura mesmo quando o foco altera a luminancia da linha.
-// 3. ESQUERDA = desligar, DIREITA = ligar. Rejeitada: ESQUERDA ja significa
-//    "sair do painel" nesta camada (ver spainel_evento), gesto herdado de
-//    perfil.c. Um interruptor em que um lado inverte e o outro fecha a tela
-//    inteira e pior que interruptor sem lados.
-// 4. UMA PALAVRA AO LADO DA BOLA ("Sim"/"Nao"). Rejeitada: se o controle diz o
-//    estado, a palavra e a segunda coisa dizendo a mesma coisa — e duas coisas
-//    dizendo o mesmo e o que da cara de formulario a uma linha.
-//
-// COMO O ESTADO E LIDO: a POSICAO da bola (48 px de percurso, ~35' de arco a
-// 3 m) e a diferenca entre a trilha neutra e a trilha accent. A bola permanece
-// branca para que o foco nao troque o significado da cor.
-//
-// QUAL LADO E O SEGURO, sem sermao. O padrao — e a resposta que o produto
-// defende — e NAO aparecer, e esse e o lado da trilha VAZIA. Ligar acende
-// alguma coisa; desligado nao ha nada aceso. A assimetria esta na fisica do
-// interruptor, e nao num aviso, num alerta ou numa cor de perigo: o dono ja
-// recusou copy moralista neste app e um interruptor que repreende e a mesma
-// coisa desenhada.
-static void desenhaAparecer(int i, float dx, float y, float alt, float a) {
-  GfxRect r = { SP_X + dx + SP_PAD, y, SP_INTERNO, alt };
-  GfxRect trilho, bola;
-  float f = (i >= 0 && i < SP_MAX) ? animFoco[i] : 0.0f;
-  float ar, ag, ab, ti = ajustes_acento_tinta(&ar, &ag, &ab);
-  int esc = focoTexto(f) >= 0.5f;
-  int c1 = esc ? ajustes_tinta_foco() : 240;
-  int c2 = esc ? ajustes_tinta_foco2() : 168;
-  // Clamp de seguranca: animSw nasce em -1 e so assenta na primeira
-  // atualizacao. Um quadro desenhado antes dela (o painel abre e desenha no
-  // mesmo quadro) deslocaria a bola para fora da capsula.
-  float lig = animSw < 0.0f ? 0.0f : anim_clamp(animSw, 0.0f, 1.0f);
-  float largTexto = SP_LINHA_W - 2.0f * SP_LINHA_PADX - SPS_SW_W - SPS_SW_GAP;
-  const char *sub = recomenda_aparecer() == REC_APARECER_SIM
-      // O SUBTITULO PAROU DE REPETIR O ESTADO. Ele dizia "Sim, voce aparece
-      // nas sugestoes de quem te conhece" / "Nao, voce nao aparece na lista de
-      // ninguem", que era a unica coisa na linha dizendo ligado ou desligado —
-      // agora quem diz isso e o interruptor. Sobrou para o subtitulo o que o
-      // interruptor NAO consegue dizer: ligado, QUEM passa a te achar; e
-      // desligado, o que voce NAO perde por recusar (nada) — que e a mesma
-      // promessa que a pergunta de primeira entrada ja faz, nas mesmas
-      // palavras, e a duvida real de quem esta com o dedo em cima.
-      //
-      // AS DUAS TEM 36 CARACTERES, e isso foi medido e nao estimado: a coluna
-      // de texto tem 520 px (688 - 32 - 32 - 80 de trilha - 24 de vao) e o
-      // TXT_CAPTION de 22 px gasta ~10,8 px por caractere aqui. "Voce continua
-      // recebendo e enviando recomendacoes" pedia ~511 px e saiu da PRIMEIRA
-      // captura como "Voce continua recebendo e enviando…", com a palavra que
-      // importa cortada fora. "Trocando" diz os dois sentidos numa palavra e
-      // guarda o substantivo.
-      ? "Quem te conhece te acha nas sugestões"
-      : "Você continua trocando recomendações";
-
-  // A CAIXA DA ILHA: a mesma borda e o mesmo raio das linhas (26/22), 6 px
-  // de ar em cima e embaixo dentro da altura da linha, o titulo em 24
-  // semibold e o subtitulo em 19 a 62 % — os dois andares de cima do mockup.
-  r.x = SP_X + dx + SP_LINHA_X; r.w = SP_LINHA_W; r.y = y + 6.0f; r.h = alt - 12.0f;
-  superficieCaixa(r, SP_LINHA_RAIO / r.h, f, a);
-  (void)c1; (void)c2;
-  { TxtLinha t = txtIlha(TXT_ILHA_NOME, "Aparecer para outras pessoas", largTexto);
-    TxtLinha s = txtIlha(TXT_ILHA_SUB, sub, largTexto);
-    float ty = r.y + (r.h - 56.0f) * 0.5f;
-    txt_desenhar_alpha(t, r.x + SP_LINHA_PADX, ty, a * (0.88f + 0.12f * focoVisual(f)));
-    txt_desenhar_alpha(s, r.x + SP_LINHA_PADX, ty + 33.0f, a * 0.62f); }
-
-  // A TRILHA. Raio 0,5 numa caixa 80x40: o teto 0,5*w/h vale 1,0, entao os
-  // 0,5 passam inteiros e as pontas saem em semicirculo de 20 px. Capsula de
-  // verdade, e nao "quase".
-  //
-  // OS 32 px DE RECUO SAO OS MESMOS DO TEXTO. Sem eles a capsula encostava na
-  // borda da pilula — apareceu na primeira captura e parecia a linha cortada.
-  trilho.x = r.x + r.w - SP_LINHA_PADX - SPS_SW_W;
-  trilho.y = r.y + (r.h - SPS_SW_H) * 0.5f;
-  trilho.w = SPS_SW_W;
-  trilho.h = SPS_SW_H;
-  //
-  // DESLIGADA A TRILHA E UM ANEL, e nao uma capsula chapada de alfa baixo. A
-  // primeira versao pintava tinta a 16% e MEDI o resultado na captura: a
-  // capsula saia em 76 sobre uma linha de 45, ou seja 1,56:1 — e em foco, 209
-  // sobre 245, 1,41:1. Nos dois casos a capsula praticamente nao existia, e
-  // sem ela a bola clara a esquerda flutua sem dizer que ha um percurso.
-  //
-  // O ANEL E EXATO, e nao GFX_ANEL: aquele modo sai losangudo (squircle) em
-  // diametro pequeno. Duas formas CONCENTRICAS preenchidas dao um anel exato,
-  // com 4 px de espessura e centro preservado mesmo depois da compactacao.
-  // A regra assentada e simples: trilho cinza quando desligado, accent quando
-  // ligado. Durante a animacao a mistura evita um salto de luminancia.
-  // O INTERRUPTOR (dono, 21/09/2026): trilho na COR DE REALCE ligado, cinza
-  // desligado, bola clara. A regra que faz isso valer em toda combinacao e
-  // "a bola contrasta com o trilho e o trilho com a linha":
-  //   linha em repouso  desligado: trilho branco a 30 %, bola branca
-  //                     ligado:    trilho realce, bola na TINTA do realce
-  //                                (branca sobre rosa, escura sobre branco)
-  //   linha em foco     desligado: trilho tinta a 25 %, bola tinta
-  //   (superficie=realce) ligado:  trilho tinta cheia, bola na cor de realce
-  // Sem isso, realce sobre realce sumia na linha em foco e bola branca sumia
-  // sobre trilho branco no tema padrao.
-  { float tr, tg, tb, ta;
-    if (esc) { tr = tg = tb = ti; ta = anim_mistura(0.25f, 1.0f, lig); }
-    else { tr = anim_mistura(0.30f, ar, lig); tg = anim_mistura(0.30f, ag, lig);
-           tb = anim_mistura(0.30f, ab, lig); ta = 1.0f; }
-    gfx_cor(trilho, 0.5f, tr, tg, tb, ta * a); }
-
-  // A BOLA. Quadrada com raio 0,5 = circulo EXATO pelo SDF (com asp = 1 a
-  // funcao vira length(p) - 0,5). Nao e GFX_ANEL: aquele sai losangudo em
-  // diametro pequeno, e aqui nem ha anel — sao dois discos preenchidos, que e
-  // a saida que gfx.h ja recomenda.
-  bola.w = SPS_SW_BOLA;
-  bola.h = SPS_SW_BOLA;
-  bola.x = trilho.x + SPS_SW_PAD +
-           (SPS_SW_W - SPS_SW_PAD * 2.0f - SPS_SW_BOLA) * lig;
-  bola.y = trilho.y + SPS_SW_PAD;
-  // A bola e sempre branca; a sombra curta conserva a leitura sobre a linha
-  // clara quando o foco esta ativo.
-  { GfxRect sombra = { bola.x - 2.0f, bola.y - 2.0f,
-                       bola.w + 4.0f, bola.h + 4.0f };
-    float br, bg, bb;
-    // Em DEGRAU no meio do percurso (um interruptor de verdade vira, nao
-    // esmaece): interpolada, a bola passaria pela cor do trilho e sumiria.
-    if (esc) { if (lig > 0.5f) { br = ar; bg = ag; bb = ab; } else br = bg = bb = ti; }
-    else     { if (lig > 0.5f) br = bg = bb = ti; else br = bg = bb = 0.96f; }
-    gfx_cor(sombra, 0.5f, 0.0f, 0.0f, 0.0f, 0.18f * a);
-    gfx_cor(bola, 0.5f, br, bg, bb, a); }
-}
-
-
-// =============================================================================
-// AMIGOS, 06/10 (dono): "vamos melhorar esses 2 botoes", "nao da pra ver
-// direito quando alguem te adicionou", "o 'como voce aparece' precisa de
-// destaque, e o 'quem ve o que voce assiste' tambem", e os botoes de unir
-// Trakt/Simkl/Letterboxd "cada um fazendo quase a mesma coisa" — um cartao
-// por servico, com a cor dele, e uma animacao de juntar a cor do Nuvio com a
-// do servico quando liga.
-// =============================================================================
-
-// O rotulo de secao no ACENTO: so o dos pedidos de amizade, que esperam uma
-// resposta de quem esta olhando.
-static void desenhaSecaoAcento(float x, float y, const char *rotulo, float a, int primeira) {
-  float ar, ag, ab;
-  TxtLinha t;
-  float ty = y + (primeira ? SP_SECAO_AR1 : SP_SECAO_AR);
-  ajustes_acento(&ar, &ag, &ab);
-  t = txt_linha_corta(TXT_ILHA_SECAO, rotulo, (int)(ar * 255), (int)(ag * 255), (int)(ab * 255), 255, SP_INTERNO);
-  txt_desenhar_alpha(t, x + SP_PAD, ty, a);
-  gfx_cor((GfxRect){ x + SP_LINHA_X, ty + SP_SECAO_TXT + 10.0f, SP_LINHA_W, 1.0f }, 0.0f, ar, ag, ab, 0.45f * a);
-}
-
-// AS DUAS PORTAS. Cartao inteiro (nao chip): o icone num disco no acento,
-// o nome e uma linha do que a porta faz, e a seta de "abre outra tela". O
-// numero de pedidos esperando vai na porta de Encontrar pessoas, que tambem
-// os mostra no topo.
-static void desenhaPorta(int i, float dx, float y, float alt, float a) {
-  float f = (i >= 0 && i < SP_MAX) ? animFoco[i] : 0.0f, v = focoVisual(f);
-  float ar, ag, ab, tinta = ajustes_acento_tinta(NULL, NULL, NULL);
-  int np = recomenda_n_pedidos();
-  GfxRect r = { SP_X + dx + SP_LINHA_X, y + 6.0f, SP_LINHA_W, alt - 12.0f };
-  GfxRect d = { r.x + SP_LINHA_PADX, r.y + (r.h - 52.0f) * 0.5f, 52.0f, 52.0f };
-  float tx = d.x + d.w + 18.0f, fim = r.x + r.w - SP_LINHA_PADX - 28.0f;
-  ajustes_acento(&ar, &ag, &ab);
-  superficieCaixa(r, SP_LINHA_RAIO / r.h, f, a);
-  gfx_cor(d, 0.5f, ar, ag, ab, (0.28f + 0.72f * v) * a);
-  { float ic = anim_mistura(1.0f, tinta, v);
-    gfx_icone((GfxRect){ d.x + 12.0f, d.y + 12.0f, 28.0f, 28.0f }, "aj_user-plus", ic, ic, ic, a); }
-  if (np > 0) {
-    char b[16];
-    TxtLinha n;
-    GfxRect p;
-    snprintf(b, sizeof b, "%d", np > 99 ? 99 : np);
-    n = txt_linha(TXT_ILHA_NUM, b, (int)(tinta * 255), (int)(tinta * 255), (int)(tinta * 255), 255);
-    p = (GfxRect){ fim - (float)n.w - 24.0f, r.y + (r.h - 32.0f) * 0.5f, (float)n.w + 24.0f, 32.0f };
-    gfx_cor(p, 0.5f, ar, ag, ab, a);
-    txt_desenhar_alpha(n, p.x + 12.0f, p.y + (p.h - n.h) * 0.5f, a);
-    fim = p.x - 12.0f;
-  }
-  { float lw = fim - tx;
-    TxtLinha t = txtIlha(TXT_ILHA_NOME, "Adicionar pessoas", lw);
-    TxtLinha sb = txtIlha(TXT_ILHA_SUB, "Busque por nome ou @apelido, ou use o código", lw);
-    float ty = r.y + (r.h - 56.0f) * 0.5f;
-    txt_desenhar_alpha(t, tx, ty, a * (0.9f + 0.1f * v));
-    txt_desenhar_alpha(sb, tx, ty + 33.0f, a * 0.62f); }
-  gfx_icone((GfxRect){ r.x + r.w - SP_LINHA_PADX - 22.0f, r.y + (r.h - 22.0f) * 0.5f, 22.0f, 22.0f },
-            "aj_chevron-right", 1, 1, 1, a * (0.35f + 0.5f * v));
-}
-
-// O nome do nivel em tres segmentos, e a frase do que cada um faz.
-static const char *ALC_SEG[3] = { "Ninguém", "Amigos", "Amigos de amigos" };
-static const char *ALC_FRASE[3] = {
-  "Nada do que você assiste sai desta TV.",
-  "Seus amigos veem o que você assiste, termina e gosta.",
-  "Amigos dos seus amigos veem só o título e a ação, sem a sua foto." };
-
-// COMO VOCE APARECE: a PREVIA do cartao que os amigos veem (rosto, nome,
-// @apelido) dentro de uma caixa propria, com o nivel de agora num selo. OK
-// edita o nome, como antes.
-static void desenhaPrevia(int i, float dx, float y, float alt, float a, Uint32 agora) {
-  float f = (i >= 0 && i < SP_MAX) ? animFoco[i] : 0.0f, v = focoVisual(f);
-  float ar, ag, ab;
-  // UM CARTAO SO com o controle de nivel logo abaixo (a linha seguinte, que nao
-  // desenha caixa propria): o fundo e pintado aqui, com a altura das duas.
-  GfxRect r = { SP_X + dx + SP_LINHA_X, y + 6.0f, SP_LINHA_W, alt + SPS_H_ALCANCE - 12.0f };
-  const ContaPerfil *pf = perfis_item_ativo();
-  RecPerfil eu;
-  char nome[96], l2[160];
-  ajustes_acento(&ar, &ag, &ab);
-  superficieCaixa(r, SP_LINHA_RAIO / r.h, 0.0f, a);
-  caixaAltaIlha("Como você aparece", (int)(ar * 255), (int)(ag * 255), (int)(ab * 255),
-                r.x + SP_LINHA_PADX, r.y + 18.0f, a);
-  if (v > 0.5f) {
-    TxtLinha h = txtIlha(TXT_ILHA_HORA, "OK para mudar o nome", 300.0f);
-    txt_desenhar_alpha(h, r.x + r.w - SP_LINHA_PADX - (float)h.w, r.y + 16.0f, a * 0.5f);
-  }
-  snprintf(nome, sizeof nome, "%s", recomenda_meu_nome()[0] ? recomenda_meu_nome()
-                                   : (pf && pf->nome[0] ? pf->nome : i18n("Nome do perfil")));
-  memset(&eu, 0, sizeof eu);
-  recomenda_perfil(&eu);
-  if (eu.apelido[0]) snprintf(l2, sizeof l2, "@%s", eu.apelido);
-  else snprintf(l2, sizeof l2, "%s", i18n("Ainda sem @apelido"));
-  { GfxRect m = { r.x + 8.0f, r.y + 46.0f, r.w - 16.0f, 64.0f };
-    GfxRect av = { m.x + 14.0f, m.y + 4.0f, 56.0f, 56.0f };
-    float tx = av.x + av.w + 18.0f;
-    // So o foco desenha caixa: em repouso a linha e texto sobre o cartao.
-    if (f > 0.01f) superficieItem(m, 18.0f / m.h, f, a);
-    rostoIlha(av, pf ? pf->avatarUrl : "", nome, "eu", 0, a, agora);
-    { float lw = m.x + m.w - 14.0f - tx;
-      txt_desenhar_alpha(txtIlha(TXT_ILHA_NOME, nome, lw), tx, m.y + 2.0f, a);
-      txt_desenhar_alpha(txtIlha(TXT_ILHA_SUB, l2, lw), tx, m.y + 33.0f, a * 0.62f); } }
-}
-
-// QUEM VE O QUE VOCE ASSISTE: tres segmentos. ← → andam, OK escolhe. O
-// segmento de agora fica aceso; com o foco, o cursor vai no acento. Embaixo,
-// a frase do segmento sob o cursor — a pessoa le o que vai mudar ANTES do OK.
-static void desenhaAlcanceSeg(int i, float dx, float y, float alt, float a) {
-  float f = (i >= 0 && i < SP_MAX) ? animFoco[i] : 0.0f, v = focoVisual(f);
-  float ar, ag, ab;
-  int tf = ajustes_tinta_foco(), cur = recomenda_alcance(), sel, k;
-  // Sem caixa propria: o cartao de cima (desenhaPrevia) ja cobre esta linha.
-  // So se a linha de cima saiu da janela, o fundo e pintado aqui.
-  GfxRect r = { SP_X + dx + SP_LINHA_X, y + 6.0f, SP_LINHA_W, alt - 12.0f };
-  GfxRect t = { r.x + SP_LINHA_PADX, y + 40.0f, r.w - 2.0f * SP_LINHA_PADX, 54.0f };
-  float sw = (t.w - 8.0f) / 3.0f;
-  if (cur < 0 || cur > 2) cur = 0;
-  sel = (v > 0.5f && alcCol >= 0 && alcCol <= 2) ? alcCol : cur;
-  ajustes_acento(&ar, &ag, &ab);
-  if (y < listaTopo()) {
-    GfxRect c = { r.x, y - SPS_H_PREVIA + 6.0f, r.w, SPS_H_PREVIA + alt - 12.0f };
-    superficieCaixa(c, SP_LINHA_RAIO / c.h, 0.0f, a);
-  }
-  txt_desenhar_alpha(txtIlha(TXT_ILHA_NOME, "Quem vê o que você assiste?", r.w * 0.62f),
-                     r.x + SP_LINHA_PADX, y - 2.0f, a);
-  if (v > 0.5f) {
-    TxtLinha h = txtIlha(TXT_ILHA_HORA, "← → escolhe · OK confirma", 260.0f);
-    txt_desenhar_alpha(h, r.x + r.w - SP_LINHA_PADX - (float)h.w, y + 4.0f, a * 0.5f);
-  }
-  if (ajustes_vidro()) gfx_cor(t, 0.5f, 1, 1, 1, 0.06f * a);
-  else gfx_cor(t, 0.5f, .135f, .142f, .165f, a);
-  for (k = 0; k < 3; k++) {
-    GfxRect s = { t.x + 4.0f + sw * (float)k, t.y + 4.0f, sw, t.h - 8.0f };
-    int cursor = v > 0.5f && k == sel;
-    int aceso = k == cur;
-    TxtLinha l;
-    if (cursor) { botaoSup(s, 0.5f, 1.0f, a); l = txt_linha_corta(TXT_ILHA_SEG, ALC_SEG[k], tf, tf, tf, 255, s.w - 20.0f); }
-    else {
-      if (aceso) gfx_cor(s, 0.5f, 1, 1, 1, 0.16f * a);
-      l = txtIlha(TXT_ILHA_SEG, ALC_SEG[k], s.w - 20.0f);
-    }
-    txt_desenhar_alpha(l, s.x + (s.w - (float)l.w) * 0.5f, s.y + (s.h - (float)l.h) * 0.5f,
-                       a * (cursor || aceso ? 1.0f : 0.55f));
-    // O valor de agora leva um ponto no acento, mesmo com o cursor em outro.
-    if (aceso && !cursor)
-      gfx_cor((GfxRect){ s.x + (s.w - 6.0f) * 0.5f, s.y + s.h - 9.0f, 6.0f, 6.0f }, 0.5f, ar, ag, ab, a);
-  }
-  txt_desenhar_alpha(txtIlha(TXT_ILHA_SUB, ALC_FRASE[sel], r.w - 2.0f * SP_LINHA_PADX),
-                     r.x + SP_LINHA_PADX, t.y + t.h + 10.0f, a * 0.62f);
-}
-
-// --- CONTAS LIGADAS ----------------------------------------------------------
-// A cor de cada servico (a do logo) e o arquivo da marca em art/marcas. O
-// Simkl nao tem arte no repositorio: o nome dele vai escrito, em caixa alta,
-// num ladrilho na cor escolhida para ele.
-typedef struct { const char *nome, *marca; float r, g, b; } SpServico;
-static const SpServico SERVICO[3] = {
-  { "Trakt",      "trakt",      0.929f, 0.110f, 0.141f },   // #ED1C24
-  { "Simkl",      NULL,         0.118f, 0.427f, 0.878f },   // azul, sem arte oficial no repo
-  { "Letterboxd", "letterboxd", 0.000f, 0.600f, 0.290f },   // o verde do logo, escurecido
-};
-static const char *SERVICO_FRASE[3] = {
-  "Junta amigos e atividade do Trakt a este perfil",
-  "Confirma que a conta Simkl é sua, neste perfil",
-  "Seu usuário do Letterboxd no perfil. Só você vê" };
-#define CONTA_ANIM_MS 800u
-static int contaAntes[3] = { -1, -1, -1 };
-static Uint32 contaLigouEm[3];
-
-static int contaServico(int tipo) { return tipo == SPS_IDENT ? 0 : tipo == SPS_SIMKL ? 1 : 2; }
-static float suave(float x) { x = x < 0 ? 0 : x > 1 ? 1 : x; return x * x * (3.0f - 2.0f * x); }
-
-// O ladrilho da marca, 64x64.
-static void contaMarca(int sv, GfxRect d, float a) {
-  if (SERVICO[sv].marca) {
-    const char *cam = extras_caminho_marca_nome(SERVICO[sv].marca);
-    GLuint tex = cam ? tex_obter(cam) : 0;
-    if (tex) gfx_rect(d, tex, GFX_TEXTO, 0, 0, 0, 0, 1, 1, 1, a);
-    return;
-  }
-  // O letreiro do Simkl e branco sobre preto: o ladrilho escuro separa a
-  // marca do cartao, que fica na cor do servico quando ligado.
-  gfx_cor(d, 0.28f, .043f, .051f, .063f, a);
-  { TxtLinha l = txt_linha(TXT_ILHA_HORA, "SIMKL", 255, 255, 255, 255);
-    if ((float)l.w > d.w - 6.0f) l = txt_linha(TXT_ILHA_NOME, "S", 255, 255, 255, 255);   // ladrilho pequeno: so a inicial
-    txt_desenhar_alpha(l, d.x + (d.w - (float)l.w) * 0.5f, d.y + (d.h - (float)l.h) * 0.5f, a); }
-}
-
-// Um cartao por servico. Estados: para ligar (superficie neutra, "Ligar"),
-// ligando (dois pontos, o do Nuvio e o do servico, girando na pilula),
-// ligado (o cartao inteiro na cor do servico, "Ligado" com o check), e os
-// recados de erro/confirmacao de antes, na linha de baixo.
-//
-// A ANIMACAO DE LIGAR (<= 0,8 s, so retangulos arredondados): um disco no
-// acento do Nuvio sai da marca, um na cor do servico sai da pilula; os dois
-// se encontram no meio (0-45 %), viram um so que troca de cor e cresce
-// (40-60 %), e dele o cartao se enche da cor do servico (50-100 %). Com
-// animacoes reduzidas, so o preenchimento aparecendo.
-static void desenhaConta(int i, float dx, float y, float alt, float a, Uint32 agora) {
-  float f = (i >= 0 && i < SP_MAX) ? animFoco[i] : 0.0f, v = focoVisual(f);
-  int sv = contaServico(social[i].tipo), ligado = 0, indo = 0, tf = ajustes_tinta_foco();
-  const char *sub = SERVICO_FRASE[sv], *pilula = "Ligar";
-  char buf[160];
-  float ar, ag, ab, cr = SERVICO[sv].r, cg = SERVICO[sv].g, cb = SERVICO[sv].b;
-  float encher = 0.0f, t = 1.0f;
-  // UM LADRILHO de uma fileira de ate tres (06/10): col/n dizem onde ele cai.
-  int col = 0, n = 1, j;
-  GfxRect fila, r, d;
-  GfxRect p;
-  TxtLinha pr, pf;
-  (void)alt;
-  for (j = i; j > 0 && spsConta(social[j - 1].tipo); j--) col++;
-  for (j = i - col; j < nSocial && spsConta(social[j].tipo); j++) n = j - (i - col) + 1;
-  // As linhas 2 e 3 do grupo chegam com o y da fileira JA somado a altura dela.
-  if (col > 0) y -= SPS_H_CONTAS;
-  fila = (GfxRect){ SP_X + dx + SP_LINHA_X, y + 6.0f, SP_LINHA_W, SPS_CONTA_H };
-  { float gap = 12.0f, tw = (fila.w - gap * (float)(n - 1)) / (float)n;
-    r = (GfxRect){ fila.x + (tw + gap) * (float)col, fila.y, tw, fila.h }; }
-  d = (GfxRect){ r.x + 16.0f, r.y + (r.h - 48.0f) * 0.5f, 48.0f, 48.0f };
-  int reduz = ajustes_animacoes_reduzidas() || anim_politica_reduzida || gfx_efeitos_minimos();
-#if SP_V2
-  int op;
-  if (sv == 0) {
-    int sit = recomenda_identidade_situacao();
-    op = recomenda_identidade_op();
-    ligado = sit == REC_IDENT_UNIDA;
-    if (ligado) { snprintf(buf, sizeof buf, i18n("Ligado como @%s"), recomenda_identidade_trakt()); sub = buf; }
-    if (ligado && identConfirma == SPS_IDENT + 1) sub = i18n("OK de novo para separar. O que já foi unido continua aqui");
-    if (op == REC_IDENT_OP_CONFLITO) sub = i18n("Essa conta Trakt já está em outro perfil");
-    else if (op == REC_IDENT_OP_FALHA) sub = i18n("Não foi possível. OK para tentar de novo");
-  } else {
-    int prov = sv == 1 ? REC_IDENT_SIMKL : REC_IDENT_LETTERBOXD;
-    int tipo = sv == 1 ? SPS_SIMKL : SPS_LETTERBOXD;
-    op = recomenda_identidade_op_de(prov);
-    ligado = recomenda_identidade_estado(prov) == REC_IDENT_E_LIGADO;
-    if (ligado && sv == 1) sub = i18n("Ligado a este perfil");
-    if (ligado && sv == 2) {
-      snprintf(buf, sizeof buf, i18n("@%s · informado por você, só você vê"), recomenda_identidade_usuario_letterboxd());
-      sub = buf;
-    }
-    if (ligado && identConfirma == tipo + 1) {
-      if (sv == 2) { snprintf(buf, sizeof buf, i18n("OK de novo para remover @%s"), recomenda_identidade_usuario_letterboxd()); sub = buf; }
-      else sub = i18n("OK de novo para separar. O que já foi unido continua aqui");
-    }
-    if (op == REC_IDENT_OP_SEM_SERVICO) sub = i18n("O servidor ainda não oferece o Simkl");
-    else if (op == REC_IDENT_OP_CONFLITO)
-      sub = sv == 1 ? i18n("Essa conta Simkl já está em outro perfil") : i18n("Não foi possível. OK para tentar de novo");
-    else if (op == REC_IDENT_OP_RECUSADO)
-      sub = sv == 1 ? i18n("O Simkl não aceitou o login desta TV. Entre de novo em Ajustes")
-                    : i18n("Não foi possível. OK para tentar de novo");
-    else if (op == REC_IDENT_OP_FALHA) sub = i18n("Não foi possível. OK para tentar de novo");
-  }
-  indo = op == REC_IDENT_OP_INDO;
-  if (indo) sub = i18n(identSeparando ? "Separando…" : "Ligando…");
-  if (ligado) pilula = (identConfirma == social[i].tipo + 1) ? "Separar" : "Unida";
-  if (op == REC_IDENT_OP_FALHA || op == REC_IDENT_OP_CONFLITO || op == REC_IDENT_OP_RECUSADO) pilula = "Tentar de novo";
-#else
-  (void)buf; (void)indo;
-#endif
-  // A virada para ligado comeca a animacao (vista pelo desenho: o painel so
-  // anima o que esta na tela).
-  if (contaAntes[sv] == 0 && ligado) contaLigouEm[sv] = agora ? agora : 1;
-  contaAntes[sv] = ligado;
-  if (ligado) {
-    encher = 1.0f;
-    if (contaLigouEm[sv]) {
-      t = (float)(agora - contaLigouEm[sv]) / (float)CONTA_ANIM_MS;
-      if (t >= 1.0f) { contaLigouEm[sv] = 0; t = 1.0f; }
-      encher = reduz ? suave(t / 0.4f) : suave((t - 0.5f) / 0.5f);
-    }
-  }
-  ajustes_acento(&ar, &ag, &ab);
-  superficieCaixa(r, SP_LINHA_RAIO / r.h, f, a);
-  // O CARTAO NA COR DO SERVICO, crescendo do meio enquanto anima.
-  if (encher > 0.0f) {
-    float cx = r.x + r.w * 0.5f, cy = r.y + r.h * 0.5f;
-    float w = reduz ? r.w : 40.0f + (r.w - 40.0f) * encher, h = reduz ? r.h : 40.0f + (r.h - 40.0f) * encher;
-    GfxRect c = { cx - w * 0.5f, cy - h * 0.5f, w, h };
-    float raio = (SP_LINHA_RAIO + (28.0f - SP_LINHA_RAIO) * (1.0f - encher)) / h;
-    gfx_cor(c, raio > 0.5f ? 0.5f : raio, cr, cg, cb, (reduz ? encher : 1.0f) * 0.62f * a);
-    // O foco sobre a cor: um fio claro por dentro da borda.
-    if (v > 0.01f && encher >= 1.0f) gfx_anel_fora(r, SP_LINHA_RAIO / r.h, 0.0f, 3.0f, 1, 1, 1, 0.9f * v * a);
-  }
-  contaMarca(sv, d, a);
-  // O ESTADO NO LADRILHO: uma linha sob o nome ("Ligar", "Unida"...). A frase
-  // longa (erro, "OK de novo para separar") vai na legenda sob a fileira,
-  // para o ladrilho em foco.
-  { char rotP[64];
-    snprintf(rotP, sizeof rotP, "%s", i18n(pilula));
-    pr = txt_linha(TXT_ILHA_SUB, rotP, SPI_FG_R, SPI_FG_G, SPI_FG_B, 255);
-    pf = txt_linha(TXT_ILHA_SUB, rotP, 255, 255, 255, 255); }
-  { float tx = d.x + d.w + 12.0f, lw = r.x + r.w - 12.0f - tx, ty = r.y + (r.h - 56.0f) * 0.5f, ix = tx;
-    int unida = ligado && !indo && !strcmp(pilula, "Unida");
-    txt_desenhar_alpha(txtIlha(TXT_ILHA_NOME, SERVICO[sv].nome, lw), tx, ty, a);
-    if (unida) { gfx_icone((GfxRect){ tx, ty + 36.0f, 20.0f, 20.0f }, "aj_check", 1, 1, 1, a); ix = tx + 26.0f; }
-    if (indo) {
-      // LIGANDO: o ponto do Nuvio e o do servico girando um em volta do outro.
-      float ang = (float)(agora % 900u) / 900.0f * 6.2832f, ox = tx + 10.0f, oy = ty + 46.0f;
-      if (reduz) ang = 0.0f;
-      gfx_cor((GfxRect){ ox + cosf(ang) * 6.0f - 4.0f, oy + sinf(ang) * 6.0f - 4.0f, 8, 8 }, 0.5f, ar, ag, ab, a);
-      gfx_cor((GfxRect){ ox - cosf(ang) * 6.0f - 4.0f, oy - sinf(ang) * 6.0f - 4.0f, 8, 8 }, 0.5f, cr, cg, cb, a);
-      ix = tx + 28.0f;
-    }
-    txt_desenhar_alpha(pr, ix, ty + 36.0f, a * (ligado ? 0.9f : 0.6f) * (1.0f - v));
-    txt_desenhar_alpha(pf, ix, ty + 36.0f, a * v); }
-  p = (GfxRect){ r.x + r.w * 0.5f - 20.0f, r.y + r.h * 0.5f - 20.0f, 40.0f, 40.0f };   // para a animacao
-  // A LEGENDA da fileira: a frase do ladrilho em foco, uma vez por fileira.
-  if (v > 0.5f) {
-    TxtLinha lg = txtIlha(TXT_ILHA_SUB, sub, fila.w - 8.0f);
-    txt_desenhar_alpha(lg, fila.x + 4.0f, fila.y + fila.h + 12.0f, a * 0.7f);
-  }
-  // OS DOIS DISCOS SE JUNTANDO, por cima de tudo (dura menos de meio segundo).
-  if (ligado && !reduz && t < 0.62f) {
-    float mx = r.x + r.w * 0.5f, my = r.y + r.h * 0.5f;
-    float sa = d.x + d.w * 0.5f, sb = r.x + r.w - 26.0f;
-    float e = 1.0f - powf(1.0f - (t / 0.45f > 1.0f ? 1.0f : t / 0.45f), 3.0f);
-    float junta = suave((t - 0.40f) / 0.20f);
-    float some = 1.0f - suave((t - 0.50f) / 0.12f);
-    if (junta < 1.0f) {
-      float rad = 10.0f + 4.0f * e, xa = sa + (mx - sa) * e, xb = sb + (mx - sb) * e;
-      gfx_cor((GfxRect){ xa - rad * 2, my - rad * 2, rad * 4, rad * 4 }, 0.5f, ar, ag, ab, 0.22f * (1 - junta) * a);
-      gfx_cor((GfxRect){ xb - rad * 2, my - rad * 2, rad * 4, rad * 4 }, 0.5f, cr, cg, cb, 0.22f * (1 - junta) * a);
-      gfx_cor((GfxRect){ xa - rad, my - rad, rad * 2, rad * 2 }, 0.5f, ar, ag, ab, (1 - junta) * a);
-      gfx_cor((GfxRect){ xb - rad, my - rad, rad * 2, rad * 2 }, 0.5f, cr, cg, cb, (1 - junta) * a);
-    }
-    if (junta > 0.0f) {
-      float rad = 14.0f + 12.0f * junta;
-      float mr = ar + (cr - ar) * junta, mg = ag + (cg - ag) * junta, mb = ab + (cb - ab) * junta;
-      gfx_cor((GfxRect){ mx - rad * 1.8f, my - rad * 1.8f, rad * 3.6f, rad * 3.6f }, 0.5f, mr, mg, mb, 0.25f * some * a);
-      gfx_cor((GfxRect){ mx - rad, my - rad, rad * 2, rad * 2 }, 0.5f, mr, mg, mb, some * a);
-    }
-  }
-}
-
-// Uma sugestao: a cara, o nome, POR ONDE ela chegou, e a pilula que diz o que
-// o OK faz.
-//
-// A LINHA DA ORIGEM NAO E ENFEITE — e ela que separa "alguem que voce talvez
-// conheca" de "um estranho que o app resolveu mostrar". Sem "Segue no Trakt" ou
-// "Amigo de Gustavo", a resposta honesta a "quem e essa pessoa?" seria "nao
-// sei", e a de quem esta olhando seria recusar.
-static void desenhaSugLinha(int i, int idx, float dx, float y, float a, Uint32 agora) {
-  const RecSugestao *s = &sugs[idx];
-  float f = (i >= 0 && i < SP_MAX) ? animFoco[i] : 0.0f, v = focoVisual(f);
-  float px = SP_X + dx + SP_PAD, tx = px + SPI_AV + SPI_AV_GAP;
-  float fimLinha = SP_X + dx + SP_LINHA_X + SP_LINHA_W - SP_LINHA_PADX;
-  char origem[128];
-  int tf = ajustes_tinta_foco();
-  { GfxRect r = linhaIlhaRet(dx, y, SPS_H_SUG);
-    superficieItem(r, SP_LINHA_RAIO / r.h, f, a); }
-  rostoIlha((GfxRect){ px, y + (SPS_H_SUG - SPI_AV) * 0.5f, SPI_AV, SPI_AV },
-            s->avatar, s->nome, s->id, 0, a, agora);
-  rec_sugestao_origem(origem, sizeof origem, s);
-  // A PILULA DA ACAO E MEDIDA ANTES DO NOME, e o nome e cortado para caber ao
-  // lado dela: sem isso, "Carolina Menezes" passava por baixo de "Adicionar"
-  // e as duas ficavam ilegiveis na captura. E um chip da ilha em tamanho de
-  // linha (44 de altura): repouso a 8 %, e com a linha em foco ele vira a
-  // pilula cheia no acento — o OK desta linha E "Adicionar".
-  { TxtLinha acR = txtIlha(TXT_ILHA_SEG, "Adicionar", 300.0f);
-    TxtLinha acF = txt_linha(TXT_ILHA_SEG, "Adicionar", tf, tf, tf, 255);
-    float pw = (float)acR.w + 40.0f;
-    GfxRect p = { fimLinha - pw, y + (SPS_H_SUG - 44.0f) * 0.5f, pw, 44.0f };
-    andaresIlha(tx, y, SPS_H_SUG, p.x - 18.0f - tx, v, a, s->nome, NULL, origem, NULL);
-    botaoSup(p, 0.5f, f, a);
-    txt_desenhar_alpha(acR, p.x + 20.0f, p.y + (p.h - acR.h) * 0.5f, a * 0.85f * (1.0f - v));
-    txt_desenhar_alpha(acF, p.x + 20.0f, p.y + (p.h - acF.h) * 0.5f, a * v); }
-}
-
-// Linha de um PEDIDO DE AMIZADE: o rosto, o apelido, a bio (ou o aviso de
-// que recusar nao avisa) e as duas pilulas. A pilula em foco e a de `pedCol`;
-// fora do foco as duas ficam em repouso.
-static void desenhaPedidoLinha(int i, int idx, float dx, float y, float a, Uint32 agora) {
-  const RecPessoa *p = &peds[idx];
-  float f = (i >= 0 && i < SP_MAX) ? animFoco[i] : 0.0f, v = focoVisual(f);
-  float px = SP_X + dx + SP_PAD, tx = px + SPI_AV + SPI_AV_GAP;
-  float fimLinha = SP_X + dx + SP_LINHA_X + SP_LINHA_W - SP_LINHA_PADX;
-  const char *nome = p->apelido[0] ? p->apelido : (p->nome[0] ? p->nome : "?");
-  const char *rot[2] = { i18n("Aceitar"), i18n("Recusar") };
-  int tf = ajustes_tinta_foco(), k;
-  float xp = fimLinha;
-  GfxRect pr[2];
-  TxtLinha rr[2], rf[2];
-  // O PEDIDO E INCONFUNDIVEL (06/10): a linha tem o acento por baixo mesmo
-  // em repouso, e uma barra no acento na borda — e a unica coisa da aba que
-  // espera uma resposta.
-  { GfxRect r = linhaIlhaRet(dx, y, SPS_H_SUG);
-    float ar, ag, ab;
-    ajustes_acento(&ar, &ag, &ab);
-    gfx_cor(r, SP_LINHA_RAIO / r.h, ar, ag, ab, 0.13f * a);
-    superficieItem(r, SP_LINHA_RAIO / r.h, f, a);
-    gfx_cor((GfxRect){ r.x + 7.0f, r.y + 22.0f, 4.0f, r.h - 44.0f }, 0.5f, ar, ag, ab, a); }
-  rostoIlha((GfxRect){ px, y + (SPS_H_SUG - SPI_AV) * 0.5f, SPI_AV, SPI_AV },
-            p->avatar, nome, p->pub, 0, a, agora);
-  for (k = 1; k >= 0; k--) {
-    rr[k] = txtIlha(TXT_ILHA_SEG, rot[k], 300.0f);
-    rf[k] = txt_linha(TXT_ILHA_SEG, rot[k], tf, tf, tf, 255);
-    pr[k] = (GfxRect){ xp - ((float)rr[k].w + 40.0f), y + (SPS_H_SUG - 44.0f) * 0.5f, (float)rr[k].w + 40.0f, 44.0f };
-    xp = pr[k].x - 10.0f;
-  }
-  andaresIlha(tx, y, SPS_H_SUG, pr[0].x - 18.0f - tx, v, a, nome, NULL,
-              p->bio[0] ? p->bio : i18n("Quer ser seu amigo"), NULL);
-  for (k = 0; k < 2; k++) {
-    float fk = (k == pedCol) ? f : 0.0f, vk = focoVisual(fk);
-    botaoSup(pr[k], 0.5f, fk, a);
-    txt_desenhar_alpha(rr[k], pr[k].x + 20.0f, pr[k].y + (pr[k].h - rr[k].h) * 0.5f, a * 0.85f * (1.0f - vk));
-    txt_desenhar_alpha(rf[k], pr[k].x + 20.0f, pr[k].y + (pr[k].h - rf[k].h) * 0.5f, a * vk);
-  }
-}
-
-// Linha de um AMIGO JA ADICIONADO, na gramatica do feed: o rosto (anel
-// vermelho e ponto se esta vendo agora), o nome, o que ele esta fazendo e, a
-// direita, a capa do titulo dele. Sem acao alem de abrir o perfil.
-static void desenhaAmigoLinha(int i, int idx, float dx, float y, float a, Uint32 agora) {
-  const RecContato *c = &ctts[idx];
-  float f = (i >= 0 && i < SP_MAX) ? animFoco[i] : 0.0f, v = focoVisual(f);
-  float px = SP_X + dx + SP_PAD, tx = px + SPI_AV + SPI_AV_GAP, alt = socialAlt(i);
-  float larg = SP_X + dx + SP_LINHA_X + SP_LINHA_W - SP_LINHA_PADX - tx;
-  const SvAmigo *am = (cttSv[idx] >= 0) ? socialvis_amigo(cttSv[idx]) : NULL;
-  int vivo = am && am->agora && am->nTit > 0;
-  char linha2[260], linha3[300];
-  { GfxRect r = linhaIlhaRet(dx, y, alt);
-    superficieItem(r, SP_LINHA_RAIO / r.h, f, a); }
-  rostoIlha((GfxRect){ px, y + (alt - SPI_AV) * 0.5f, SPI_AV, SPI_AV },
-            am ? am->avatar : c->avatar, c->nome, c->id, vivo, a, agora);
-  if (am && am->nTit > 0) {
-    larg -= SPI_CAP_W + 18.0f;
-    capaIlha(dx, y, alt, am->tit[0].poster[0] ? am->tit[0].poster : am->tit[0].arte, a);
-  }
-  // O QUE ELE ESTA FAZENDO (tela A, 02/10/2026), do modelo do social: "Agora ·
-  // The Bear · T3E4 · faltam 12 min", ou "Project Hail Mary · Terminou e
-  // gostou · ontem". Sem atividade, "Ainda sem atividade" — a FONTE (Trakt)
-  // nao e escrita aqui, fica no perfil.
-  if (am && am->nTit > 0) {
-    char st[160];
-    const SvEvento *e = &am->tit[0];
-    socialvis_status(e, st, sizeof st);
-    if (vivo) {
-      const char *resto = strstr(st, " \xc2\xb7 ");
-      snprintf(linha2, sizeof linha2, "%s \xc2\xb7 %s%s", i18n("Agora"), e->titulo,
-               resto ? resto : "");
-    } else snprintf(linha2, sizeof linha2, "%s \xc2\xb7 %s", e->titulo, st);
-  } else snprintf(linha2, sizeof linha2, "%s", i18n("Ainda sem atividade"));
-  // A CADEIA DO QUE EU MANDEI ("Voce mandou X › viu › gostou") e o andar de
-  // baixo, em texto como o resto da ilha — eram pilulas coloridas que o
-  // mockup nao tem.
-  linha3[0] = 0;
-  if (cttCadeia[idx]) {
-    SvEnviada m;
-    if (socialvis_ultima_enviada(c->id, &m)) {
-      snprintf(linha3, sizeof linha3, i18n("Você mandou %s"), m.titulo);
-      { size_t k = strlen(linha3);
-        snprintf(linha3 + k, sizeof linha3 - k, " \xe2\x80\xba %s",
-                 socialvis_enviada_rotulo(&m, NULL));
-      }
-    }
-  }
-  andaresIlha(tx, y, alt, larg, v, a, c->nome, NULL, linha2, linha3);
-  // O SELO DE CRIADOR depois do nome, na mesma conta de andaresIlha (o nome
-  // ocupa ate 60 % da largura; o bloco e centrado na altura da linha).
-  if (rec_selo_pessoa_largura(c->selo) > 0.0f) {
-    float bloco = 29.0f + (linha2[0] ? 27.0f : 0.0f) + (linha3[0] ? 22.0f : 0.0f);
-    float nw = (float)txtIlha(TXT_ILHA_NOME, c->nome, larg * 0.6f).w;
-    if (tx + nw + 12.0f + rec_selo_pessoa_largura(c->selo) <= tx + larg)
-      rec_selo_pessoa(tx + nw + 12.0f, y + (alt - bloco) * 0.5f + (29.0f - BADGE_H) * 0.5f + 1.0f, c->selo, a);
-  }
-}
-
-// A ATIVIDADE VAZIA: diz o que vai aparecer e de onde, sem prometer dado que
-// ainda nao existe.
-static void desenhaAtividadeVazia(float dx, float y0, float a) {
-  float x = SP_X + dx + SP_PAD, y = y0 + 8.0f;
-  TxtLinha t = txt_linha(TXT_ILHA_NOME, "Nada por aqui ainda", 243, 242, 239, 255);
-  txt_desenhar_alpha(t, x, y, a);
-  y += (float)t.h + 14.0f;
-  txt_bloco(TXT_ILHA_SUB,
-      "Quando seus amigos começarem, terminarem ou gostarem de um título, aparece aqui.",
-      243, 242, 239, x, y, SP_INTERNO, 27.0f, a * 0.5f, 3);
-}
-
-// UMA LINHA DO FEED (tela B): o rosto, o cartaz e tres linhas — "Marina esta
-// vendo", "The Bear · T3E4" e quando. O nome e o verbo sao DUAS linhas de
-// texto lado a lado (o verbo e chave de i18n inteira; a frase com o nome
-// dentro nunca seria). Mesma superficie e mesmo foco das outras linhas.
-static void desenhaAtvLinha(int i, float dx, float y, float a, Uint32 agora) {
-  const SvEvento *e = socialvis_evento(i);
-  float f = (i >= 0 && i < SP_MAX) ? animFoco[i] : 0.0f, v = focoVisual(f);
-  float px = SP_X + dx + SP_PAD, tx = px + SPA_AV + SPI_AV_GAP;
-  float larg = SP_X + dx + SP_LINHA_X + SP_LINHA_W - SP_LINHA_PADX - SPA_CAP_W - 18.0f - tx;
-  char linha[220], ep[24], q[48], tit[220];
-  if (!e) return;
-  { GfxRect r = linhaIlhaRet(dx, y, SPA_H);
-    superficieItem(r, SP_LINHA_RAIO / r.h, f, a); }
-  rostoIlha((GfxRect){ px, y + (SPA_H - SPA_AV) * 0.5f, SPA_AV, SPA_AV },
-            e->pessoaAvatar, e->pessoaNome, e->pessoaId, e->acao == SV_AGORA, a, agora);
-  { GfxRect c = { SP_X + dx + SP_LINHA_X + SP_LINHA_W - SP_LINHA_PADX - SPA_CAP_W,
-                  y + (SPA_H - SPA_CAP_H) * 0.5f, SPA_CAP_W, SPA_CAP_H };
-    capaArte(c, e->poster[0] ? e->poster : e->arte, SPA_CAP_RAIO, a); }
-  socialvis_ep(e, ep, sizeof ep);
-  if (ep[0]) snprintf(tit, sizeof tit, "%s \xc2\xb7 %s", e->titulo, ep);
-  else snprintf(tit, sizeof tit, "%s", e->titulo);
-  // QUANDO, e o que o cartao da home tambem diria: "faltam 12 min", "aos 18 %".
-  socialvis_quando(e->quando, q, sizeof q);
-  linha[0] = 0;
-  if (e->acao == SV_AGORA && e->restanteMin > 0)
-    snprintf(linha, sizeof linha, i18n("faltam %d min"), e->restanteMin);
-  // A NOTA DO TRACKER, quando houve: a linha diz o que a pessoa achou, nao so
-  // que viu. (A saida do player, "parou aos 18%", nao chega mais ao feed.)
-  else if (e->nota > 0)
-    snprintf(linha, sizeof linha, i18n("Nota %d/10"), (e->nota + 5) / 10);
-  juntar(linha, sizeof linha, q);
-  // OS TRES ANDARES NA ESCALA _L (28 / 22 / 17), centrados na linha de 142.
-  { float ty = y + (SPA_H - (34.0f + 5.0f + 27.0f + 5.0f + 21.0f)) * 0.5f;
-    nomeVerboEst(TXT_ILHA_NOME_L, e->pessoaNome, socialvis_verbo(e), tx, ty, larg, v, a);
-    ty += 34.0f + 5.0f;
-    txt_desenhar_alpha(txtIlha(TXT_ILHA_SUB_L, tit, larg), tx, ty, a * 0.62f);
-    ty += 27.0f + 5.0f;
-    if (linha[0]) txt_desenhar_alpha(txtIlha(TXT_ILHA_HORA_L, linha, larg), tx, ty, a * 0.38f); }
-}
 
 static void desenhaAgendaVazia(float dx, float y, float a) {
   float cx = SP_X + dx + SP_W * 0.5f;
@@ -4500,7 +2641,6 @@ void spainel_desenhar(Uint32 agora) {
   { ESCALA_INI();
     spainel_desenharCorpo_(agora);
     ESCALA_FIM(); }
-  reacao_painel_desenhar(agora);   // "Ja assisti" -> "O que achou?" (reacao.h)
 }
 static void spainel_desenharCorpo_(Uint32 agora) {
   desenharPainel(agora);
@@ -4578,26 +2718,7 @@ static void desenharPainel(Uint32 agora) {
   // recomenda_n() E NAO nRecs: com a pergunta de consentimento na tela a lista
   // local esta vazia de proposito, e escrever "0 recomendações" ao lado de uma
   // aba com o selo em 2 seria o painel se contradizendo em dois centimetros.
-  if (aba == SP_ABA_SOCIAL) {
-    int n = recomenda_n(), np = recomenda_n_pedidos();
-    if (np == 1) snprintf(buf, sizeof buf, "%s", i18n("1 pedido de amizade"));
-    else if (np > 1) snprintf(buf, sizeof buf, i18n("%d pedidos de amizade"), np);
-    else snprintf(buf, sizeof buf, "%d %s", n,
-                  i18n(n == 1 ? "recomendação" : "recomendações"));
-  }
-  else if (aba == SP_ABA_ATIVIDADE) {
-    int nv = socialvis_n_ao_vivo();
-    if (nv > 0) snprintf(buf, sizeof buf, "%d %s", nv, i18n("assistindo agora"));
-    else {
-      // Sem ninguem ao vivo, quantos amigos ha; sem amigos no modelo (o feed
-      // pode vir so de recomendacoes), o nome da aba — "0 amigos" em cima de
-      // uma lista cheia seria o painel se contradizendo.
-      int na = socialvis_n_amigos();
-      if (na > 0) snprintf(buf, sizeof buf, "%d %s", na, i18n(na == 1 ? "amigo" : "amigos"));
-      else snprintf(buf, sizeof buf, "%s", i18n("Atividade"));
-    }
-  }
-  else if (aba == SP_ABA_AVISOS) {
+  if (aba == SP_ABA_AVISOS) {
     int n = avisos_lista_n(), nv = avisos_n_novos();
     if (nv > 0) snprintf(buf, sizeof buf, i18n("%d avisos · %d novos"), n, nv);
     else snprintf(buf, sizeof buf, "%d %s", n, i18n(n == 1 ? "aviso" : "avisos"));
@@ -4646,24 +2767,7 @@ static void desenharPainel(Uint32 agora) {
   if (editando) { desenhaEditar(x, a); gfx_sem_recorte(); return; }
   if (temBarra()) desenhaBarra(x, a);
 
-  if (aba == SP_ABA_ATIVIDADE) {
-    gfx_recorte(SP_X + xp, listaTopo(), SP_W, SP_LISTA_BASE - listaTopo());
-    y = listaTopo() + SP_FOCO_AR - scrollY;
-    if (nAtv == 0) desenhaAtividadeVazia(x, y, a);
-    for (i = 0; i < nAtv; i++) {
-      float cab = atvAntes(i);
-      if (cab > 0.0f) {
-        if (y + cab >= listaTopo() && y <= SP_LISTA_BASE)
-          desenhaSecao(SP_X + x, y, atvRot[i], a, i == 0);
-        y += cab;
-      }
-      if (y + SPA_H >= listaTopo() && y <= SP_LISTA_BASE)
-        desenhaAtvLinha(i, x, y, a, agora);
-      y += SPA_H + SPS_GAP;
-    }
-    gfx_sem_recorte();
-    return;
-  }
+
   if (aba == SP_ABA_AGENDA) {
     gfx_recorte(SP_X + xp, listaTopo(), SP_W, SP_LISTA_BASE - listaTopo());
     y = listaTopo() + SP_FOCO_AR - scrollY;
@@ -4701,91 +2805,7 @@ static void desenharPainel(Uint32 agora) {
     return;
   }
 
-  if (aba == SP_ABA_SOCIAL) {
-    gfx_recorte(SP_X + xp, listaTopo(), SP_W, SP_LISTA_BASE - listaTopo());
-    y = listaTopo() + SP_FOCO_AR - scrollY;
-    // O BLOCO DE TEXTO ROLA COM A LISTA, e nao fica preso no topo: ele explica
-    // a lista que vem logo abaixo, e um texto fixo com linhas passando por
-    // baixo dele leria como duas telas empilhadas.
-    if (consentindo())    desenhaConsentimento(x, y, a);
-    else if (perguntandoAlcance()) desenhaAlcancePergunta(x, y, a);
-    y += socialTopo();
-    for (i = 0; i < nSocial; i++) {
-      float alt = socialAlt(i);
-      float cab = socialAntes(i);
-      if (cab > 0.0f) {
-        // So a secao das sugestoes tem rotulo; o vao do interruptor e mudo.
-        if (social[i].tipo == SPS_PEDIDO && y + cab >= listaTopo() && y <= SP_LISTA_BASE) {
-          char rotPed[96];
-          snprintf(rotPed, sizeof rotPed, i18n("Pedidos de amizade (%d)"), nPeds);
-          desenhaSecaoAcento(SP_X + x, y, rotPed, a, cab < SP_SECAO_H - 0.5f);
-        }
-        if ((social[i].tipo == SPS_SUG || social[i].tipo == SPS_AMIGO || social[i].tipo == SPS_NOME ||
-             spsConta(social[i].tipo)) &&
-            y + cab >= listaTopo() && y <= SP_LISTA_BASE)
-          desenhaSecao(SP_X + x, y,
-                       social[i].tipo == SPS_NOME ? "Você para os outros"
-                       : spsConta(social[i].tipo) ? "Contas ligadas"
-                       : social[i].tipo == SPS_SUG ? "Pessoas que você talvez conheça"
-                                                 : "Seus amigos", a, cab < SP_SECAO_H - 0.5f);
-        // Por pessoa: o nome de quem mandou abre o grupo dele.
-        if (social[i].tipo == SPS_REC && y + cab >= listaTopo() && y <= SP_LISTA_BASE)
-          desenhaSecao(SP_X + x, y, recVista[social[i].idx] ? "Assistidas"
-                                                             : recs[social[i].idx].deNome,
-                       a, cab < SP_SECAO_H - 0.5f);
-        y += cab;
-      }
-      // Fora da janela nao custa texto nem textura — mesma razao da lista de
-      // Salvos logo abaixo.
-      { float yv = y, av = alt;
-        if (spsConta(social[i].tipo)) { av = SPS_H_CONTAS; if (i > 0 && spsConta(social[i - 1].tipo)) yv -= SPS_H_CONTAS; }
-      if (yv + av >= listaTopo() && yv <= SP_LISTA_BASE) {
-        switch (social[i].tipo) {
-          case SPS_REC: desenhaRecLinha(i, social[i].idx, x, y, a, agora); break;
-          case SPS_SUG: desenhaSugLinha(i, social[i].idx, x, y, a, agora); break;
-          case SPS_PEDIDO: desenhaPedidoLinha(i, social[i].idx, x, y, a, agora); break;
-          case SPS_AMIGO: desenhaAmigoLinha(i, social[i].idx, x, y, a, agora); break;
-          case SPS_ENCONTRAR:
-          case SPS_ADICIONAR:
-            desenhaPorta(i, x, y, alt, a);
-            break;
-          case SPS_APARECER:
-            // NAO e desenhaBotaoLinha, e a diferenca e o ponto todo desta
-            // linha. Ver a nota longa em desenhaAparecer.
-            desenhaAparecer(i, x, y, alt, a);
-            break;
-          case SPS_CONSENT_SIM:
-            desenhaBotaoLinha(i, x, y, alt, a, "Sim, pode me mostrar", NULL, NULL, 1);
-            break;
-          case SPS_ALC_0:
-            desenhaBotaoLinha(i, x, y, alt, a, "Ninguém", NULL, NULL, 0);
-            break;
-          case SPS_ALC_1:
-            desenhaBotaoLinha(i, x, y, alt, a, "Só meus amigos", NULL, NULL, 1);
-            break;
-          case SPS_ALC_2:
-            desenhaBotaoLinha(i, x, y, alt, a, "Amigos e amigos deles", NULL, NULL, 0);
-            break;
-#if SP_V2
-          case SPS_ALCANCE: desenhaAlcanceSeg(i, x, y, alt, a); break;
-          case SPS_NOME: desenhaPrevia(i, x, y, alt, a, agora); break;
-          case SPS_IDENT:
-          case SPS_SIMKL:
-          case SPS_LETTERBOXD:
-            desenhaConta(i, x, y, alt, a, agora);
-            break;
-#endif   // sem SP_V2 essas linhas nem existem (reconstruirSocial)
-          default:
-            desenhaBotaoLinha(i, x, y, alt, a, "Não, não quero aparecer", NULL, NULL, 0);
-            break;
-        }
-      }
-      }
-      y += alt + SPS_GAP;
-    }
-    gfx_sem_recorte();
-    return;
-  }
+
 
   if (nLinhas == 0) { desenhaVazio(x, a); gfx_sem_recorte(); return; }
 
@@ -4833,22 +2853,7 @@ static void desenharPainel(Uint32 agora) {
 }
 
 const char *spainel_foco_social(void) {
-  if (aba != SP_ABA_SOCIAL || foco < 0 || foco >= nSocial) return "";
-  switch (social[foco].tipo) {
-    case SPS_PEDIDO: return "pedido";
-    case SPS_ENCONTRAR: return "encontrar";
-    case SPS_ADICIONAR: return "adicionar";
-    case SPS_NOME: return "previa";
-    case SPS_ALCANCE: return "alcance";
-    case SPS_IDENT: return "trakt";
-    case SPS_SIMKL: return "simkl";
-    case SPS_LETTERBOXD: return "letterboxd";
-    case SPS_APARECER: return "aparecer";
-    case SPS_AMIGO: return "amigo";
-    case SPS_REC: return "rec";
-    case SPS_SUG: return "sug";
-    default: return "outra";
-  }
+  return "";
 }
 
 int spainel_n_continuar(void) { if (listaVelha()) reconstruir(); return nCont; }

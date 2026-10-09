@@ -44,8 +44,6 @@
 #include "gifcolecao.h"
 #include "badges.h"
 #include "selospacote.h"
-#include "svdesenho.h"
-#include "amigostitulo.h"
 #include "extras.h"
 #include "diretor.h"
 #include "descoberta.h"
@@ -78,8 +76,6 @@ int player_aberto(void);
 #include "trailerapple.h"
 #include "trailerfonte.h"
 #include "ponteiro.h"
-#include "amigosfil.h"
-#include "socialvis.h"
 
 #define MAX_ARTE   64
 // Era 32 para as 16 fileiras (CAT_FIL_MAX) do web neste runtime, mais o que a
@@ -157,10 +153,6 @@ typedef struct {
 
 static int fileiraItemIndice(const Fileira *f, int coluna) {
   if (!f || coluna < 0 || coluna >= f->n) return -1;
-  // A FILEIRA DE AMIGOS (amigosfil.h): as colunas sao ROSTOS, e nao itens do
-  // catalogo. O item dela e o cartao em foco (ou o titulo mais novo do rosto),
-  // que e o que o destaque e a memoria de posicao precisam.
-  if (f->tipo == FILEIRA_SOCIAL) return amigosfil_indice_cat(coluna);
   return f->usaItens ? f->itens[coluna] : f->ini + coluna;
 }
 
@@ -191,14 +183,8 @@ static int nFileiras = 3;
 static int retomarIndice = -1;
 static char retomarId[64];
 static unsigned retomarRev, retomarAplicada;
-static int pedidoSocial;
-static int pedidoPessoaSocial;
-static CatItem pessoaSocial;
-int home_pediu_pessoa_social(CatItem *saida) {
-  if (!pedidoPessoaSocial) return 0;
-  pedidoPessoaSocial=0; if(saida)*saida=pessoaSocial; return 1;
-}
-int home_pediu_social(void) { int v=pedidoSocial;pedidoSocial=0;return v; }
+int home_pediu_pessoa_social(CatItem *saida) { (void)saida; return 0; }
+int home_pediu_social(void) { return 0; }
 
 // Pedido de abrir o GUIA DE CANAIS: o "Ver tudo" de uma fileira de canal nao
 // leva a grade de cartazes — leva ao guia, e o OK num cartao de canal abre o
@@ -1781,13 +1767,6 @@ void home_evento(const SDL_Event *e) {
         foco.nColunas[foco.fileira]=s->n+1;
         return;
       }
-      // A FILEIRA DE AMIGOS decide o proprio OK: rosto = perfil, cartao =
-      // titulo, "+ Adicionar"/convite = tela de amigos ou o QR do celular.
-      if(fileiras[foco.fileira].tipo==FILEIRA_SOCIAL) {
-        amigosfil_ok(foco.coluna);
-        if(amigosfil_pediu_ajustes())pedidoSocial=1;
-        return;
-      }
       if (fileiras[foco.fileira].tipo == FILEIRA_CATALOGOS) {
         if (dur >= NV_HOLD_MS) abrirMenuCartaz();
         else if (foco.coluna >= 0 && foco.coluna < fileiras[foco.fileira].n) {
@@ -1901,19 +1880,6 @@ void home_evento(const SDL_Event *e) {
     }
     // Cima no destaque: nao ha para onde ir. A pagina sobe um pouco e volta.
     if (k == SDLK_UP) { anim_borda_bater(&bordaPag, -NV_BORDA_AMP); return; }
-  }
-  // A FILEIRA DE AMIGOS ANDA POR DENTRO antes da home: direita entra nos
-  // cartoes do rosto em foco, esquerda volta ao rosto (amigosfil.h).
-  if (foco.fileira >= 0 && foco.fileira < nFileiras &&
-      fileiras[foco.fileira].tipo == FILEIRA_SOCIAL) {
-    int c = foco.coluna;
-    if (amigosfil_tecla(k, &c)) {
-      if (c != foco.coluna) {
-        foco.coluna = c;
-        if (foco.fileira < FOCUS_MAX_FILEIRAS) foco.colunaLembrada[foco.fileira] = c;
-      }
-      return;
-    }
   }
   if (k == SDLK_RIGHT) {
     // O `&&` aqui era um curto-circuito com efeito colateral: escrito como
@@ -2167,8 +2133,7 @@ static void sincronizarFileiras(void) {
     // esvazia, tira. E o que renderModernHomeLayout faz quando
     // computeContinueWatchingRenderState devolve a fileira desligada.
     if (!strcmp(cf->chave, "continue_watching") && !ajustes_cw_ligado()) continue;
-    // "Recursos sociais" desligado: a fileira de amigos nao existe.
-    if (!strcmp(cf->chave, "social_activity") && !ajustes_social()) continue;
+    if (!strcmp(cf->chave, "social_activity")) continue;
     // A fileira pode ser republicada depois de uma montagem em que o destaque
     // usou índices compostos. Limpar a marca evita que uma linha comum herde
     // silenciosamente os índices daquela montagem anterior.
@@ -2209,7 +2174,6 @@ static void sincronizarFileiras(void) {
     snprintf(fileiras[destino].catId, sizeof fileiras[destino].catId, "%s", cf->catId);
     snprintf(fileiras[destino].catTipo, sizeof fileiras[destino].catTipo, "%s", cf->tipo);
     fileiras[destino].ini = cf->ini;
-    if(!strcmp(cf->chave,"social_activity"))fileiras[destino].tipo=FILEIRA_SOCIAL;
     // UM TITULO, UM LUGAR (cwretido.h): o que o cartao da ilha ou a faixa
     // "Retomar agora" segura nao entra aqui. So a lista desenhada muda; o
     // catalogo continua com o item. Passa pela janela INTEIRA (cf->n), nao so
@@ -2313,16 +2277,6 @@ static void sincronizarFileiras(void) {
     if(s->tipo==FILEIRA_TOP10 && s->base[0] && s->catId[0]) {
       s->stackN=s->n;s->n=1;s->verTudo=0;
     }
-  }
-  int socialExiste=0;
-  for(int i=0;i<destino;i++)if(fileiras[i].tipo==FILEIRA_SOCIAL)socialExiste=1;
-  if(!socialExiste && destino<MAX_FIL && ajustes_social()) {
-    int pos=destino>0?1:0;
-    memmove(fileiras+pos+1,fileiras+pos,(destino-pos)*sizeof *fileiras);
-    Fileira *s=&fileiras[pos];memset(s,0,sizeof *s);
-    s->tipo=FILEIRA_SOCIAL;s->ini=-1;s->n=1;
-    snprintf(s->titulo,sizeof s->titulo,"Amigos assistindo");
-    snprintf(s->chave,sizeof s->chave,"social_activity");destino++;
   }
   // Um retorno do player e contexto, nao catalogo: entra acima das fileiras e
   // desaparece quando nao existe sessao incompleta. Nao duplica dados nem faz
@@ -2601,33 +2555,6 @@ void home_ir_topo(void) {
 
 void home_atualizar(float dt, Uint32 agora) {
   sincronizarFileiras();
-  // A FILEIRA DE AMIGOS tem tantas colunas quantos rostos (+ "Adicionar"), e
-  // isso muda sem o catalogo mudar (um amigo novo chega do recomenda.c).
-  for (int r = 0; r < nFileiras; r++) {
-    if (fileiras[r].tipo != FILEIRA_SOCIAL) continue;
-    int focada = !focoHero && foco.fileira == r, c = foco.coluna;
-    amigosfil_atualizar(dt, focada, focada ? &c : NULL);
-    int nc = amigosfil_n_colunas();
-    // A FILEIRA DO CATALOGO QUE RESPONDEU VAZIA (estado 1) continua sem
-    // coluna quando nao ha amigo nenhum: o convite so mora no lugar reservado
-    // (ini < 0), e um cabecalho vazio nao recebe foco (tests/fimfileira).
-    if (amigosfil_convite() && fileiras[r].ini >= 0) {
-      for (int q = 0; q < cat_n_fileiras(); q++) {
-        const CatFileira *cf = cat_fileira(q);
-        if (cf && !strcmp(cf->chave, "social_activity")) { if (cf->n == 0) nc = 0; break; }
-      }
-    }
-    if (fileiras[r].n != nc || fileiras[r].verTudo) {
-      fileiras[r].n = nc; fileiras[r].verTudo = 0;
-      if (r < FOCUS_MAX_FILEIRAS) foco.nColunas[r] = nc;
-    }
-    if (focada) {
-      if (c >= nc) c = nc - 1;
-      if (c < 0) c = 0;
-      foco.coluna = c;
-      if (r < FOCUS_MAX_FILEIRAS) foco.colunaLembrada[r] = c;
-    }
-  }
   // Primeira batida da home viva: ancora o ocio do carrossel no "agora", nao
   // no zero do BSS (ver nota em heroUltTecla).
   if (!heroUltTecla) heroUltTecla = agora;
@@ -3248,9 +3175,7 @@ static float desenhaCopiaHero(const CatItem *ci, int principal, float x,
     minTop = base - (NV_PAD_BANNER_H - NV_PAD_TEXTO_BASE) + 24.0f;
   else if (lay == HOME_LAYOUT_DINAMICA)
     minTop = base - (NV_DIN_HERO_H - NV_DIN_TEXTO_BASE) + 54.0f;
-  AmigosTitulo amigos;
-  int temAmigos = ci && ci->imdb[0] && amigostitulo_obter(ci->imdb, &amigos);
-  float friendsH = temAmigos ? NV_AMIGOS_HERO_H : 0.0f;
+  float friendsH = 0.0f;
   HeroCopyLayout copy = heroCopyLayout(base, hSin, metaLinha[0] != 0, temSec,
                                       captionH, logoH, btnH, btnGap, minTop, slot, friendsH);
   logoH = copy.logoHeight;
@@ -3312,18 +3237,6 @@ static float desenhaCopiaHero(const CatItem *ci, int principal, float x,
   if (caption && aCopy > 0.004f)
     txt_bloco_corta(TXT_HERO_META, ci->titulo, 255, 255, 255, x, copy.caption,
                     sinW, NV_LD_HERO_META, aCopy, 1);
-
-  if (temAmigos && aCopy > 0.004f) {
-    static const float ANEL[3] = { 0.04f, 0.045f, 0.055f };
-    char linha[200];
-    float d = NV_AMIGOS_HERO_H, lx;
-    lx = x + svd_amigos_pilha(x, copy.friends, d, &amigos, amigos.n < 3 ? amigos.n : 3, 1, ANEL, aCopy) + 14.0f;
-    amigostitulo_linha_destaque(&amigos, linha, sizeof linha);
-    if (linha[0]) {
-      TxtLinha lf = txt_linha_corta(TXT_HERO_META, linha, 214, 217, 224, 255, sinW - (lx - x));
-      txt_desenhar_alpha(lf, lx, copy.friends + (d - lf.h) * 0.5f, aCopy);
-    }
-  }
 
   if (metaLinha[0] && aCopy > 0.004f) {
     float badgeW=ci?badges_desenhar(badges_provedor(ci->provNome),x,yMeta,150,24,aCopy):0;
@@ -3391,9 +3304,7 @@ static void desenhaHero(Uint32 agora, float saida) {
   // autoria, ficha) desenhada para a arte inteira; na faixa a arte parava no
   // meio e sobrava o fundo social dos lados (dono, 05/10).
   int cheio = ajustes_hero_cheio() ||
-              (lay == HOME_LAYOUT_MODERNA &&
-               (focoHero || (foco.fileira >= 0 && foco.fileira < nFileiras &&
-                             fileiras[foco.fileira].tipo == FILEIRA_SOCIAL)));
+              (lay == HOME_LAYOUT_MODERNA && focoHero);
   // Em tela cheia o bloco sobe 70px (ver layout.h).
   GfxModo modoHero = cheio ? GFX_HERO_CHEIO : GFX_HERO;
   GfxRect r = cheio ? (GfxRect){ 0, 0, NV_TELA_W, NV_HERO_CHEIO_H }
@@ -3437,70 +3348,6 @@ static void desenhaHero(Uint32 agora, float saida) {
     logoH = NV_DIN_LOGO_H; sinW = 760.0f;
     btnH = NV_HERO_BOTAO_COMPACTO_H; btnGap = 22.0f;
   }
-
-  if(lay==HOME_LAYOUT_MODERNA && foco.fileira>=0 && foco.fileira<nFileiras && fileiras[foco.fileira].tipo==FILEIRA_SOCIAL) {
-    float x=ajustes_conteudo_x(),a=1-saida;
-    const Fileira *s=&fileiras[foco.fileira];
-    const CatItem *p=(fileiraItemIndice(s, foco.coluna) >= 0)
-                    ?cat_item_exato(fileiraItemIndice(s, foco.coluna)):NULL;
-    const char *arte=p?arte_hero_do_item(p):NULL;   // tela cheia: arte grande
-    GLuint ta=arte?tex_obter_hero(arte):0;
-    // O fundo social so onde a arte NAO cobre. Com a arte do titulo opaca por
-    // cima (tela cheia), ele era uma tela inteira pintada e escondida: a C9
-    // parada na fileira "Entre amigos" ficava a 34 fps (29/09).
-    // (Compor fundo e arte numa passada so, gfx_hero_camadas, foi MEDIDO na
-    // C9 em 30/09 e saiu PIOR: 30 fps contra 38-45 deste caminho.)
-    if (!ta || aArte < 0.999f || r.w < NV_TELA_W || r.h < NV_TELA_H ||
-        nv_ambiente_forca > 0.001f)   // imersivo: o hero deixa o fundo vazar (uVaza)
-      gfx_rect((GfxRect){0,0,NV_TELA_W,NV_TELA_H},0,GFX_SOCIAL,0,0,0,0,1,1,1,1);
-    if(p) {
-      if(arte)corviva_definir(arte,CORVIVA_HOME);
-      // A atividade continua com um ambiente discreto, mas quando o Trakt
-      // trouxe arte real ela vira o assunto do hero. A pessoa fica apenas na
-      // ficha social, onde o avatar tem contexto e não compete com o titulo.
-      if(ta){gfx_tex_aspect_atual=tex_aspecto(arte);
-        gfx_rect(r,ta,modoHero,0,0,0,0,0,0,0,aArte);gfx_tex_aspect_atual=0;}
-      else if (!arte) desenhaArteAusente(r, 0.0f, p, aArte);
-
-      const char *nome=p->socialNome[0]&&strcmp(p->socialNome,"Amigo")?p->socialNome:NULL;
-      char autoria[240];
-      // A ACAO VEM EM PORTUGUES DO trakt.c ("assistiu", "assistindo agora") e
-      // e montada aqui numa frase so: sem i18n() na peca, o txt_linha traduzia
-      // a frase inteira — que nao e chave — e o "Pedro · assistiu" saia em
-      // portugues numa home em ingles (C9, 22/09). Mesmo defeito que social.c
-      // ja tinha corrigido no cartao.
-      const char *acaoTr=p->socialAcao[0]?i18n(p->socialAcao):"";
-      if(nome&&acaoTr[0])snprintf(autoria,sizeof autoria,"%s  ·  %s",nome,acaoTr);
-      else if(nome)snprintf(autoria,sizeof autoria,"%s",nome);
-      else snprintf(autoria,sizeof autoria,"%s",acaoTr);
-      txt_desenhar_alpha(txt_linha_corta(TXT_HERO_META,autoria,210,210,221,255,680),x,146,a);
-
-      const char *urlPl=p->logo[0]?artehero_url_logo_larg(p->logo,520):NULL;
-      GLuint tl=urlPl?tex_obter_larg(urlPl,520):0;
-      if(tl&&tex_aspecto(urlPl)>0){
-        float ap=tex_aspecto(urlPl),w=520,h=w/ap;
-        if(h>104){h=104;w=h*ap;}
-        gfx_rect((GfxRect){x,208,w,h},tl,tex_marca_escura(urlPl)?GFX_MARCA:GFX_TEXTO,
-                 0,0,0,0,1,1,1,a);
-      } else if(p->titulo[0]) {
-        txt_desenhar_alpha(txt_linha_corta(TXT_TITULO1,p->titulo,244,243,247,255,680),x,208,a);
-      }
-      if(p->direcao[0])
-        txt_desenhar_alpha(txt_linha_corta(TXT_CALLOUT,p->direcao,230,231,238,255,680),x,326,a);
-      if(p->meta[0])
-        txt_desenhar_alpha(txt_linha_corta(TXT_HERO_META,p->meta,190,194,205,255,680),x,364,a);
-      if(p->sinopse[0])
-        txt_bloco(TXT_HERO_SIN,p->sinopse,229,231,237,x,402,700,31,a,2);
-    } else {
-      // Sem a marca do Trakt: a fonte nao aparece na home (amigosfil.h).
-      txt_desenhar_alpha(txt_linha(TXT_HERO_META,"SUA COMUNIDADE",210,191,199,255),x,154,a);
-      txt_desenhar_alpha(txt_linha(TXT_TITULO1,"Boas histórias conectam.",244,243,247,255),x,226,a);
-      txt_bloco(TXT_HERO_SIN,"Descubra o que seus amigos estão vendo.\nUma nova recomendação pode começar aqui.",187,190,202,x,330,740,36,a,2);
-    }
-    heroArteRect=r;
-    return;
-  }
-
   // COLECAO EM FOCO: o destaque vira o banner da pasta. Moderna e Padrao; a
   // Dinamica nao tem destaque parado no topo e mostra o mesmo banner por tras
   // do cabecalho da fileira (dinArteColecao).
@@ -4282,11 +4129,10 @@ void home_trailer_passo(int topo, float dt, Uint32 agora) {
            heroDesejado < 0 && heroAtual >= 0 && heroEntra >= 0.999f && heroSai <= 0.001f &&
            heroDesliza >= 1.0f &&   // o trailer abre com a arte ja parada
            !(!focoHero && foco.fileira >= 0 && foco.fileira < nFileiras &&
-             (fileiras[foco.fileira].tipo == FILEIRA_CATALOGOS ||
-              fileiras[foco.fileira].tipo == FILEIRA_SOCIAL));
+             fileiras[foco.fileira].tipo == FILEIRA_CATALOGOS);
   if (motivo == HERO_GATE_READY && !pronto) {
     if (!focoHero && foco.fileira >= 0 && foco.fileira < nFileiras &&
-        (fileiras[foco.fileira].tipo == FILEIRA_CATALOGOS || fileiras[foco.fileira].tipo == FILEIRA_SOCIAL))
+        fileiras[foco.fileira].tipo == FILEIRA_CATALOGOS)
       motivo = HERO_GATE_NONCONTENT;
     else motivo = HERO_GATE_TRANSITION;
   }
@@ -4969,21 +4815,7 @@ static float desenhaSeloVisto(float px, float py, float w) {
     return mx; }
 }
 
-// CHIP DE AMIGOS no canto de cima A ESQUERDA do cartaz (amigostitulo.h): ate 2
-// rostos + "+N". Fica longe do titulo (embaixo) e do selo "Assistido" (a
-// direita): `limiteX` e a borda esquerda desse selo, e o chip encolhe para nao
-// passar dela.
-static void desenhaChipAmigos(const CatItem *ci, float px, float py, float w, float limiteX, float a) {
-  AmigosTitulo at;
-  float h = w * 0.17f, m = w * 0.045f;
-  if (!ci || !ci->imdb[0] || w < 110.0f) return;
-  if (!amigostitulo_obter(ci->imdb, &at)) return;
-  if (h < 28.0f) h = 28.0f;
-  if (h > 38.0f) h = 38.0f;
-  if (m < 8.0f) m = 8.0f;
-  if (m > 14.0f) m = 14.0f;
-  svd_amigos_chip(px + m, py + m, h, limiteX - 6.0f - (px + m), &at, a);
-}
+
 
 static void pintarCartao(const CartaoFoco *k, float raio) {
   const int r = k->r, c = k->c; const TipoFileira tipo = k->tipo; const CatItem *cItem = k->cItem;
@@ -5049,8 +4881,6 @@ static void pintarCartao(const CartaoFoco *k, float raio) {
               ajustes_selo_visto() && cat_visto(cItem)) {
             limiteSelo = desenhaSeloVisto(px, py, w);
           }
-          if (cItem && tipo != FILEIRA_CONTINUE && tipo != FILEIRA_RETORNO)
-            desenhaChipAmigos(cItem, px, py, w, limiteSelo, aArte);
 
           // `cardDepthEnabled` mais o interruptor por secao: `cardDepthPosters`
           // nas fileiras de catalogo, `cardDepthContinueWatching` na primeira.
@@ -5153,7 +4983,6 @@ int home_cartao_foco_por_cima(int indice) {
 }
 
 void home_desenhar(Uint32 agora) {
-  amigostitulo_atualizar();   // barato: so remonta quando o feed social mudou
   // O REBORDO DO CARTAZ EM FOCO e ajuste da pessoa, e ele mora no shader do
   // GFX_CARD (nao e um retangulo desenhado por cima): por isso vai por uma
   // variavel de modulo, uma vez por quadro, e nao em cada chamada.
@@ -5308,7 +5137,7 @@ void home_desenhar(Uint32 agora) {
         TxtLinha ai=txt_linha(TXT_HERO_META,"AI-powered",183,192,219,255);
         txt_desenhar(ai,ajustes_conteudo_x()+tl.w+22,y+(tl.h-ai.h)*.5f);
       }
-      if (foco.fileira == r && !focoHero && tipo != FILEIRA_SOCIAL) {
+      if (foco.fileira == r && !focoHero) {
         char pos[32];
         if (foco.coluna < fileiras[r].n)
           snprintf(pos, sizeof pos, "%d / %d", foco.coluna + 1, fileiras[r].n);
@@ -5325,13 +5154,6 @@ void home_desenhar(Uint32 agora) {
         gfx_cor((GfxRect){ px - 16.0f, py - 6.0f, lp.w + 32.0f, lp.h + 12.0f }, 0.5f,
                 0.04f, 0.045f, 0.055f, 0.62f);
         txt_desenhar(lp, px, py);
-      }
-      if (tipo == FILEIRA_SOCIAL) {
-        amigosfil_desenhar(ajustes_conteudo_x() + bordaX(r), cardY, alturaFil(r), corte,
-                           foco.fileira == r && !focoHero, foco.coluna, agora);
-        if (foco.fileira == r && !focoHero) temItemFoco = 0;
-        y += NV_LEGACY_ROW_HEAD_H + alturaTotalFil(r) + fileiraGap();
-        continue;
       }
       if (tipo == FILEIRA_CATALOGOS) {
         desenhaAtalhos(r, cardY);
@@ -5453,82 +5275,12 @@ void home_desenhar(Uint32 agora) {
             if(foco.fileira==r)temItemFoco=0;
             continue;
           }
-          if(tipo==FILEIRA_SOCIAL && fileiras[r].ini<0) {
-            // ESTADO VAZIO NA COR DE REALCE (nao num roxo fixo) e com a tinta que
-            // contrasta com ela; sem repetir "Entre amigos", que ja e o titulo da
-            // fileira logo acima (revisao da home, 29/09/2026).
-            GfxRect b={px,py,w,h};
-            float ar,ag,ab; ajustes_acento(&ar,&ag,&ab);
-            int t1=ajustes_tinta_foco(), t2=ajustes_tinta_foco2();
-            gfx_cor(b,.055f,ar,ag,ab,1);
-            if(f>.01f)gfx_rect(b,0,GFX_ANEL,0,.008f,0,.055f,t1/255.0f,t1/255.0f,t1/255.0f,f);
-            txt_desenhar(txt_linha_corta(TXT_CALLOUT,"Nenhuma atividade disponível agora.",t1,t1,t1,255,w-48),px+24,py+24);
-            txt_bloco(TXT_CAPTION,i18n("Siga pessoas no Trakt ou adicione amigos do Nuvio."),t2,t2,t2,px+24,py+91,w-48,30.0f,1.0f,2);
-            txt_desenhar(txt_linha_corta(TXT_CAPTION,"OK · Conferir conexão",t1,t1,t1,255,w-48),px+24,py+h-50);
-            if(foco.fileira==r)temItemFoco=0;
-            continue;
-          }
           const CatItem *cItem = cat_item_exato(idxCat);
-          // LOGO DO CARD ABERTO JA NO FOCO. So era pedido quando o card abria
-          // (abre > 0), depois do atraso de expansao: o download so comecava
-          // ali, e o logo aparecia atras do card. Pedir agora, na largura do card
-          // ABERTO (a mesma do desenho abaixo), usa esse atraso para baixar e
-          // decodificar, e nao promove depois por largura diferente.
           if (cItem && cItem->logo[0] && abre <= 0.01f && r == expFileira &&
               c == expColuna && ajustes_expandir_poster() && podeExpandir(r)) {
             float wFim = artH * (1.0f + escalaDe(tipo)) * NV_EXP_ASPECTO;
             const char *uP = artehero_logo_sessao_larg(cItem, wFim * 0.65f);
             if (uP) (void)tex_obter_logo_larg(uP, wFim * 0.65f);
-          }
-          if(tipo==FILEIRA_SOCIAL && cItem) {
-            if(foco.fileira==r)temItemFoco=0;
-            // A atividade social precisa de contexto, nao de um segundo hero.
-            // Sem painel e sem contorno: o palco neutro da home faz o trabalho
-            // de fundo. A imagem tem um papel editorial menor, thumbnail da
-            // obra, enquanto autoria e acao respiram diretamente na tela.
-            const float conteudoTopo=py+24.0f;
-            const float conteudoBase=py+h-24.0f;
-            const float arteW=134.0f;
-            const float arteX=px+w-24.0f-arteW;
-            const char *thumbPath=cItem->poster[0]?cItem->poster:
-                                  (cItem->backdrop[0]?cItem->backdrop:NULL);
-            if(thumbPath){GLuint thumb=tex_obter_larg(thumbPath,arteW);
-              if(thumb){GfxRect tr={arteX,conteudoTopo,arteW,conteudoBase-conteudoTopo};
-                gfx_tex_aspect_atual=tex_aspecto(thumbPath);
-                gfx_rect(tr,thumb,GFX_CARD,0,0,0,.055f,0,0,0,1);gfx_tex_aspect_atual=0;
-              }
-            }
-            // Avatar maior e centralizado na mesma faixa vertical da arte.
-            // O eixo comum deixa a composicao com cara de ficha editorial,
-            // em vez de avatar solto no topo e thumbnail separado embaixo.
-            float d=120.0f, ax=px+24.0f, ay=py+(h-d)*.5f;
-            GfxRect avatar={ax,ay,d,d};
-            GLuint foto=cItem->socialAvatar[0]?tex_obter_larg(cItem->socialAvatar,220):0;
-            // O foco e um disco atras da imagem, nunca um stroke por cima.
-            // Assim as duas circunferencias compartilham o mesmo centro e o
-            // aro permanece uniforme inclusive no limite superior da fileira.
-            float pad=5.0f*f;
-            if(f>.01f)gfx_rect(avatar,0,GFX_DISCO,0,0,0,0,.96f,.96f,.98f,f);
-            GfxRect miolo={ax+pad,ay+pad,d-pad*2,d-pad*2};
-            gfx_rect(miolo,0,GFX_DISCO,0,0,0,0,.15f,.16f,.18f,1);
-            if(foto){gfx_tex_aspect_atual=tex_aspecto(cItem->socialAvatar);
-              gfx_rect(miolo,foto,GFX_AVATAR,0,0,0,0,1,1,1,1);gfx_tex_aspect_atual=0;}
-            else {char inicial[8]="?";const char *nome=cItem->socialNome[0]?cItem->socialNome:cItem->pais;
-              if(nome[0]){size_t z=1;while(z<4 && (nome[z]&0xc0)==0x80)z++;memcpy(inicial,nome,z);inicial[z]=0;}
-              TxtLinha l=txt_linha(TXT_TITULO2,inicial,235,236,240,255);txt_desenhar(l,ax+(d-l.w)*.5f,ay+(d-l.h)*.5f);}
-            float tx=ax+d+24.0f,tw=thumbPath?arteX-tx-24.0f:w-192.0f;
-            TxtLinha nome=txt_linha_corta(TXT_CW_TITULO,cItem->socialNome[0]?cItem->socialNome:cItem->pais,245,245,247,255,tw);
-            txt_desenhar(nome,tx,conteudoTopo);
-            TxtLinha acao=txt_linha_corta(TXT_MINI,cItem->socialAcao[0]?i18n(cItem->socialAcao):cItem->provNome,181,185,196,255,tw);
-            txt_desenhar(acao,tx,conteudoTopo+38.0f);
-            TxtLinha titulo=txt_linha_corta(TXT_CW_META,cItem->titulo,228,231,239,255,tw);
-            txt_desenhar(titulo,tx,conteudoTopo+92.0f);
-            TxtLinha ep=txt_linha_corta(TXT_MINI,(cItem->temporada||!strcmp(cItem->tipo,"series"))?cItem->direcao:i18n("Filme"),181,185,196,255,tw);
-            txt_desenhar(ep,tx,conteudoTopo+130.0f);
-            TxtLinha fonte=txt_linha_corta(TXT_MINI,cItem->provNome[0]?cItem->provNome:"Trakt",155,161,174,255,tw);
-            txt_desenhar(fonte,tx,conteudoBase-14.0f);
-            if(f>.1f){TxtLinha ver=txt_linha(TXT_MINI,"Ver perfil",235,237,244,255);txt_desenhar_alpha(ver,tx,conteudoBase-40.0f,f);}
-            continue;
           }
           const char *caminho = NULL;
           // Card DEITADO pede arte deitada. No web o poster do card landscape sai
@@ -5599,7 +5351,7 @@ void home_desenhar(Uint32 agora) {
           // pintar uma fileira inteira so para marcar atrasaria o numero que
           // o marcador existe para medir. Hero/social/top10 nao contam: nao
           // representam a fileira comum da home.
-          if (tPrimeiraFileiraPintada < 0 && tipo != FILEIRA_SOCIAL &&
+          if (tPrimeiraFileiraPintada < 0 &&
               tipo != FILEIRA_TOP10 && !focoHero) {
             tPrimeiraFileiraPintada = (int)agora;
             marco("primeira fileira pintada");

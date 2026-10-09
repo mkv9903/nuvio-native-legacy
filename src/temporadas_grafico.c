@@ -3,7 +3,6 @@
 #include "catalogo.h"
 #include "vistoep.h"
 #include "extras.h"
-#include "svdesenho.h"
 #include "notasui.h"
 #include "plrui.h"
 #include "gfx.h"
@@ -51,8 +50,8 @@ int tgraf_coluna(const TgDados *d, int numero) {
 }
 
 int tgraf_montar(TgDados *d, const TgEp *eps, int n, int sabe, int agT, int agE,
-                 int especiais, const AmigosTitulo *amg) {
-  int i, j;
+                 int especiais) {
+  int i;
   char imdb[sizeof d->imdb];
   memcpy(imdb, d->imdb, sizeof imdb);
   memset(d, 0, sizeof *d);
@@ -95,72 +94,23 @@ int tgraf_montar(TgDados *d, const TgEp *eps, int n, int sabe, int agT, int agE,
     d->total += t->total; d->exibidos += t->exibidos; d->vistos += t->vistos;
     d->completas += t->completa;
   }
-  if (!amg) return d->n;
-  d->totalAmg = amg->total;
-  for (i = 0; i < amg->n && d->nAmg < AMT_MAX; i++) {
-    const AmigoTit *a = &amg->a[i];
-    TgAmigo *g;
-    // Sem posicao (filme, ou so reagiu) nao entra: o grafico e de onde cada
-    // um esta. Especial so com especiais no grafico.
-    if (a->temporada < 0 || a->episodio <= 0) continue;
-    if (a->temporada == 0 && !especiais) continue;
-    g = &d->amg[d->nAmg++];
-    memset(g, 0, sizeof *g);
-    snprintf(g->id, sizeof g->id, "%s", a->id);
-    snprintf(g->nome, sizeof g->nome, "%s", a->nome);
-    snprintf(g->avatar, sizeof g->avatar, "%s", a->avatar);
-    g->temporada = a->temporada; g->episodio = a->episodio;
-    g->reacao = a->reacao; g->nota = a->nota; g->agora = a->agora;
-    // A FRENTE so quando sabemos onde VOCE esta: sem mapa nao ha "sua frente".
-    g->frente = sabe && depois(a->temporada, a->episodio, d->meuT, d->meuE);
-    g->col = tgraf_coluna(d, a->temporada);
-  }
-  // Ordem: os da frente primeiro; dentro de cada grupo, o mais adiantado antes.
-  // Insercao estavel (AMT_MAX e 8): empate fica na ordem de amigostitulo.
-  for (i = 1; i < d->nAmg; i++) {
-    TgAmigo x = d->amg[i];
-    for (j = i; j > 0; j--) {
-      const TgAmigo *p = &d->amg[j - 1];
-      int antes = x.frente > p->frente ||
-                  (x.frente == p->frente && depois(x.temporada, x.episodio, p->temporada, p->episodio));
-      if (!antes) break;
-      d->amg[j] = d->amg[j - 1];
-    }
-    d->amg[j] = x;
-  }
-  for (i = 0; i < d->nAmg; i++) { if (d->amg[i].frente) d->nFrente++; else d->nAtras++; }
   return d->n;
 }
 
 int tgraf_existe(const TgDados *d) {
-  return d && d->n > 0 && ((d->sabe && d->vistos > 0) || d->nAmg > 0);
+  return d && d->n > 0 && d->sabe && d->vistos > 0;
 }
 
 void tgraf_frase_amigos(const TgDados *d, char *dst, size_t tam) {
-  char n1[64], n2[64];
-  dst[0] = 0;
-  if (!d || d->nAmg <= 0) return;
-  if (d->nFrente > 0) {
-    amigostitulo_primeiro_nome(d->amg[0].nome, n1, sizeof n1);
-    if (d->nFrente == 1) snprintf(dst, tam, i18n("%s está na sua frente"), n1);
-    else if (d->nFrente == 2) {
-      amigostitulo_primeiro_nome(d->amg[1].nome, n2, sizeof n2);
-      snprintf(dst, tam, i18n("%s e %s estão na sua frente"), n1, n2);
-    } else snprintf(dst, tam, i18n("%s e mais %d estão na sua frente"), n1, d->nFrente - 1);
-    return;
-  }
-  // Ninguem na frente: com mapa, voce lidera; sem mapa, so onde eles estao.
-  if (!d->sabe) { snprintf(dst, tam, "%s", i18n("Onde seus amigos estão")); return; }
-  amigostitulo_primeiro_nome(d->amg[0].nome, n1, sizeof n1);
-  if (d->nAtras == 1) snprintf(dst, tam, i18n("Você está na frente de %s"), n1);
-  else snprintf(dst, tam, i18n("Você está na frente de %d amigos"), d->nAtras);
+  (void)d;
+  if (dst && tam) dst[0] = 0;
 }
 
 // --- DADOS DA PAGINA (com revisao) ------------------------------------------
 
 static TgDados dados;
 static int     dIdx = -1;
-static unsigned dCat, dVisto, dAmg;
+static unsigned dCat, dVisto;
 static int     dAgT, dAgE, dNEps, dValido;
 static TgEp    epsBuf[1024];
 
@@ -168,8 +118,6 @@ const TgDados *tgraf_dados(int idx) {
   const CatItem *ci = cat_item(idx);
   int agT = extras_agenda_temporada(), agE = extras_agenda_episodio();
   int n = cat_n_episodios(idx), i, k = 0, sabe;
-  AmigosTitulo at;
-  int temAmg;
   if (!ci || !ci->imdb[0] || n < 1) {
     memset(&dados, 0, sizeof dados);
     dValido = 0;
@@ -177,7 +125,7 @@ const TgDados *tgraf_dados(int idx) {
   }
   if (dValido && idx == dIdx && !strncmp(dados.imdb, ci->imdb, sizeof dados.imdb - 1) &&
       dCat == cat_revisao() && dVisto == vistoep_revisao() &&
-      dAmg == amigostitulo_revisao() && dAgT == agT && dAgE == agE && dNEps == n)
+      dAgT == agT && dAgE == agE && dNEps == n)
     return &dados;
   sabe = vistoep_conhecido(ci->imdb);
   for (i = 0; i < n && k < (int)(sizeof epsBuf / sizeof epsBuf[0]); i++) {
@@ -188,12 +136,11 @@ const TgDados *tgraf_dados(int idx) {
     epsBuf[k].visto = (signed char)(sabe ? vistoep_estado(ci->imdb, e->temporada, e->episodio) : -1);
     k++;
   }
-  temAmg = amigostitulo_obter(ci->imdb, &at);
   snprintf(dados.imdb, sizeof dados.imdb, "%s", ci->imdb);
   { char *dp = strchr(dados.imdb, ':'); if (dp) *dp = 0; }
-  tgraf_montar(&dados, epsBuf, k, sabe, agT, agE, 0, temAmg ? &at : NULL);
+  tgraf_montar(&dados, epsBuf, k, sabe, agT, agE, 0);
   dIdx = idx; dCat = cat_revisao(); dVisto = vistoep_revisao();
-  dAmg = amigostitulo_revisao(); dAgT = agT; dAgE = agE; dNEps = n; dValido = 1;
+  dAgT = agT; dAgE = agE; dNEps = n; dValido = 1;
   return &dados;
 }
 
@@ -361,53 +308,10 @@ static void desenhaGrafico(const TgDados *d, GfxRect card, int foco, int selNume
   }
 }
 
-// OS AMIGOS FICAM FORA DO GRAFICO (dono, 06/10: "so as barras; pessoas/social
-// algo separado, menos poluido"): um cartao calmo ao lado, sem aro nem rosto
-// apagado — ate tres linhas (rosto, nome, "Na sua frente"/"Atrás de você" e a
-// posicao T5E3) e "+N".
-static void desenhaAmigos(const TgDados *d, GfxRect card, float a, Uint32 agora) {
-  char frase[160];
-  float x = card.x + TG_PAD, w = card.w - 2.0f * TG_PAD, y = card.y + 28.0f;
-  TxtLinha lf;
-  int i, mostra = d->nAmg < 3 ? d->nAmg : 3;
-  tgraf_frase_amigos(d, frase, sizeof frase);
-  lf = txt_linha_corta(TXT_ILHA_NOME, frase, 243, 242, 239, 255, w);
-  txt_desenhar_alpha(lf, x, y, a);
-  y += (float)lf.h + 18.0f;
-  for (i = 0; i < mostra; i++) {
-    const TgAmigo *g = &d->amg[i];
-    char ep[24];
-    const char *st = !d->sabe ? "" : g->frente ? i18n("Na sua frente") : i18n("Atrás de você");
-    TxtLinha ln, le, ls;
-    float tx = x + TG_LIN_AV + 16.0f;
-    GfxRect av = { x, y + (TG_LIN_H - TG_LIN_AV) * 0.5f, TG_LIN_AV, TG_LIN_AV };
-    svd_avatar(av, g->avatar, g->nome, g->id, a);
-    if (g->agora) svd_ponto_vivo(av.x + av.w - 8.0f, av.y + av.h - 8.0f, 14.0f, 3.0f, a, agora);
-    snprintf(ep, sizeof ep, i18n("T%dE%d"), g->temporada, g->episodio);
-    le = txt_linha(TXT_G20B, ep, 243, 242, 239, 255);
-    ln = txt_linha_corta(TXT_ILHA_NOME, g->nome, 243, 242, 239, 255, w - TG_LIN_AV - 16.0f - (float)le.w - 20.0f);
-    ls = txt_linha_corta(TXT_ILHA_HORA, st, 243, 242, 239, 255, w - TG_LIN_AV - 16.0f);
-    { float bloco = (float)ln.h + (st[0] ? 2.0f + (float)ls.h : 0.0f);
-      float ty = y + (TG_LIN_H - bloco) * 0.5f;
-      txt_desenhar_alpha(ln, tx, ty, a);
-      if (st[0]) txt_desenhar_alpha(ls, tx, ty + (float)ln.h + 2.0f, a * 0.55f); }
-    txt_desenhar_alpha(le, x + w - (float)le.w, y + (TG_LIN_H - (float)le.h) * 0.5f, a * 0.8f);
-    y += TG_LIN_H;
-  }
-  if (d->nAmg > mostra) {
-    char b[16];
-    TxtLinha lb;
-    snprintf(b, sizeof b, "+%d", d->nAmg - mostra);
-    lb = txt_linha(TXT_ILHA_SUB, b, 243, 242, 239, 255);
-    txt_desenhar_alpha(lb, x + TG_LIN_AV + 16.0f, y + 6.0f, a * 0.55f);
-  }
-}
-
 void tgraf_desenhar(const TgDados *d, float x, float y, float w, int foco,
                     int selNumero, float a, Uint32 agora) {
   float alt = tgraf_altura();
-  GfxRect cg, ca;
-  int temAmg;
+  GfxRect cg;
   if (!tgraf_existe(d) || a <= 0.001f) return;
   if (y >= NV_TELA_H || y + alt <= 0.0f) return;
   // A animacao comeca quando o bloco aparece pela primeira vez nesta serie.
@@ -417,14 +321,8 @@ void tgraf_desenhar(const TgDados *d, float x, float y, float w, int foco,
   }
   { TxtLinha lt = txt_linha(TXT_HEADLINE, i18n("Seu progresso"), 245, 248, 255, 255);
     txt_desenhar_alpha(lt, x, y, a); }
-  temAmg = d->nAmg > 0;
-  cg = (GfxRect){ x, y + TG_CAB, temAmg ? w - TG_AMG_W - TG_GAP : w, TG_CARD_H };
+  cg = (GfxRect){ x, y + TG_CAB, w, TG_CARD_H };
   notasui_painel(cg, TG_RAIO, a);
   colunaNumeros(d, cg.x + TG_PAD, cg.y + 30.0f, TG_STAT_W - 8.0f, foco, a);
   desenhaGrafico(d, cg, foco, selNumero, a, agora);
-  if (temAmg) {
-    ca = (GfxRect){ x + w - TG_AMG_W, y + TG_CAB, TG_AMG_W, TG_CARD_H };
-    notasui_painel(ca, TG_RAIO, a);
-    desenhaAmigos(d, ca, a, agora);
-  }
 }

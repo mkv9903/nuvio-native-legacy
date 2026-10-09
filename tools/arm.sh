@@ -33,7 +33,13 @@ cd "$(dirname "$0")/.."
 TV_IP="${NUVIO_TV_IP:-192.168.1.32}"
 TV_PASS="${NUVIO_TV_PASS:-alpine}"
 APP_ID="space.nuvio.native.legacy"
-ARES="${NUVIO_ARES_PACKAGE:-../NuvioWeb-0.3.38-beta/node_modules/.bin/ares-package}"
+if [ -n "${NUVIO_ARES_PACKAGE:-}" ]; then
+  ARES="$NUVIO_ARES_PACKAGE"
+elif [ -x "../NuvioWeb-0.3.38-beta/node_modules/.bin/ares-package" ]; then
+  ARES="../NuvioWeb-0.3.38-beta/node_modules/.bin/ares-package"
+else
+  ARES="$(command -v ares-package || echo ares-package)"
+fi
 CONTAINER_RUNTIME="${NUVIO_CONTAINER_RUNTIME:-docker}"
 BUILD_PLATFORM="${NUVIO_BUILD_PLATFORM:-linux/arm64}"
 SDK_IMAGE="${NUVIO_SDK_IMAGE:-nuvio-webos-sdk}"
@@ -77,15 +83,9 @@ trap cleanup EXIT
 ENVF=$(mktemp "${TMPDIR:-/tmp}/nuvio-arm-env.XXXXXXXX"); CLEANUP_FILES="$CLEANUP_FILES $ENVF"
 tools/env.sh --env-file "$ENVF"
 
-# Embedded P2P engine (src/p2pmotor.h):
-. tools/p2p-motor/pasta.sh
-nv_p2p_resolver arm
-P2P_VOL=""
-[ -n "$NV_P2P_DIR" ] && P2P_VOL="-v $NV_P2P_DIR:/p2p"
 DTS_ENV=()
 if [ -n "${NUVIO_DTS_ROOT:-}" ]; then DTS_ENV=(-e "NUVIO_DTS_ROOT=$NUVIO_DTS_ROOT"); fi
 "$CONTAINER_RUNTIME" run --rm --platform "$BUILD_PLATFORM" --env-file "$ENVF" \
-  -e NUVIO_P2P_MOTOR="${NV_P2P_DIR:+1}" $P2P_VOL \
   -e NUVIO_EXTRA_CFLAGS="${NUVIO_EXTRA_CFLAGS:-}" \
   -e NUVIO_ASS_LIBASS="${NUVIO_ASS_LIBASS:-1}" \
   -e NUVIO_DTS_FFMPEG="$DTS_ENABLED" \
@@ -109,16 +109,7 @@ if [ -n "${NUVIO_DTS_ROOT:-}" ]; then DTS_ENV=(-e "NUVIO_DTS_ROOT=$NUVIO_DTS_ROO
     DTS_CFLAGS="-DNV_DTS_FFMPEG -I$DTS/include"
     DTS_LIBS="-L$DTS/lib -Wl,--start-group -lavformat -lavcodec -lswresample -lavutil -Wl,--end-group -lpthread -lm"
   fi
-  P2P_CFLAGS=""
-  P2P_LIBS=""
-  if [ "${NUVIO_P2P_MOTOR:-}" = "1" ]; then
-    P2P_CFLAGS="-DNV_P2P_MOTOR -I/p2p/nuvio-engine/include"
-    P2P_LIBS="/p2p/build-arm/libnuvio_engine.a /p2p/build-arm/_deps/nuvio_libtorrent-build/libtorrent-rasterbar.a $SR/usr/lib/libssl.a $SR/usr/lib/libcrypto.a -static-libgcc -Wl,-Bstatic -lstdc++ -latomic -Wl,-Bdynamic -lrt -Wl,--gc-sections"
-  fi
-  # #297: p2pmotor.c built in separate object with -D_FILE_OFFSET_BITS=64 for 32-bit ARM webOS.
-  arm-webos-linux-gnueabi-gcc -c src/p2pmotor.c -o /tmp/p2pmotor.o -O2 -DNV_WEBOS -D_FILE_OFFSET_BITS=64 $NUVIO_EXTRA_CFLAGS $P2P_CFLAGS \
-    -I$SR/usr/include -I$SR/usr/include/SDL2
-  arm-webos-linux-gnueabi-gcc $(ls src/*.c | grep -v "^src/p2pmotor\.c$") src/dts/*.c /tmp/p2pmotor.o -o nuvio-proto.arm -O2 -DNV_WEBOS $NUVIO_EXTRA_CFLAGS $ASS_CFLAGS $P2P_CFLAGS $DTS_CFLAGS \
+  arm-webos-linux-gnueabi-gcc src/*.c src/dts/*.c -o nuvio-proto.arm -O2 -DNV_WEBOS $NUVIO_EXTRA_CFLAGS $ASS_CFLAGS $DTS_CFLAGS \
     -DNV_SUPABASE_URL="\"$NV_SUPABASE_URL\"" \
     -DNV_SUPABASE_ANON_KEY="\"$NV_SUPABASE_ANON_KEY\"" \
     -DNV_TV_LOGIN_BASE="\"$NV_TV_LOGIN_BASE\"" \
@@ -128,11 +119,9 @@ if [ -n "${NUVIO_DTS_ROOT:-}" ]; then DTS_ENV=(-e "NUVIO_DTS_ROOT=$NUVIO_DTS_ROO
     -DNV_SIMKL_APP="\"$NV_SIMKL_APP\"" \
     -DNV_TMDB_API_KEY="\"$NV_TMDB_API_KEY\"" \
     -DNV_SEEKR_API_KEY="\"$NV_SEEKR_API_KEY\"" \
-    -DNV_REC_URL="\"$NV_REC_URL\"" \
-    -DNV_DISCORD_CLIENT_ID="\"${NV_DISCORD_CLIENT_ID:-}\"" \
     -DNV_VERSAO="\"$NV_VERSAO\"" \
     -I$SR/usr/include -I$SR/usr/include/SDL2 \
-    -lSDL2 -lSDL2_image -lSDL2_ttf -lGLESv2 -lEGL $P2P_LIBS -ldl -lpthread -lz -lm $ASS_LIBS $DTS_LIBS \
+    -lSDL2 -lSDL2_image -lSDL2_ttf -lGLESv2 -lEGL -ldl -lpthread -lz -lm $ASS_LIBS $DTS_LIBS \
     -Wl,--export-dynamic-symbol=pthread_create
   # src/dts/rt_shim.c: LG audio sink (KADP_OSA_CreateThread) binds to our pthread_create
   mkdir -p deploy/app/lib
@@ -166,9 +155,9 @@ rm -f ./*.ipk
 # Package from clean copy, never deploy/app directly:
 USER_FILES="trakt.txt addons.txt tmdb.txt mdblist.txt ajustes.txt
             progresso.txt nuvem.txt sessao.txt perfil.txt cliente.txt
-            listas.txt guia-fav.txt debrid.txt fanart.txt p2p.txt"
+            listas.txt guia-fav.txt debrid.txt fanart.txt"
 
-USER_GLOBS="stalker-p*.txt xtream-p*.txt listas-p*.txt trakt-p*.txt trakt-fluxo*.txt simkl*.txt conta-*.txt conta-*.txt.tmp discord-p*.txt discord-p*.txt.tmp jellyfin-p*.txt jellyfin-p*.txt.tmp emby-p*.txt emby-p*.txt.tmp plex-p*.txt plex-p*.txt.tmp"
+USER_GLOBS="stalker-p*.txt xtream-p*.txt listas-p*.txt trakt-p*.txt trakt-fluxo*.txt simkl*.txt conta-*.txt conta-*.txt.tmp jellyfin-p*.txt jellyfin-p*.txt.tmp emby-p*.txt emby-p*.txt.tmp plex-p*.txt plex-p*.txt.tmp"
 
 USER_COLLECTIONS="collections.json catalogo-rede.bin catalogo-rede.bin.tmp"
 USER_DIRS="collections"
@@ -206,7 +195,6 @@ if [ "$1" = "--ipk" ]; then
   done
   printf '%s\n' "$PKG_LIST" | grep -qE "art/(trakt-fluxo|simkl)\.txt$" && LEAKED="$LEAKED trakt-fluxo.txt/simkl.txt"
   printf '%s\n' "$PKG_LIST" | grep -qE '(^|/)conta-[^/]*\.txt(\.tmp)?$' && LEAKED="$LEAKED conta-*.txt/conta-*.txt.tmp"
-  printf '%s\n' "$PKG_LIST" | grep -qE '(^|/)discord-p[^/]*\.txt(\.tmp)?$' && LEAKED="$LEAKED discord profile tokens"
   printf '%s\n' "$PKG_LIST" | grep -qE '(^|/)(jellyfin|emby|plex)-p[^/]*\.txt(\.tmp)?$' && LEAKED="$LEAKED media-server profile tokens"
   for d in $USER_DIRS; do
     printf '%s\n' "$PKG_LIST" | grep -q "art/$d/" && LEAKED="$LEAKED $d/"
@@ -229,18 +217,6 @@ if [ "$1" = "--ipk" ]; then
     fi
   done
   echo "    DTS: $([ "$DTS_ENABLED" = 1 ] && echo 'conversion included (adapters + LGPL notice)' || echo 'without conversion')"
-  printf '%s\n' "$PKG_LIST" | grep -qE 'licencas/p2p-avisos\.txt$' || {
-    echo "    ABORTED: package missing licencas/p2p-avisos.txt"; rm -f "$IPK"; exit 1; }
-  if [ -n "$NV_P2P_DIR" ]; then
-    mkdir -p "$STAGING/x" && tar xzf "$STAGING/data.tar.gz" -C "$STAGING/x" 2>/dev/null
-    MOT=$(find "$STAGING/x" -name nuvio-proto -type f | head -1)
-    if [ -z "$MOT" ] || [ "$(strings "$MOT" | grep -c 'Nuvio Engine/')" -lt 1 ]; then
-      echo "    ABORTED: nuvio-proto in package lacks P2P engine (tag \"Nuvio Engine/\")"; rm -f "$IPK"; exit 1
-    fi
-    echo "    P2P engine present in packaged nuvio-proto"
-  else
-    echo "    WARNING: package WITHOUT P2P engine (NUVIO_P2P_MOTOR=none or missing folder)"
-  fi
   echo "    $IPK ($(du -h "$IPK" | cut -f1)) — without art/{$(echo $USER_FILES $USER_GLOBS $USER_COLLECTIONS $USER_DIRS | tr ' ' ',')}"
 fi
 
