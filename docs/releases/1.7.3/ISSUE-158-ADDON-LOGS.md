@@ -1,50 +1,48 @@
-# Issue158 — Flix-Streams e add-ons de legenda
+# Issue 158 — Flix-Streams and Subtitle Add-ons
 
-03/10/2026. Revisão somente leitura dos500 registros privados21252–21751 já exportados do D1. Sem chamadas a URLs privadas de add-on, sem autenticação, comentário público ou alteração runtime. Identidade do reporter não foi estabelecida pelo dump, que não possui coluna de pessoa; combinação de add-ons é indício, não identificação.
+10/03/2026. Read-only review of 500 private records 21252–21751 exported from D1. Zero calls to private add-on URLs, zero authentication, public comments, or runtime modifications. Reporter identity was not established by dump, which lacks a user column; add-on combinations provide hints, not identification.
 
-## Evidência útil, com duplicatas removidas
+## Useful Evidence with Duplicates Removed
 
-| Registro/linha | Evidência sanitizada | O que permite concluir |
+| Record/Line | Sanitized Evidence | Supported Conclusion |
 |---|---|---|
-|21749:135–137|Flix-Streams Free, manifesto `org.flixstreams.free`, catalogo=1/stream=1/legenda=0|Manifesto foi lido e resource stream reconhecido |
-|21749:169–172|Subs.ro Subtitles, `org.stremio.subsro`, catalogo=0/stream=0/legenda=1|Resource de legenda foi reconhecido; zero catálogos é esperado para esse tipo |
-|21749:191 e224|HTTP404 no host associado a Flix-Streams Free|Há duas respostas404 reais no caminho usado pelo app, mas rota/configuração redigidas impedem diagnosticar endpoint |
-|21738:905–907|Flix-Streams, `org.flickystream.addon`, catalogo=1/stream=1/legenda=0/meta=1|É outra implementação/manifesto; não pode ser tratado como o mesmo Flix-Streams Free |
-|21738:541|Busca de legendas terminou com12 resultados agregados|Não é prova de resposta Subs.ro nem Community; evento não informa add-on responsável |
+| 21749:135–137 | Flix-Streams Free, manifest `org.flixstreams.free`, catalog=1/stream=1/subtitles=0 | Manifest was read and stream resource recognized |
+| 21749:169–172 | Subs.ro Subtitles, `org.stremio.subsro`, catalog=0/stream=0/subtitles=1 | Subtitle resource recognized; zero catalogs expected for this type |
+| 21749:191 & 224 | HTTP 404 on host associated with Flix-Streams Free | Two real 404 responses in app path, but redacted route/config prevents endpoint diagnosis |
+| 21738:905–907 | Flix-Streams, `org.flickystream.addon`, catalog=1/stream=1/subtitles=0/meta=1 | Different implementation/manifest; cannot be treated as identical to Flix-Streams Free |
+| 21738:541 | Subtitle search finished with 12 aggregated results | Not proof of Subs.ro or Community response; event does not indicate responsible add-on |
 
-Os23 uploads com Subs.ro têm corpo idêntico byte a byte (checado por hash local). Representante21749: webOS, uploader1.7.2, corpo56316 caracteres. Portanto não são23 sessões independentes nem23 ocorrências novas. Esse corpo NÃO possui evento `[legendas]`; não comprova consulta HTTP ou parsing de resultado Subs.ro. Presença do manifesto não comprova uso posterior.
+The 23 uploads with Subs.ro have byte-for-byte identical bodies (verified via local hash). Representative 21749: webOS, uploader 1.7.2, body 56,316 characters. Therefore they do not represent 23 independent sessions or 23 novel occurrences. This body does NOT contain a `[legendas]` event; does not prove HTTP query or Subs.ro parsing. Manifest presence does not prove subsequent usage.
 
-PashaMetadata/PashaStreams e StremioCommunitySubtitles não aparecem por esses nomes no recorte. Ausência de nome não prova que o usuário não instalou: lista limitada, logs redigidos/truncados e manifesto pode usar outro nome. Nenhum registro foi atribuído ao reporter somente porque contém Flix+Subs.ro.
+PashaMetadata/PashaStreams and StremioCommunitySubtitles do not appear under those names in this slice. Absence of name does not prove user did not install them: bounded list, redacted/truncated logs, and manifests may use alternate names. Zero records were attributed to reporter solely because they contain Flix+Subs.ro.
 
-## Por que o404 ainda não fecha a causa
+## Why 404 Does Not Conclude Root Cause
 
-`rede.c` passa URLs por `rede_url_publica` ao registrar status. O path/configuração deixa de ser visível, então o log não distingue `/catalog`, `/stream`, `/meta` ou `/subtitles` naquele host. Contexto é atividade de catálogo/descoberta, não confirmação de playback. O404 pode ser rota incorreta, catálogo declarado e indisponível, ID incompatível ou servidor; não dá para escolher entre eles com essa evidência.
+`rede.c` passes URLs through `rede_url_publica` when logging status. Path and query become invisible, so log does not distinguish `/catalog`, `/stream`, `/meta`, or `/subtitles` on that host. Context is catalog/discovery activity, not playback confirmation. The 404 could be an incorrect route, declared yet unavailable catalog, incompatible ID, or server issue; one cannot choose among them with this evidence.
 
-Comprimento29/57 dos textos de base redigida no log NÃO é comprimento da URL configurada original e não prova truncamento. `addons.c` guarda base600 e usa `url[900]` na busca de legendas, mas a configuração privada integral não está no dump para medir limite ou perda de segmento/query. Não afirmar correção de truncamento para este caso sem fixture que reproduza.
+Redacted base text length 29/57 in log is NOT length of original configured URL and does not prove truncation. `addons.c` stores base length 600 and uses `url[900]` in subtitle searches, but complete private configuration is not in dump to measure limits or lost segment/query. Do not claim truncation fix for this case without a reproducing fixture.
 
-## Pontos concretos do cliente e próximo teste
+## Concrete Client Code Points and Next Test
 
-1. `addons.c:701–780`, `buscarLegendas`: consulta add-ons ativos com flaglegenda, sequencialmente, prazo25s por request. Falha ou falta do array `subtitles` não gera diagnóstico por add-on; apenas resumo agregado ao final. Acrescentar evento sanitizado com identificador público do manifesto, resource, tipo do item, HTTP, bytes, JSON válido/array existente e resultados aceitos/filtrados. Nunca logar ID do filme, configuração ou URL/token.
-2. O mesmo loop forma `/subtitles/{tipo}/{id}.json` sem aplicar declaração types/idPrefixes específica do resource de legenda. Isso é suspeito para providers com IDs próprios, mas NÃO foi comprovado como causa Pasha/Subs.ro/Community neste dump. Fixtures devem incluir manifesto com resourceobjeto/type/prefix, série com season/episode e resposta vazia versus inválida, além de idioma principal/secundário e campos obrigatórios.
-3. A normalização de base em `addons.c:200` remove query e sufixo manifest conforme regra anterior. Avaliar em fixture query funcional versus query de versão e base longa; não alterar política global só porHTTP404. Mapear manifesto de cada serviço para endpoints esperados usando fonte pública ou configuração explicitamente fornecida para teste, sem executar os privados desta revisão.
-4. Distinguir Flix-Streams Free (`org.flixstreams.free`) do Flix-Streams (`org.flickystream.addon`) nas fixtures e relatório. O nome de exibição não é chave suficiente para deduplicar provider ou aplicar correção específica.
+1. `addons.c:701–780`, `buscarLegendas`: queries active add-ons with subtitles flag, sequentially, 25s timeout per request. Failure or missing `subtitles` array generates zero per-add-on diagnostic; only aggregate summary at end. Add sanitized event with public manifest identifier, resource, item type, HTTP status, bytes, valid JSON / existing array, and accepted/filtered results. Never log movie ID, configuration, or URL/token.
+2. The same loop builds `/subtitles/{type}/{id}.json` without applying specific `types`/`idPrefixes` declarations of subtitle resource. Suspicious for providers with proprietary IDs, but NOT proven as cause for Pasha/Subs.ro/Community in this dump. Fixtures must include manifest with object/type/prefix resources, series with season/episode, and empty vs invalid responses, alongside primary/secondary language and mandatory fields.
+3. Base normalization in `addons.c:200` strips query and manifest suffix per legacy rule. Evaluate functional query vs version query and long base in fixture; do not alter global policy based solely on HTTP 404. Map manifests of each service to expected endpoints using public sources or explicitly provided test configurations, without invoking private URLs from this review.
+4. Distinguish Flix-Streams Free (`org.flixstreams.free`) from Flix-Streams (`org.flickystream.addon`) in fixtures and report. Display name is insufficient key to deduplicate provider or apply targeted fixes.
 
-Conclusão: reconhecimento do resource Subs.ro está demonstrado; falha de consulta/parser de legendas não. Há404 associado a FlixFree com endpoint indeterminado. A investigação precisa de diagnóstico por resource e fixture reproduzível antes de declarar correção da issue158.
+Conclusion: Subs.ro resource recognition is proven; query/parser failure is not. There is a 404 associated with FlixFree with indeterminate endpoint. Investigation requires per-resource diagnostics and reproducible fixture prior to claiming issue 158 resolved.
 
+## Reproductions and Fixes Following 1.7.3 Publication
 
-## Correções reproduzidas após a publicação da 1.7.3
+In branch `codex/fix-addons-158`, commits `a8f8d031` and `354215a3`:
 
-Na branch `codex/fix-addons-158`, commits `a8f8d031` e `354215a3`:
+- Subs.ro maps `ro` to `ron` in its public implementation ([addon.js](https://github.com/allecsc/stremio-subs-ro/blob/master/addon.js)). Client only recognized `ro`/`rum`; Romanian preference rejected `ron`. Language family, on-screen label, and auto-selection now accept all three codes. Five test checks failed previously and passed with fix.
+- Local preference "All" and absence of preference without secondary language created an exclusive English group in add-on search. Now use group without filter; chosen languages remain ordered primary, secondary, English, with identical shared result ceiling. Real worker test returned solely one English subtitle previously and now returns all four fixture languages.
+- `tests/addons_legendas.sh`, regression `addonslista.sh`, language tests, and ASan/UBSan runs passed. Tests use synthetic local responses; do not access reporter configuration or verify their server response.
 
-- Subs.ro mapeia `ro` para `ron` em sua implementação pública ([addon.js](https://github.com/allecsc/stremio-subs-ro/blob/master/addon.js)). O cliente só reconhecia `ro`/`rum`; preferência por romeno rejeitava `ron`. A família de idioma, o nome na tela e a seleção automática agora aceitam os três códigos. Cinco verificações falhavam antes e passaram com a correção.
-- Preferência local “Todas” e ausência de preferência sem idioma secundário criavam um grupo exclusivo de inglês na busca dos add-ons. Agora usam um grupo sem filtro; idiomas escolhidos continuam na ordem principal, secundário, inglês, com o mesmo teto compartilhado de resultados. O teste do worker real retornava só uma legenda inglesa e passou a retornar os quatro idiomas da fixture.
-- `tests/addons_legendas.sh`, regressão `addonslista.sh`, testes de línguas e execução com ASan/UBSan passaram. Os testes usam respostas artificiais locais; não acessam a configuração do reporter nem comprovam resposta de seu servidor.
+These fixes reside in local code and **are not part of published 1.7.3 packages**. Zero modifications made to release assets/tag, installation, or republishing. They do not demonstrate that all reported add-ons were resolved or establish cause of HTTP 404 in Flix-Streams.
 
-Estas correções estão no código local e **não fazem parte dos pacotes publicados da 1.7.3**. Não houve alteração dos anexos/tag, instalação ou nova publicação. Elas não demonstram que todos os add-ons do relato foram corrigidos nem estabelecem a causa do HTTP404 no Flix-Streams.
+Stremio protocol allows extras `filename`, `videoHash`, and `videoSize` ([SDK](https://github.com/Stremio/stremio-addon-sdk/blob/master/docs/api/requests/defineSubtitlesHandler.md)). Their absence was not accepted as universal explanation: Community supports routes without extras and Subs.ro supports optional filename. Preserve user configuration and compare real responses prior to altering this policy.
 
-O protocolo Stremio permite extras `filename`, `videoHash` e `videoSize` ([SDK](https://github.com/Stremio/stremio-addon-sdk/blob/master/docs/api/requests/defineSubtitlesHandler.md)). Sua ausência não foi aceita como explicação geral: Community admite rota sem extras e Subs.ro admite filename opcional. Preservar configuração de usuário e comparar resposta real antes de alterar essa política.
+## Public Probe Without Private Configuration
 
-
-## Sonda pública sem configuração privada
-
-Em 03/10/2026, o manifesto público sem configuração [free.flixnest.app/manifest.json](https://free.flixnest.app/manifest.json) respondeu HTTP200 e confirmou `org.flixstreams.free`. Resources: stream/catalog/meta; types: movie/series/tv; idPrefixes: tt/tmdb/essential/dlstreams. Os dois catálogos declarados são tv/essential-live-events e tv/dlstreams-live. O manifesto público principal [flixnest.app/flix-streams/manifest.json](https://flixnest.app/flix-streams/manifest.json) respondeu403 nesta sonda. Não foram consultadas URLs configuradas, catálogos, fontes nem arquivos de mídia. Essas sondas não identificam o add-on `org.flickystream.addon` nem estabelecem a causa das respostas404 históricas. Para concluir o caso do Flix é necessário log novo da tentativa com diagnóstico de resource/HTTP ou o manifesto público exato do add-on instalado.
+On 10/03/2026, unconfigured public manifest [free.flixnest.app/manifest.json](https://free.flixnest.app/manifest.json) returned HTTP 200 and confirmed `org.flixstreams.free`. Resources: stream/catalog/meta; types: movie/series/tv; idPrefixes: tt/tmdb/essential/dlstreams. The two declared catalogs are tv/essential-live-events and tv/dlstreams-live. Main public manifest [flixnest.app/flix-streams/manifest.json](https://flixnest.app/flix-streams/manifest.json) returned 403 in this probe. Zero configured URLs, catalogs, streams, or media files queried. These probes do not identify add-on `org.flickystream.addon` or establish cause of historic 404 responses. Concluding Flix case requires fresh attempt log with resource/HTTP diagnostics or exact public manifest of installed add-on.

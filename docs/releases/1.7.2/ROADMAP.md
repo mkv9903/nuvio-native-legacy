@@ -1,38 +1,38 @@
-# Auditoria da 1.7.2: logs, issues e trabalhos de outras sessões
+# Release 1.7.2 Audit: Logs, Issues, and External Session Work
 
-**Mapa entre versões:** [roadmap geral — 1.7.2, 1.7.3 e 1.8](../../ROADMAP.md). Este arquivo conserva a auditoria detalhada da candidata.
+**Version Cross-Reference:** [General Roadmap — 1.7.2, 1.7.3, and 1.8](../../ROADMAP.md). This file preserves the detailed release candidate audit.
 
-## Atualização posterior — 02/10/2026 21:39 BRT
+## Subsequent Update — 10/02/2026 21:39 BRT
 
-O dono rejeitou o mockup da ilha; as quatro evoluções propostas ficam fora da fila e não são dependência de release. A ilha existente e o bugfix de identidade integrado permanecem. A nova consulta GitHub encontrou23issues abertas: #223 (tela preta Android/TCL, relato1.7.0), #224 (LG65UT7300LA/webOS25, falha de arranque1.7.1) e #225 (LG50NANO75SPA, falha após atualização1.7.1) foram adicionadas à triagem de arranque/login. #224/#225 não trazem logs. Não inferir causa única nem correção pela conferência dos pacotes. Destinos futuros agora estão explícitos no roadmap geral;1.7.3 é proposta, plugins/P2P na1.8 seguem a direção já escolhida.
+The owner rejected the island mockup; the four proposed evolutions are excluded from the queue and are not release dependencies. The existing island and integrated identity bugfix remain. A fresh GitHub query identified 23 open issues: #223 (Android/TCL black screen, 1.7.0 report), #224 (LG 65UT7300LA / webOS 25, 1.7.1 startup failure), and #225 (LG 50NANO75SPA, post-update 1.7.1 failure) were added to startup/login triage. #224/#225 include zero logs. Do not infer a single root cause or fix from package verification. Future destinations are explicit in the general roadmap; 1.7.3 is a proposal, plugins/P2P in 1.8 follow previously chosen direction.
 
-Revisão de 02/10/2026, com evidências coletadas entre 20:34 e 20:48 BRT e status final dos pacotes atualizado nesta rodada. Trabalho local em `release/1.7.2`, `/private/tmp/nv-172`, sobre a 1.7.1 publicada (`2bc9659b`). Fonte auditada inicialmente: `fc711f6b`; nova candidata após isolamento da ilha: `b71471bc20e36806de9665145e4898c5e8e67884`. O escopo pode receber escolhas posteriores do dono; este documento recomenda encaminhamentos e não autoriza novos merges ou publicação.
+Review of 10/02/2026, with evidence gathered between 20:34 and 20:48 BRT and final package status updated in this round. Local work in `release/1.7.2`, `/private/tmp/nv-172`, atop published 1.7.1 (`2bc9659b`). Initial audited source: `fc711f6b`; new candidate post-island isolation: `b71471bc20e36806de9665145e4898c5e8e67884`. Scope may receive subsequent owner decisions; this document recommends next steps and authorizes zero new merges or releases.
 
-A prioridade é terminar a candidata já aprovada, validar os cenários reais e resolver defeitos reproduzidos. Fechar todas as issues não é critério de qualidade: há pedidos de produto, agradecimento, portabilidade e relatos que ainda dependem de dados. Código integrado, pacote gerado e comportamento observado na TV são evidências distintas.
+The priority is completing the approved candidate, validating real scenarios, and resolving reproduced bugs. Closing all issues is not a quality gate: there are product requests, thank-you notes, portability patches, and reports still awaiting data. Integrated code, generated packages, and observed TV behavior constitute distinct evidence.
 
-Referências locais: [plano aprovado](PLANO.md), [validação focada e casos das TVs](VALIDACAO-LOCAL.md), [pacotes e origem das builds](PACOTES.md), [notas em rascunho](NOTAS.md). O handoff externo da 1.7.1 foi lido; as decisões posteriores de retenção de dois minutos e Ajustes funcionais prevalecem sobre suas alternativas iniciais.
+Local references: [approved plan](PLAN.md), [focused validation and TV test cases](LOCAL-VALIDATION.md), [packages and build provenance](PACKAGES.md), [draft notes](NOTES.md). The external 1.7.1 handoff was reviewed; subsequent decisions on two-minute retention and functional Settings supersede earlier alternatives.
 
-## Atualização após a análise da ilha
+## Post-Island Analysis Update
 
-O [inventário e mockup da ilha](ILHA-PROPOSTA.md) revelaram defeito P2 confirmado por callchain: cartão, modal/pedido e conteúdo animado não estavam todos ligados à conta/perfil. A sessão retida já bloqueia a identidade anterior; o fallback do cartão podia usar o título/episódio antigo no contexto novo. Correção focada `b71471bc` aprovada com ASan/UBSan e revisão independente, sem adicionar as funcionalidades propostas no mockup. Invalida também modal/pedido/arte/voo e rejeita instância antiga mesmo quando o novo perfil vê o mesmo episódio; reempacotamento concluído: três plataformas PASS e 12 checksums aprovados. O conjunto de 13 anexos `fc711f6b` passou na conferência técnica, mas está preservado como intermediário após o fix; a nova candidata deriva de `b71471bc`. A auditoria anterior abaixo mantém seus horários e evidências.
+The [island inventory and mockup](ISLAND-PROPOSAL.md) revealed a P2 defect confirmed via callchain: card, modal/request, and animated assets were not all bound to account/profile. Retained session already blocked previous identity; card fallback could use stale title/episode in new context. Focused fix `b71471bc` approved with ASan/UBSan and independent review, without adding mockup proposals. Also invalidates modal/request/artwork/flight and rejects stale instances even when new profile accesses identical episode; repackaging completed: three platforms PASS and 12 checksums approved. The 13-attachment batch `fc711f6b` passed technical checks but is retained as intermediate post-fix; new candidate derives from `b71471bc`. Prior audit below preserves timestamps and evidence.
 
-## Inclusão posterior do screensaver
+## Subsequent Screensaver Inclusion
 
-`8a49956` autorizado pelo dono para 1.7.2. Integrado em `857f83e3`, ativação corrigida em `11835ffa`; teste focado e i18n PASS. API ainda sem confirmação física; novo empacotamento pendente. O lote `b71471bc` auditado abaixo não inclui esse fix. Detalhes em VALIDACAO-LOCAL.md.
+`8a49956` authorized by owner for 1.7.2. Integrated in `857f83e3`, activation corrected in `11835ffa`; focused test and i18n PASS. API lacks physical confirmation; repackaging pending. Audited batch `b71471bc` below does not include this fix. Details in LOCAL-VALIDATION.md.
 
-## Estado confirmado nesta revisão
+## Confirmed State in this Review
 
-- GitHub, consulta somente leitura às 20:34 BRT: **20 issues abertas e nenhuma PR aberta**. Foram relidos os últimos comentários de #158, #195, #201, #217, #222, #144, #192 e #190. #212/#213/#215 já foram tratadas pela sessão da 1.7.1; não duplicar respostas.
-- D1, consulta somente leitura às 20:37 BRT: **118 registros rotulados 1.7.1**. Uma segunda captura às 20:39 BRT já tinha **119 registros e 118 corpos distintos**. Não são 118 ou 119 sessões/aparelhos independentes. Não havia registro rotulado 1.7.2 em nenhuma das duas consultas.
-- Inventário Git amplo: **29 refs com ao menos um patch sem equivalência exata**, incluindo as **17 branches do inventário anterior**, duas features recentes e dez refs históricas/experimentos/preservações. Esses grupos se sobrepõem em commits; não somar seus patches como trabalho novo.
-- `abrirrapido`/`ilhavolta`/`i221`, `i216` e `ajustesux` já estão na release. Fila durável de addons (`d8402e54`) e temporários explícitos no SSD (`fc711f6b`) foram fechados nesta rodada; a revisão e os testes focados da fila passaram. O conjunto dessa fonte foi preservado como intermediário. Os 13 anexos atuais passaram na geração/conferência e nos checksums consolidados a partir de `b71471bc`, conforme PACOTES.md. A revisão de ferramenta `06d915f6` complementa o guard standalone TPK, consumindo toda a lista para evitar SIGPIPE; fixture com 12 mil entradas e conferência robusta dos ZIPs finais passaram. Ela não altera o runtime; está incluída na fonte da nova candidata.
-- Não houve push, tag, publicação, comentário, deploy de servidor nem controle/instalação em TV por esta auditoria.
+- GitHub read-only query at 20:34 BRT: **20 open issues and zero open PRs**. Latest comments on #158, #195, #201, #217, #222, #144, #192, and #190 reviewed. #212/#213/#215 were already addressed in 1.7.1; do not duplicate replies.
+- D1 read-only query at 20:37 BRT: **118 logs labeled 1.7.1**. Second capture at 20:39 BRT contained **119 logs and 118 distinct bodies**. These do not represent 118 or 119 independent sessions/devices. Zero logs labeled 1.7.2 in either query.
+- Broad Git inventory: **29 refs with at least one patch lacking exact equivalence**, including **17 branches from previous inventory**, two recent features, and ten historical/experimental refs. These groups overlap in commits; do not sum patches as fresh work.
+- `abrirrapido`/`ilhavolta`/`i221`, `i216`, and `ajustesux` are already in release. Durable add-on queue (`d8402e54`) and explicit temporaries on SSD (`fc711f6b`) closed in this round; queue review and focused tests passed. Batch from that source preserved as intermediate. Current 13 attachments passed generation, check, and consolidated checksums from `b71471bc`, per PACKAGES.md. Tooling update `06d915f6` complements standalone TPK guard, consuming entire listing to prevent SIGPIPE; 12k-entry fixture and final ZIP verification passed. Does not alter runtime; included in source of new candidate.
+- Zero push, tag, release, issue comment, server deploy, or TV installation executed by this audit.
 
-## Logs: o que mudou e o que ainda não está demonstrado
+## Logs: What Changed and What Remains Unproven
 
-O recorte anterior de 65 registros continua válido como auditoria anterior; a tabela abaixo descreve a captura de 20:39 BRT. Os dados brutos permaneceram privados fora do Git. As consultas D1 retornaram `rows_written=0`, `changes=0` e `changed_db=false`.
+Previous 65-log excerpt remains valid as earlier audit; table below describes 20:39 BRT capture. Raw data kept private outside Git. D1 queries returned `rows_written=0`, `changes=0`, and `changed_db=false`.
 
-| Plataforma rotulada | Registros 1.7.1 | Registros com HTTP 5xx | Ícone do celular ausente | Sem despedida | Marcador fatal explícito |
+| Labeled Platform | 1.7.1 Logs | Logs with HTTP 5xx | Missing Mobile Icon | Unclean Exit | Explicit Fatal Marker |
 |---|---:|---:|---:|---:|---:|
 | Android | 67 | 11 | 0 | 31 | 0 |
 | Samsung WGT (`tizen`) | 7 | 6 | 0 | 0 | 0 |
@@ -40,151 +40,151 @@ O recorte anterior de 65 registros continua válido como auditoria anterior; a t
 | LG webOS | 14 | 2 | 0 | 9 | 0 |
 | **Total** | **119** | **30** | **5** | **41** | **0** |
 
-Um registro pode conter várias ocorrências e várias tentativas. Ausência de `FATAL EXCEPTION`, `Fatal signal`, `Segmentation fault`, `RuntimeError:` ou `Aborted` não comprova estabilidade; sessão sem despedida não comprova crash. Nem todo HTTP 5xx é do Nuvio: nas linhas novas de rede, a rota/origem nem sempre está identificada. Não atribuir todos os 30 registros ao `api.nuvio.tv` ou à sincronização.
+A single log may contain multiple events and retries. Absence of `FATAL EXCEPTION`, `Fatal signal`, `Segmentation fault`, `RuntimeError:`, or `Aborted` does not prove stability; unclean exit does not prove crash. Not all HTTP 5xx errors originate from Nuvio: on new network lines route/origin is not always identified. Do not attribute all 30 logs to `api.nuvio.tv` or sync.
 
-| Evidência | Interpretação e próximo passo |
+| Evidence | Interpretation & Next Step |
 |---|---|
-| 13 registros adicionais após o recorte anterior têm HTTP 5xx; há 502/504 em WGT/TPK e 503/504 em Android | Mantém prioridade de resiliência, backoff e mensagem de falha. Separar conta, addons, arte, trailers e fornecedor antes de corrigir uma rota. A proteção do cliente não demonstra recuperação do serviço remoto. |
-| Cinco registros TPK com `aj_smartphone.png` ausente; nenhum adicional após o recorte anterior | Fallback embutido já integrado. O registro 18898 demonstra núcleo 1.7.1 por memfd, host api11 e arte ausente, mas não informa a versão exata do pacote antigo. Confirmar atualização de núcleo sobre host anterior no aparelho. |
-| Android 19066: seis erros de player 3003; 19107: 2004 e 3003; 19164: 3003 | São falhas reais de reprodução a investigar, não marcadores de crash. Os dois primeiros têm marcador `[tv]` 1.7.1; o corpo de 19164 não tem banner de versão. Distinguir tentativa no diagnóstico Live TV de filme aberto e conferir fonte/Content-Type/cabeçalhos/fallback. Não presumir três usuários diferentes. |
-| Recorte 16626–16630, recebido às 06:49 UTC, horário local informado 09:49, núcleo 1.7.0 | Cenário compatível com #158: HLS obtém segmentos, proxy encerra em um ou dois segundos; conexão subsequente termina sem segmentos. A TV chega a `loadCompleted`/`currentTime`/`endOfStream`. Corresponde ao mecanismo da segunda conexão corrigido na 1.7.1. Falta confirmação de playback contínuo na versão atual. Associação por horário e cenário é provável; o corpo não identifica literalmente o modelo C4. |
-| Busca de logs LG deste dia por UK6540 sem correspondência | #211 continua sem firmware/log de arranque identificado. Ausência no recorte não demonstra que o aparelho funciona ou que não houve falha. |
+| 13 additional logs post-earlier excerpt contain HTTP 5xx; 502/504 on WGT/TPK and 503/504 on Android | Maintains resilience, backoff, and error reporting priorities. Distinguish account, add-ons, artwork, trailers, and provider before fixing a route. Client protection does not prove remote service recovery. |
+| 5 TPK logs with missing `aj_smartphone.png`; zero additions post-earlier excerpt | Built-in fallback already integrated. Log 18898 demonstrates 1.7.1 core via memfd, api11 host, and missing artwork, but does not provide exact older package version. Confirm core update on older host on device. |
+| Android 19066: 6 player 3003 errors; 19107: 2004 and 3003; 19164: 3003 | Real playback failures to investigate, not crash markers. First two have `[tv]` 1.7.1 marker; 19164 body lacks version banner. Distinguish Live TV diagnostic attempts from movie playback and verify source/Content-Type/headers/fallback. Do not assume three separate users. |
+| Excerpt 16626–16630, received 06:49 UTC, reported local 09:49, 1.7.0 core | Scenario matches #158: HLS fetches chunks, proxy shuts down in 1–2s; subsequent connection ends without chunks. TV reaches `loadCompleted`/`currentTime`/`endOfStream`. Corresponds to second connection mechanism resolved in 1.7.1. Awaiting continuous playback confirmation on current version. Probable timestamp/scenario match; body does not explicitly identify C4 model. |
+| LG log search today for UK6540 yielded zero matches | #211 remains without identified bootstrap log or firmware. Absence in excerpt does not prove hardware functions or that failure did not occur. |
 
-Na referência oficial do [Media3 PlaybackException](https://developer.android.com/reference/androidx/media3/common/PlaybackException), 3003 corresponde a container/funcionalidade de container não suportado; 2004 a status HTTP inesperado. Isso classifica a falha, não identifica sua causa neste app. O zero que acompanha esses eventos é argumento auxiliar da ponte; não transforma 3003 em sucesso. Reproduzir com amostra autorizada e verificar a versão real do núcleo, pacote, ponte e alvo antes de alterar parser ou player.
+In official [Media3 PlaybackException](https://developer.android.com/reference/androidx/media3/common/PlaybackException) reference, 3003 maps to unsupported container/feature; 2004 maps to unexpected HTTP status. Classifies failure, does not diagnose app root cause. Companion zero in events is bridge auxiliary argument; does not turn 3003 into success. Reproduce with authorized sample and verify core version, package, bridge, and target prior to changing parser or player.
 
-O agregador [#192](https://github.com/iqui27/nuvio-native-legacy/issues/192) mistura versões, eventos de diagnóstico, fallback ASS, códigos auxiliares e encerramentos. Seus rótulos de regressão/crash são hipóteses; o roadmap usa eventos brutos e confirmações do relator.
+Aggregator [#192](https://github.com/iqui27/nuvio-native-legacy/issues/192) conflates versions, diagnostic events, ASS fallbacks, auxiliary codes, and shutdowns. Regression/crash tags are hypotheses; roadmap relies on raw events and reporter confirmations.
 
-## Prioridades para terminar a candidata
+## Priorities to Complete Candidate
 
-P0 impede aceitar esta candidata; P1 exige investigação ou prova antes de declarar aquele cenário resolvido; P2/P3 é produto, manutenção ou plataforma futura. Um P1 sem reprodução não implica merge especulativo.
+P0 blocks candidate acceptance; P1 requires investigation or proof before declaring scenario resolved; P2/P3 covers product, maintenance, or future platforms. P1 lacking reproduction does not warrant speculative merge.
 
-| Prioridade | Origem: issue/log/sessão/branch | Evidência / hipótese | Decisão de merge | Dependência e validação |
+| Priority | Origin: Issue/Log/Session/Branch | Evidence / Hypothesis | Merge Decision | Dependency & Validation |
 |---|---|---|---|---|
-| P0 | Fila offline; sessão atual; `d8402e54` | Edição de addons após push500 antes só sobrevivia em RAM; precisava sobreviver ao reinício | **Sim agora: integrado**, não repetir merge | ASan/UBSan e revisão passaram. Pacotes finais devem excluir snapshot e temporário pessoal. Conta/perfil A→B→A, ACK exato, edição durante POST, disco indisponível, logout. |
-| P0 | Build local; `fc711f6b` | `mktemp` sem template no Mac extraiu no disco interno mesmo com TMPDIR no SSD | **Sim agora: integrado** | Gerar os 13 anexos da mesma fonte; versão, assinatura, ABI, configuração, hashes e ausência de arquivos pessoais. Candidata intermediária `32e70e48` não vale como final. |
-| P0 | Dono: C9, Samsung e TCL | Teste de host e pacote não comprovam renderer/player/controle da TV | **Depende de prova física**, sem patch presumido | Matriz abaixo; registrar fonte/build/aparelho/firmware/tempo. Não publicar enquanto os casos exigidos pelo dono estiverem pendentes. |
-| P1 | [#158](https://github.com/iqui27/nuvio-native-legacy/issues/158), logs 09:49 | Pausa após segundos, proxy com segunda conexão, resposta 1.7.1 já enviada | **Já integrado na 1.7.1**; novo patch depende de reprodução atual | C9 com live contínuo, troca de canal e diagnóstico; confirmação no LG C4 do relator continua pendente. Não fechar pelo teste da C9 sozinho. |
-| P1 | [#221](https://github.com/iqui27/nuvio-native-legacy/issues/221), `i221` dentro de `abrirrapido` | Samsung Tizen5 esperava 20–25s por fontes; entrega incremental já integrada | **Já integrado** | Samsung TPK4/5 e 6+, addon rápido+addon lento, Play automático e prazo padrão de 5 s. WGT: fluidez da UI durante requisição. |
-| P1 | Retorno ao filme/ilha, `abrirrapido`/`ilhavolta`, posição inicial Android | Retenção119/120 s e preparação com ponto salvo passam em fixtures; ganho real não medido | **Já integrado**, manter dois minutos | C9/TCL/Samsung antes e depois120s; fonte vencida, fallback, episódio/perfil, HDR e passagem por outro app. Comparar marcos da mesma mídia/aparelho. |
-| P1 | Erros Android novos 19066/19107/19164 | 3003/2004 durante tentativas de mídia; causa não demonstrada | **Depende de reprodução**, não mesclar um player alternativo | Classificar diagnóstico/live/VOD, identificar media/cabeçalhos/HTTP sem expor URL pessoal, verificar container, mensagem e próxima fonte na TCL. |
-| P1 | Catálogo/histórico; [#197](https://github.com/iqui27/nuvio-native-legacy/issues/197), parte de [#195](https://github.com/iqui27/nuvio-native-legacy/issues/195) | Corridas/identidade foram corrigidas; catálogo vazio, escolha automática ao rolar e configurações ainda podem ter causas distintas | **Correção de consistência já integrada**; restante depende de cenário | Mesma conta/perfil/addon e configuração do relator; sete fileiras, rolar sem selecionar; troca de perfil durante resposta. ASan/TSan focados aprovados. |
-| P1 | [#195](https://github.com/iqui27/nuvio-native-legacy/issues/195), proporção | Relator confirmou trailer corrigido e agora relata proporção95% dos casos | **Depende de prova**, não reintroduzir canários antigos | Samsung TPK6.5+/4/5 com a mesma mídia e cada modo. ROI fora da tela já expôs Home; recorte da origem permanece limitado pelo backend. |
-| P1 | [#188](https://github.com/iqui27/nuvio-native-legacy/issues/188) | Áudio com Home atrás do player em TPK antigo; correção single-window já publicada | **Já integrado**; patch só com log/build atuais | Samsung S90D/cenário do relator; trailer → filme, voltar de segundo plano, plano de vídeo/GL. |
-| P1 | [#211](https://github.com/iqui27/nuvio-native-legacy/issues/211) | UK6540 volta à entrada no arranque; versão/firmware/log desconhecidos | **Depende de dados**, não marcar resolvida | Log de bootstrap, versão do IPK instalado, firmware e alvo; comparar normal/highcache se pertinente. C9 não substitui prova no UK6540. |
-| P1 | ASS embutida/sonda/HTTP; logs e cliente atual | Fallback de legenda não significa falha de vídeo; sonda pode ter efeitos de rede/cota | **Endurecimento da sonda integrado**; paralelo genérico adiado | MKV com ASS em faixa embutida na C9, TPK e TCL. HTTP 403 com cabeçalhos, redirecionamento, timeout e fonte vencida; WGT preserva decisão de AVPlay quando XHR não pode enviar cabeçalho. |
-| P2 | [#144](https://github.com/iqui27/nuvio-native-legacy/issues/144) | Cantos inferiores cortados e cintilação no Continuar assistindo; Ajustes são outro ponto da issue | **Ajustes integrados**; cintilação depende de reprodução | Mesmos cartazes/layout/escala; navegar verticalmente para CW, capturar quadro e perfil GPU na TV. Não contabilizar redesign dos Ajustes como correção do poster. |
-| Fora da fila | Mockup da ilha; agente `island_ux_mockup` | Dono rejeitou o mockup e pediu continuidade no roadmap | **Não integrar as quatro evoluções propostas** | Preservar artefato como histórico. Ilha existente e correção de identidade permanecem; não são uma nova proposta visual. |
-| P2 | [#216](https://github.com/iqui27/nuvio-native-legacy/issues/216), `i216` | Toque/perfis e login manual, antes ausência de suporte | **Já integrado** | Android celular/tablet para toque e IME; TCL para regressão do D-pad/login. Simulação de ponteiro no Mac não comprova toque físico. |
-| P2 | [#202](https://github.com/iqui27/nuvio-native-legacy/issues/202) e [#209](https://github.com/iqui27/nuvio-native-legacy/issues/209) | Contraste e localização publicados; UX funcional teve12 capturas host aprovadas | **Já integrado/publicado**, confirmar cenário | C9: acento matching sem branco sobre branco; descrição/título de série em português, TMDB+addon e perfil corretos. |
-| P2 | [#217](https://github.com/iqui27/nuvio-native-legacy/issues/217) | Quatro melhorias de hostLinux; autor já foi convidado a mandar PRs, nenhuma aberta | **Depende da contribuição e revisão** | Não duplicar pacote de patches. GNU/BSD sed, fallback ffmpeg, subset TPK e NV_WEBOS: Linux/Mac builds, preprocessing por alvo, C9 e TPK api11. Não exige deploy. |
+| P0 | Offline queue; current session; `d8402e54` | Add-on edits following push 500 previously survived in RAM only; needed persistence across restart | **Yes now: integrated**, do not repeat merge | ASan/UBSan and review passed. Final packages must exclude snapshots and personal temporaries. Account/profile A→B→A, exact ACK, edit during POST, disk failure, logout. |
+| P0 | Local build; `fc711f6b` | macOS template-less `mktemp` extracted to internal drive despite SSD TMPDIR | **Yes now: integrated** | Generate all 13 attachments from identical source; version, signature, ABI, config, hashes, and zero personal files. Intermediate candidate `32e70e48` invalid as final. |
+| P0 | Owner: C9, Samsung, and TCL | Host test and package do not prove TV renderer/player/remote | **Requires physical hardware verification**, zero assumed patches | Matrix below; record source/build/device/firmware/timing. Do not publish while owner cases remain pending. |
+| P1 | [#158](https://github.com/iqui27/nuvio-native-legacy/issues/158), 09:49 logs | Pause after seconds, proxy second connection, 1.7.1 reply already sent | **Already integrated in 1.7.1**; new patch requires current reproduction | C9 continuous live TV, channel switch, diagnostics; confirmation on reporter's LG C4 pending. Do not close based on C9 test alone. |
+| P1 | [#221](https://github.com/iqui27/nuvio-native-legacy/issues/221), `i221` in `abrirrapido` | Samsung Tizen 5 waited 20–25s for sources; incremental delivery integrated | **Already integrated** | Samsung TPK 4/5 and 6+, fast+slow add-ons, autoplay, and 5s default timeout. WGT: UI responsiveness during query. |
+| P1 | Return to media / island, `abrirrapido`/`ilhavolta`, Android initial position | Retention 119/120s and preparation with saved point pass fixtures; real gain unmeasured | **Already integrated**, retain 2 minutes | C9/TCL/Samsung before and after 120s; expired source, fallback, episode/profile, HDR, app switch. Compare milestones on same media/device. |
+| P1 | New Android errors 19066/19107/19164 | 3003/2004 during media attempts; cause unproven | **Requires reproduction**, do not merge alternative player | Classify diagnostic/live/VOD, identify media/headers/HTTP without exposing personal URLs, check container, message, and fallback on TCL. |
+| P1 | Catalog/history; [#197](https://github.com/iqui27/nuvio-native-legacy/issues/197), part of [#195](https://github.com/iqui27/nuvio-native-legacy/issues/195) | Race conditions/identity resolved; empty catalog, scroll autoplay, and settings may have distinct causes | **Consistency fix integrated**; remainder depends on scenario | Same account/profile/add-on and reporter config; 7 rows, scroll without selecting; profile switch during response. Focused ASan/TSan passed. |
+| P1 | [#195](https://github.com/iqui27/nuvio-native-legacy/issues/195), aspect ratio | Reporter confirmed trailer resolved, now reports aspect ratio in 95% of cases | **Requires proof**, do not reintroduce old canaries | Samsung TPK 6.5+/4/5 with same media and each mode. Off-screen ROI previously exposed Home; source crop remains backend-limited. |
+| P1 | [#188](https://github.com/iqui27/nuvio-native-legacy/issues/188) | Audio with Home behind player on older TPK; single-window fix published | **Already integrated**; patch only with current log/build | Samsung S90D / reporter scenario; trailer → movie, background resume, video/GL plane. |
+| P1 | [#211](https://github.com/iqui27/nuvio-native-legacy/issues/211) | UK6540 returns to input on startup; unknown version/firmware/log | **Requires data**, do not mark resolved | Bootstrap log, installed IPK version, firmware, and target; compare normal/highcache if relevant. C9 does not substitute UK6540. |
+| P1 | Embedded ASS / probe / HTTP; logs and current client | Subtitle fallback does not imply video failure; probe may incur network/quota side effects | **Probe hardening integrated**; generic parallel check postponed | MKV with embedded ASS on C9, TPK, and TCL. HTTP 403 with headers, redirect, timeout, and expired source; WGT preserves AVPlay decision when XHR cannot send header. |
+| P2 | [#144](https://github.com/iqui27/nuvio-native-legacy/issues/144) | Cut bottom corners and Continue Watching flicker; Settings are separate point in issue | **Settings integrated**; flicker requires reproduction | Same posters/layout/scale; navigate vertically to CW, capture frame and TV GPU profile. Do not treat Settings redesign as poster fix. |
+| Out of Queue | Island mockup; agent `island_ux_mockup` | Owner rejected mockup and directed continuity into roadmap | **Do not integrate four proposed evolutions** | Preserve artifact as history. Existing island and identity fix remain; not a new visual design. |
+| P2 | [#216](https://github.com/iqui27/nuvio-native-legacy/issues/216), `i216` | Touch/profiles and manual login, previously unsupported | **Already integrated** | Android phone/tablet for touch and IME; TCL for D-pad/login regression. Pointer simulation on Mac does not prove physical touch. |
+| P2 | [#202](https://github.com/iqui27/nuvio-native-legacy/issues/202) and [#209](https://github.com/iqui27/nuvio-native-legacy/issues/209) | Contrast and localization published; functional UX had 12 host screenshots approved | **Already integrated/published**, confirm scenario | C9: accent matching without white-on-white; series description/title in user language, TMDB+add-on and correct profile. |
+| P2 | [#217](https://github.com/iqui27/nuvio-native-legacy/issues/217) | Four Linux host improvements; author invited to submit PRs, none open | **Depends on contribution and review** | Do not duplicate patch set. GNU/BSD sed, ffmpeg fallback, TPK subset, NV_WEBOS: Linux/Mac builds, per-target preprocessing, C9, and TPK api11. No deploy required. |
 
-## Issues de produto e administração
+## Product and Administrative Issues
 
-| Issue | Encaminhamento concreto | Quando considerar |
+| Issue | Action / Next Step | Timing |
 |---|---|---|
-| [#222 Discord](https://github.com/iqui27/nuvio-native-legacy/issues/222) | Há implementação nova `feat/discord-presenca`; o diagnóstico inicial de inviabilidade está superado por esse trabalho, mas ainda falta prova nas TVs e revisão do contrato/credenciais/OAuth. Nenhum merge autorizado nesta rodada. | Versão posterior ou ampliação explícita de escopo, após matriz de plataforma e retomada/desvinculação por perfil. |
-| [#201 TopN](https://github.com/iqui27/nuvio-native-legacy/issues/201) | Relator confirmou primeira fileira corrigida. Mais itens Top10/12/18/24 é escolha de produto e layout, separada do bug. | Definir limite/paginação e custo em TVs antigas antes de implementar. |
-| [#195 pedidos](https://github.com/iqui27/nuvio-native-legacy/issues/195#issuecomment-5960258625) | Thumbnails na barra, logo do título, ajuste de legenda e media server precisam triagem própria; não agrupá-los à correção de proporção. | Proposta com custo/compatibilidade e validação por recurso. Plugins seguem na 1.8. |
-| [#172 ideias visuais](https://github.com/iqui27/nuvio-native-legacy/issues/172) | Ajustes funcionais escolhidos e integrados; outras ideias do fork não foram presumidas como aprovadas. | Revisão seletiva de fluxo/legibilidade, baseada em captura atual e medida de GPU. |
-| [#171 P2P](https://github.com/iqui27/nuvio-native-legacy/issues/171) | Usar `agente/p2p2` como candidato futuro, não a branch antiga. Disco, cancelamento e TPK real ainda limitam aceitação. WGT sem socket fica fora. | **1.8**, decisão já tomada. |
-| [#134 plugins](https://github.com/iqui27/nuvio-native-legacy/issues/134) | Usar `agente/plugins2`, não a versão antiga. C9 tem medidas anteriores, mas TPK/WGT real e scraper travado ainda não validados. | **1.8**, com cancelamento por chamada, limite de memória/tempo e perfis. |
-| [#135 VIDAA](https://github.com/iqui27/nuvio-native-legacy/issues/135) | Port experimental sem prova em aparelho real; não generalizar resultados de Chrome desktop. | Frente independente, com testador/aparelho/versão de Chromium. |
-| [#190](https://github.com/iqui27/nuvio-native-legacy/issues/190#issuecomment-5956133326) | Relator confirmou título/episódio resolvido. Resta administração da issue, sem novo patch. | Só com autorização de resposta/fechamento. |
-| [#155](https://github.com/iqui27/nuvio-native-legacy/issues/155) | Agradecimento; não há defeito a corrigir. | Nenhuma dependência de release. |
-| [#192](https://github.com/iqui27/nuvio-native-legacy/issues/192) | Melhorar critérios de triagem e separar usuário/sessão/tentativa/diagnóstico/versão real antes de abrir novos bugs. | Manutenção de observabilidade; nenhuma nova postagem nesta rodada. |
+| [#222 Discord](https://github.com/iqui27/nuvio-native-legacy/issues/222) | New implementation exists in `feat/discord-presenca`; initial infeasibility diagnosis superseded, but hardware proof and OAuth contract review pending. Zero merges authorized in this round. | Later release or explicit scope expansion, following platform matrix and per-profile unlinking. |
+| [#201 TopN](https://github.com/iqui27/nuvio-native-legacy/issues/201) | Reporter confirmed first row resolved. More Top 10/12/18/24 items is layout/product decision, separate from bug. | Define limit/pagination and cost on legacy TVs before implementation. |
+| [#195 requests](https://github.com/iqui27/nuvio-native-legacy/issues/195#issuecomment-5960258625) | Seekbar thumbnails, title logo, subtitle offset, and media servers require dedicated triage; do not bundle with aspect ratio fix. | Proposal with cost/compatibility and per-feature validation. Plugins remain in 1.8. |
+| [#172 visual ideas](https://github.com/iqui27/nuvio-native-legacy/issues/172) | Functional Settings chosen and integrated; other fork ideas not assumed approved. | Selective flow/readability review, based on current captures and GPU profiling. |
+| [#171 P2P](https://github.com/iqui27/nuvio-native-legacy/issues/171) | Use `agente/p2p2` as future candidate, not legacy branch. Disk, cancellation, and real TPK limit acceptance. Socket-less WGT excluded. | **1.8**, decision already finalized. |
+| [#134 plugins](https://github.com/iqui27/nuvio-native-legacy/issues/134) | Use `agente/plugins2`, not legacy version. C9 has prior measurements, but real TPK/WGT and frozen scrapers pending validation. | **1.8**, with per-call cancellation, memory/time limits, and profiles. |
+| [#135 VIDAA](https://github.com/iqui27/nuvio-native-legacy/issues/135) | Experimental port without hardware proof; do not extrapolate desktop Chrome findings. | Independent track with tester/device/Chromium version. |
+| [#190](https://github.com/iqui27/nuvio-native-legacy/issues/190#issuecomment-5956133326) | Reporter confirmed title/episode resolved. Issue administration remains, zero new patches. | Only with reply/closure authorization. |
+| [#155](https://github.com/iqui27/nuvio-native-legacy/issues/155) | Thank-you note; zero defects to resolve. | Zero release dependency. |
+| [#192](https://github.com/iqui27/nuvio-native-legacy/issues/192) | Improve triage criteria; separate user/session/attempt/diagnostic/real version before filing new bugs. | Observability maintenance; zero postings in this round. |
 
-## Sessões e unidade correta de integração
+## Sessions and Integration Unit
 
-Os títulos Codex abaixo foram preservados exatamente como retornados pelo app. Estado do chat e timestamp da lista não provam que um patch novo foi feito: foi conferida a relação do Git. As sessões Social/Discord não apareceram como chats identificáveis na lista consultada; o registro externo no M3 e os commits permitem inventariar seu trabalho, sem inventar título ou autorizar contato.
+Codex titles below preserved as returned by tool. Chat state and listing timestamp do not prove a new patch was created: Git relationship was verified. Social/Discord sessions did not appear as identifiable chats in queried listing; external M3 logs and commits allow inventorying work without inventing titles or contacting authors.
 
-| Sessão / trabalho | Estado observado e evidência | Unidade de integração | Recomendação |
+| Session / Work | Observed State & Evidence | Integration Unit | Recommendation |
 |---|---|---|---|
-| **Otimizar e corrigir o código** — chat atual | Fonte final `b71471bc`; fila `d8402e54` e isolamento da ilha fechados, 13 anexos finais aprovados; agentes `queue_finish`/`queue_review` pertencem a esta rodada | Commits locais da release; pacote final deriva da fonte congelada | Pacotes fechados; faltam os gates físicos. Não criar merge fictício para trabalho feito diretamente na release. |
-| **Review docs/ajustes-ux.md** | Último turno retornado confirma selo jade/check branco em `2fbcf53b`; worktree limpa às 20:39; branch é ancestral da release | `agente/ajustesux`, já mesclada em `f9083b10` | Não mesclar de novo nem tratar o selo como patch solto. Outras propostas do chat exigem commit/prova própria. |
-| **Polir a UI para nível profissional** | Turnos retornados são históricos: relatam UI/fontes/What’s New enviados em `fc2025a`; lista mostrava `notLoaded` e atualização recente | Commits históricos, já incorporados na base; não há patch novo demonstrado por esse retorno | Evitar duplicação. Uma data recente na lista não torna a proposta histórica uma feature pendente. |
-| Sessão externa Social, nome não identificado pelo app | `feat/social` em `46e9b24f`, commit 20:00 BRT, worktree limpa; agrega `socialsrv`+`reacao`+`socialui` | **`feat/social` é agregadora**;23 patches novos, incluindo os22 das três branches e a cola | Fora da 1.7.2 por decisão atual. Se aprovado depois, revisar/mesclar uma vez a agregadora, preservando a release mais nova. |
-| Sessão externa Discord, nome não identificado pelo app | `feat/discord-presenca` em `6b6bfe14`, commit 19:48 BRT, worktree limpa; um patch sobre1.7.1 | Patch/branch Discord, com alterações C/rede/build/ajustes e arquivos OAuth por perfil | Fora do escopo atual; depende de revisão de integração e prova real. Não substituir a release por árvore antiga nem copiar pacote de outra sessão como1.7.2. |
+| **Optimize and fix code** — current chat | Final source `b71471bc`; queue `d8402e54` and island isolation closed, 13 final attachments approved; `queue_finish`/`queue_review` agents belong to this round | Local release commits; final package derives from frozen source | Packages completed; physical gates remain. Do not create synthetic merge for work done directly in release. |
+| **Review docs/ajustes-ux.md** | Last turn confirms jade badge / white check in `2fbcf53b`; worktree clean at 20:39; branch is ancestor of release | `agente/ajustesux`, already merged in `f9083b10` | Do not merge again or treat badge as standalone patch. Other chat proposals require dedicated commit/proof. |
+| **Polish UI to professional level** | Returned turns are historical: report UI/sources/What's New submitted in `fc2025a`; listing showed `notLoaded` and recent update | Historical commits, already in base; zero new patches demonstrated | Avoid duplication. Recent timestamp in listing does not make historical proposal a pending feature. |
+| External Social session, unnamed | `feat/social` at `46e9b24f`, commit 20:00 BRT, clean worktree; aggregates `socialsrv`+`reacao`+`socialui` | **`feat/social` is aggregator**; 23 new patches, including 22 from the three branches and glue | Excluded from 1.7.2 per current decision. If approved later, review/merge aggregator once, preserving newer release. |
+| External Discord session, unnamed | `feat/discord-presenca` at `6b6bfe14`, commit 19:48 BRT, clean worktree; 1 patch atop 1.7.1 | Discord patch/branch, with C/network/build/settings changes and per-profile OAuth files | Outside current scope; depends on integration review and hardware proof. Do not overwrite release with old tree or copy foreign session package as 1.7.2. |
 
-**Coexistência com servidor e TVs de outras sessões.** A consulta somente leitura `wrangler deployments list` confirmou o Worker `nuvio-recomendacoes` com versão `23314845-8ba9-4471-83ca-1e6c713db44f` a 100%, publicado às 20:06 BRT. Isso coincide com o registro externo do Social. A fonte desta release ainda tem o servidor anterior: um deploy indiscriminado daqui pode retirar as rotas novas. Não há necessidade de deploy para os pacotes 1.7.2 e nenhum foi feito aqui.
+**Coexistence with Server and Other Sessions' TVs.** Read-only `wrangler deployments list` confirmed Worker `nuvio-recomendacoes` version `23314845-8ba9-4471-83ca-1e6c713db44f` at 100%, published 20:06 BRT. Matches external Social log. Current release source still contains prior server: indiscriminate deploy would remove new routes. Zero deployment needed for 1.7.2 packages; none executed.
 
-O registro externo no M3 também relata APK Social instalado na TCL e aprovação do dono; essa instalação não foi checada nesta auditoria. Portanto, o pacote atualmente presente na TCL não está comprovado como o APK estável puro. O que está demonstrado nesta rodada é que **nenhuma build 1.7.2 desta release foi instalada ou validada na TCL**. Para teste futuro, conferir pacote/núcleo/host reais antes de interpretar o resultado. O relato externo de Discord diz instalação Android e uma build C9 anterior ao rebase, sem presença observada na TV; não equivale a validação desta candidata.
+External M3 log reports Social APK installed on TCL and owner approval; install not audited here. Package on TCL not verified as pure stable APK. Proven in this round: **zero 1.7.2 builds from this release installed or validated on TCL**. For future tests, verify actual package/core/host before evaluating results. External Discord report mentions Android install and pre-rebase C9 build, without verified presence on TV; does not equate to candidate validation.
 
-## Destino posterior da Glass UI
+## Subsequent Destination of Glass UI
 
-O dono indicou `feat/glass-ilha` para 1.8. Ponta `c5269ed4`, baseada em `feat/social` (`46e9b24f`), com 12 commits não-merge de camada visual adicionais. Inclui Fontes, menu/rail, Salvos/Social, menus, Spotlight, Agenda, Biblioteca e Perfil/stats; não é apenas relógio. Sem merge na 1.7.2. Revisar delta visual após Social, preservar os fluxos mais novos e validar por plataforma. Conteúdo/dependências no [roadmap geral](../../ROADMAP.md). O mockup HTML rejeitado continua fora. Esse é um acréscimo ao inventário histórico abaixo, não uma atualização retroativa da contagem 29.
+Owner indicated `feat/glass-ilha` for 1.8. Head `c5269ed4`, based on `feat/social` (`46e9b24f`), with 12 non-merge visual commits. Includes Sources, menu/rail, Saved/Social, menus, Spotlight, Schedule, Library, and Profile/stats; not just clock. No merge into 1.7.2. Review visual delta post-Social, preserve newer flows, and validate per platform. Content/dependencies in [general roadmap](../../ROADMAP.md). Rejected HTML mockup remains excluded. Addition to historical inventory, not retroactive update of 29 count.
 
-## Inventário de branches soltas
+## Inventory of Loose Branches
 
-Método: ancestralidade e `git cherry` contra a fonte da release. `+` significa patch sem equivalência exata; `-` significa equivalência de patch, mesmo sem o mesmo hash. Patch adaptado pode aparecer como `+` apesar de correção semanticamente presente. Worktree limpa significa apenas ausência de alterações sem commit no momento da leitura. Não significa teste ou autorização de merge.
+Method: ancestry and `git cherry` against release source. `+` indicates patch lacking exact equivalence; `-` indicates patch equivalence, even with different hash. Adapted patch may appear as `+` despite semantically present fix. Clean worktree indicates only absence of uncommitted edits at read time. Does not indicate testing or merge approval.
 
-### As 17 branches do inventário anterior
+### The 17 Branches from Prior Inventory
 
-| Branch | Patches `+` | Decisão e motivo |
+| Branch | Patches `+` | Decision & Rationale |
 |---|---:|---|
-| `agente/ajustesvisual` | 2 | **Não agora**: A/B fora; Ajustes funcionais já escolhidos. |
-| `agente/guiaunicode` | 1 | **Não**: gênero Unicode já corrigido por adaptação na 1.7.1; não reverter leitor/busca mais novos. |
-| `agente/i195` | 1 | **Não agora**: canário de janelas antigo; single-window publicado. Preservar até conferir obsolescência. |
-| `agente/i195b` | 1 | Mesmo encaminhamento; não combinar estratégias antigas de janela. |
-| `agente/i195c` | 2 | Mesmo encaminhamento; dependia de host/api e canário específico. |
-| `agente/i195d` | 3 | Mesmo encaminhamento; canário6 precede correção final. |
-| `agente/i203` | 1 | Mesmo encaminhamento; host antigo, sem novo defeito reproduzido. |
-| `agente/icones` | 5 | **Outra versão/decisão**: atividade-alias afeta launcherAndroid; exige aceitação e prova próprias. |
-| `agente/p2p` | 6 | **Não**: supersedida por `p2p2`; preservar, não mesclar. |
-| `agente/p2p2` | 13 | **1.8**: disco/cancelamento/TPK real; WGT não suporta motor socket. |
-| `agente/plugins` | 14 | **Não**: supersedida por `plugins2`. |
-| `agente/plugins2` | 21 | **1.8**: já compartilha #221; não duplicar fontes incrementais. Provar TPK/WGT e cancelamento. |
-| `agente/reacao` | 6 | **Outra versão/decisão**: já ancestral de `feat/social`; não merge isolado duplicado. |
-| `agente/socialsrv` | 7 | **Outra versão/decisão**: ancestral de `feat/social`; servidor externo já avançou, deploy separado. |
-| `agente/socialui` | 9 | **Outra versão/decisão**: ancestral de `feat/social`; worktree agora limpa. LG/Samsung ainda sem prova do Social novo. |
-| `feat/tizen4-coop` | 5 | **Não agora**: port/canário histórico; pacote TPK4/5 atual tem contrato distinto. |
-| `feat/vidaa` | 7 | **Frente independente**: precisa TV real; não bloquear a 1.7.2 das plataformas estáveis. |
+| `agente/ajustesvisual` | 2 | **Not now**: A/B excluded; functional Settings selected. |
+| `agente/guiaunicode` | 1 | **No**: Unicode genre fixed by adaptation in 1.7.1; do not revert newer reader/search. |
+| `agente/i195` | 1 | **Not now**: Old window canary; single-window published. Preserve until obsolescence verified. |
+| `agente/i195b` | 1 | Same triage; do not combine old window strategies. |
+| `agente/i195c` | 2 | Same triage; depended on specific host/API and canary. |
+| `agente/i195d` | 3 | Same triage; canary 6 precedes final fix. |
+| `agente/i203` | 1 | Same triage; legacy host, zero new reproduced defects. |
+| `agente/icones` | 5 | **Different version/decision**: activity-alias affects Android launcher; requires dedicated acceptance and proof. |
+| `agente/p2p` | 6 | **No**: superseded by `p2p2`; preserve, do not merge. |
+| `agente/p2p2` | 13 | **1.8**: disk/cancellation/real TPK; WGT cannot support socket motor. |
+| `agente/plugins` | 14 | **No**: superseded by `plugins2`. |
+| `agente/plugins2` | 21 | **1.8**: shares #221; do not duplicate incremental sources. Prove TPK/WGT and cancellation. |
+| `agente/reacao` | 6 | **Different version/decision**: ancestor of `feat/social`; avoid duplicate isolated merge. |
+| `agente/socialsrv` | 7 | **Different version/decision**: ancestor of `feat/social`; external server advanced, separate deploy. |
+| `agente/socialui` | 9 | **Different version/decision**: ancestor of `feat/social`; worktree clean. LG/Samsung unproven on new Social. |
+| `feat/tizen4-coop` | 5 | **Not now**: historical port/canary; current TPK 4/5 package has distinct contract. |
+| `feat/vidaa` | 7 | **Independent track**: requires real TV; do not block 1.7.2 stable platforms. |
 
-### Duas features novas desde o inventário anterior
+### Two Features Added Since Prior Inventory
 
-| Branch | Patches `+` | Decisão |
+| Branch | Patches `+` | Decision |
 |---|---:|---|
-| `feat/social` | 23 | **Depende de ampliação de escopo**; agrega três branches acima, não são23 patches adicionais a elas. Cliente antigo/servidor novo deve coexistir; não redeployar servidor anterior. |
-| `feat/discord-presenca` | 1 | **Depende de ampliação de escopo/revisão**. Mac teve prova de protocolo segundo o commit; TV ainda não comprova vinculação, presença, retomada e desvinculação. |
+| `feat/social` | 23 | **Requires scope expansion**; aggregates three branches above, not 23 patches beyond them. Older client / newer server must coexist; do not redeploy previous server. |
+| `feat/discord-presenca` | 1 | **Requires scope expansion / review**. Mac had protocol proof per commit; TV unproven for linking, presence, resume, and unlinking. |
 
-### Dez refs históricas / experimentos / preservações
+### Ten Historical Refs / Experiments / Preservations
 
-| Ref | Patches `+` | Encaminhamento |
+| Ref | Patches `+` | Next Step |
 |---|---:|---|
-| `canario/tpk-audio-foco` | 1 | Preservar; canário antigo sem solicitação atual de merge. |
-| `canary/tpk-youtube-retoma` | 1 | Preservar; não reintroduzir estratégia antiga de áudio/resource-conflict sem reprodução. |
-| `experimento/universo-2026` | 36 | Revisão futura por patch. Mistura exploração de dados/UX/corridas antigas; não merge amplo. |
-| `nacl/app-completo` | 2 | Rota experimental antiga; não substituir TPK4/5 atual. |
-| `spike/nacl-tizen45` | 1 | Compartilha experimento NaCl; não somar como implementação independente. |
-| `webos3` | 5 | Há ainda um patch equivalente `-`; alvo antigo precisa revisão específica, não merge geral. |
-| `worktree-agent-a03fb2e226f125a82` | 2 | Mesmo conteúdo de `nacl/app-completo`; preservação, não feature nova. |
-| `worktree-agent-a53ac8d8d82f17106` | 1 | WIP preservado de agente antigo; conteúdo não auditado, não mesclar/apagar. |
-| `worktree-agent-a62e3f13ac3f493e5` | 1 | WIP preservado de agente antigo; conteúdo não auditado, não mesclar/apagar. |
-| `worktree-agent-af383a462c2f04823` | 1 | Mais um patch equivalente `-`; correção antiga de catálogo/limite precisa comparação semântica antes de uso. |
+| `canario/tpk-audio-foco` | 1 | Preserve; older canary with zero merge requests. |
+| `canary/tpk-youtube-retoma` | 1 | Preserve; do not reintroduce old audio/resource-conflict logic without reproduction. |
+| `experimento/universo-2026` | 36 | Future per-patch review. Mixes data exploration, UX, and old race conditions; avoid broad merge. |
+| `nacl/app-completo` | 2 | Legacy experimental track; do not replace current TPK 4/5. |
+| `spike/nacl-tizen45` | 1 | Shares NaCl experiment; do not count as independent implementation. |
+| `webos3` | 5 | Retains one equivalent `-` patch; legacy target requires targeted review, not broad merge. |
+| `worktree-agent-a03fb2e226f125a82` | 2 | Same content as `nacl/app-completo`; preservation, not fresh feature. |
+| `worktree-agent-a53ac8d8d82f17106` | 1 | Legacy agent WIP; unaudited content, do not merge or delete. |
+| `worktree-agent-a62e3f13ac3f493e5` | 1 | Legacy agent WIP; unaudited content, do not merge or delete. |
+| `worktree-agent-af383a462c2f04823` | 1 | One equivalent `-` patch; old catalog/limit fix requires semantic comparison before use. |
 
-As refs `abrirrapido`, `ilhavolta`, `i221`, `i216`, `ajustesux`, `offline`, `i212`, `i213a`, `i213b` e `quedas171` têm sua integração conferida por ancestralidade/patch; não pertencem à fila de merges. Registros worktree marcados `prunable` indicam checkout ausente, não autorização para prune ou apagar commits. Nenhuma worktree de outra sessão foi modificada.
+Refs `abrirrapido`, `ilhavolta`, `i221`, `i216`, `ajustesux`, `offline`, `i212`, `i213a`, `i213b`, and `quedas171` have integration verified via ancestry/patch; excluded from merge queue. Worktree entries marked `prunable` indicate missing checkouts, not prune or commit deletion authorization. Zero external session worktrees altered.
 
-## Sequência recomendada e dependências
+## Recommended Sequence and Dependencies
 
-1. **Candidata local autorizada concluída.** Fila durável, scripts e isolamento da ilha estão em `b71471bc`; geração, conferência e checksums dos 13 anexos passaram, com hash de origem igual. Usar esse conjunto na rodada física. Pacotes `32e70e48` e `fc711f6b` ficam identificados e separados como intermediários.
-2. **Dono faz a rodada curta das TVs.** Conferir package/core/host antes do teste; uma pessoa/agente por TV. Observar duas fronteiras, 119/120 s, fonte vencida, perfil, Ajustes, live e legenda. Registrar falhas com etapa e horário, sem repetir suíte longa.
-3. **Investigar os P1 pendentes por cenário.** Android 3003/2004, Samsung proporção/catálogos, LG startup UK6540 e CW cintilação devem ganhar reproduções específicas. Alterar apenas a causa demonstrada; voltar aos focados da área alterada e ao pacote afetado. Não juntar hipóteses diferentes numa correção ampla.
-4. **Reavaliar escopo com o dono.** Social e Discord têm trabalho concreto novo, mas continuam fora desta candidata. O mockup da ilha foi rejeitado e saiu da fila. Se escolhidos, revisar cada unidade sobre a release atual, conservar enums/defaults/identidade/gerações e refazer a matriz afetada. A agregadora Social evita três merges redundantes. Não mexer em servidor ativo como efeito colateral.
-5. **Preparar 1.8.** Plugins e P2P exigem cancelamento por chamada, limite de disco/memória e prova por backend. A primeira abertura de fonte em paralelo também depende de sonda cancelável e entendimento do efeito do GETRange sobre o debrid; a fonte guardada já tem caminho paralelo.
-6. **Publicação e respostas só depois.** Após resultados físicos e autorização do dono, usar notas e tabela de arquivo por sistema, publicar anexos conferidos e então responder/administrar issues realmente resolvidas. Nenhuma autorização de envio é inferida do pedido de roadmap.
+1. **Authorized Local Candidate Completed.** Durable queue, scripts, and island isolation reside in `b71471bc`; generation, check, and checksums for 13 attachments passed with identical source hash. Use this batch for hardware round. Packages `32e70e48` and `fc711f6b` segregated as intermediate.
+2. **Owner Conducts Short TV Testing Round.** Verify package/core/host prior to test; one person/agent per TV. Observe two boundaries, 119/120s, expired source, profile, Settings, live TV, and subtitles. Record failures with milestone and timestamp, without running full test suite.
+3. **Investigate Pending P1s per Scenario.** Android 3003/2004, Samsung aspect ratio / catalogs, LG startup UK6540, and CW flicker should receive targeted reproductions. Modify solely demonstrated root causes; rerun area-specific tests and rebuild affected package. Avoid combining disparate hypotheses into broad patches.
+4. **Reevaluate Scope with Owner.** Social and Discord possess substantial new work, but remain excluded from this candidate. Island mockup was rejected and dropped from queue. If selected, review each unit atop current release, preserving enums/defaults/identity/generations and retesting affected matrix. Aggregator Social avoids three redundant merges. Do not touch active server as side effect.
+5. **Prepare 1.8.** Plugins and P2P demand per-call cancellation, disk/memory bounds, and backend proof. Generic parallel first-source open also depends on cancellable probe and debrid GET Range effect analysis; stored source already features parallel path.
+6. **Publishing and Replies Subsequent to Hardware Pass.** After physical results and owner authorization, use notes and platform file table, publish verified attachments, and reply/administer genuinely resolved issues. Zero release authorization inferred from roadmap request.
 
-## Matriz curta por plataforma
+## Short Per-Platform Matrix
 
-| Plataforma | Casos necessários | Aceitação / limites |
+| Platform | Required Cases | Acceptance / Limits |
 |---|---|---|
-| **LG C9 — IPK normal/highcache** | Ilha/retorno119/120 s; fonte expirada; live Xtream contínuo e troca de canal; MKV com ASS **em faixa embutida**; perfil/logout durante sync; contraste/localização | Sem novo load na retenção válida; após prazo pipeline liberado e fallback válido; live sem corte da segunda conexão; memória compatível com aparelho. C9 não certifica UK6540 ou C4. |
-| **Samsung WGT** | Fontes incrementais, UI durante addon lento/timeout, HTTP 403 com cabeçalhosAVPlay, Ajustes/busca/Voltar, perfil/fallback | Chrome69, orçamento de heap, sem travar navegação indevidamente. XHR síncrono ainda tem limites de timeout/cancelamento; não afirmar garantia ausente. |
-| **Samsung TPK4/5** | #221 no Tizen 5; núcleo por memfd, atualização sobre host anterior/ícone, proporção/modos, saída/retorno e trailer → filme | ABI sem TLS/PT_TLS/relocaçõesTLS, DT_HASH presente e arte essencial disponível. Build não prova carga na TV; host4/5 precisa aparelho dessa geração. |
-| **Samsung TPK6+ /6.5 /api11** | Plano single-window, proporção#195, áudio sem vídeo#188, retorno de segundo plano, fonte/cabeçalho, Ajustes e ícone | Distinguir host/API e núcleo. Não reintroduzir ROI que revela Home; backend pode não oferecer todos os recortes. Uma Samsung moderna não certifica todas as APIs. |
-| **Android/TCL — APK dual ABI** | Ponto salvo aceito na preparação/fallback, live sem seek, HDR/troca deapp, retenção, fonte vencida,3003/2004, perfis | Medir pedido→fontes→URL→pronto→primeiro quadro→ponto salvo na mesma mídia; sem seek duplicado e sem resposta de perfil antigo. Confirmar pacote presente após builds de outras sessões. |
-| **Android celular/tablet** | Toque, arrastar, seleção de perfil, login por e-mail, teclado, tamanho/orientação |  #216 exige toque real. Teste D-pad da TCL não substitui esse caso. |
+| **LG C9 — normal/highcache IPK** | Island / resume 119/120s; expired source; continuous Xtream live TV and channel switch; MKV with **embedded ASS track**; profile/logout during sync; contrast/localization | Zero new load during valid retention; post-retention pipeline freed and valid fallback; live TV without second connection cut; device-compatible memory. C9 does not certify UK6540 or C4. |
+| **Samsung WGT** | Incremental sources, UI during slow add-on / timeout, HTTP 403 with AVPlay headers, Settings/search/Back, profile/fallback | Chrome69, heap budget, non-blocking navigation. Synchronous XHR still carries timeout/cancellation limits; do not make unfounded guarantees. |
+| **Samsung TPK 4/5** | #221 on Tizen 5; core via memfd, update on legacy host / icon, aspect ratio / modes, app resume, and trailer → movie | ABI without TLS/PT_TLS/TLS relocations, DT_HASH present, and essential artwork available. Build does not prove TV loading; 4/5 host requires matching hardware generation. |
+| **Samsung TPK 6+ / 6.5 / api11** | Single-window plane, aspect ratio #195, audio without video #188, background resume, source/header, Settings, and icon | Distinguish host/API from core. Do not reintroduce ROI revealing Home; backend may not support all crops. Modern Samsung does not certify all APIs. |
+| **Android/TCL — Dual ABI APK** | Saved point accepted in prep / fallback, live TV without seek, HDR / app switch, retention, expired source, 3003/2004, profiles | Benchmark request→sources→URL→ready→first frame→saved position on same media; zero duplicate seeks and no stale profile responses. Confirm present package post foreign builds. |
+| **Android Phone/Tablet** | Touch, drag, profile selection, email login, keyboard, size/orientation | #216 requires physical touch. TCL D-pad does not substitute. |
 
-Não há medição de latência/fps/memória da nova candidata em TV nesta auditoria. Aproveitar o hardware exige orçamento e medidas por backend; pré-cache genérico não é automaticamente seguro nem torna nova mídia instantânea.
+Zero latency/FPS/memory measurements of new candidate on TV in this audit. Exploiting hardware requires backend-specific budgets and measurements; generic precache is not inherently safe and does not make new media playback instant.
 
-## Resultado esperado da próxima decisão
+## Expected Outcome of Next Decision
 
-Candidata 1.7.2 com origem e anexos verificáveis, casos essenciais testados pelo dono, defeitos restantes identificados por cenário e roadmap das features separado da estabilização. Social/Discord só entram após escolha explícita e prova; plugins/P2P permanecem na 1.8. Nenhuma contagem de issue ou ausência de marcador fatal será usada para prometer 100% de correção.
+1.7.2 candidate with verifiable source and attachments, essential test cases conducted by owner, remaining bugs isolated per scenario, and feature roadmap separated from stabilization. Social/Discord enter only post explicit decision and proof; plugins/P2P remain in 1.8. Zero issue counts or missing fatal markers will be used to promise 100% resolution.

@@ -1,170 +1,108 @@
-# Pôsteres personalizados
+# Custom Posters
 
-Troca os cartazes retrato do app (home, biblioteca, busca, "Ver tudo" e "Mais
-como este") por cartazes **já prontos** de um serviço externo: arte sem texto,
-logo, notas, selos 4K/HDR/Dolby Vision e faixa Top 10, tudo desenhado no
-próprio cartaz. **Desligado por padrão.**
+Replaces portrait poster cards in the app (Home, Library, Search, "See all" and "More like this") with **pre-rendered** posters from an external service: textless art, logo, ratings, 4K/HDR/Dolby Vision badges, and Top 10 banner, all rendered directly onto the poster image itself. **Disabled by default.**
 
-Ajustes > Layout > **Pôsteres personalizados**.
+Settings > Layout > **Custom posters**.
 
-Só cartaz retrato (2:3) de card. O destaque da home, o fundo da página do
-título e os cards deitados **não mudam**: nenhum dos serviços abaixo entrega
-16:9.
+Portrait cards (2:3) only. The hero spotlight on Home, the title page background, and landscape cards **do not change**: none of the services below provide 16:9 images.
 
-## Provedores
+## Providers
 
-| Opção | O que é | Precisa de |
+| Option | What it is | Requires |
 |---|---|---|
-| **SpatialPosters** | Servidor de código aberto ([TheAceOfficials/SpatialPosters](https://github.com/TheAceOfficials/SpatialPosters), AGPL-3.0) que monta o cartaz na hora. Instância pública ou a sua. | Nada (instância pública) ou um servidor seu |
-| **RPDB** | [RatingPosterDB](https://ratingposterdb.com), serviço pago com chave gratuita de teste limitada. | Chave da sua conta |
-| **Modelo próprio** | Qualquer endereço com `{imdb}`, `{tmdb}`, `{type}`, `{tipo_tmdb}`. | Um servidor que responda imagem |
+| **SpatialPosters** | Open source server ([TheAceOfficials/SpatialPosters](https://github.com/TheAceOfficials/SpatialPosters), AGPL-3.0) that generates posters on the fly. Public instance or self-hosted. | Nothing (public instance) or your own server |
+| **RPDB** | [RatingPosterDB](https://ratingposterdb.com), paid service with a limited free trial key. | Your account API key |
+| **Custom template** | Any URL with `{imdb}`, `{tmdb}`, `{type}`, `{tipo_tmdb}`. | A server that responds with an image |
 
-Se o serviço não responde (erro HTTP, prazo, imagem quebrada), o card volta ao
-cartaz normal e **não tenta de novo naquela sessão**. Depois de 6 falhas
-seguidas o serviço fica em pausa por 5 minutos, para uma instância fora do ar
-não custar 20 segundos de espera por card.
+If the service fails to respond (HTTP error, timeout, corrupted image), the card falls back to the default poster and **does not retry in that session**. After 6 consecutive failures, the service pauses for 5 minutes, preventing an offline instance from causing a 20-second wait per card.
 
 ## SpatialPosters
 
-### Instância pública
+### Public Instance
 
-1. Ajustes > Layout > Pôsteres personalizados > escolha **SpatialPosters**.
-2. Deixe o endereço vazio: usa `https://spatial-posters.vercel.app`.
-3. **Testar pôsteres** baixa o cartaz de *Um Sonho de Liberdade* e diz se deu
-   certo.
+1. Settings > Layout > Custom posters > select **SpatialPosters**.
+2. Leave address empty: defaults to `https://spatial-posters.vercel.app`.
+3. **Test posters** downloads the poster for *The Shawshank Redemption* and reports success or failure.
 
-A pública é gratuita e **compartilhada** (ver "Limites"). Para uso diário com
-muitos cartazes, prefira a sua.
+The public instance is free and **shared** (see "Limits"). For daily use with many posters, self-hosting is recommended.
 
-### Instância própria (Docker)
+### Self-Hosted Instance (Docker)
 
 ```bash
 docker run -d --name spatialposters -p 3000:3000 \
-  -e SPATIALPOSTERS_TMDB_KEY="sua_chave_v3_do_tmdb" \
+  -e SPATIALPOSTERS_TMDB_KEY="your_tmdb_v3_key" \
   -e SPATIALPOSTERS_PUBLIC_INSTANCE=1 \
   -v spatialposters_data:/data --restart unless-stopped \
   theaceofficials/spatialposters:latest
 ```
 
-No app: **Endereço do SpatialPosters** = `192.168.1.5:3000` (IP e porta do
-servidor; sem `https://` vira `http://` para IP e nome `.local`). O visual
-padrão (estilo dos selos, gradiente, faixa) é o que você escolher no estúdio da
-própria instância — não precisa de token.
+In the app: **SpatialPosters Address** = `192.168.1.5:3000` (IP and port of the server; without `https://`, becomes `http://` for IP and `.local` hostname). The default visual style (badge style, gradient, banner) is configured in your instance's studio — no token required.
 
-### Escolher o estilo: parâmetros curtos (recomendado)
+### Choosing the Style: Short Parameters (Recommended)
 
-**Parâmetros do SpatialPosters** aceita a parte curta da URL, por exemplo:
+**SpatialPosters Parameters** accepts the short URL query string, for example:
 
 ```
 bs=vetro&side=right
 ```
 
-Os mais úteis (nomes do próprio SpatialPosters): `bs` estilo do selo
-(`shadow`, `pill`, `bar`, `colored`, `bordo`, `vetro`), `rs` estilo da faixa
-Top 10 (`default`, `bar`, `colored`, `pill`, `netflix`), `side` (`left` ou
-`right`), `badges=0` (sem selos), `ranking=0` (sem faixa). O idioma da
-interface vai sozinho (`lang=`). `fmt`, `format`, `config` e `c` são recusados:
-o formato é sempre JPEG e o token tem campo próprio.
+Most useful parameters (native SpatialPosters names): `bs` badge style (`shadow`, `pill`, `bar`, `colored`, `bordo`, `vetro`), `rs` Top 10 banner style (`default`, `bar`, `colored`, `pill`, `netflix`), `side` (`left` or `right`), `badges=0` (no badges), `ranking=0` (no banner). Interface language is passed automatically (`lang=`). `fmt`, `format`, `config`, and `c` are rejected: format is always JPEG and token has its own field.
 
-### Token de configuração e o manifest do addon
+### Configuration Token and Addon Manifest
 
-O SpatialPosters também gera um **token** com todo o seu estilo (`/c/<token>/…`).
-Dá para colar no campo **Token do SpatialPosters** o token ou o endereço do
-manifest inteiro (`https://…/c/<token>/manifest.json`): o app extrai o token e,
-se vier com host, também a instância.
+SpatialPosters also generates a **token** containing your complete configuration (`/c/<token>/…`). You can paste into **SpatialPosters Token** either the raw token or the full manifest URL (`https://…/c/<token>/manifest.json`): the app extracts the token and, if a host is present, also sets the instance address.
 
-**Limite honesto:** um token real tem mais de 500 caracteres, e o app aceita no
-máximo 400 (a URL do cartaz precisa caber em 512 bytes no cache de imagens; o
-teclado da TV também não ajuda). Na prática o token só serve para
-configurações mínimas. Use os **parâmetros curtos** ou os **padrões da sua
-instância**.
+**Practical limit:** a full token often exceeds 500 characters, while the app accepts at most 400 (poster URLs must fit within 512 bytes in the image cache; typing on TV keyboard is also difficult). In practice, tokens are best suited for minimal setups. Prefer **short parameters** or **instance defaults**.
 
-### Duas maneiras de usar o SpatialPosters
+### Two Ways to Use SpatialPosters
 
-**A) Endpoint de imagem (o que esta tela faz).** O app monta a URL
-`<instância>/api/poster/{movie|series}/<tt…>?fmt=jpeg&lang=<idioma>[&extras][&config=<token>]`
-para o IMDb de cada título. O título continua sendo o do seu catálogo normal:
-streams, Trakt, legendas e progresso seguem iguais. É o modo recomendado.
+**A) Image Endpoint (what this screen provides).** The app constructs the URL `<instance>/api/poster/{movie|series}/<tt…>?fmt=jpeg&lang=<lang>[&extras][&config=<token>]` for each title's IMDb ID. The title remains linked to your regular catalog: streams, Trakt, subtitles, and progress behave normally. This is the recommended mode.
 
-**B) Addon Stremio.** Instalar `https://<domínio>/c/<token>/manifest.json` na
-conta Nuvio já funciona **sem esta tela**: os catálogos dele trazem o campo
-`poster` com o cartaz pronto e o app o desenha como vem (o destaque e os fundos
-continuam vindo da "Fonte da arte"). Mas os itens desse addon têm id
-`tmdb:<número>`, não IMDb, e por isso addons de fontes/legendas que só falam
-IMDb não acham o título. Serve para descobrir títulos, não para substituir o
-seu catálogo. Os dois modos combinam: com o addon instalado e esta tela
-ligada, os cartazes dos seus outros catálogos também ganham o visual.
+**B) Stremio Addon.** Installing `https://<domain>/c/<token>/manifest.json` in your Nuvio account works **without this screen**: its catalogs supply the pre-rendered `poster` URL directly and the app renders it as received (hero and backgrounds still use the "Artwork source"). However, items from this addon carry `tmdb:<id>` instead of IMDb IDs, so stream/subtitle addons that only support IMDb IDs will not locate the title. Best suited for discovery rather than replacing your primary catalog. Both modes can be combined: with the addon installed and this screen enabled, posters in your other catalogs also adopt the custom style.
 
 ## RPDB
 
-1. Pegue a chave em ratingposterdb.com.
-2. Escolha **RPDB** e preencha **Chave do RPDB**.
+1. Obtain your API key from ratingposterdb.com.
+2. Select **RPDB** and enter **RPDB Key**.
 
-URL usada: `https://api.ratingposterdb.com/<chave>/imdb/poster-default/<tt…>.jpg?fallback=true`
-(com `fallback=true` o RPDB devolve o cartaz do TMDB quando ele não tem o
-seu). Título sem IMDb usa `…/tmdb/poster-default/{movie|series}-<id>.jpg`.
-O arquivo é um JPEG progressivo de ~145 KB (580x859), bem maior que o do
-SpatialPosters (~48 KB, 500x750).
+URL used: `https://api.ratingposterdb.com/<key>/imdb/poster-default/<tt…>.jpg?fallback=true` (with `fallback=true`, RPDB returns TMDB poster when custom poster is absent). Titles without IMDb ID use `…/tmdb/poster-default/{movie|series}-<id>.jpg`.
+The image is a progressive JPEG of ~145 KB (580x859), larger than SpatialPosters (~48 KB, 500x750).
 
-## Modelo próprio
+## Custom Template
 
-**Modelo de URL dos pôsteres** = um endereço `http(s)://…` com pelo menos um
-destes marcadores:
+**Posters URL Template** = an `http(s)://…` URL containing at least one of these placeholders:
 
-| Marcador | Vale |
+| Placeholder | Value |
 |---|---|
-| `{imdb}` | `tt0111161` (título sem IMDb: fica com o cartaz normal) |
-| `{tmdb}` | id numérico do TMDB (se ainda não se sabe: cartaz normal) |
-| `{type}` | `movie` ou `series` |
-| `{tipo_tmdb}` | `movie` ou `tv` |
+| `{imdb}` | `tt0111161` (titles without IMDb retain standard poster) |
+| `{tmdb}` | Numeric TMDB ID (if unknown yet, retains standard poster) |
+| `{type}` | `movie` or `series` |
+| `{tipo_tmdb}` | `movie` or `tv` |
 
-Exemplo: `https://meu.servidor/{type}/{imdb}.jpg`. Máximo 300 caracteres; a URL
-final tem de caber em 512 bytes.
+Example: `https://my.server/{type}/{imdb}.jpg`. Maximum 300 characters; final URL must fit within 512 bytes.
 
-## O que é pedido, e quando
+## Requests and Scheduling
 
-- Só filme e série com id de IMDb (`tt…`) ou de TMDB (`tmdb:…`). Canais,
-  TV ao vivo e itens de outros addons ficam com o cartaz normal.
-- A URL é **estável** por título (não muda quando o app descobre o id do TMDB
-  depois): o cartaz vai para o mesmo cache de imagens de todo o resto, em
-  disco, e não é baixado de novo na próxima abertura.
-- No máximo **3 downloads ao mesmo tempo** do provedor, mesmo com 4 fios de rede
-  livres, e prazo de 20 s por cartaz (o primeiro cartaz de um título é montado
-  no servidor: ~3 s medidos na instância pública). Uma home de 200 cards vai
-  enchendo aos poucos; o card mostra o esqueleto cinza até o cartaz chegar (ou
-  o cartaz normal, se o serviço falhar).
-- Formato: **sempre JPEG** (`fmt=jpeg`). É o que decodifica direto em todos os
-  alvos (LG com libjpeg; Samsung no navegador) e, nos testes, o WebP do
-  SpatialPosters tinha o mesmo tamanho.
-- O token e a chave **nunca vão para o log**: a URL só aparece como
-  `https://host/...`. Ficam em `posteres.txt` na pasta de dados desta TV, não
-  sincronizam com a conta.
+- Movies and series only, with IMDb ID (`tt…`) or TMDB ID (`tmdb:…`). Live TV channels and non-standard addon items retain default posters.
+- URLs are **stable** per title (do not change when the app discovers TMDB ID later): posters enter the unified on-disk image cache and are not re-downloaded on subsequent app launches.
+- Maximum **3 concurrent downloads** from provider, even with 4 network worker threads available, with a 20 s timeout per poster (first poster request for a title is generated on server: ~3 s measured on public instance). A 200-card home screen populates progressively; cards display a gray skeleton placeholder until poster arrives (or default poster on error).
+- Format: **always JPEG** (`fmt=jpeg`). Decodes directly on all targets (LG via libjpeg; Samsung in browser) and WebP showed identical file size in testing.
+- Token and API key are **never logged**: URLs appear sanitized as `https://host/...`. Stored locally in `posteres.txt` in device data directory; not synced to account.
 
-## Limites e custo
+## Limits and Costs
 
-- **Instância pública do SpatialPosters (Vercel):** compartilhada, sem
-  garantia. O servidor limita cada IP a um balde de 200 pedidos com
-  reposição de 20 por segundo (rota de cartaz) e responde `429`/`503` quando
-  passa disso; o app trata como falha do item. Cartazes frios são renderizados
-  na função da Vercel e podem demorar. O cartaz pronto fica em cache do CDN por
-  6 h (`max-age=21600`).
-- **Custo para você:** o app não cobra nada. Instância pública: grátis. Sua
-  própria: o servidor/NAS e uma chave gratuita do TMDB. RPDB: o plano dele.
-- **Dados enviados:** o servidor escolhido vê o IP da TV, o id do título e, se
-  houver, o token ou a chave (por isso "instância própria" é o caminho mais
-  privado).
-- **Licença:** o SpatialPosters é AGPL-3.0. Este app **só chama os endpoints
-  HTTP dele**; não contém nem copia código dele. Quem hospeda a própria
-  instância segue as condições da AGPL para o código do servidor.
-- **Memória e disco:** cartaz de 500x750 decodificado no tamanho do card, no
-  mesmo orçamento de texturas de sempre.
+- **Public SpatialPosters Instance (Vercel):** shared, no SLA. Server limits each IP to a bucket of 200 requests with 20/s refill (poster route) and returns `429`/`503` when exceeded; app handles this gracefully as item fallback. Cold posters are rendered in Vercel serverless function and can be slower. Completed posters are cached on CDN for 6 hours (`max-age=21600`).
+- **Cost:** app charges nothing. Public instance: free. Self-hosted: your own server/NAS + free TMDB API key. RPDB: subscription tier.
+- **Privacy:** chosen server receives TV IP address, title ID, and token/key (self-hosting is the most private option).
+- **License:** SpatialPosters is AGPL-3.0. This app **only calls its HTTP endpoints**; contains no copied code. Self-hosters are subject to AGPL terms for server code.
+- **Memory & Disk:** 500x750 poster decoded to card dimensions within standard texture budget.
 
-## Problemas comuns
+## Common Issues
 
-| A linha "Testar pôsteres" diz | Significa |
+| "Test posters" message | Meaning |
 |---|---|
-| `funcionou · 47 KB em 900 ms` | Tudo certo. |
-| `sem resposta do serviço` | Endereço errado, servidor fora do ar, sem internet ou o prazo de 20 s estourou. |
-| `respondeu, mas não é uma imagem` | O endereço responde, mas não é o endpoint de cartaz (proxy, página de erro). |
-| `configuração incompleta ou grande demais` | Falta a chave do RPDB / o modelo, ou a URL passou de 512 bytes (token longo). |
-| `token inválido …` | O texto colado tem caracteres fora de letras, números e `_ . ~ = -` ou passa de 400. |
+| `success · 47 KB in 900 ms` | Everything working properly. |
+| `no response from service` | Wrong address, server down, no internet, or 20 s timeout expired. |
+| `responded, but not an image` | Server responds, but not with an image endpoint (proxy error page). |
+| `incomplete or oversized configuration` | Missing RPDB key/template, or URL exceeded 512 bytes (long token). |
+| `invalid token …` | Pasted text contains characters outside letters, numbers, and `_ . ~ = -` or exceeds 400 chars. |

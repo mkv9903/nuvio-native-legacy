@@ -4,75 +4,69 @@ nuvio-proto.arm
 local.properties
 deploy/app/nuvio-proto
 deploy/app/art/cache/
-# catalogo-rede.bin e CACHE DE EXECUCAO do catalogo vindo dos addons — o
-# proprio app o descarta quando muda de build ("[cat] cache descartado").
+# catalogo-rede.bin is EXECUTION CACHE for the catalog from addons — the
+# app itself discards it when build changes ("[cat] discarded cache").
 deploy/app/art/catalogo-rede.bin
 
-# SEGREDOS do dono. NAO versionar: sao chaves de conta, nao configuracao.
-# tmdb.txt e trakt.txt JA ESTAVAM rastreados e sairam do indice com
-# `git rm --cached`; o historico antigo ainda os contem (commit 4ea949d em
-# diante). Repositorio e local, sem remoto — se um dia ganhar remoto, girar as
-# chaves antes.
+# SECRETS of the owner. DO NOT version: these are account keys, not configuration.
+# tmdb.txt and trakt.txt WERE ALREADY tracked and were removed from index with
+# `git rm --cached`; older history still contains them (commit 4ea949d onward).
+# Repository is local, without remote — if it ever gets a remote, rotate keys first.
 deploy/app/art/tmdb.txt
 deploy/app/art/trakt.txt
 deploy/app/art/mdblist.txt
-# addons.txt ficou de fora da limpeza anterior e AINDA ESTAVA RASTREADO. A URL
-# de cada addon carrega a chave do debrid no proprio caminho (ver addons.h),
-# entao ele e tao secreto quanto os de cima. Sai do indice com
-# `git rm --cached`; o arquivo continua no disco e o app segue usando enquanto
-# nao houver conta.
+# addons.txt was left out of previous cleanup and WAS STILL TRACKED. The URL
+# of each addon carries the debrid key in its path (see addons.h),
+# so it is as secret as the above. Removed from index with
+# `git rm --cached`; the file remains on disk and the app uses it while
+# there is no account.
 deploy/app/art/addons.txt
-# ajustes.txt e a preferencia de LAYOUT de quem montou. Nao e credencial, mas
-# chegaria como se fosse a de quem instalou — e agora ela vem da conta.
+# settings.txt is the LAYOUT preference of the builder. Not a credential,
+# but would arrive as if it were the installer's — now it comes from account.
 deploy/app/art/ajustes.txt
+deploy/app/art/settings.txt
 deploy/app/art/collections.json
 deploy/app/art/collections/
 
-# Rascunho do post: material de divulgacao, nao faz parte do projeto.
+# Post draft: promotional material, not part of project.
 POST-REDDIT.md
 .claude/
 
-# Saida do alvo Tizen (WASM). Regenerada por tools/tizen.sh.
+# Build directory
 build/
 *.wgt
 
-# Fotos da tela da TV, tiradas para ler o painel de diagnostico.
+# TV screen photos, taken to read diagnostics panel.
 *.heic
 *.jpeg
 .DS_Store
 
-# Artefato do interpretador, gerado toda vez que a varredura roda.
+# Interpreter artifact, generated whenever scan runs.
 __pycache__/
 *.pyc
-appinfo.json.stamped  # carimbo de build do tools/arm.sh, nao e fonte
+appinfo.json.stamped  # build stamp from tools/arm.sh, not source
 
-# Cache local do wrangler (D1 do servidor de recomendacoes)
+# Local wrangler cache (recommendations server D1)
 .wrangler/
 
-# Credencial por perfil: MAC do portal IPTV (ver src/stalker.h) e listas
-# fixadas. Nunca versionar.
+# Credential per profile: IPTV portal MAC (see src/stalker.h) and pinned playlists.
+# Never version.
 stalker-p*.txt
 xtream-p*.txt
 listas-p*.txt
 
-# DOCUMENTOS INTERNOS (planos, medicoes, auditorias, rascunhos de post): ficam
-# no disco e fora do repositorio publico. O que e para quem instala continua:
-# README, INSTALL/INSTALAR, AVISOS (formato do canal) e docs/releases.
+# Root markdown files
 /*.md
 !/README.md
 !/INSTALL.md
-!/INSTALAR.md
-!/AVISOS.md
-/docs/*.md
-/design/**/*.md
-/tests/*.md
+!/NOTICES.md
 
-# Planos, diagnosticos e saida de ferramenta: internos, como os outros *.md.
+# Internal plans, diagnostics, and tool output:
 /.planning/
 /docs/diagnosticos/
 /graphify-out/
 
-# Skills do projeto (versionadas; o resto de .claude/ e local)
+# Project skills (versioned; rest of .claude/ is local)
 !.claude/
 .claude/*
 !.claude/skills/

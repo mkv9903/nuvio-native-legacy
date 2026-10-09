@@ -1,36 +1,36 @@
-# Home progressiva — review independente
+# Progressive Home — Independent Review
 
-Revisao read-only de `src/catalogo.c/h:cat_home_apenas_fixas`, decisao em
-`src/descoberta.c:montar` e novo fixture `tests/home_progressiva.c/sh`.
-Sem edicoes ou duplicacao da suite executada pelo implementador.
+Read-only review of `src/catalogo.c/h:cat_home_apenas_fixas`, decision in
+`src/descoberta.c:montar` and new fixture `tests/home_progressiva.c/sh`.
+Without edits or duplication of the suite executed by the implementer.
 
-Veredito: sem blocker novo observado nos hunks. A decisao antiga cat_n()==0
-nao reconhecia a Home inicial quando CW/social chegavam antes do primeiro
-catalogo; getter novo reconhece esse estado com leitura coerente de itens e
-fileiras. O log de reproducao antes tinha ready=1ms, visible=354ms esperando
-o catalogo lento. Resultado depois deve vir dos testes do implementador.
+Verdict: no new blockers observed in the hunks. The old decision `cat_n() == 0`
+did not recognize the initial Home when CW/social arrived before the first
+catalog; the new getter recognizes this state with coherent reading of items and
+rows. The playback log previously had `ready=1ms`, `visible=354ms` waiting
+for the slow catalog. The "after" result should come from implementer tests.
 
-- Mutex pubTrava cobre snapshot conjunto n/itens/fils/nFils, evitando observar
-  n==0 ou janelas intermediarias durante publicacao. Getter nao chama APIs que
-  peguem outras travas e nao retém ponteiros depois de soltar a trava.
-- Apenas chaves reservadas continue_watching/social_activity permitem cold.
-  Qualquer catalogo/colecao ja publicado e warm, inclusive fileira com estado
-  mas sem itens. Marcadores naLista/naColecao e itens nao atribuidos a janela
-  tambem bloqueiam, preservando listas/metadata prontas antes da classificacao.
-- Warm sai durante scan curto de fileiras; cold tem no maximo duas fixas e
-  poucos itens. Nao introduz scan pesado por quadro; chamado uma vez por ciclo.
-- Estado de lista preparado dentro do proprio ciclo permanece anexado pelos
-  helpers de publicacao existentes. FonteIntacta/geracao guardam publicacoes
-  por catalogo e descarte/reinicio final como antes. Hunk nao relaxa identidade.
-- Tests usam implementacao real descoberta/catalogo/homeestado com rede dublada
-  e atraso controlado. Cases0-3 separam coldfixas, warmcatalogo, readywatchlist
-  sem janela, collectionkey; case4 troca dono+geracao durante rede.
+- Mutex `pubTrava` covers joint snapshot `n/itens/fils/nFils`, avoiding observing
+  `n == 0` or intermediate windows during publication. The getter does not call APIs
+  that acquire other locks and does not retain pointers after releasing the lock.
+- Only reserved keys `continue_watching`/`social_activity` allow cold state.
+  Any catalog/collection already published is warm, including a row with state
+  but without items. `naLista`/`naColecao` markers and items not assigned to a window
+  also block, preserving ready lists/metadata before classification.
+- Warm exits during a short row scan; cold has at most two fixed rows and
+  few items. It does not introduce heavy per-frame scans; called once per cycle.
+- List state prepared within the cycle itself remains attached by existing
+  publication helpers. `FonteIntacta`/generation guard publications
+  per catalog and final discard/restart as before. Hunk does not relax identity.
+- Tests use real discovery/catalog/home-state implementation with mocked network
+  and controlled delay. Cases 0-3 separate cold fixed rows, warm catalog, ready watchlist
+  without window, collection key; case 4 switches owner + generation during network.
 
-Limites relevantes: case4 usa mesmos ids nos dois donos e perfil fixo1; prova
-cancel/restart, nao dados distintos entre perfis/contas reais. Getter decide
-uma vez no inicio: dados mesclados posteriormente seguem protocolo existente,
-nao uma transacao de classificacao+publicacao. Override parcialNaTela e
-publicacao inicialCW sao caminhos herdados sem alteracao de guard pelo hunk;
-nao e novo teste abrangente de races de todos os publicadores. Nao rodado TSan,
-provider externo ou TV nesta revisao. Logs PASS do implementador e copia
-integrada do root sao a evidencia dinamica complementar.
+Relevant boundaries: case 4 uses the same IDs in both owners and fixed profile 1; proves
+cancel/restart, not distinct data between real profiles/accounts. Getter decides
+once at startup: subsequently merged data follows existing protocol,
+not a classification + publication transaction. Partial override on screen and
+initial CW publication are inherited paths without guard alteration by the hunk;
+it is not a comprehensive new race test for all publishers. TSan,
+external provider, or TV were not run in this review. Implementer PASS logs and
+integrated copy from root are complementary dynamic evidence.

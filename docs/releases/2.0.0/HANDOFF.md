@@ -1,143 +1,143 @@
-# Handoff 2.0 — estado em 05/10/2026, ~18h (horário local)
+# Handoff 2.0 — State on 10/05/2026, ~18:00 (Local Time)
 
-Documento único para quem assume. Substitui `docs/releases/1.8.0/HANDOFF-2.0.md` no que diz respeito a estado; as regras de release de lá continuam valendo. Leia inteiro antes de mexer.
+Single document for the taking-over agent. Replaces `docs/releases/1.8.0/HANDOFF-2.0.md` regarding state; release rules from that document remain valid. Read entirely before making changes.
 
-**Nada foi publicado.** Sem push, sem tag, sem release, sem `avisos.json`, sem resposta em issue. Tudo isso precisa de "pode" do dono.
+**Nothing was published.** No push, no tag, no release, no `avisos.json`, no issue responses. All of this requires explicit owner approval.
 
-## Onde está o trabalho
+## Location of Work
 
-- Checkout: `/Users/hrocha/.codex/worktrees/integration-180-glass/nuvio-native-legacy`, branch `codex/integration-180-glass`, HEAD `20631ad8`. Local, sem push.
-- **Árvore suja de propósito**: `deploy/app/appinfo.json` e `tools/tizen-config.xml` estão em `2.0.0` **sem commit** (vira o commit `v2.0.0` no fim). Enquanto estiver assim, **nunca use `git commit -a` nem `git add -A`** — já levou o bump junto uma vez. Adicione por arquivo.
-- Worktree de build limpa: `/Users/hrocha/Projetos/Pessoal/LG WEB/nuvio-tpk-build`, parada em `f95345cf` com o mesmo bump solto. É irmã do NuvioWeb e acha as chaves sozinha.
-- O checkout principal (`LG WEB/nuvio-native-legacy`, branch `fix/tpk-selo-hdr`) tem ~90 arquivos de WIP do dono. **Não tocar.**
+- Checkout: `/Users/hrocha/.codex/worktrees/integration-180-glass/nuvio-native-legacy`, branch `codex/integration-180-glass`, HEAD `20631ad8`. Local, without push.
+- **Tree intentionally dirty**: `deploy/app/appinfo.json` and `tools/tizen-config.xml` are set to `2.0.0` **uncommitted** (becomes `v2.0.0` commit at end). While in this state, **never use `git commit -a` or `git add -A`** — it previously included version bump by mistake. Add per file.
+- Clean build worktree: `/Users/hrocha/Projetos/Pessoal/LG WEB/nuvio-tpk-build`, stopped at `f95345cf` with same loose bump. Sibling to NuvioWeb and discovers keys automatically.
+- Main checkout (`LG WEB/nuvio-native-legacy`, branch `fix/tpk-selo-hdr`) contains ~90 owner WIP files. **Do not touch.**
 
-## Regras do dono que já custaram caro hoje
+## Owner Rules that Proved Costly Today
 
-1. **Não instalar em TV sem ele pedir naquela tarefa.** Compilar, avisar, esperar. Instalei três vezes na TCL sem pedido antes de reler essa regra. Ler log e tirar captura não fecham o app e estão liberados.
-2. **Não afirmar causa sem prova.** Diga "acho" até ter log ou medida.
-3. **Medir na TV, não no Mac.** O simulador do Mac usa outra fonte e outra GPU.
-4. Respostas curtas. Menos teste, só do que mudou.
-5. `NUVIO_PROPERTIES="/Users/hrocha/Projetos/Pessoal/LG WEB/NuvioWeb-0.3.38-beta/local.properties"` sempre exportado ao compilar fora de `LG WEB/` (senão o pacote sai sem chaves).
+1. **Do not install on TV without explicit request in that task.** Compile, notify, wait. Installed 3 times on TCL without request before rereading rule. Reading logs and capturing screenshots do not close app and are allowed.
+2. **Do not assert root cause without proof.** Say "suspect" until having log or measurement.
+3. **Measure on physical TV, not Mac.** Mac simulator uses different font rendering and GPU.
+4. Short answers. Fewer tests, only what changed.
+5. `NUVIO_PROPERTIES="/Users/hrocha/Projetos/Pessoal/LG WEB/NuvioWeb-0.3.38-beta/local.properties"` always exported when compiling outside `LG WEB/` (otherwise package lacks keys).
 
-## O que cada TV tem agora
+## What Each TV Currently Runs
 
-| TV | Endereço | Build |
+| TV | Address | Build |
 |---|---|---|
-| TCL Android | `192.168.1.128:5555` (adb) | `2f752c39`, APK limpo |
-| LG C9 | `192.168.1.32` (ssh root/alpine) | `3f6b9904`, `--alto-cache` |
-| Samsung (testador, Q80A Tizen 6.0) | só por arquivo | recebeu `.tpk` de `f95345cf` |
+| TCL Android | `192.168.1.128:5555` (adb) | `2f752c39`, clean APK |
+| LG C9 | `192.168.1.32` (ssh root/alpine) | `3f6b9904`, `--high-cache` |
+| Samsung (tester, Q80A Tizen 6.0) | File only | Received `.tpk` from `f95345cf` |
 
-A C9 só responde quando está acordada. Do Mac vai direto: `NUVIO_SSH_OPTS="-o ProxyJump=none -o UserKnownHostsFile=/dev/null" bash tools/arm.sh --alto-cache`. Log em `/tmp/nuvio.log` (não `/tmp/space.nuvio...log`).
+C9 responds only when awake. From Mac direct: `NUVIO_SSH_OPTS="-o ProxyJump=none -o UserKnownHostsFile=/dev/null" bash tools/arm.sh --high-cache`. Log in `/tmp/nuvio.log` (not `/tmp/space.nuvio...log`).
 
-## Feito hoje (25 commits desde `f3f802a6`)
+## Completed Today (25 Commits Since `f3f802a6`)
 
-### Regressões achadas com prova
+### Proven Regressions Found
 
-- **Home colapsava no arranque** (`a7162fa4`, `3f6b9904`). A descoberta larga no boot e lia a lista de addons antes de o sync entregar os da conta (que só roda depois de escolher o perfil). Lista vazia → 0 catálogos pedidos → publicava 2 fileiras por cima das 7 do cache e gravava o cache menor. Depois remontava de novo quando as coleções chegavam. Agora a primeira volta espera o ciclo inteiro da conta, por um gancho que `main.c` registra (`desc_espera_addons_definir`). Medido na TCL: 7 do cache → 14 de uma vez.
-  - O gancho existe porque testes que compilam `descoberta.c` sozinho não têm sessão nem perfis; dependência direta quebra o link de `colfileiras`, `cwlocal`, `home_progressiva` e outros.
-- **Página do título travava ~2 s ao entrar** (`e1e39362`). Os filtros do pacote de selos (regex) rodavam na thread principal a cada addon que respondia. Log da TCL: `upd=1667 ms` com 20 fontes. Agora em thread de fundo; até chegar, a fileira usa a detecção embutida.
-- **Frost preto em toda TV no nível de efeitos 1** (`a7162fa4`). `gfx_rect` descartava `GFX_LUZ` até dentro do assado do Frost. Prova no log da Samsung: esperado `61,60,59`, tela `20,21,25`. A TCL também é nível 1.
-- **Parede "Filmes" da tela de perfis a 34 FPS na C9** (`a400173d`). Medido peça por peça: sem os dois véus laterais radiais, 60 FPS. Saíram; as colunas das pontas apagam no próprio cartaz.
-- **Título aberto pelas Recomendações ficava com o cartaz esticado** (`f95345cf`). A página congelava a arte na semente (só cartaz) e não trocava quando o fundo chegava.
+- **Home collapsed on startup** (`a7162fa4`, `3f6b9904`). Discovery begins at boot and read add-on list before sync delivered account add-ons (which runs only after profile selection). Empty list → 0 catalogs requested → published 2 rows over 7 cached rows and saved smaller cache. Then rebuilt again when collections arrived. First pass now awaits complete account cycle via hook registered in `main.c` (`desc_espera_addons_definir`). Measured on TCL: 7 cached → 14 at once.
+  - Hook exists because tests compiling `descoberta.c` in isolation lack session/profiles; direct dependency breaks link for `colfileiras`, `cwlocal`, `home_progressiva`, and others.
+- **Title page stalled ~2s upon entering** (`e1e39362`). Badge pack regex filters ran on main thread per responding add-on. TCL log: `upd=1667 ms` with 20 sources. Now on background thread; until ready, row uses built-in detection.
+- **Black Frost across all TVs on effects level 1** (`a7162fa4`). `gfx_rect` discarded `GFX_LUZ` even inside Frost bake. Proof in Samsung log: expected `61,60,59`, rendered `20,21,25`. TCL is also level 1.
+- **"Movies" wall on profile screen at 34 FPS on C9** (`a400173d`). Measured component by component: without two radial edge veils, 60 FPS. Removed; edge columns fade on the poster itself.
+- **Title opened from Recommendations displayed stretched poster** (`f95345cf`). Page froze artwork on seed (poster only) and did not swap when background arrived.
 
-### Pedidos do dono
+### Owner Requests
 
-- Fonte árabe embarcada para a Samsung + legenda Windows-1256 (`a1cf2e46`).
-- Padrões da 2.0 para novos e antigos: Imersiva + Cor da logo + Frost, vidro desligado, com migração única (`7457db07`).
-- Frost na Imersiva = chão do app + a luz de ambiente do layout Apple TV; "Cor da logo" alimenta essa luz (`705bd604`, `a400173d`, `020a8214`).
-- Fundo borrado: véu do detalhe 55% → 36%; assado suavizado para não mostrar faixas (`a719bed2`, `7451c16a`).
-- Cor de destaque: ícone próprio por modo dinâmico, pílulas dentro do bloco (`0795d162`, `c9144dfd`).
-- Hero da Moderna em tela cheia na fileira de amigos (`f0449999`).
-- Tela de perfis sem logo no canto, sem ilha de dicas, cartão "Continuar" maior (`30d80179`, `a400173d`).
-- Atraso de legenda em régua (`e5e4e337`). Segunda legenda fica embaixo da principal (`0314a683`; com ASS continua em cima).
-- Voltar de um título aberto dentro de outro volta ao anterior (`1300a466`).
-- Samsung: CH+/CH− fazem zap e o host reserva as teclas; Azul e CH+ chegam com o código da tecla Azul; Spotlight e Busca não os digitam (`91532396`, `2f752c39`, `20631ad8`).
-- Notas da release em `docs/releases/2.0.0/NOTAS.md`.
+- Embedded Arabic font for Samsung + Windows-1256 subtitles (`a1cf2e46`).
+- 2.0 defaults for new and existing installs: Immersive + Logo Color + Frost, glass disabled, with single migration (`7457db07`).
+- Frost in Immersive = app base plane + ambient light from Apple TV layout; "Logo Color" feeds this light (`705bd604`, `a400173d`, `020a8214`).
+- Blurred background: detail veil 55% → 36%; smoothed bake to prevent color banding (`a719bed2`, `7451c16a`).
+- Accent color: custom icon per dynamic mode, pills inside block (`0795d162`, `c9144dfd`).
+- Fullscreen Modern Hero on friends row (`f0449999`).
+- Profile screen without corner logo, without tips island, larger "Continue" card (`30d80179`, `a400173d`).
+- Subtitle delay on ruler (`e5e4e337`). Secondary subtitle positioned below primary (`0314a683`; with ASS remains above).
+- Back from title opened inside another returns to previous title (`1300a466`).
+- Samsung: CH+/CH− perform channel zap and host reserves keys; Blue and CH+ arrive with Blue keycode; Spotlight and Search do not type them (`91532396`, `2f752c39`, `20631ad8`).
+- Release notes in `docs/releases/2.0.0/NOTES.md`.
 
-### Instrumentos novos
+### New Instrumentation
 
-- Android: `adb shell setprop debug.nuvio.gfxoff "33 1"` desliga modos de desenho em execução (`1f15213f`). Modos: 0 CARD, 1 SOMBRA, 2 COR, 5 TEXTO, 33 AMBIENTE, 35 VITRINE.
-- `fotosDoElenco` loga cada saída (`[desc] elenco <tt>: ...`).
-- `tools/arm.sh` aceita `NUVIO_ARES_PACKAGE` (o `ares-package` está em `/Volumes/ExternalSSD/ares-cli/node_modules/.bin/ares-package`).
+- Android: `adb shell setprop debug.nuvio.gfxoff "33 1"` disables render modes at runtime (`1f15213f`). Modes: 0 CARD, 1 SOMBRA, 2 COR, 5 TEXTO, 33 AMBIENTE, 35 VITRINE.
+- `fotosDoElenco` logs every exit (`[desc] elenco <tt>: ...`).
+- `tools/arm.sh` accepts `NUVIO_ARES_PACKAGE` (`ares-package` resides in `/Volumes/ExternalSSD/ares-cli/node_modules/.bin/ares-package`).
 
-## Sem prova em TV
+## Unproven on Physical Hardware
 
-Nada abaixo foi visto por mim numa TV; a base é log, medida ou captura no Mac:
+Items below unverified on physical hardware by author; based on logs, measurements, or Mac captures:
 
-- Hero de amigos em tela cheia, véu do borrado, Frost com a luz de ambiente, Cor da logo na luz.
-- Voltar para o título anterior, segunda legenda embaixo, régua do atraso.
-- Tudo o que é Samsung: fonte árabe, CH±, Azul, e o próprio `.tpk` 2.0.0.
+- Fullscreen friends Hero, blurred veil, Frost with ambient light, Logo Color on light.
+- Return to previous title, secondary subtitle below, delay ruler.
+- All Samsung-specific items: Arabic font, CH±, Blue key, and `.tpk` 2.0.0 itself.
 
-Visto na TV: tela de perfis na C9 (60 FPS parada, captura conferida), Home montando de uma vez na TCL, CH+ na TCL.
+Observed on TV: profile screen on C9 (60 FPS static, capture verified), Home loading all at once on TCL, CH+ on TCL.
 
-## Aberto — por ordem de quem espera
+## Open Items — By Waiting Priority
 
-### 1. `.tpk` novo para o testador da Samsung
+### 1. Fresh `.tpk` for Samsung Tester
 
-O que ele tem é de `f95345cf`: **a Azul ainda escreve "s"** nesse pacote. Gerar de `20631ad8`:
+Tester has package from `f95345cf`: **Blue key still types "s"** in that package. Generate from `20631ad8`:
 
 ```bash
 cd "/Users/hrocha/Projetos/Pessoal/LG WEB/nuvio-tpk-build"
-git checkout -q --detach 20631ad8   # o bump 2.0.0 solto acompanha
+git checkout -q --detach 20631ad8   # loose 2.0.0 bump tracks along
 NV_TPK_PACOTES=NuvioTpk60 bash tools/tpk.sh
 ```
 
-Conferir: manifesto `version="2.0.0"`, zero arquivo de pessoa (`unzip -Z1 <tpk> | grep -iE 'addons\.txt|trakt\.txt|tmdb\.txt|mdblist|sessao|collections\.json'` vazio). O pacote tem ~34 MB e **não passa no envio pelo celular** (limite 30 MB): entregar pelo caminho no Mac. O dono precisa pedir o envio.
+Verify: manifest `version="2.0.0"`, zero personal files (`unzip -Z1 <tpk> | grep -iE 'addons\.txt|trakt\.txt|tmdb\.txt|mdblist|sessao|collections\.json'` empty). Package is ~34 MB and **fails mobile upload** (30 MB limit): transfer via Mac path. Owner must request delivery.
 
-Atenção: o dono já tinha mandado ao testador um `Nuvio-2.0(beta)-NuvioTpk60.tpk` que na verdade é **1.7.4** (commit `9ca29519`, antes de tudo de hoje). No servidor de logs ele aparece como 1.7.4 com a linha `[selos] embutidos`.
+Note: owner previously sent tester `Nuvio-2.0(beta)-NuvioTpk60.tpk` which is actually **1.7.4** (commit `9ca29519`, preceding today's work). On log server it shows as 1.7.4 with `[selos] embutidos` line.
 
-### 2. Tecla Azul — conferir depois do `.tpk` novo
+### 2. Blue Key — Verify After Fresh `.tpk`
 
-Relato do dono: na Samsung a Azul escreve "s". O conserto está em `2f752c39` + `20631ad8`, sem prova. Se continuar, olhar `src/tpk.c` (mapa de teclas) e quem mais digita letras por `sym`.
+Owner report: on Samsung Blue key types "s". Fix is in `2f752c39` + `20631ad8`, unverified on hardware. If persisting, inspect `src/tpk.c` (keymap) and other callers typing characters via `sym`.
 
-### 3. Editor de fileiras: divisão do limite
+### 3. Row Editor: Limit Partition
 
-O dono diz que a divisão entre o que está na Home e o que ficou de fora pelo limite não aparece. Ela existe no código (`src/ajustes_ux_fileiras.inc`, cabeçalho "Na fila", `filSep`) e só aparece quando as fileiras de catálogo ligadas passam do limite (`fil_estado` → `FIL_NA_FILA`). **Não achei por que não aparece na TV dele**; o log não diz. Pedi uma foto do editor aberto e ela não veio. Suspeita não provada: entradas velhas de addons sem manifesto lido ocupam posições abaixo do limite.
+Owner reports partition between items on Home and items excluded by limit does not appear. Exists in code (`src/ajustes_ux_fileiras.inc`, "In queue" header, `filSep`) and renders only when enabled catalog rows exceed limit (`fil_estado` → `FIL_NA_FILA`). **Could not determine why it does not render on his TV**; log does not indicate. Requested photo of open editor, not received. Unproven hypothesis: stale add-on entries lacking parsed manifests occupy slots below limit.
 
-### 4. TCL: 30 FPS com trailer tocando
+### 4. TCL: 30 FPS with Playing Trailer
 
-Medido: navegando nas fileiras sem trailer, 60 FPS. Parado no destaque com o trailer, 30,2. `dumpsys SurfaceFlinger` mostra as duas camadas do app (vídeo e interface) como `CLIENT` em 3840×2160; sem vídeo, a interface é `DEVICE`. Ou seja, a TV compõe as duas pela GPU em 4K.
+Measured: navigating rows without trailer, 60 FPS. Idle on hero with trailer, 30.2 FPS. `dumpsys SurfaceFlinger` shows both app layers (video and UI) as `CLIENT` at 3840×2160; without video, UI is `DEVICE`. TV composes both via GPU in 4K.
 
-Testado e revertido, sem efeito: tirar o zoom do trailer, `VIDEO_CHANGE_FRAME_RATE_STRATEGY_OFF`, a interface votar 60 Hz.
+Tested and reverted without effect: removing trailer zoom, `VIDEO_CHANGE_FRAME_RATE_STRATEGY_OFF`, UI voting 60 Hz.
 
-Proposta pendente de resposta do dono: trailer automático desligado de fábrica no Android. Ele quer um workaround; não achei outro.
+Pending owner proposal: disable auto-trailer by default on Android. Owner requested workaround; no other located.
 
-Receita de medição: `am force-stop`; `monkey -p space.nuvio.nativelegacy -c android.intent.category.LEANBACK_LAUNCHER 1`; 7 s; `input keyevent DPAD_CENTER`; o trailer do destaque começa ~4 s parado.
+Measurement recipe: `am force-stop`; `monkey -p space.nuvio.nativelegacy -c android.intent.category.LEANBACK_LAUNCHER 1`; 7s; `input keyevent DPAD_CENTER`; hero trailer starts after ~4s idle.
 
-### 5. Elenco sem foto e sem clique na Samsung (Ted Lasso)
+### 5. Cast Without Photo and Click on Samsung (Ted Lasso)
 
-Sem causa. TMDB `/find` e `/credits` respondem certo, os nomes do catálogo Nuvio e do Cinemeta casam, não há erro de rede no log do testador. Com os logs novos (`[desc] elenco ...`) o próximo registro dele deve dizer onde para. Suspeita não provada: `ajustes_tmdb_elenco()` é ajuste da conta (`tmdb_use_credits`).
+No proven root cause. TMDB `/find` and `/credits` respond correctly, Nuvio catalog and Cinemeta names match, zero network errors in tester log. With new logs (`[desc] elenco ...`) next upload should pinpoint failure point. Unproven hypothesis: `ajustes_tmdb_elenco()` is account setting (`tmdb_use_credits`).
 
-### 6. Pedidos que não comecei
+### 6. Unstarted Requests
 
-- **Legenda ASS em árabe.** A libass não usa a fonte de reserva nem o `src/bidi.c`, e o recorte da Noto Naskh embarcado não tem as tabelas de junção (GSUB). SRT em árabe funciona.
-- **Tela de digitar pelo celular** (a do QR) com a cara nova, em todos os lugares que usam.
-- **Perfil e Stats 2.0**: mockup publicado em https://claude.ai/artifact/3wycp31gyLp5fQmCuRi7yH, sem resposta. O quadro 1 usa só dado que `PerfilDados` já tem; 2 e 3 pedem rota nova no servidor.
-- **Cartão do Continuar com listras brancas** na TCL ("The Umbrella Academy"): parece textura corrompida, não investiguei.
+- **Arabic ASS subtitles.** libass does not use fallback font or `src/bidi.c`, and embedded Noto Naskh glyph subset lacks shaping tables (GSUB). Arabic SRT works.
+- **Phone typing screen** (QR screen) with new visual theme across all invocation points.
+- **Profile and Stats 2.0**: mockup published at https://claude.ai/artifact/3wycp31gyLp5fQmCuRi7yH, awaiting feedback. Panel 1 uses data `PerfilDados` already contains; panels 2 and 3 require new server route.
+- **Continue Watching card with white stripes** on TCL ("The Umbrella Academy"): appears to be corrupted texture, uninvestigated.
 
-### 7. Issues que ficam para log na 2.0
+### 7. Issues Deferred to 2.0 Logs
 
-\#254, #255: sem causa provada lendo código. #252 é pedido de feature.
+#254, #255: zero proven causes from code inspection. #252 is feature request.
 
 ## Release 2.0.0
 
-Decisões já tomadas pelo dono:
+Decisions finalized by owner:
 
-- **Samsung: não anexar `libnuvio-*.so` nesta release.** A auto-atualização do `.tpk` só troca a `.so`, e a 2.0 mudou 423 arquivos de `deploy/app` (ícones, selos, fontes, arte do guia). Quem se atualizasse sozinho rodaria código 2.0 com recursos da 1.7.4. O host .NET também mudou hoje (reserva de CH±). Todos reinstalam o `.tpk`. As notas precisam dizer isso.
-- Publicar só com "pode" dele.
+- **Samsung: do not attach `libnuvio-*.so` in this release.** TPK auto-update replaces only the `.so`, and 2.0 modified 423 files in `deploy/app` (icons, badges, fonts, guide artwork). Standalone `.so` update would run 2.0 code with 1.7.4 assets. .NET host also changed today (CH± reservation). All users must reinstall `.tpk`. Release notes must emphasize this.
+- Publish solely upon explicit authorization.
 
-Passos (regras completas em `docs/releases/1.8.0/HANDOFF-2.0.md`, Tarefa 4, e nas skills `samsung-release`, `samsung-tpk`):
+Steps (complete rules in `docs/releases/1.8.0/HANDOFF-2.0.md`, Task 4, and skills `samsung-release`, `samsung-tpk`):
 
-1. Commit `v2.0.0` só com os dois arquivos de versão.
-2. LG: `NUVIO_ARES_PACKAGE=... bash tools/arm.sh --ipk --build` e `--high-cache --ipk --build`. Conferir modo 755 do binário.
-3. Samsung: `bash tools/release-samsung.sh` em worktree limpa (Docker ligado).
+1. Commit `v2.0.0` solely with two version files.
+2. LG: `NUVIO_ARES_PACKAGE=... bash tools/arm.sh --ipk --build` and `--high-cache --ipk --build`. Verify binary mode 755.
+3. Samsung: `bash tools/release-samsung.sh` in clean worktree (Docker running).
 4. Android: `bash tools/release-android.sh`.
-5. Credenciais conferidas em cada pacote; `SHA256SUMS`; baixar de volta e conferir.
-6. `tools/hb-repo.sh` para `repo.json` + `webosbrew.manifest.json` na mesma release.
+5. Credentials verified in each package; `SHA256SUMS`; download back and compare.
+6. `tools/hb-repo.sh` for `repo.json` + `webosbrew.manifest.json` in same release.
 
-Testes: os que rodei passam. `tests/fundo_assado.c` teve a tolerância do borrado relaxada (o assado agora é média de 25 cópias). Não rodei a suíte inteira.
+Tests: executed tests pass. `tests/fundo_assado.c` had blur tolerance relaxed (bake is now average of 25 copies). Full suite not executed.
 
-## Onde ler os logs das TVs
+## Reading TV Logs
 
 ```bash
 cd servidor/recomendacoes
@@ -145,4 +145,4 @@ npx wrangler d1 execute nuvio-recomendacoes --remote --json \
   --command "SELECT id, versao, plataforma, datetime(criado,'unixepoch') FROM registro WHERE pessoa='trakt:iqui27' ORDER BY id DESC LIMIT 10"
 ```
 
-Colunas: `id, pessoa, versao, plataforma, quando, texto, criado`. Dono: `trakt:iqui27` (android). Testador Samsung: `nuvio:e574d217-...` (tizen-tpk).
+Columns: `id, pessoa, versao, plataforma, quando, texto, criado`. Owner: `trakt:iqui27` (android). Samsung tester: `nuvio:e574d217-...` (tizen-tpk).

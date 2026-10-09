@@ -1,37 +1,37 @@
-# Issue #158 — agregação de legendas e retomada local na integração 1.8
+# Issue #158 — Subtitle Aggregation and Local Resume in 1.8 Integration
 
-Data: 03/10/2026. Worktree `codex/integration-180-glass`. Correções locais; nenhuma instalação, publicação, alteração de tag/anexos ou comentário/encerramento de issue foi feito nesta etapa.
+Date: 10/03/2026. Worktree `codex/integration-180-glass`. Local fixes; zero installation, release publication, tag/attachment modifications, or issue comments/closures occurred during this step.
 
-## Defeitos reproduzidos e comportamento atual
+## Reproduced Defects and Current Behavior
 
-| Caminho | Antes | Depois | Prova |
+| Path | Before | After | Proof |
 |---|---|---|---|
-| Legendas de vários addons | `buscarLegendas` parava o loop externo assim que o primeiro addon preenchesse `LEG_MAX=12`; as cotas de idioma eram consumidas antes de consultar os seguintes | Consulta todos os addons ativos que declaram legendas. Guarda um lote limitado por origem e distribui os 12 lugares por rodízio de addon dentro de cada grupo de idioma | Dois providers, ambos com 56 candidatas. As duas consultas ocorrem e cada um contribui com seis linhas; principal/secundário/inglês recebem quatro linhas cada |
-| Origem na folha de faixas | Toda legenda externa mostrava o selo OpenSubtitles, inclusive resultado de outro addon | `Legenda.provedor` acompanha o resultado até `rotuloLegenda`; origem ausente usa “Legenda externa” | Função de rótulo da folha real testada com OpenSubtitles, Subs.ro e Community Subtitles |
-| Continuar assistindo local | Montava `CatItem` vazio a partir de progresso e dependia do enfeite Cinemeta/Trakt. IDs sem `tt` e sem poster eram compactados para fora | Copia metadados do catálogo/cache por identidade base + tipo sob `pubTrava`. O progresso atual repõe ID, episódio, percentual, instante e tempo restante. Enriquece uma cópia; descarte remoto não descarta registro local | IMDb, TMDB, Kitsu e provider próprio preservam título/poster/origem conhecidos com rede fora. Registro sem metadados continua com “Filme”/“Programa de TV”, sem imagem inventada |
-| Retorno da rede | Um título de reserva persistido poderia impedir um parser que preenche só campos vazios de trazer o título real | Reserva é removida apenas na cópia enviada ao enfeite; resultado real substitui-a quando chega | Fixture offline → catálogo com reserva → reconexão traz o título real |
+| Subtitles from multiple addons | `buscarLegendas` terminated outer loop once first addon filled `LEG_MAX=12`; language quotas were consumed prior to querying subsequent addons | Queries all active addons declaring subtitle resources. Buffers bounded batch per source and distributes 12 slots via round-robin within each language group | Two providers, each with 56 candidates. Both queries execute and each contributes six rows; primary/secondary/English receive four rows each |
+| Source in track selection sheet | All external subtitles displayed OpenSubtitles badge, including results from other addons | `Legenda.provedor` follows result into `rotuloLegenda`; missing source defaults to "External subtitle" | Track sheet label function verified with OpenSubtitles, Subs.ro, and Community Subtitles |
+| Local Continue Watching | Constructed blank `CatItem` from progress and relied on Cinemeta/Trakt enrichment. IDs without `tt` and missing posters were compacted out | Copies metadata from catalog/cache via base identity + type under `pubTrava`. Active progress restores ID, episode, percentage, timestamp, and remaining runtime. Enriches clone; remote cache evictions do not purge local records | IMDb, TMDB, Kitsu, and custom provider preserve title/poster/source while offline. Un-cached entries retain "Movie"/"TV Show" placeholders without synthesized art |
+| Network restoration | Persisted placeholder title could prevent parsers that only populate empty fields from loading real title | Placeholder stripped only on copy sent to enrichment; real result overwrites placeholder on arrival | Offline fixture → catalog with placeholder → reconnection delivers real title |
 
-A distribuição mantém a ordem principal → secundário → inglês. “Todas” e ausência de preferência usam um grupo sem filtro. O limite visual continua sendo 12; não promete espaço para todos quando há mais origens com resultados que lugares disponíveis. O lote temporário está no heap e tem teto `ADD_MAX * LEG_MAX`, sem vetor grande adicional na pilha da TV.
+Distribution preserves primary → secondary → English ordering. "All" and missing preferences use an unfiltered group. Visual cap remains 12; does not guarantee slots for all when available sources exceed capacity. Temporary batch is heap-allocated and bounded by `ADD_MAX * LEG_MAX`, avoiding large stack allocations on TV hardware.
 
-`cat_copiar_por_id` compara a base inteira (`kitsu:41370`, `tmdb:t101`, etc.), sem cortar no primeiro `:`; filtra pelo tipo e prefere uma cópia com poster. Retorna uma cópia independente sob a trava de publicação, para que a descoberta não retenha ponteiro de um bloco liberável na virada de quadro. Se o episódio mudou, o nome do episódio antigo é limpo.
+`cat_copiar_por_id` compares full base identity (`kitsu:41370`, `tmdb:t101`, etc.) without truncating at first `:`; filters by type and prefers cached entries with posters. Returns independent copy under publication lock, ensuring discovery does not hold dangling pointers to released memory blocks on frame boundaries. When episode shifts, stale episode title is cleared.
 
-As regras de entrada no Continuar local continuam sendo duração mínima de 60 segundos, pelo menos 1% e percentual abaixo de `ajustes_cw_concluido()` (90% de fábrica). Não houve mudança no gate de gravação `video_pronto >= 120`. A remoção/ocultação de uma coleção não remove o registro de progresso; o teste local conserva os cinco registros mesmo com catálogo vazio. Ordenação e remoção explícita de CW também passaram nas regressões existentes.
+Local Continue Watching criteria remain: minimum duration 60 s, at least 1% completed, and percentage below `ajustes_cw_concluido()` (factory default 90%). Zero changes to write gate `video_pronto >= 120`. Hiding or removing a collection does not delete progress records; local test preserves all five records even with an empty catalog. Explicit CW sorting and removal also pass existing regression suites.
 
-## Diagnóstico por resource
+## Per-Resource Diagnostics
 
-A consulta de legendas usa `rede_baixar_medido_controle` e emite:
+Subtitle query uses `rede_baixar_medido_controle` and outputs:
 
 ```text
 [addon-recurso] addon=2 resource=subtitles tipo=movie http=200 bytes=4007 ms=7 array=1 recebidas=56 candidatas=12
 ```
 
-`addon` é o ordinal na lista, `tipo` é movie/series/outro e os demais campos são medidas/contagens. `array=1 recebidas=0` distingue um array vazio de `array=0`. `candidatas` conta o lote aceito antes da divisão dos lugares finais. O resumo de conclusão não inclui mais o ID do título. URLs, IDs de conteúdo, nomes de arquivo, corpos, configuração e cabeçalhos não são emitidos nesses novos eventos; a fixture verifica ausência do host, token artificial e ID artificial no stdout.
+`addon` is list index, `tipo` is movie/series/other, and remaining fields are metrics/counts. `array=1 recebidas=0` distinguishes empty arrays from non-arrays. `candidatas` tracks accepted batch prior to slot allocation. Completion summary omits title ID. URLs, media IDs, filenames, payloads, configuration, and headers are excluded from these telemetry events; test fixture asserts absence of hostnames, mock tokens, and synthetic IDs on stdout.
 
-Esse evento não identifica sozinho a causa de status HTTP0, não valida todo o JSON e não constitui prova de resposta de servidores reais.
+This event alone does not determine root cause of HTTP 0 statuses, validate full JSON payloads, or prove live server responsiveness.
 
-## Validação local
+## Local Validation
 
-Executados com sucesso:
+Executed successfully:
 
 ```sh
 bash tests/addons_legendas.sh
@@ -42,16 +42,16 @@ bash tests/cwordem.sh
 bash tests/cwremover.sh
 ```
 
-`addons_legendas.sh` cobre o worker real e o rótulo real da folha: idioma romeno ISO, preferências ordenadas, duas origens densas, origem correta, resposta vazia, resource ausente, HTTP404, campos obrigatórios e identificação de episódio. `cwlocal.sh` usa `continuarLocal` real com enfeite artificial que compacta linhas sem arte ou simula indisponibilidade total; cobre base + tipo, metadados salvos, progresso sem cache, mudança de episódio, reconexão e limites originais. Cópia de metadados continua válida após troca do catálogo e aposentadoria de blocos.
+`addons_legendas.sh` exercises the real worker and track sheet labels: Romanian ISO language, sorted preferences, dual dense sources, correct origin attribution, empty responses, missing resource declarations, HTTP 404 handling, mandatory fields, and episode matching. `cwlocal.sh` exercises `continuarLocal` with mock enrichment that drops un-cached art or simulates total network outages; verifies base + type, saved metadata, un-cached progress, episode changes, reconnection, and original bounds. Metadata copies remain valid after catalog recreation and block retirement.
 
-A prova antes/depois exportou somente `HEAD:src/addons.c` e `HEAD:src/descoberta.c` para diretórios temporários, sem substituir arquivos do worktree. O worker anterior falhou na asserção de duas consultas/contribuições; a montagem local anterior falhou na asserção de cinco registros preservados. Os mesmos cenários passam no código corrigido, com ASan/UBSan.
+Before/after validation exported `HEAD:src/addons.c` and `HEAD:src/descoberta.c` to temp folders without overwriting worktree files. Prior worker failed the dual query/contribution assertion; prior local assembly failed the 5-record retention assertion. Fixed codebase passes all scenarios with ASan/UBSan.
 
-As suites existentes de CW passam integralmente (regra, descoberta e Home). Foram acrescentados apenas doubles mínimos para símbolos novos da integração: geração de recomendações, estado da modal e pacote de selos da conta. Esses doubles não substituem a regra de CW testada. Avisos já existentes: inicializador de `VideoLegendaEstilo` sem `negrito` e variável `fim` de `colecoes.c` usada apenas por atribuição.
+Existing CW suites pass completely (rules, discovery, and Home). Added minimal doubles for new integration symbols: recommendations generation, modal states, and account badge packs. These doubles do not replace tested CW logic. Existing compiler warnings: `VideoLegendaEstilo` initializer without `negrito`, and `fim` variable in `colecoes.c` used only in assignment.
 
-## Flix e condições para concluir a issue
+## Flix and Issue Closure Prerequisites
 
-A evidência histórica permanece em [ISSUE-158-ADDON-LOGS.md](../releases/1.7.3/ISSUE-158-ADDON-LOGS.md). Os HTTP404 do recorte antigo não distinguem resource nem demonstram a causa. Nesta integração, a nova consulta D1 falhou com Error7403/account não autorizado; não há log novo atribuível ao reporter. URLs privadas não foram executadas.
+Historical evidence documented in [ISSUE-158-ADDON-LOGS.md](../releases/1.7.3/ISSUE-158-ADDON-LOGS.md). HTTP 404s in legacy logs do not distinguish resource or show root cause. In this integration, new D1 query failed with Error 7403 / unauthorized account; no new log attributable to reporter. Private URLs were not executed.
 
-As reproduções fecham os defeitos de agregação, selo de origem e descarte local por metadados; não demonstram que Flix, Pasha, Subs.ro ou Community instalados pelo reporter respondem corretamente agora. Falta obter uma tentativa real na versão candidata, com manifesto exato/resource/status, e separar Flix-Streams Free de outra implementação com nome semelhante. Sem isso, Flix continua sem causa confirmada.
+Reproductions resolve aggregation bugs, origin attribution badges, and local metadata evictions; they do not prove that Flix, Pasha, Subs.ro, or Community addons installed by reporter respond correctly today. Live verification on release candidate is required, capturing exact manifest/resource/status and disambiguating Flix-Streams Free from identically named addons. Without this, Flix root cause remains unconfirmed.
 
-Para a 1.8: validar a folha de legendas e a retomada em TVs com versão/build verificados; observar comportamento com os addons efetivamente instalados; anexar log sanitizado de tentativa Flix antes de declarar a parte Flix corrigida. Host/fixtures, pacotes e funcionamento físico são provas distintas.
+For 1.8: validate subtitle sheet and resume on verified hardware builds; observe behavior with user's installed addons; capture sanitized logs of Flix requests before claiming complete resolution. Desktop fixtures, package verification, and physical hardware testing represent separate validation gates.

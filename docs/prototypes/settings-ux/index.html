@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark"><title>Nuvio — Settings UX Prototype</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="labbar"><span><strong>Nuvio</strong><span class="lab-divider"></span>Settings Study</span><span class="lab-disclosure">Local demo · no account connection</span><button id="reset-demo" title="Reset values of this demo">Reset demo</button></div>
+<main id="tv" class="tv">
+<header class="masthead"><div class="masthead-title"><svg class="brand" viewBox="0 0 48 48" aria-hidden="true"><path d="M9 34V14a5 5 0 0 1 9-3l14 21V14a5 5 0 0 1 10 0v20a5 5 0 0 1-9 3L19 16v18a5 5 0 0 1-10 0Z" fill="currentColor"/></svg><div><h1>Settings</h1><p>Your way, in every detail.</p></div></div><div class="profile"><span class="avatar">N</span><div>Sample Profile<small>Demo preferences</small></div></div></header>
+<div class="settings-grid"><nav id="navigation" class="navigation" aria-label="Settings sections"></nav><section id="content" class="content" aria-label="Options"></section><aside id="inspector" class="inspector" aria-label="Option explanation"></aside></div>
+<footer class="tv-footer"><div><span><kbd>↑</kbd><kbd>↓</kbd> Navigate</span><span><kbd>OK</kbd> Select</span><span><kbd>Esc</kbd> Back</span></div><span class="footer-note">Also works with click</span></footer>
+</main>
+<div class="study-bottom"><p><strong>Try:</strong> disabling only poster trailer, changing audio, or testing a TV with fewer effects.</p><button id="help-button">How to use remote</button></div>
+<div id="overlay-root"></div><div id="toast" class="toast" role="status" aria-live="polite"></div>
+<script type="module" src="app.js"></script>
+</body></html>

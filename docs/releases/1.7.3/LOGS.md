@@ -1,17 +1,17 @@
-# Logs consultados para a 1.7.3
+# Logs Reviewed for 1.7.3
 
-Consulta D1 remota somente leitura, SELECT de 300 uploads recentes identificados 1.7.1 ou 1.7.2. Evidência de retorno: rows_written=0, changes=0, changed_db=false. Corpos brutos privados fora do Git; relatório não inclui pessoas, tokens, URLs de fontes ou endpoints pessoais.
+Remote read-only D1 query, SELECT of 300 recent uploads identified as 1.7.1 or 1.7.2. Query response confirmation: rows_written=0, changes=0, changed_db=false. Raw bodies private outside Git; report excludes personal identities, tokens, source URLs, or private endpoints.
 
-O recorte contém 76 uploads identificados 1.7.2: 20 webOS, 17 tizen-tpk, 39 Android. Recebimento entre 2026-10-03 01:53:36 e 04:53:20 UTC; IDs da consulta inteira 19441–19958. Parte antecede a publicação estável às 03:26:27 UTC. Rótulo de versão não comprova pacote publicado/commit instalado. Corpos são distintos, mas vários repetem trechos de uma mesma reprodução: não contar uploads como sessões ou incidentes independentes.
+The slice contains 76 uploads identified as 1.7.2: 20 webOS, 17 tizen-tpk, 39 Android. Received between 2026-10-03 01:53:36 and 04:53:20 UTC; query IDs 19441–19958. Part precedes stable publication at 03:26:27 UTC. Version label does not prove published package or installed commit. Bodies are distinct, but several duplicate segments of identical playback sessions: do not count uploads as independent sessions or incidents.
 
-## Achados
+## Findings
 
-- Nenhum padrão explícito FATAL EXCEPTION, Fatal signal, Segmentation fault, RuntimeError ou Aborted no recorte 1.7.2. Isso não comprova ausência de crash nem estabilidade geral.
-- Falhas de origem/addons (408, 4xx, 5xx), Trakt 401 e ausência de dados/arte 404. HTTP 404 de introdução/Seekr pode significar conteúdo não disponível; não tratar automaticamente como defeito do cliente. URLs não expostas neste documento.
-- Samsung registra erros de player 0xfe6c0031, 0xffffffff, 0xfe6c0026 e 0xfe6c002e. Em contexto de um upload, a abertura falha e o Guia já tenta a fonte seguinte, mas o diagnóstico lê erro vazio. A candidata passa a conservar o código sem atribuir causa não demonstrada.
-- Atrasos de arte na Home e taxas de quadros baixas em alguns trechos. Tempos extremos podem atravessar player/suspensão; contadores de despejo não são OOM. O cache atual já contém prioridade, proteção da tela e orçamento por aparelho; não alterar limites automaticamente com base só nessa amostra.
-- Seekr respondeu tanto 200 com cues quanto 404 sem prévia. Quotas por TV, chave pessoal e política de fallback seguem o escopo 1.8.
+- Zero explicit FATAL EXCEPTION, Fatal signal, Segmentation fault, RuntimeError, or Aborted patterns in 1.7.2 slice. Does not prove absence of crashes or general stability.
+- Origin/addon failures (408, 4xx, 5xx), Trakt 401, and missing data/artwork 404. HTTP 404 on intro/Seekr may signify content unavailable; do not treat automatically as client defect. URLs not exposed in this document.
+- Samsung records player errors 0xfe6c0031, 0xffffffff, 0xfe6c0026, and 0xfe6c002e. In context of one upload, playback fails and Guide attempts next source, but diagnostic reports empty error. The candidate preserves the error code without assigning unproven causes.
+- Home artwork delays and low framerates in some segments. Extreme timings may span player/background suspension; cache eviction counts are not OOM. Existing cache includes priority, screen protection, and per-device budgets; do not alter limits automatically based solely on this sample.
+- Seekr responded both 200 with cues and 404 without preview. Per-TV quotas, personal keys, and fallback policies remain in 1.8 scope.
 
-## Validação necessária
+## Required Validation
 
-Reproduzir erros Samsung com fonte/codec e identidade do host confirmados; verificar expiração Trakt com sessão consentida; comparar latência de arte e quadros em aparelhos sob a mesma carga. Dados insuficientes para atribuir todas as falhas ao Nuvio ou prometer ganho de performance nesta candidata.
+Reproduce Samsung errors with confirmed source/codec and host identity; verify Trakt expiration with consented session; benchmark artwork and framerate latency on hardware under identical load. Data insufficient to assign all failures to Nuvio or promise performance gains in this candidate.

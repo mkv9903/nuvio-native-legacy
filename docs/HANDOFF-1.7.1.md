@@ -1,56 +1,56 @@
-# Passagem 1.7.1 (02/10/2026)
+# Handoff 1.7.1 (10/02/2026)
 
-Base: `origin/master` = v1.7.0 publicada (b07bb926 + docs do dono). Branch de trabalho: **`release/1.7.1`** (worktree `/private/tmp/nv-171`; o `/private/tmp` ja foi apagado 3x — so o commitado sobrevive). Versao nos arquivos ainda e 1.7.0 (bump = commit `v1.7.1` em `deploy/app/appinfo.json` + `tools/tizen-config.xml`).
+Base: `origin/master` = published v1.7.0 (b07bb926 + owner docs). Working branch: **`release/1.7.1`** (worktree `/private/tmp/nv-171`; `/private/tmp` was erased 3x — only committed work survives). Version in files is still 1.7.0 (bump = commit `v1.7.1` in `deploy/app/appinfo.json` + `tools/tizen-config.xml`).
 
-## Ja mesclado em `release/1.7.1` (testes no Mac passam; NADA provado em TV salvo onde dito)
+## Already merged into `release/1.7.1` (Mac tests pass; NOTHING proven on TV except where noted)
 
-| Issue / origem | Causa (medida) | Conserto | Commits |
+| Issue / origin | Cause (measured) | Fix | Commits |
 |---|---|---|---|
-| #212 selo de visto / olho / "marcar visto nao faz nada" | Selo e olho so olhavam `progresso >= 90`; marcar zerava o progresso; historico do Trakt (`limit=100`) so tinha episodios | `cat_visto()` unica regra; `/sync/watched/movies` (so rebaixa se `/sync/last_activities` mudou); serie via `/progress/watched`; ajuste novo `AJ_SELO_VISTO` (ligado) | 5f5174ad 24a14ed0 964bb741 |
-| #213 (1) CW do Trakt com series ja vistas | Serie marcada inteira = mesmo `watched_at` em todos os ep; pegava ep do meio como "ultimo" | Empate pega maior T/E; cada candidata conferida em `/shows/<id>/progress/watched` (3 em paralelo) | 28064cae |
-| #213 (2) "Ends at 1" | Frase traduzida (ru 35 bytes) num buffer de 32 | `relogio_fim()` com 128 bytes; teste cobre 30 idiomas | ff1c8bbc |
-| #213 (3)(4) hero/CW em ingles 1-2 s | CW do Trakt vinha com arte/texto do Cinemeta (en); traducao so em memoria | arte do addon de metadados; texto localizado gravado em `loc-texto.txt` por conta/perfil | 5658d0b0 |
-| #213 (5) abertura cinza | splash padrao do webOS | `splashBackground` no appinfo + `src/abertura.c` (marca, mola, 350 ms..1,5 s) + Android windowBackground | 880a4f76 8557e459 |
-| Logs 1.7.0: queda por "catalogo remontou X para X+1" | id de titulo guardado com 23 bytes (canal ao vivo, colecoes AIOM, anime) -> reinsere o titulo a cada quadro, memoria sobe ate SIGSEGV (tpk 1.7.0; tizen 1.6.5 27->107 MB) | id com 64 bytes | 2ed8cc02 |
-| Seekr (pedido do dono) | seekr.tv = so miniaturas da barra de tempo (nao addon) | Ajustes > Integracoes > Seekr: ligar (off), chave pessoal mascarada (seekr.txt, por TV), testar, fita, sincronia -60..+60 s. Testado no Mac com chave real (Matrix 817 quadros, folha 3200x1800 ~22 MB decodificada, solta apos a busca). Chave NUNCA em arquivo | b3512ba9 ee198248 fc32733c fb66d609 097b41ed |
-| i18n | 13 chaves novas (Seekr) + selo de visto nos 28 idiomas | | bf736a5a |
-| Mescla #212 x #213 em `src/trakt.c` | chave `}` perdida na uniao | corrigido | 7a5896fa |
+| #212 watched badge / eye / "mark watched does nothing" | Badge and eye only checked `progress >= 90`; marking reset progress; Trakt history (`limit=100`) only had episodes | `cat_watched()` single rule; `/sync/watched/movies` (only redownloads if `/sync/last_activities` changed); shows via `/progress/watched`; new setting `SETTING_WATCHED_BADGE` (enabled) | 5f5174ad 24a14ed0 964bb741 |
+| #213 (1) Trakt CW with already-watched shows | Entire show marked = same `watched_at` on all episodes; picked middle episode as "latest" | Tie-break picks highest S/E; each candidate checked against `/shows/<id>/progress/watched` (3 in parallel) | 28064cae |
+| #213 (2) "Ends at 1" | Translated phrase (ru 35 bytes) in a 32-byte buffer | `clock_end()` with 128 bytes; test covers 30 languages | ff1c8bbc |
+| #213 (3)(4) hero/CW in English for 1-2 s | Trakt CW came with art/text from Cinemeta (en); translation was in-memory only | art from metadata addon; localized text saved in `loc-texto.txt` per account/profile | 5658d0b0 |
+| #213 (5) gray splash screen | default webOS splash | `splashBackground` in appinfo + `src/abertura.c` (brand, spring, 350 ms..1.5 s) + Android windowBackground | 880a4f76 8557e459 |
+| Logs 1.7.0: crash on "catalog remounted X to X+1" | title id stored in 23 bytes (live channel, AIOM collections, anime) -> re-inserts title every frame, memory rises to SIGSEGV (tpk 1.7.0; tizen 1.6.5 27->107 MB) | id with 64 bytes | 2ed8cc02 |
+| Seekr (owner request) | seekr.tv = timeline thumbnails only (not addon) | Settings > Integrations > Seekr: enable (off), masked personal key (seekr.txt, per TV), test, filmstrip, sync -60..+60 s. Tested on Mac with real key (Matrix 817 frames, sheet 3200x1800 ~22 MB decoded, released after seek). Key NEVER in file | b3512ba9 ee198248 fc32733c fb66d609 097b41ed |
+| i18n | 13 new keys (Seekr) + watched badge across 28 languages | | bf736a5a |
+| Merge #212 x #213 in `src/trakt.c` | bracket `}` lost in merge | fixed | 7a5896fa |
 
-Teste na TCL (Android 14, APK de release do HEAD, 02/10 11:45): conta e Trakt ok, `[trakt] filmes vistos: 100`, `a seguir conferido no Trakt: 20 serie(s), 4 sem proximo`, `[abertura] fim em 934 ms`, sem crash.
+Test on TCL (Android 14, release APK of HEAD, 10/02 11:45): account and Trakt ok, `[trakt] watched movies: 100`, `next checked on Trakt: 20 show(s), 4 without next`, `[startup] finished in 934 ms`, no crash.
 
-## Achados do teste na TCL para quem continuar
-1. `[abertura] sem a marca (.../files/res/art/marcas/nuvio_wordmark.png)`: o PNG ESTA no APK; o Android so reextrai os assets quando muda a versao (continuou 1.7.0). Some com o bump para 1.7.1, mas a extracao deveria olhar o `lastUpdateTime`/hash do APK, nao so a versao.
-2. `filmes vistos: 100` exatamente — conferir se `/sync/watched/movies` esta paginando/limitando (deveria ser o mapa completo).
+## TCL test findings for whoever continues
+1. `[startup] without brand (.../files/res/art/marcas/nuvio_wordmark.png)`: the PNG IS in the APK; Android only re-extracts assets when version changes (stayed 1.7.0). Disappears with bump to 1.7.1, but extraction should check APK `lastUpdateTime`/hash, not just version.
+2. `watched movies: 100` exactly — verify if `/sync/watched/movies` is paginating/limiting (should be the full map).
 
-## Logs 1.7.0 (triagem, so informativo)
-Erros de player vem das fontes (Pluto 401, IPTV 429, codec nao suportado, decoder retirado ao ir para segundo plano). Long tasks do .wgt = arranque do WASM (taxa menor que 1.6.5). "Catalog quota" e "ASS fallback" sao informativos. Recursos novos (ilha, Spotlight, teclado do sistema, Salvos) sem erro nos logs. Quedas sem causa: 1 .wgt (8x, TV fechando?) e 3 TCLs (5x, log sem o fim).
+## Logs 1.7.0 (triage, informational only)
+Player errors come from sources (Pluto 401, IPTV 429, unsupported codec, decoder reclaimed when moving to background). Long tasks on .wgt = WASM startup (lower rate than 1.6.5). "Catalog quota" and "ASS fallback" are informational. New features (island, Spotlight, system keyboard, Library/Saved) without errors in logs. Crashes without cause: 1 .wgt (8x, TV closing?) and 3 TCLs (5x, log truncated at end).
 
-## Respostas pendentes (postar so com a release no ar)
-- #212, #213: rascunhos nos relatorios dos agentes (ver mensagens de commit).
-- #211 LG UK6540 nao abre: pedimos firmware e `tail /tmp/nuvio.log`; aguardando.
+## Pending responses (post only when release is live)
+- #212, #213: drafts in agent reports (see commit messages).
+- #211 LG UK6540 won't open: asked for firmware and `tail /tmp/nuvio.log`; awaiting reply.
 
-## Em branch, FORA da 1.7.1 (decisao do dono)
-- `agente/plugins` (QuickJS + htmlq, 29 scrapers reais testados no Mac; falta TV e escolha por scraper)
-- `agente/p2p` (nuvio-engine/libtorrent, `-DNV_P2P_MOTOR`; falta C9/tpk/Android)
-- `agente/icones` (icones de apoiador, gate `apoiador_ativo()`=0; RISCO: activity-alias muda a entrada do launcher para todos no Android)
-- `agente/ajustesux` (proposta `docs/ajustes-ux.md`, fase 1 aguardando OK) e `agente/ajustesvisual` (peles A/B)
-- `agente/sidebarorg` (parado a pedido)
-- `agente/guiaunicode` (outra sessao: `\u` nos generos da Live TV)
-- .tpk teclado/STT = canario `NUVIO_TPK_TEXTO=1` (em master desde 1.7.0, desligado no build)
+## In branches, OUTSIDE 1.7.1 (owner decision)
+- `agent/plugins` (QuickJS + htmlq, 29 real scrapers tested on Mac; needs TV and per-scraper choice)
+- `agent/p2p` (nuvio-engine/libtorrent, `-DNV_P2P_MOTOR`; needs C9/tpk/Android)
+- `agent/icones` (supporter icons, gate `supporter_active()`=0; RISK: activity-alias changes launcher entry for everyone on Android)
+- `agent/settingsux` (proposal `docs/settings-ux.md`, phase 1 awaiting OK) and `agent/settingsvisual` (skins A/B)
+- `agent/sidebarorg` (stopped by request)
+- `agent/guiaunicode` (another session: `\u` in Live TV genres)
+- .tpk keyboard/STT = canary `NUVIO_TPK_TEXTO=1` (in master since 1.7.0, disabled in build)
 
-## Receita (ver memoria receita-de-release)
-`export NUVIO_PROPERTIES="/Users/hrocha/Projetos/Pessoal/LG WEB/NuvioWeb-0.3.38-beta/local.properties"`; `/private/tmp/NuvioWeb-0.3.38-beta` com `@webos-tools/cli` (ares-package) e symlink do local.properties; libass WASM: `source ~/emsdk/emsdk_env.sh; sh tools/build-ass-wasm.sh` (copia em `~/.cache/nuvio-ass-wasm`). adb para a TCL pode precisar rodar fora do sandbox (`No route to host` com a porta aberta). Pacotes da 1.7.0 em `~/.cache/nuvio-rel-170`.
+## Recipe (see release recipe memory)
+`export NUVIO_PROPERTIES="/Users/hrocha/Projetos/Pessoal/LG WEB/NuvioWeb-0.3.38-beta/local.properties"`; `/private/tmp/NuvioWeb-0.3.38-beta` with `@webos-tools/cli` (ares-package) and local.properties symlink; libass WASM: `source ~/emsdk/emsdk_env.sh; sh tools/build-ass-wasm.sh` (copy in `~/.cache/nuvio-ass-wasm`). adb to TCL may need to run outside sandbox (`No route to host` with port open). Packages for 1.7.0 in `~/.cache/nuvio-rel-170`.
 
-## Adendo: "Digitar pelo celular" (agente/celular, ja mesclado)
-Todo campo que usa src/teclado.c mostra um QR para colar o texto pelo celular na mesma rede (src/celular.c: servidor HTTP so com o teclado aberto, token de uso unico, 5 min, 4 KB, sem CORS, log sem o texto). Provado no Mac e na TCL. FALTA: LG (jail/firewall deixa porta alta? log "[celular] servidor no ar"/"pagina aberta"), .tpk, iPhone/Safari; .wgt nao tem (navegador nao escuta). FALTA traduzir as frases novas (i18n.sh falha por elas). Spotlight e Busca principal nao usam teclado.c (fora).
+## Addendum: "Type via mobile phone" (agent/celular, already merged)
+Every field using src/teclado.c shows a QR code to paste text from mobile phone on the same network (src/celular.c: HTTP server only while keyboard is open, single-use token, 5 min, 4 KB, no CORS, log without text). Proven on Mac and TCL. MISSING: LG (jail/firewall allows high port? log "[mobile] server up"/"page opened"), .tpk, iPhone/Safari; .wgt does not have it (browser cannot listen). MISSING: translating new phrases (i18n.sh fails because of them). Spotlight and Main Search do not use teclado.c (outside).
 
-## Adendo 2 (02/10 ~13h BRT)
-Mesclados depois da primeira passagem (Mac ok; TV parcial):
-- **agente/celular2**: botao de celular (src/celbotao.c) ao lado de TODO campo de texto (Spotlight, Busca, teclado.c: guia, Salvos, apelido, codigos, chaves). OK abre cartao com QR por cima; texto recebido busca direto no Spotlight/Busca. Servidor so sobe com o cartao aberto. NuvioActivity.kt reextrai os assets a cada instalacao (resolve o "sem a marca" da abertura). Provado na TCL (curl ponta a ponta). Testes de tela (celbotao_shot, teclado_shot, ilha2_shot, spotlight_shot) FALHARAM na ultima rodada so por DISCO CHEIO no Mac — rodar de novo.
-- **agente/ilhasaida**: saindo do player no meio com o relogio ligado volta para a HOME e a arte encolhe ate a mini capa da ilha; ajuste novo AJ_SAIDA_PLAYER ("Ao sair do player": home / pagina do titulo). Caminho dentro de app.c sem teste automatizado; nao visto na TV.
-- Efeito colateral dos testes na TCL: "Blue Lights" foi parar na watchlist/Salvos do dono por OK perdido — conferir.
+## Addendum 2 (10/02 ~13:00 BRT)
+Merged after first handoff (Mac ok; TV partial):
+- **agent/celular2**: mobile button (src/celbotao.c) next to EVERY text field (Spotlight, Search, teclado.c: guide, Saved, nickname, codes, keys). OK opens card with QR on top; received text searches directly in Spotlight/Search. Server only starts with card open. NuvioActivity.kt re-extracts assets on every install (resolves "without brand" in startup). Proven on TCL (end-to-end curl). Screen tests (celbotao_shot, teclado_shot, ilha2_shot, spotlight_shot) FAILED in last run only due to FULL DISK on Mac — re-run.
+- **agent/ilhasaida**: exiting player midway with clock enabled returns to HOME and art shrinks down to island mini poster; new setting AJ_SAIDA_PLAYER ("On leaving player": home / title page). Path inside app.c without automated test; not verified on TV.
+- Side effect of tests on TCL: "Blue Lights" ended up on owner's watchlist/Saved due to lost OK press — verify.
 
-**QUEDA DO SERVIDOR DA CONTA (medido 02/10 ~13h):** api.nuvio.tv /rest/v1 responde 504 (auth/v1/health 200) — do lado do Nuvio. Por isso #214 (QR HTTP 400) e #215 (sem addons + login HTTP 504) e a TCL sem addons. Rascunho de resposta curta pronto (nao postado; dono precisa liberar): "The Nuvio account server (api.nuvio.tv) is currently returning errors (504)... don't sign out... next update keeps your last add-ons".
-- Em andamento: **agente/offline** (base release/1.7.1): cache em disco da ultima lista boa de addons/colecoes/biblioteca/vistos/ordem por conta+perfil, aviso "servidor fora do ar", login com mensagem clara e sem apagar sessao em 5xx; investigar o 400 do #214. Mesclar quando terminar.
+**ACCOUNT SERVER OUTAGE (measured 10/02 ~13:00):** api.nuvio.tv /rest/v1 returns 504 (auth/v1/health 200) — on Nuvio side. This causes #214 (QR HTTP 400) and #215 (no addons + login HTTP 504) and TCL without addons. Short response draft ready (not posted; owner needs to approve): "The Nuvio account server (api.nuvio.tv) is currently returning errors (504)... don't sign out... next update keeps your last add-ons".
+- In progress: **agent/offline** (base release/1.7.1): disk cache of last good addons/collections/library/watched/order list per account+profile, warning "server unavailable", login with clear message and without wiping session on 5xx; investigate 400 in #214. Merge when finished.
 
-Disco do Mac chegou a 136 MB livres (testes falharam por isso); liberados 8,5 GB apagando so build/ das worktrees de agentes e pacotes velhos. Continua ~99% cheio.
+Mac disk reached 136 MB free (tests failed because of this); freed 8.5 GB deleting only build/ from agent worktrees and old packages. Remains ~99% full.

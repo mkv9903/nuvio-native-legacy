@@ -1,114 +1,114 @@
-# Roadmap geral do Nuvio Native Legacy
+# General Roadmap for Nuvio Native Legacy
 
-## Planejamento vigente — 03/10/2026
+## Current Planning — 10/03/2026
 
-A1.7.4 já está publicada. O plano atual para integrar, otimizar e entregar a1.8 está em [releases/1.8.0/PLANO.md](releases/1.8.0/PLANO.md), com [inventário Git](releases/1.8.0/INVENTARIO.md). As etapas/versões abaixo são o registro histórico de02/10 e não definem o estado atual.
+1.7.4 is already published. The current plan to integrate, optimize and deliver 1.8 is in [releases/1.8.0/PLANO.md](releases/1.8.0/PLANO.md), with [Git inventory](releases/1.8.0/INVENTARIO.md). The stages/versions below are historical records from 10/02 and do not reflect current state.
 
-Atualizado em 02/10/2026 21:39 BRT. Planejamento local sobre `release/1.7.2`, com candidata compilada de `b71471bc`. Este é o mapa entre versões; a auditoria detalhada de logs, branches e sessões fica em [releases/1.7.2/ROADMAP.md](releases/1.7.2/ROADMAP.md).
+Updated on 10/02/2026 21:39 BRT. Local planning on `release/1.7.2`, with compiled candidate from `b71471bc`. This is the version map; detailed audit of logs, branches and sessions is in [releases/1.7.2/ROADMAP.md](releases/1.7.2/ROADMAP.md).
 
-O dono rejeitou o mockup da ilha e pediu continuidade no roadmap. As quatro funcionalidades daquele mockup saem da fila. A ilha já integrada e seu bugfix de isolamento por conta/perfil permanecem. Não há novo desenho da ilha aprovado.
+The owner rejected the island mockup and requested continuity on the roadmap. The four features from that mockup are removed from the queue. The already integrated island and its account/profile isolation bugfix remain. There is no new approved island design.
 
-**Inclusão autorizada na 1.7.2:** fix do screensaver LG `8a49956`, cherry-pick `857f83e3` + ajuste `11835ffa`. Teste focado e i18n PASS; falta confirmação da API na TV e novo empacotamento. Os pacotes `b71471bc` mencionados abaixo são o lote anterior, sem essa inclusão.
+**Authorized inclusion in 1.7.2:** LG screensaver fix `8a49956`, cherry-pick `857f83e3` + setting `11835ffa`. Focused test and i18n PASS; awaiting TV API confirmation and new packaging. The `b71471bc` packages mentioned below are the prior batch, without this inclusion.
 
-## Distribuição entre versões
+## Version Distribution
 
-| Destino | Objetivo e conteúdo | Estado / condição |
+| Target | Goal and Content | Status / Condition |
 |---|---|---|
-| **1.7.2** | Correções, resiliência, consistência, retomada em dois minutos, Ajustes funcionais, toque/login, fontes incrementais e otimizações já implementadas. Investigar os relatos atuais de arranque, reprodução, catálogo e proporção antes de declarar os cenários resolvidos. | Código integrado e pacotes locais conferidos; validação física e triagem dos novos relatos ainda pendentes. Não é uma release publicada. |
-| **1.7.3 — proposta** | Social/recomendações/reações, Discord, TopN configurável e portabilidade dos scripts Linux. Melhorias pequenas de player podem ser selecionadas por custo e compatibilidade. | Existem branches para Social/Discord; os demais itens não são implementação pronta. Selecionar escopo e revisar sobre a base estabilizada. Nenhum merge adicional autorizado apenas por este planejamento. |
-| **1.8 — plugins, P2P e Glass UI** | Integrar `plugins2` e `p2p2`, cancelamento por chamada e orçamento de disco/memória; candidata visual `feat/glass-ilha`, com superfícies vidro/sólido e reorganização de Fontes/menu/painéis. | Branches candidatas, não features aceitas. Provar LG/Android/TPK; WGT não recebe motor P2P de sockets. |
-| **Portes e exploração — sem versão prometida** | VIDAA, webOS3 e experimentos NaCl/Tizen 4; ideias visuais/launcher ainda não escolhidas. | Cada porte precisa aparelho/testador e matriz própria. Experimentos históricos não são pendências de merge da 1.7.2. |
+| **1.7.2** | Fixes, resilience, consistency, two-minute resume, functional Settings, touch/login, incremental sources and already implemented optimizations. Investigate current reports of startup, playback, catalog and aspect ratio before declaring scenarios resolved. | Integrated code and checked local packages; physical validation and triage of new reports still pending. Not a published release. |
+| **1.7.3 — proposal** | Social/recommendations/reactions, Discord, configurable TopN and Linux script portability. Small player improvements can be selected by cost and compatibility. | Branches exist for Social/Discord; remaining items are not ready implementations. Select scope and review against stabilized base. No additional merge authorized by this planning alone. |
+| **1.8 — plugins, P2P and Glass UI** | Integrate `plugins2` and `p2p2`, per-call cancellation and disk/memory budget; visual candidate `feat/glass-ilha`, with glass/solid surfaces and reorganization of Sources/menu/panels. | Candidate branches, not accepted features. Prove LG/Android/TPK; WGT does not receive socket-based P2P engine. |
+| **Ports and exploration — uncommitted version** | VIDAA, webOS3 and NaCl/Tizen 4 experiments; visual/launcher ideas not yet selected. | Each port requires dedicated device/tester and matrix. Historical experiments are not 1.7.2 merge blockers. |
 
-1.7.3 é uma recomendação de agrupamento, não compromisso de publicar todos os candidatos juntos. Não há datas inventadas. Correção comprovada que impeça usar uma plataforma suportada continua sendo estabilização da 1.7.2; não empurrar automaticamente um bug para a versão de features.
+1.7.3 is a grouping recommendation, not a commitment to ship all candidates together. No fabricated dates. Proven fix preventing use of a supported platform remains 1.7.2 stabilization; do not automatically push bugs into feature releases.
 
-## 1.7.2 — o que entra
+## 1.7.2 — What Goes In
 
-**Ajustes novos já estão nesta versão:** merge `f9083b10`, 184 opções em 11 categorias, busca/avançados e navegação reorganizada. Incluídos nos pacotes locais de `b71471bc`. [Captura nativa local](releases/1.7.2/ajustes-tela-inicial.png) · [Validação e outras capturas](releases/1.7.2/VALIDACAO-LOCAL.md). Falta conferência no controle/painel das TVs.
+**New Settings are already in this version:** merge `f9083b10`, 184 options across 11 categories, search/advanced and reorganized navigation. Included in local packages from `b71471bc`. [Local native capture](releases/1.7.2/ajustes-tela-inicial.png) · [Validation and other captures](releases/1.7.2/VALIDACAO-LOCAL.md). Awaiting remote control / panel verification on TVs.
 
-Já integrado e exercitado por testes focados:
+Already integrated and exercised by focused tests:
 
-- **Ajustes funcionais:** categorias, busca, avançados e navegação; enum/defaults e espera de fontes preservados. `agente/ajustesux` já mesclada.
-- **Fontes/retomada:** fontes incrementais e prazo de escolha (#221), última fonte com fallback, Android recebendo ponto salvo na preparação e retenção de exatamente dois minutos. `abrirrapido` inclui `ilhavolta` e `i221`.
-- **Conta/offline:** cache/sessão conservados na indisponibilidade; fila durável de addons por conta/perfil, ACK exato e retomada após reinício. HTTP500 remoto não foi corrigido pelo cliente.
-- **Consistência:** catálogo concorrente, selo/histórico de assistidos por identidade, rejeição de resposta antiga, cartão/modal/pedido da ilha isolados entre contas/perfis.
-- **Entradas e arte:** toque/login (#216), ícone do celular embutido para atualização do núcleo Samsung. Recursos da 1.7.1, como entrada pelo celular, traduções e Seekr, são base; não contar como novo merge.
-- **Screensaver LG:** assinatura no load válido; manter desligado durante reprodução efetiva e liberar em pausa/fim/erro/parada. Pedido do dono incorporado; prova física pendente.
-- **Sonda/build:** validação HTTP/cabeçalhos/URL sem truncamento, corpo limitado; temporários no SSD e exclusão de arquivos pessoais. APK, dois IPKs, WGT, quatro TPKs, dois núcleos, metadados e checksums conferidos.
+- **Functional Settings:** categories, search, advanced, and navigation; enum/defaults and source timeouts preserved. `agent/ajustesux` already merged.
+- **Sources/resume:** incremental sources and selection timeout (#221), last source with fallback, Android receiving saved point in preparation and exact two-minute retention. `abrirrapido` includes `ilhavolta` and `i221`.
+- **Account/offline:** cache/session preserved during outage; durable addon queue per account/profile, exact ACK and resume after restart. Remote HTTP 500 was not fixed client-side.
+- **Consistency:** concurrent catalog, watched badge/history by identity, rejection of stale response, card/modal/request of island isolated between accounts/profiles.
+- **Inputs and art:** touch/login (#216), embedded mobile icon for Samsung core update. 1.7.1 features, like mobile typing, translations and Seekr, are baseline; not counted as new merge.
+- **LG Screensaver:** subscription on valid load; keep disabled during active playback and release on pause/end/error/stop. Owner request incorporated; physical proof pending.
+- **Probe/build:** HTTP/headers/URL validation without truncation, bounded body; SSD temporaries and personal file exclusion. APK, two IPKs, WGT, four TPKs, two cores, metadata and checksums verified.
 
-### O que impede chamar a 1.7.2 de pronta
+### Blockers for Calling 1.7.2 Ready
 
-| Prioridade | Casos | Trabalho necessário |
+| Priority | Cases | Required Work |
 |---|---|---|
-| **P0: arranque/login** | #224 LG 65UT7300LA/webOS 25 e #225 LG 50NANO75SPA (1.7.1); #223 TCL/Mali-G31/Android 11 (1.7.0); #211 UK6540 | **#224/#225, causa no pacote:** os dois `.ipk` publicados da 1.7.1 trazem `nuvio-proto` com modo `-rwx---r--` dentro do `data.tar.gz` (na 1.7.0 era `-rwxr-xr-x`). O app roda como uid 5152, sem permissão de execução, e fecha ao abrir. A C9 não denunciou porque lá o binário é trocado com `chmod 755` à mão. Origem: `cp` por cima de um `deploy/app/nuvio-proto` existente preserva o modo antigo. Os `.ipk` 1.7.2 locais (`nuvio-rel-172/final`) já saem `755`. `tools/arm.sh` agora força `755` e aborta se o modo no pacote pronto divergir. Falta instalar o `.ipk` pelo instalador numa TV não-root. Quem está na 1.7.1 não abre o app para atualizar: reinstalar pelo Homebrew Channel. **#223/#211:** sem relação demonstrada; #223 descreve tela preta com loop ativo, não crash. |
-| **P1: reprodução** | Xtream #158; Android3003/2004; Samsung vídeo/áudio #188; ASS embutida | Reproduzir a mesma fonte/cabeçalhos/aparelho; verificar versão efetiva e distinguir diagnóstico de uso normal. Correção Xtream da segunda conexão já é base 1.7.1; confirmar continuidade atual. |
-| **P1: catálogo e proporção** | #195/#197, histórico/selo, catálogo vazio e seleção ao rolar | Testar cenário/configuração do relator. Corridas corrigidas não comprovam todos os sintomas. Não reintroduzir canários antigos de janela/ROI. |
-| **Validação de UX existente** | #144 CW/bordas/cintilação, #202 contraste, #209 idioma, #216 toque, #221 espera | Captura/controle real e mesma escala/configuração. Ajustes reorganizados não equivalem a resolver a cintilação dos posters. |
-| **Gates por aparelho** | C9, Samsung TPK4/5 e6+, WGT, TCL e Android toque | Retenção 119/120 s, fonte vencida, perfil/logout, arranque, HDR, legendas e navegação. Medir velocidade na mesma mídia; fixture não prova ganho físico. |
+| **P0: startup/login** | #224 LG 65UT7300LA/webOS 25 and #225 LG 50NANO75SPA (1.7.1); #223 TCL/Mali-G31/Android 11 (1.7.0); #211 UK6540 | **#224/#225, package cause:** the two published 1.7.1 `.ipk` files carry `nuvio-proto` with mode `-rwx---r--` inside `data.tar.gz` (in 1.7.0 it was `-rwxr-xr-x`). The app runs as uid 5152, without execute permission, and exits on launch. C9 did not report because binary was swapped with manual `chmod 755`. Root cause: `cp` over an existing `deploy/app/nuvio-proto` preserves old mode. Local 1.7.2 `.ipk` files (`nuvio-rel-172/final`) already ship `755`. `tools/arm.sh` now enforces `755` and aborts if package mode diverges. Awaiting `.ipk` install via installer on non-rooted TV. Users on 1.7.1 cannot launch app to update: reinstall via Homebrew Channel. **#223/#211:** no proven relation; #223 describes black screen with active loop, not crash. |
+| **P1: playback** | Xtream #158; Android 3003/2004; Samsung video/audio #188; embedded ASS | Reproduce same source/headers/device; check effective version and distinguish diagnostics from regular usage. Xtream second-connection fix is already 1.7.1 baseline; confirm continuity. |
+| **P1: catalog and aspect ratio** | #195/#197, history/badge, empty catalog and scroll selection | Test reporter's scenario/configuration. Fixed races do not prove all symptoms resolved. Do not reintroduce legacy window/ROI canaries. |
+| **Existing UX validation** | #144 CW/borders/flicker, #202 contrast, #209 language, #216 touch, #221 timeout | Real device capture/control and matching scale/configuration. Reorganized Settings is not equivalent to resolving poster flicker. |
+| **Per-device gates** | C9, Samsung TPK4/5 and 6+, WGT, TCL and Android touch | Retention 119/120 s, expired source, profile/logout, startup, HDR, subtitles and navigation. Measure speed on identical media; test fixtures do not prove physical performance gains. |
 
-A consulta GitHub desta atualização encontrou **23 issues abertas**, contra 20 na auditoria anterior. #223/#224/#225 são a diferença. Relato novo na 1.7.1 não prova regressão da candidata1.7.2, mas exige triagem antes de prometer resolução.
+GitHub query for this update found **23 open issues**, compared to 20 in previous audit. #223/#224/#225 account for the difference. New reports in 1.7.1 do not prove regression in 1.7.2 candidate, but require triage before promising fixes.
 
-Consulta direcionada aos logs Android 19066/19107/19164 foi somente leitura (`rows_written=0`, `changed_db=false`). Confirmado: os seis erros 3003 de 19066 pertencem às tentativas A/B/C do diagnóstico Live TV; não são seis sessões ou seis filmes. Os outros dois registros não têm causa Java/HTTP detalhada no corpo centralizado. A causa de 3003/2004 continua não demonstrada. Dados privados permanecem fora do Git.
+Targeted query on Android logs 19066/19107/19164 was read-only (`rows_written=0`, `changed_db=false`). Confirmed: the six 3003 errors in 19066 belong to Live TV diagnostic attempts A/B/C; they are not six sessions or six movies. The other two records contain no detailed Java/HTTP cause in central payload. Root cause of 3003/2004 remains unproven. Private data remains outside Git.
 
-## 1.7.3 — proposta de próximo incremento
+## 1.7.3 — Next Increment Proposal
 
-| Ordem | Recurso / issue | Origem concreta | Antes de aceitar |
+| Order | Feature / Issue | Concrete Origin | Acceptance Criteria |
 |---|---|---|---|
-|1 | **Social, recomendações, reações e atividade entre amigos** | `feat/social`; agrega `agente/reacao`, `agente/socialsrv`, `agente/socialui` | Revisar uma única agregadora sobre 1.7.2. Perfil/conta, compatibilidade do servidor já ativo, falha de rede, listas/reações e LG/Samsung/Android. Não fazer quatro merges redundantes nem redeployar servidor antigo. |
-|2 | **Discord Rich Presence — #222** | `feat/discord-presenca` | Vincular, publicar presença, pausar/retomar, trocar perfil e desvincular em TV real; revisar armazenamento e contrato OAuth. Protocolo no Mac não é presença comprovada na TV. |
-|3 | **TopN configurável — #201** | Pedido de produto; primeira fileira já corrigida | Escolher limites/paginação e medir custo em TV antiga. Não confundir contagem automática corrigida com nova opção 10/12/18/24. |
-|4 | **Build Linux — #217** | Quatro sugestões do relator; nenhuma PR na auditoria anterior | GNU/BSD sed, fallback ffmpeg, subconjunto TPK e identidade NV_WEBOS; testar Linux/Mac e preprocessing por alvo. Não duplicar contribuição externa sem verificar. |
-|5 | **Melhorias pequenas do player — parte dos pedidos #195** | Ajustes de legenda/logo como candidatos de produto | Escopo individual, capacidade do backend e revisão visual do dono. Não incluir automaticamente thumbnails/media server nesse grupo. |
-|6 | **Triagem/observabilidade — #192** | Agregador atual mistura diagnósticos, versões e códigos auxiliares | Separar tentativa/contexto/versão/erro real; causas seguras sem URL, credencial ou nome de mídia privado. Não transformar ausência de despedida em crash comprovado. |
+| 1 | **Social, recommendations, reactions and friends activity** | `feat/social`; aggregates `agent/reacao`, `agent/socialsrv`, `agent/socialui` | Review a single aggregate branch against 1.7.2. Profile/account, compatibility with active server, network failure, lists/reactions and LG/Samsung/Android. Do not perform four redundant merges or redeploy old server. |
+| 2 | **Discord Rich Presence — #222** | `feat/discord-presenca` | Link, publish presence, pause/resume, switch profile and unlink on real TV; review storage and OAuth contract. Mac protocol does not prove TV presence. |
+| 3 | **Configurable TopN — #201** | Product request; first row already fixed | Choose limits/pagination and measure cost on legacy TV. Do not confuse corrected auto-count with new 10/12/18/24 option. |
+| 4 | **Linux build — #217** | Four suggestions from reporter; no PR in previous audit | GNU/BSD sed, ffmpeg fallback, TPK subset and NV_WEBOS identity; test Linux/Mac and per-target preprocessing. Do not duplicate external contributions without verification. |
+| 5 | **Minor player improvements — portion of #195 requests** | Subtitle/logo settings as product candidates | Individual scope, backend capability and owner visual review. Do not automatically bundle thumbnails/media server in this group. |
+| 6 | **Triage/observability — #192** | Current aggregator mixes diagnostics, versions and auxiliary codes | Separate attempt/context/version/actual error; safe root causes without URL, credentials or private media title. Do not classify missing exit signal as proven crash. |
 
-Ícones/launcher (`agente/icones`) e alternativas A/B (`agente/ajustesvisual`) continuam sem direção aprovada; não são entregas prometidas da 1.7.3. O mockup rejeitado da ilha não volta como dependência desses itens.
+Launcher icons (`agent/icones`) and A/B alternatives (`agent/ajustesvisual`) remain without approved direction; they are not promised deliverables for 1.7.3. Rejected island mockup is not a dependency for these items.
 
-## 1.8 — plugins, P2P e Glass UI
+## 1.8 — Plugins, P2P and Glass UI
 
-| Frente | Candidato | Escopo e critério |
+| Area | Candidate | Scope and Criteria |
 |---|---|---|
-| **Glass UI / painéis como ilhas** | `feat/glass-ilha` (`c5269ed4`) | Destino 1.8 indicado pelo dono. Portar a camada visual sobre a base estabilizada, preservando Ajustes funcionais, fontes incrementais #221, enum/defaults e identidade. Vidro/sólido, D-pad/toque, contraste, movimento reduzido e orçamento GPU/memória em C9/TCL/Samsung. |
-| **Plugins — #134** | `agente/plugins2` | Integração incremental sem repetir #221; scraper cancelável, prazo/limite de resposta, isolamento de perfil e matriz LG/Android/TPK/WGT conforme capacidade. |
-| **P2P — #171** | `agente/p2p2` | Motor e fallback nos alvos que o suportem; cancelamento real, cache/disco limitado, limpeza, memória e validação TPK real. WGT fica fora do motor de sockets. |
-| **Pré-cache e abertura normal em paralelo** | Trabalho futuro, não novo merge demonstrado | Depende de cancelamento por chamada, efeito do GETRange/debrid e orçamento. Última fonte guardada já abre em paralelo na 1.7.2. Nenhuma garantia de nova mídia instantânea. |
-| **Media server/thumbnails — pedidos #195** | Avaliação, sem código demonstrado nesta auditoria | Definir contrato, fonte dos frames, custo de rede/disco/GPU e cancelamento. Pode aproveitar essa infraestrutura, mas não é promessa automática da 1.8. |
+| **Glass UI / panels as islands** | `feat/glass-ilha` (`c5269ed4`) | 1.8 target indicated by owner. Port visual layer onto stabilized base, preserving functional Settings, #221 incremental sources, enum/defaults and identity. Glass/solid, D-pad/touch, contrast, reduced motion and GPU/memory budget on C9/TCL/Samsung. |
+| **Plugins — #134** | `agent/plugins2` | Incremental integration without repeating #221; cancellable scraper, response timeout/limit, profile isolation and LG/Android/TPK/WGT matrix per capabilities. |
+| **P2P — #171** | `agent/p2p2` | Engine and fallback on supported targets; real cancellation, bounded cache/disk, cleanup, memory and real TPK validation. WGT remains excluded from socket engine. |
+| **Pre-caching and normal opening in parallel** | Future work, not demonstrated merge | Depends on per-call cancellation, GETRange/debrid behavior and budget. Last saved source already opens in parallel in 1.7.2. No guarantee of instant media playback. |
+| **Media server/thumbnails — #195 requests** | Evaluation, no demonstrated code in this audit | Define contract, frame source, network/disk/GPU cost and cancellation. Can leverage this infrastructure, but not an automatic promise for 1.8. |
 
-### Glass UI: conteúdo e unidade de integração
+### Glass UI: Content and Integration Unit
 
-Em 02/10/2026 o dono indicou `feat/glass-ilha` para 1.8. Conferência Git nesta rodada: ponta `c5269ed4`, com `feat/social` (`46e9b24f`) como ancestral. Há **12 commits não-merge próprios sobre Social**, alterando 59 arquivos; o diff amplo contra 1.7.2 também inclui Social e não representa somente a camada visual.
+On 10/02/2026 owner designated `feat/glass-ilha` for 1.8. Git check in this cycle: tip `c5269ed4`, with `feat/social` (`46e9b24f`) as ancestor. Contains **12 non-merge commits specific to Social**, modifying 59 files; broad diff against 1.7.2 also includes Social and does not represent visual layer alone.
 
-Conteúdo demonstrado nos commits:
+Demonstrated commit contents:
 
-- Folha de Fontes como ilha: grupos por resolução/HDR/SDR, filtros Em cache/Dublado, Melhor para esta TV, navegação entre abas e título do conteúdo.
-- Menu/rail e painel Salvos/Social como superfícies vidro/sólido; abas segmentadas e foco por superfície.
-- Menu do cartaz, estilo de fileira, Spotlight, Agenda, Biblioteca, Perfil/estatísticas no mesmo padrão.
-- Arte/ícones, traduções e fixtures de captura associados.
+- Sources sheet as island: resolution/HDR/SDR groupings, Cached/Dubbed filters, Best for this TV, tab navigation and content title.
+- Menu/rail and Saved/Social panel as glass/solid surfaces; segmented tabs and surface-based focus.
+- Poster menu, row style, Spotlight, Schedule, Library, Profile/stats in matching pattern.
+- Associated art/icons, translations and capture fixtures.
 
-**Dependência:** se Social entrar na 1.7.3, revisar depois somente o delta visual sobre essa base. Se Social não entrar, separar/revisar a parte que depende de Salvos/Social antes de integrar; não puxar Social/servidor automaticamente pelo merge dessa branch. Também não substituir os arquivos atuais por cópias da árvore 1.7.1: a 1.7.2 tem Ajustes, sincronização, fonte parcial e isolamento mais novos.
+**Dependency:** if Social enters 1.7.3, review only visual delta over that base later. If Social does not enter, separate/review the portion depending on Saved/Social before integration; do not pull Social/server automatically via branch merge. Do not replace current files with 1.7.1 tree copies: 1.7.2 has newer Settings, sync, partial sources, and isolation.
 
-O destino 1.8 é planejamento, sem merge nesta rodada. Exige revisão visual do dono e prova nas TVs; relato externo de folha de Fontes na TCL não valida toda essa UI nem LG/Samsung. Este trabalho nativo é distinto do mockup HTML da ilha do relógio rejeitado; aquele mockup permanece fora da fila.
+1.8 target is planning, without merge in this round. Requires owner visual review and TV testing; external report of Sources sheet on TCL does not validate full UI or LG/Samsung. This native work is distinct from rejected HTML clock island mockup; that mockup remains out of queue.
 
-Não usar `agente/plugins` nem `agente/p2p`: são versões antigas supersedidas pelos candidatos2. Preservar seus commits; não mesclar novamente.
+Do not use `agent/plugins` or `agent/p2p`: legacy versions superseded by candidates 2. Preserve commits; do not re-merge.
 
-## Portes, propostas e histórico
+## Ports, Proposals, and History
 
-| Grupo | Destino |
+| Group | Target |
 |---|---|
-| `feat/vidaa` / #135 | Frente independente até existir prova no aparelho e testador. Não atribuir versão estável antes disso. |
-| `webos3` | Compatibilidade dedicada em aparelho antigo; escolher baseline/budget. Não aplicar cinco patches em todas as plataformas por padrão. |
-| `feat/tizen4-coop`, `nacl/app-completo`, `spike/nacl-tizen45`, `worktree-agent-a03fb2e226f125a82` | Experimentos históricos; não substituir TPK4/5 atual. Preservar; revisar somente se uma limitação atual exigir essa rota. |
-| `agente/i195`, `i195b`, `i195c`, `i195d`, `i203`, `canario/tpk-audio-foco`, `canary/tpk-youtube-retoma` | Canários anteriores à correção publicada. Não compõem uma release futura só porque git cherry mostra patch+. Comparação semântica antes de reutilizar qualquer trecho. |
-| `agente/guiaunicode` | Correção já adaptada à1.7.1. Sem novo merge/release. |
-| `experimento/universo-2026` | Exploração por patch; 36 patches não equivalem a 36 features aceitas. Sem versão antes de separar conteúdo atual/duplicado/experimental. |
-| `worktree-agent-a53ac8d8d82f17106`, `worktree-agent-a62e3f13ac3f493e5`, `worktree-agent-af383a462c2f04823` | Preservações/WIP; auditar conteúdo antes de atribuir feature ou apagar. |
-| #172 ideias do fork, `agente/ajustesvisual`, `agente/icones` | Escolhas visuais futuras. Ajustes funcionais já estão na 1.7.2. Mockup da ilha rejeitado, fora da fila. |
-| #190 título/episódio resolvido; #155 agradecimento | Administração, não novas funcionalidades. Respostas/fechamentos públicos dependem de autorização. |
+| `feat/vidaa` / #135 | Independent stream until hardware proof and tester exist. Do not assign stable version beforehand. |
+| `webos3` | Dedicated legacy compatibility; pick baseline/budget. Do not apply five patches across all platforms by default. |
+| `feat/tizen4-coop`, `nacl/app-completo`, `spike/nacl-tizen45`, `worktree-agent-a03fb2e226f125a82` | Historical experiments; do not replace current TPK4/5. Preserve; review only if current limitations necessitate this path. |
+| `agent/i195`, `i195b`, `i195c`, `i195d`, `i203`, `canary/tpk-audio-foco`, `canary/tpk-youtube-retoma` | Canaries prior to published fix. Do not constitute a future release merely because git cherry indicates patch+. Semantic comparison required before reusing snippets. |
+| `agent/guiaunicode` | Fix already adapted to 1.7.1. No new merge/release. |
+| `experiment/universo-2026` | Patch-level exploration; 36 patches do not equal 36 accepted features. No version assignment before separating current/duplicate/experimental content. |
+| `worktree-agent-a53ac8d8d82f17106`, `worktree-agent-a62e3f13ac3f493e5`, `worktree-agent-af383a462c2f04823` | WIP/preservations; audit contents before assigning feature or deleting. |
+| #172 fork ideas, `agent/ajustesvisual`, `agent/icones` | Future visual choices. Functional Settings already in 1.7.2. Rejected island mockup remains out of queue. |
+| #190 resolved title/episode; #155 appreciation | Administrative, not new features. Public replies/closures require authorization. |
 
-## Ordem de trabalho e regra de publicação
+## Work Order and Publication Rules
 
-1. Investigar arranque/login novos e reproduções pendentes da 1.7.2; preservar candidata atual e seus hashes enquanto não há fix novo comprovado.
-2. Fechar matriz curta nos aparelhos. Fix novo recebe teste focado e novo pacote identificado; sem refazer suíte longa sem necessidade.
-3. Dono escolhe o conjunto da 1.7.3; revisar unidades de integração Social/Discord separadamente e conservar o servidor externo atual.
-4. Preparar contratos e provas da 1.8 para plugins/P2P; portar/revisar Glass UI após resolver a dependência de Social e conservar os fluxos da 1.7.2.
-5. Publicar/responder issues somente após validação e autorização. Tudo deste planejamento permanece local.
+1. Investigate new startup/login and pending 1.7.2 playback issues; preserve current candidate and checksums pending verified fix.
+2. Complete short device matrix. New fix receives focused test and uniquely identified package; avoid unnecessary long test suites.
+3. Owner selects 1.7.3 scope; review Social/Discord integration units separately and keep current external server.
+4. Prepare 1.8 contracts and proofs for plugins/P2P; port/review Glass UI after resolving Social dependency and preserving 1.7.2 flows.
+5. Publish/respond to issues only following validation and authorization. All planning remains local.
 
-Não há merge pendente de `abrirrapido`, `ilhavolta`, `i221`, `i216`, `ajustesux`, `offline`, `i212`, `i213a`, `i213b`, `quedas171`: integração já conferida na auditoria. Mapeamento detalhado das 29 refs e sessões está no documento de auditoria; não contar as branches Social agregadas ou experimentos equivalentes mais de uma vez.
+No pending merge for `abrirrapido`, `ilhavolta`, `i221`, `i216`, `ajustesux`, `offline`, `i212`, `i213a`, `i213b`, `quedas171`: integration verified in audit. Detailed mapping of the 29 refs and sessions is in audit doc; do not double-count aggregated Social branches or equivalent experiments.

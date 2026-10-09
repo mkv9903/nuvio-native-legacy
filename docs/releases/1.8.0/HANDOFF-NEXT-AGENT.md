@@ -1,86 +1,86 @@
-# Handoff da integração Nuvio 1.8 — 03/10/2026
+# Handoff of Nuvio 1.8 Integration — 10/03/2026
 
-## Pedido final do Henrique
+## Final Owner Request
 
-Parar ao terminar somente o que já estava em execução. Não iniciar tarefas novas. O próximo agente assume este documento e o plano; não interpretar a existência do roadmap como autorização para o agente anterior continuar. Nenhuma release 1.8 foi publicada.
+Stop upon completing only what was already executing. Do not initiate new tasks. The next agent takes over this document and the plan; do not interpret the existence of the roadmap as authorization for the prior agent to continue. Zero 1.8 releases were published.
 
-## Onde continuar — não perder o trabalho
+## Where to Continue — Do Not Lose Work
 
-- **Checkout de integração:** `/Users/hrocha/.codex/worktrees/integration-180-glass/nuvio-native-legacy`
+- **Integration checkout:** `/Users/hrocha/.codex/worktrees/integration-180-glass/nuvio-native-legacy`
 - **Branch:** `codex/integration-180-glass`
 - **HEAD:** `e688599116043057f72a83fbee9087cac1ea973d`
-- **Há muitas alterações staged, unstaged e arquivos novos. O HEAD sozinho NÃO contém a entrega.** Não resetar, limpar, trocar arquivos inteiros nem fazer cherry-pick presumindo que as correções estão commitadas. Revisar `git status`, `git diff`, `git diff --cached` e arquivos não rastreados.
-- Checkout original do usuário: `/Users/hrocha/Projetos/Pessoal/LG WEB/nuvio-native-legacy`, branch `fix/tpk-selo-hdr`, também sujo. Foi preservado. Não confundir com a integração.
-- `saida=` não rastreado tem proprietário desconhecido; não apagar.
-- Disco interno ficou apertado; builds e snapshots estão em `/Volumes/ExternalSSD`.
-- Plano completo: [PLANO.md](PLANO.md). Inventário: [INVENTARIO.md](INVENTARIO.md), [INTEGRACAO.md](INTEGRACAO.md).
-- Histórico de execução: `.superpowers/sdd/PLANO/progress.md`. É cronológico: as últimas entradas substituem estados antigos, inclusive mensagens de testes inicialmente falhos.
-- Referências do dono: `docs/HANDOFF-1.8.0.md` e `/private/tmp/nv-codex-ctx/docs/glass-ui-contexto.md`.
+- **Many staged, unstaged, and untracked changes exist. HEAD alone DOES NOT contain delivery.** Do not reset, clean, overwrite entire files, or cherry-pick assuming fixes are committed. Review `git status`, `git diff`, `git diff --cached`, and untracked files.
+- Original user checkout: `/Users/hrocha/Projetos/Pessoal/LG WEB/nuvio-native-legacy`, branch `fix/tpk-selo-hdr`, also dirty. Preserved. Do not confuse with integration.
+- Untracked `saida=` has unknown ownership; do not delete.
+- Internal disk is constrained; builds and snapshots reside in `/Volumes/ExternalSSD`.
+- Complete plan: [PLAN.md](PLAN.md). Inventory: [INVENTORY.md](INVENTORY.md), [INTEGRATION.md](INTEGRATION.md).
+- Execution history: `.superpowers/sdd/PLANO/progress.md`. Chronological: latest entries supersede older ones.
+- Owner references: `docs/HANDOFF-1.8.0.md` and `/private/tmp/nv-codex-ctx/docs/glass-ui-contexto.md`.
 
-## O que está na Android TV
+## What Runs on Android TV
 
-Smart TV Pro, Android 14, `192.168.1.128:5555`. Instalação autorizada feita com `adb install -r`, preservando dados. APK armeabi-v7a e arm64-v8a; TV usa armeabi-v7a. Versão de prévia **1.8.0 / 10800**, não release pública.
+Smart TV Pro, Android 14, `192.168.1.128:5555`. Authorized install via `adb install -r`, preserving data. APK armeabi-v7a and arm64-v8a; TV uses armeabi-v7a. Preview version **1.8.0 / 10800**, not public release.
 
-- Fonte imutável: `/Volumes/ExternalSSD/nuvio-180-preview-ui-home-final`, `manifest.json` com 1275 hashes de src/tests.
-- Cópia de empacotamento: `/Volumes/ExternalSSD/nuvio-180-android-preview`.
-- Commit local de empacotamento: `6fa8e2d4d8abb9c8b28054d720e9729f8bd7ca2d`.
-- APK: `build/release-1.8.0/Nuvio-1.8.0-android.apk` nessa cópia.
-- SHA256 produzido e extraído da TV, comparados pelo coordenador: `8d012314de5b73d60958dec7f06c1f6620abd7842550d8308f66fb46b03216d4`.
-- Foto física inspecionada: `build/release-1.8.0/android-tv-home-settled.png`; Home com CW, amigos e For You.
-- Detalhes: [ANDROID-PREVIEW.md](ANDROID-PREVIEW.md).
+- Immutable source: `/Volumes/ExternalSSD/nuvio-180-preview-ui-home-final`, `manifest.json` with 1,275 hashes of src/tests.
+- Packaging copy: `/Volumes/ExternalSSD/nuvio-180-android-preview`.
+- Local packaging commit: `6fa8e2d4d8abb9c8b28054d720e9729f8bd7ca2d`.
+- APK: `build/release-1.8.0/Nuvio-1.8.0-android.apk` in that copy.
+- SHA-256 produced and extracted from TV, matched by coordinator: `8d012314de5b73d60958dec7f06c1f6620abd7842550d8308f66fb46b03216d4`.
+- Inspected physical screenshot: `build/release-1.8.0/android-tv-home-settled.png`; Home with CW, friends, and For You.
+- Details: [ANDROID-PREVIEW.md](ANDROID-PREVIEW.md).
 
-Inclui restauração Details 1.7.4, véu contínuo Apple TV, ratings 1.7.4, elenco/recomendações separados, Home inicial progressiva, #158/#233/#228 reproduzidos, diagnóstico/persistência, proteção de preferências locais, Seekr Settings/quota e primeira versão N01. **Não inclui o OSD Seekr nem o wiring F03 feitos depois de congelar a fonte.**
+Includes Details 1.7.4 restoration, continuous Apple TV veil, 1.7.4 ratings, separated cast/recommendations, progressive initial Home, #158/#233/#228 reproduced fixes, diagnostics/persistence, local preference protection, Seekr Settings/quota, and initial N01. **Does not include Seekr OSD or F03 wiring completed after freezing source.**
 
-As capturas espaçadas não medem latência de startup. Não houve benchmark comparável 1.7.4/1.8 na TV nem prova de reprodução/fluidez completa. Luna usou monkey para lançar; o salto do seletor para Home não prova retomada automática. Em próximas aberturas, resolver componente e usar `am start`, sem evento aleatório. Nenhum teste físico Samsung/LG novo.
+Spaced screenshots do not measure startup latency. Zero comparable 1.7.4/1.8 benchmark on TV or full playback/fluidity proof. Luna used monkey to launch; jumping from selector to Home does not prove auto-resume. In future runs, resolve component and use `am start` without random events. Zero new physical Samsung/LG tests.
 
-A cópia de build tem versão ajustada; a integração ainda conserva versões antigas em alguns arquivos. Não sincronizar versão/release a partir de um número de preview. Um build anterior pegou objetos antigos porque copy2 preservou timestamps: invalidar objetos ou tocar todos os fontes antes de recompilar essa cópia.
+Build copy has adjusted version; integration retains legacy versions in some files. Do not synchronize version/release from preview number. Prior build picked up stale objects because copy2 preserved timestamps: invalidate objects or touch all sources before recompiling copy.
 
-## Concluído nesta integração, com limites claros
+## Completed in this Integration, with Explicit Limits
 
-| Frente | Entrega | Prova / limite |
+| Track | Delivery | Proof / Limit |
 |---|---|---|
-| Details / Apple TV | Restauração visual v1.7.4 preserva fan, episódios, navegação e integrações; logo primeiro, botões abaixo; legenda do título estrangeiro sem esperar decode; sem elenco inline | GL local e revisão; não declarar toda UI fisicamente aprovada |
-| Véu | Endpoint da expansão usa composição contínua, inclusive Imersiva/Frost/blur/poster/sem arte | 7 cenários GL; diferença p95≤1/255; [VEU-CONTINUIDADE.md](VEU-CONTINUIDADE.md); vídeo nativo/trailer e GPU real pendentes |
-| Ratings e fileiras | Render notasui v1.7.4, API média preservada; elenco seguido de recomendações em filme/série | 10 itens, foco/scroll além do 7º, ponteiro, rota TMDB tv/movie; [DETAIL-ROWS-REVIEW.md](DETAIL-ROWS-REVIEW.md) |
-| Home loading | Só CW/social é estado inicial: primeira fileira pode aparecer sem esperar última; cache/listas/coleções já prontos não encolhem | Antes controlado pronta1ms/visível354ms; depois publicação no instante de pronta; 5 cenários + suites legadas ASan/UBSan. Não é ganho físico medido. [HOME-LOADING-IMPLEMENTATION.md](HOME-LOADING-IMPLEMENTATION.md), [review](HOME-LOADING-REVIEW.md) |
-| #233 | Coleções por ID estável, snapshot vazio válido remove; JSON/RPC inválido não apaga; editor e Home consistentes; coleção fora da quota de catálogo | Parser/projeção/Home/concorrência e revisão. Logs atuais do reportador/TV Samsung pendentes |
-| #158 | Addons de legenda não colapsam por fornecedor; CW local preserva metadados/registro offline | Correções reproduzidas/testadas; não provado que explicam Flix-Streams específico ou todos os logs do usuário |
-| #228 | Fallback de trailer e estado prepared/playing corrigidos nos caminhos reproduzidos | Suites focadas; Samsung Q80A físico pendente |
-| Diagnóstico de memória | Separa candidato, orçamento aplicado, persistido, rollback, manual override; trata falha de disco/timeout/commit | 19 casos, ASan/TSan, teste real de cache; não aumentou caps de hardware nem provou ganho |
-| Perfis por aparelho | Incoming blob agora respeita somenteDesteAparelho; RAM/qualidade/GPU locais não seguem outra TV | ajustes_perfil PASS; UUID cliente.txt existente reutilizado; teste de duas TVs pendente. [DEVICE-PREFERENCES.md](DEVICE-PREFERENCES.md) |
-| Seekr engine/Settings | Chave pessoal, 50 consultas por instalação/dia UTC compartilhadas entre perfis/chaves; persistência, cache/singleflight, 429 separado, retry local, falhas de gravação | Suites quota/estados/Settings; WGT Retry-After exposto ou desconhecido |
-| Seekr OSD, NÃO instalado | Cápsula durante scrubbing com causa, uso/reset; sem chave/clock/storage/provider distintos; some ao soltar | Teste unit rerodado pela raiz + 16 GL vidro/sólido do executor; raiz inspecionou quota. [F02-SEEKR-PLAYER-OSD-ENTREGA.md](F02-SEEKR-PLAYER-OSD-ENTREGA.md) |
-| N01 inicial | API de request isolado, TLS, caps antes de alocar, redirects sem vazamento, deadline, cancelamento/geração, métricas | HTTP/TLS local, ASan/UBSan/TSan, TPK40 host e wrappers; raiz rerodou teste. [NETWORK-REQUEST-CONTRACT.md](NETWORK-REQUEST-CONTRACT.md). F03 abaixo estende esta API |
-| Biblioteca/Guia | Fade/recorte da biblioteca portado seletivamente, Unicode do Guia confirmado | Fixture GL e teste jscadeia |
+| Details / Apple TV | Visual restoration v1.7.4 preserves fan, episodes, navigation, integrations; logo first, buttons below; foreign title subtitle without waiting for decode; no inline cast | Local GL and review; do not claim all UI physically approved |
+| Veil | Expansion endpoint uses continuous composition, including Immersive/Frost/blur/poster/no artwork | 7 GL scenarios; p95 diff ≤ 1/255; [CONTINUITY-VEIL.md](CONTINUITY-VEIL.md); native video/trailer and real GPU pending |
+| Ratings and Rows | Render notasui v1.7.4, media API preserved; cast followed by recommendations in movie/show | 10 items, focus/scroll past 7th, pointer, TMDB tv/movie route; [DETAIL-ROWS-REVIEW.md](DETAIL-ROWS-REVIEW.md) |
+| Home Loading | CW/social only as initial state: first row can appear without waiting for last; ready cache/lists/collections do not collapse | Controlled before ready 1ms / visible 354ms; published immediately upon ready; 5 scenarios + legacy ASan/UBSan. Not measured hardware gain. [HOME-LOADING-IMPLEMENTATION.md](HOME-LOADING-IMPLEMENTATION.md), [review](HOME-LOADING-REVIEW.md) |
+| #233 | Stable ID collections, valid empty snapshot removes; invalid JSON/RPC does not delete; consistent editor and Home; collection outside catalog quota | Parser/projection/Home/concurrency and review. Current reporter/Samsung TV logs pending |
+| #158 | Subtitle add-ons do not collapse by provider; local CW preserves offline metadata/log | Reproduced/tested fixes; unproven whether they explain specific Flix-Streams or all user logs |
+| #228 | Trailer fallback and prepared/playing states fixed in reproduced paths | Focused suites; physical Samsung Q80A pending |
+| Memory Diagnostics | Separates candidate, applied budget, persisted, rollback, manual override; handles disk failure / timeout / commit | 19 cases, ASan/TSan, real cache test; did not raise hardware caps or prove gains |
+| Per-Device Profiles | Incoming blob respects `somenteDesteAparelho`; local RAM/quality/GPU do not follow other TVs | `ajustes_perfil` PASS; existing `cliente.txt` UUID reused; two-TV test pending. [DEVICE-PREFERENCES.md](DEVICE-PREFERENCES.md) |
+| Seekr Engine/Settings | Personal key, 50 queries per install / UTC day shared across profiles/keys; persistence, cache/singleflight, separate 429, local retry, write failures | Quota/states/Settings suites; WGT Retry-After exposed or unknown |
+| Seekr OSD, UNINSTALLED | Capsule during scrubbing with cause, usage/reset; without separate key/clock/storage/provider; dismisses on release | Unit test rerun from root + 16 glass/solid GL captures; root inspected quota. [F02-SEEKR-PLAYER-OSD-DELIVERY.md](F02-SEEKR-PLAYER-OSD-DELIVERY.md) |
+| Initial N01 | Isolated request API, TLS, caps before allocating, leak-free redirects, deadline, cancel/generation, metrics | Local HTTP/TLS, ASan/UBSan/TSan, TPK 40 host and wrappers; root reran test. [NETWORK-REQUEST-CONTRACT.md](NETWORK-REQUEST-CONTRACT.md). F03 below extends this API |
+| Library/Guide | Selective library fade/crop port, Guide Unicode confirmed | GL fixture and `jscadeia` test |
 
-O OSD adicionou getter narrow `ajustes_seekr_habilitado()` (opção local), mantendo `ajustes_seekr_ligado()` (opção+chave) para dispatch. Arquivos: player.c, ajustes.c/h e quatro tests/player_seekr_status*. Sem novos pedidos a providers.
+The OSD added narrow getter `ajustes_seekr_habilitado()` (local option), keeping `ajustes_seekr_ligado()` (option+key) for dispatch. Files: `player.c`, `ajustes.c/h`, and four `tests/player_seekr_status*`. Zero new provider requests.
 
-## Último trabalho concluído antes da parada: F03
+## Last Completed Task Before Pause: F03
 
-**Estável, não instalado:** epoch Android real via ConnectivityManager/JNI e diagnóstico de mídia ligados ao engine por host final. N01 ganhou modo descartável limitado e usa o bundle CA já configurado no arranque. Player/mini bloqueiam ou cancelam o teste ativo. Android usa uma conexão conservadora; LG/TPK sem epoch confiável e WGT sem contrato N01 continuam desconhecidos para StreamFit, mantendo o diagnóstico legacy.
+**Stable, uninstalled:** real Android epoch via ConnectivityManager/JNI and media diagnostics wired to engine per final host. N01 received bounded disposable mode and uses CA bundle configured at startup. Player/mini block or cancel active test. Android uses conservative single connection; LG/TPK without reliable epoch and WGT without N01 contract remain unknown for StreamFit, keeping legacy diagnostics.
 
-ASan/UBSan, TSan, callbacks Kotlin/SDK35, syntax NDK arm64/ARMv7 e regressões focadas PASS. Coordenador conferiu relatórios/logs e hunks de cancelamento/epoch; **revisão integrada completa, full-core/APK e prova física deste delta ainda faltam**. Runtime metadata/playback e telemetria passiva NÃO começaram. Sem duração válida, a classificação ainda pode ficar desconhecida: não anunciar seleção end-to-end pronta.
+ASan/UBSan, TSan, Kotlin/SDK 35 callbacks, NDK arm64/ARMv7 syntax, and focused regressions PASS. Coordinator verified reports/logs and cancel/epoch hunks; **full integrated review, full-core/APK, and hardware proof of this delta remain pending**. Runtime metadata/playback and passive telemetry NOT started. Without valid duration, classification may remain unknown: do not announce end-to-end selection ready.
 
-Entrega e lista exata de arquivos/comandos: [F03-EPOCH-DIAGNOSTICO-HANDOFF.md](F03-EPOCH-DIAGNOSTICO-HANDOFF.md). Produção: NuvioActivity.kt, app.c (cancelamento), diagnostico.c/h, rede.c/h/rede_pedido.inc, novos redemarca.c/h e streamfitdiag.c/h. Não modifica NvPlayer/ParaleloDataSource/streams runtime nesta fatia.
+Delivery and exact file/command list: [F03-EPOCH-DIAGNOSTICS-HANDOFF.md](F03-EPOCH-DIAGNOSTICS-HANDOFF.md). Production: `NuvioActivity.kt`, `app.c` (cancellation), `diagnostico.c/h`, `rede.c/h/rede_pedido.inc`, new `redemarca.c/h` and `streamfitdiag.c/h`. Does not modify `NvPlayer`/`ParaleloDataSource`/`streams` runtime in this slice.
 
-## O que falta, em ordem de retomada
+## Remaining Items, in Resumption Order
 
-1. **Revisar e consolidar o estado sujo:** comparar staged/unstaged/untracked, incorporar relatórios/fixtures novos; commits seletivos por frente e merge final ainda faltam. Não repetir port de arquivo inteiro. Fazer build integrado a partir de fonte congelada contendo os últimos deltas, pois a TV está numa fonte anterior.
-2. **Fechar F03 StreamFit:** runtime verdadeiro por alvo exato (filme/episódio), duração do backend sem PLR_DUR_PADRAO/trailer; duração real vence metadado atrasado. Telemetria passiva Android TransferListener ainda falta; não usar soma sem sincronização dos downloads paralelos nem cache/pausa/buffer cheio como vazão. Expor origem/idade/orçamento/indisponibilidade de forma traduzida. Não generalizar host de resolvedor nem rede por chave constante. Preservar ordem/grupos/foco e modo primeira fonte.
-3. **F04 legendas:** somente auditoria/contrato, nenhum código novo de F04. [F04-LEGENDAS-AUDITORIA-CONTRATO.md](F04-LEGENDAS-AUDITORIA-CONTRATO.md). Seleção atual está em faixas.c, legendasui.c não existe. UI simples idioma+origem/embutida/addon e Mais opções; candidatos estáveis sob chegada tardia. Segunda legenda precisa loader/documento/render independente e colisões; ASS/mkvass atuais são singletons. Não oferecer opção secundária que não desenha.
-4. **F05 AutoSync:** engine/documentos/562 testes existem; faltam coletor de referência embutida independente e ligação ao player, sessões/cancel, Quick/Thorough/tolerância/desfazer/outra referência. Sem bloquear startup; aplicar apenas confiança comprovada; primeiro uma língua, depois duas. Documento: docs/plans/player-1.8/AUTOSYNC-IMPLEMENTACAO.md.
-5. **F06 áudio:** provar PCM por backend antes de VAD/modelo opcional; download explícito, hash/tamanho/cancel/remover, RAM/latência/confiança. Não desligar passthrough/offload silenciosamente. LG/Samsung ainda sem prova de diálogo acessível.
-6. **F07 cache/boost:** implementar/provar cache temporário 256/512/1024MB, Range/auth, cancel, ENOSPC, crash/limpeza; volume até200% por sessão, reset e vermelho >100%. Buffer interno AVPlay não é cache em arquivo. Capacidade real por plataforma é gate F00.
-7. **F08 Social:** consolidar conta/perfil Nuvio independente de Trakt/Simkl; deduplicar canais/amigos e associar identidades verificadas. Completar comparações filme/série/gênero/gostos/match/progresso com cobertura real e estados desconhecidos. Revisar/deploy backend/migração ainda pendentes; não presumir APIs Simkl/Letterboxd plenamente integradas. Card horizontal/menu fora/verde online precisam QA final.
-8. **F09/F10 plugins/P2P:** port seletivo plugins2/p2p2 após revisar N01; limites globais JS/DOM/filas, cancel/geração/auth; P2P shutdown antes de limpar escritores, RAM/disco/statvfs/watchdog. Toolchains/motor/licenças LG/Android/TPK; WGT não tem sockets locais. Não chamar inventário de implementação completa.
-9. **F11 servidores pessoais:** pesquisa pronta em docs/plans/media-servers-1.8; implementação Jellyfin ainda falta (auth/biblioteca/PlaybackInfo/perfil/DirectPlay/progresso), depois Emby/Plex próprios. Isolamento de origem/usuário/IDs e sessões autenticadas.
-10. **F12 TopN/ícones/scripts:** conferir deltas reais restantes, paginação/custo, ícones opcionais Android e issues226/234; scripts Mac/Linux/caminhos com espaços. Ainda há itens no inventário.
-11. **QA e performance de plataforma:** medir Home→fileiras, Play→primeiro frame+áudio e controle→resposta; frames/decodes/uploads/RAM/cache/scroll/fan/Frost, antes/depois com condições equivalentes. Reproduzir Android e LG/Samsung separadamente. Checar menu Apple, sidebar Moderna, Guide/addons/categorias/source/modal amigo, escala Settings e detalhes/heros sem regressão. Captura estática não mede fluidez.
-12. **Logs/issues/release:** restaurar acesso a logs atuais do worker, correlacionar build/horário/aparelho antes de responder/fechar #158/#228/#233 e demais issues. Revisar pendências #229/#231/#232/#227 e PR230 contra código atual, não assumir encerramento remoto. Atualizar What's New e versões finais só após escopo real pronto; builds assinados por alvo, hashes e updater/Homebrew, smoke tests, tag/release/artefatos do mesmo commit e respostas honestas às issues. Nenhuma publicação nesta pausa.
+1. **Review and Consolidate Dirty State:** compare staged/unstaged/untracked, integrate new reports/fixtures; selective commits per track and final merge remain needed. Do not repeat full-file ports. Perform integrated build from frozen source containing latest deltas, as TV runs prior source.
+2. **Complete F03 StreamFit:** genuine runtime per exact target (movie/episode), backend duration without `PLR_DUR_PADRAO`/trailer; real duration overrides delayed metadata. Passive Android `TransferListener` telemetry pending; do not use unsynchronized sum of parallel downloads or cache/pause/full buffer as throughput. Expose origin/age/budget/unavailability in translated format. Do not generalize resolver host or network via constant key. Preserve order/groups/focus and first-source mode.
+3. **F04 Subtitles:** audit/contract only, zero new F04 code. [F04-SUBTITLES-AUDIT-CONTRACT.md](F04-SUBTITLES-AUDIT-CONTRACT.md). Current selection in `faixas.c`, `legendasui.c` does not exist. Simple UI language+origin/embedded/addon and More options; stable candidates under late arrival. Second subtitle needs independent loader/document/render and collision handling; current ASS/mkvass are singletons. Do not offer non-rendering secondary option.
+4. **F05 AutoSync:** engine/documents/562 tests exist; independent embedded reference collector and player wiring, sessions/cancel, Quick/Thorough/tolerance/undo/another reference pending. Without blocking startup; apply proven confidence only; first single language, then dual. Document: [AUTOSYNC-IMPLEMENTATION.md](../../plans/player-1.8/AUTOSYNC-IMPLEMENTATION.md).
+5. **F06 Audio:** prove PCM per backend before VAD/optional model; explicit download, hash/size/cancel/remove, RAM/latency/confidence. Do not silently disable passthrough/offload. LG/Samsung unproven for accessible dialogue.
+6. **F07 Cache/Boost:** implement/prove temporary cache 256/512/1024MB, Range/auth, cancel, ENOSPC, crash/cleanup; volume up to 200% per session, reset, and red >100%. AVPlay internal buffer is not file cache. Real capability per platform is F00 gate.
+7. **F08 Social:** consolidate Nuvio account/profile independent of Trakt/Simkl; deduplicate channels/friends and associate verified identities. Complete movie/show/genre/likes/match/progress comparisons with true coverage and unknown states. Review/deploy backend/migration pending; do not assume Simkl/Letterboxd APIs fully integrated. Horizontal card / exterior menu / online green require final QA.
+8. **F09/F10 Plugins/P2P:** selective port of plugins2/p2p2 after reviewing N01; global JS/DOM/queue limits, cancel/generation/auth; P2P shutdown before clearing writers, RAM/disk/statvfs/watchdog. Toolchains/motor/licenses LG/Android/TPK; WGT lacks local sockets. Do not label inventory complete implementation.
+9. **F11 Personal Media Servers:** research complete in `docs/plans/media-servers-1.8`; Jellyfin implementation pending (auth/library/PlaybackInfo/profile/DirectPlay/progress), followed by dedicated Emby/Plex. Origin/user/ID isolation and authenticated sessions.
+10. **F12 TopN/Icons/Scripts:** check remaining true deltas, pagination/cost, optional Android icons, and issues 226/234; Mac/Linux scripts and paths with spaces. Items remain in inventory.
+11. **QA and Platform Performance:** measure Home→rows, Play→first frame+audio, and remote→response; frames/decodes/uploads/RAM/cache/scroll/fan/Frost, before/after with equivalent conditions. Benchmark Android and LG/Samsung separately. Check Apple menu, Modern sidebar, Guide/addons/categories/source/friend modal, Settings scale, and details/heroes without regression. Static captures do not measure fluidity.
+12. **Logs/Issues/Release:** restore access to current worker logs, correlate build/timestamp/device before replying/closing #158/#228/#233 and remaining issues. Review open items #229/#231/#232/#227 and PR 230 against current code, do not assume remote closure. Update What's New and final versions solely when real scope ready; signed builds per target, hashes and updater/Homebrew, smoke tests, tag/release/artifacts from identical commit, and honest issue replies. Zero releases during this pause.
 
-## Testes/evidência para retomar
+## Tests/Evidence for Resumption
 
-Comandos na integração, ou no snapshot correspondente quando houver WIP concorrente:
+Commands in integration, or matching snapshot when concurrent WIP exists:
 
 ```sh
 bash tests/detail_layout.sh
@@ -93,18 +93,18 @@ SANITIZE=1 bash tests/montagem_cedo.sh
 bash tests/rede_pedido.sh
 ```
 
-Antes de repetir testes caros, consultar logs e quais fontes foram alteradas. GL exige contexto gráfico no Mac. TPK40 host/syntax não prova ARM ou TV. Relatórios de F03 devem adicionar seus comandos específicos.
+Before repeating expensive tests, check logs and modified sources. GL requires graphical context on Mac. TPK 40 host/syntax does not prove ARM or TV. F03 reports must append their specific commands.
 
-Snapshots úteis: `/Volumes/ExternalSSD/nuvio-180-ui-continuity` (UI final), `/Volumes/ExternalSSD/nuvio-180-execution-51fxfkxd` (coorte anterior), `/Volumes/ExternalSSD/nuvio-174-detail-reference` (baseline v1.7.4). `/tmp` contém capturas/logs, pode ser volátil; referências versionadas estão em docs/releases/1.8.0.
+Useful snapshots: `/Volumes/ExternalSSD/nuvio-180-ui-continuity` (final UI), `/Volumes/ExternalSSD/nuvio-180-execution-51fxfkxd` (previous cohort), `/Volumes/ExternalSSD/nuvio-174-detail-reference` (v1.7.4 baseline). `/tmp` contains captures/logs, may be volatile; versioned references reside in `docs/releases/1.8.0`.
 
-## Restrições e coordenação
+## Constraints and Coordination
 
-- M3 localhost18080 recusou conexão; memory_write foi tentado, não salvo. Não há memória remota confirmada desta entrega.
-- Bitwarden `bw status`: unauthenticated. D1 anterior Error7403; não afirmar leitura de logs novos do worker. Segredos nunca em handoff/log.
-- Usuário autoriza subagentes e modelos por custo: Luna para build/coleta/docs; Sol para código/integração/review; Astra pontual para contratos de risco, não para tarefas simples. Neste chat slots estavam ocupados e agentes foram reutilizados; não pressupor que continuarão após a pausa.
-- Chat Android Luna: `01a10412-0de7-7480-9bd5-55a436a37c6c`, finalizado; não fará outra instalação/interação.
-- Preservar feedback visual: layout antigo de Details; logo antes de tudo e botões abaixo; fan abre ao focar primeiro botão funcional; carrossel não troca título enquanto expandido; elenco separado de recomendações; não recriar redesign rejeitado.
+- M3 localhost:18080 refused connection; memory_write attempted, not saved. Zero confirmed remote memory from this delivery.
+- Bitwarden `bw status`: unauthenticated. D1 previous Error 7403; do not assert fresh worker log reads. Secrets never in handoff/logs.
+- User authorizes subagents and models by cost: Luna for build/collection/docs; Sol for code/integration/review; Astra targeted for high-risk contracts, not simple tasks.
+- Android Luna chat: `01a10412-0de7-7480-9bd5-55a436a37c6c`, finished; will not perform further installations.
+- Preserve visual feedback: legacy Details layout; logo first, buttons below; fan expands on focusing first functional button; carousel does not swap title while expanded; cast separated from recommendations; do not recreate rejected redesign.
 
-## Checkpoint para recuperação
+## Recovery Checkpoint
 
-`/Volumes/ExternalSSD/nuvio-180-handoff-stop-u4ldpf03` contém HEAD/status, patches separados staged/unstaged, cópias dos arquivos alterados e fontes/testes/docs novos, com manifesto SHA256. Não é clone completo; usar o checkout de integração é o caminho principal. Não aplicar os patches novamente sobre ele. Os agentes de implementação encerraram; o chat Android está idle. O slot antigo issue158_fix permaneceu pending_init e recebeu interrupt, sem execução nova.
+`/Volumes/ExternalSSD/nuvio-180-handoff-stop-u4ldpf03` contains HEAD/status, separated staged/unstaged patches, copies of modified files and new sources/tests/docs, with SHA-256 manifest. Not full clone; using integration checkout is primary path. Do not reapply patches over it. Implementation agents terminated; Android chat idle. Old slot `issue158_fix` remained pending_init and received interrupt, zero new execution.

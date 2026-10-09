@@ -1,141 +1,141 @@
-# Player 1.8 — especificação e provas de viabilidade
+# Player 1.8 — Specification and Feasibility Proofs
 
-03/10/2026. Proposta de implementação, sem benchmark físico e sem funcionalidades implementadas por este documento. Escopo definido pelo usuário: estas melhorias ficam na 1.8; Settings/fixes, recuperação de trabalho local e ícones opcionais são tratados separadamente na 1.7.3.
+10/03/2026. Implementation proposal, without physical benchmark and without features implemented by this document. Scope defined by user: these improvements belong in 1.8; Settings/fixes, recovery of local work, and optional icons are handled separately in 1.7.3.
 
-## Base e conclusão
+## Baseline and Conclusion
 
-Reaproveitar o player C, `legenda.c`, `mkvass.c`, `vazao.h`, `diagnostico.c`, `perfiltv.c`, `seekr.c`, `streams.c`, e o Android Media3 existente em `android/app/src/main/java/space/nuvio/nativelegacy/`. Android já está integrado à release; a pesquisa inicial que o descrevia como branch separada é anterior ao inventário de merges.
+Reuse the C player, `legenda.c`, `mkvass.c`, `vazao.h`, `diagnostico.c`, `perfiltv.c`, `seekr.c`, `streams.c`, and the existing Android Media3 in `android/app/src/main/java/space/nuvio/nativelegacy/`. Android is already integrated into the release; initial research describing it as a separate branch predates the merge inventory.
 
-O caminho com menor dependência externa é AutoSync temporal entre legendas e adequação de streams pelo diagnóstico. Android tem APIs prontas para cache/ganho e instrumentação de transferências; acesso a PCM, ganho e cache controlado pelo app em LG/Samsung exigem provas por backend. Não prometer a mesma capacidade por plataforma antes delas. A pesquisa inicial completa está no arquivo local ignorado `docs/PESQUISA-AUTOSYNC-PLAYER.md` do checkout principal; este plano incorpora os requisitos adicionais e será versionável.
+The path with least external dependency is temporal AutoSync between subtitles and stream adequacy via diagnostics. Android has ready APIs for cache/gain and transfer instrumentation; access to PCM, gain, and app-controlled cache on LG/Samsung requires backend proofs. Do not promise the same capability across platforms prior to these proofs. Full initial research is in the local ignored file `docs/PESQUISA-AUTOSYNC-PLAYER.md` of the main checkout; this plan incorporates additional requirements and is trackable in version control.
 
-## Contratos de preferência e estado
+## Preference and State Contracts
 
-| Dado | Escopo | Política proposta |
+| Data | Scope | Proposed Policy |
 |---|---|---|
-| Idiomas principal/secundário, escolha de add-ons | Perfil de usuário | Sincronizável pela conta, respeitando escolhas explícitas |
-| Performance, cache, ganho permitido, modelo de fala e diagnóstico | Aparelho | Local; uma mesma conta pode ter ajustes distintos na Android TV e Samsung |
-| Limite Seekr e uso diário | Aparelho, todos os perfis | Nunca reseta ao mudar conta, perfil ou chave |
-| Chave Seekr pessoal | Aparelho | Local, mascarada, removível; não sincronizar em texto claro |
-| Offset automático/manual | Sessão + identidade do documento | Independentes por idioma; troca de fonte invalida a análise |
-| Aprendizado de vazão | Aparelho + rede + host/provedor | Guardar origem, idade e qualidade; não confundir CDN lenta com conexão lenta |
+| Primary/secondary languages, add-on choice | User profile | Synchronizable via account, respecting explicit choices |
+| Performance, cache, allowed gain, speech model, and diagnostics | Device | Local; one account may have distinct settings on Android TV and Samsung |
+| Seekr limit and daily usage | Device, all profiles | Never resets on account, profile, or key changes |
+| Personal Seekr key | Device | Local, masked, removable; do not sync in plaintext |
+| Automatic/manual offset | Session + document identity | Independent per language; source switch invalidates analysis |
+| Throughput learning | Device + network + host/provider | Store origin, age, and quality; do not confuse slow CDN with slow connection |
 
-Identidade do aparelho: UUID aleatório gerado pela instalação, sem serial/MAC. Um perfil de performance efetivo resolve `padrão do hardware → ajustes do aparelho → override explicitamente local`; conta não deve sobrescrever silenciosamente esse resultado. Reinstalar ou limpar dados pode apagar o UUID e o contador: limite estritamente fiscalizado por aparelho requer cadastro autenticado do aparelho no backend, não apenas armazenamento local. MVP local limita uso normal; essa limitação deve estar documentada.
+Device identity: random UUID generated upon installation, no serial/MAC. An effective performance profile resolves `hardware default → device settings → explicitly local override`; account must not silently overwrite this outcome. Reinstalling or clearing data may erase the UUID and counter: strictly enforced per-device limits require authenticated backend device registration, not just local storage. Local MVP limits normal usage; this limitation must be documented.
 
-## AutoSync de legenda
+## Subtitle AutoSync
 
-Proposta: habilitado automaticamente quando há legenda externa preferida e referência disponível, com opção de desligar em Ajustes. A reprodução inicia sem esperar pelo resultado. Aplicar somente correções aceitas; manter ajuste manual e ação Desfazer. Não trocar a faixa escolhida para produzir referência.
+Proposal: automatically enabled when a preferred external subtitle and reference are available, with an option to disable in Settings. Playback starts without waiting for the result. Apply only accepted corrections; maintain manual adjustment and Undo action. Do not switch the chosen track to produce a reference.
 
-Refatorar `LegendaDocumento` independente de overlay: cues, idioma, origem, identidade/hash e geração. A referência embutida fica em outro documento. O coletor ASS atual não cobre automaticamente SRT/MP4, e uma amostra à frente não comprova o título inteiro. Cancelamento usa geração de sessão, fonte e seleção.
+Refactor `LegendaDocumento` independent of overlay: cues, language, origin, identity/hash, and generation. The embedded reference resides in another document. The current ASS collector does not automatically cover SRT/MP4, and a forward sample does not prove the entire title. Cancellation uses session generation, source, and selection.
 
-MVP: deslocamento constante por atividade temporal, com reforço de texto apenas quando compatível. Aceitação exige cobertura de diálogo, pico distinto de alternativas e concordância entre janelas separadas. Forced/sinais, introduções repetidas, cortes diferentes e pouco diálogo devem poder resultar em recusa. Escala e retiming por segmentos são etapa posterior; offset discordante entre regiões nunca vira correção global.
+MVP: constant offset based on temporal activity, with text reinforcement only when compatible. Acceptance requires dialogue coverage, distinct peak against alternatives, and agreement across separate windows. Forced/signs, repeated intros, different cuts, and sparse dialogue must be able to produce rejection. Scaling and segment retiming are a later phase; discordant offset across regions must never become a global correction.
 
-| Controle | Semântica proposta |
+| Control | Proposed Semantics |
 |---|---|
-| Quick | Poucas referências/janelas e orçamento curto; nunca baixa o limiar de confiança |
-| Thorough | Mais referências e regiões; mesmo limiar; execução cancelável em segundo plano |
-| Tolerância | Erro residual admitido, separado do intervalo máximo de busca |
-| Tentar outra referência | Exclui a referência rejeitada na sessão e reinicia a busca |
-| Estado exibido | Analisando / Sincronizada / Sem correspondência segura / Indisponível |
+| Quick | Few references/windows and short budget; never lowers confidence threshold |
+| Thorough | More references and regions; same threshold; cancellable background execution |
+| Tolerance | Allowed residual error, separate from max search range |
+| Try another reference | Excludes rejected reference in session and restarts search |
+| Displayed state | Analyzing / Synchronized / No safe match / Unavailable |
 
-Orçamentos iniciais para protótipo, não resultado medido: Quick até 5 s de processamento e 3 regiões; Thorough até 20 s e 6 regiões, com teto separado de bytes de referência. Não aplicar durante seek/menus se o custo causar travamento. Tolerância inicial candidata 250 ms com opções 150/250/500 ms: calibrar pela distribuição de erro de anotações humanas antes de definir o padrão final.
+Initial budgets for prototype, not measured result: Quick up to 5s processing and 3 regions; Thorough up to 20s and 6 regions, with separate ceiling for reference bytes. Do not apply during seek/menus if cost causes stuttering. Initial candidate tolerance 250ms with 150/250/500ms options: calibrate against human annotation error distribution before finalizing default.
 
-## Segunda legenda e seletor simples
+## Secondary Subtitle and Simple Selector
 
-Primeira tela mostra somente os idiomas principal e secundário configurados. Para cada idioma, mostrar candidatos embutidos e de add-on com linha `Português · Embutida` ou `Português · OpenSubtitles`. Indicador de seleção distinto para principal/secundária, sem misturar idiomas. Embutida significa origem da faixa, não fornecedor externo.
+Initial screen displays only configured primary and secondary languages. For each language, display embedded and add-on candidates with line `English · Embedded` or `English · OpenSubtitles`. Distinct selection indicator for primary/secondary without mixing languages. Embedded designates track origin, not external vendor.
 
-Ação Mais opções abre lista completa e detalhes: nome da faixa, arquivo/release, codec, forced/SDH, origem/add-on, formato, atraso e estado AutoSync. Ocultar esses detalhes na tela inicial não pode impedir selecionar outra versão. Selecionar nenhum para secundária deve estar sempre disponível. Preservar identidade/foco na chegada tardia de add-ons.
+More options action opens full list and details: track name, file/release, codec, forced/SDH, origin/add-on, format, delay, and AutoSync state. Hiding these details on initial screen must not prevent selecting another version. Selecting none for secondary must always be available. Preserve identity/focus on late arrival of add-ons.
 
-Dois documentos, dois offsets e duas seleções. Uma referência pode ser reutilizada somente depois de validação individual. Definir duas áreas de overlay e evitar colisões com controles/letreiros ASS. Se o backend não permite duas faixas nativas, renderizar a secundária no app; testar compatibilidade real antes de habilitar.
+Two documents, two offsets, and two selections. A reference may be reused only after individual validation. Define two overlay areas and avoid collisions with ASS controls/billboards. If backend does not support two native tracks, render secondary in app; test actual compatibility prior to enabling.
 
-## Áudio sync
+## Audio Sync
 
-Toggle separado, inicialmente desligado, texto claro sobre processamento local. Fluxo candidato: PCM mono → VAD → correlação temporal; ASR local opcional para áudio inglês produz referência cronometrada adicional. Legenda traduzida não corresponde diretamente às palavras inglesas: validar pelo tempo e estrutura.
+Separate toggle, initially off, clear copy on local processing. Candidate pipeline: mono PCM → VAD → temporal correlation; optional local ASR for English audio produces additional timed reference. Translated subtitles do not match English words directly: validate by timing and structure.
 
-Baixar modelo uma vez, aconselhar Wi-Fi, mostrar tamanho real/hash, progresso, cancelar e remover. Nenhum download automático ao iniciar filme. Silero VAD e sherpa-onnx são candidatos; comparar whisper.cpp para suporte multilíngue sem presumir menor latência. Não inferir RAM total pelo tamanho do arquivo.
+Download model once, advise Wi-Fi, display true size/hash, progress, cancel, and remove. No automatic download on movie startup. Silero VAD and sherpa-onnx are candidates; compare whisper.cpp for multilingual support without assuming lower latency. Do not infer total RAM from file size.
 
-Passthrough/offload e codecs codificados podem não entregar PCM. Não desativar silenciosamente passthrough, HDR/DV ou offload para analisar áudio. Se preciso, decodificação auxiliar precisa de limite de CPU/RAM e amostras, ou a função fica indisponível naquele modo. APIs externas só como avaliação separada com consentimento para envio do trecho; fluxo padrão não envia áudio, URLs assinadas nem headers de debrid.
+Passthrough/offload and encoded codecs might not deliver PCM. Do not silently disable passthrough, HDR/DV, or offload to analyze audio. If necessary, auxiliary decoding requires CPU/RAM and sample limits, or the feature becomes unavailable in that mode. External APIs only as separate evaluation with consent for clip upload; default pipeline does not transmit audio, signed URLs, or debrid headers.
 
-## Cache de seek e volume
+## Seek Cache and Volume
 
-Cache de sessão em disco: Desligado, 256/512/1024 MiB (rótulos de produto 256 MB/512 MB/1 GB). Reservar espaço livre, reduzir/recusar a configuração se não couber, escrita assíncrona, limpeza ao fechar e na abertura após crash. Começar por VOD HTTP progressivo; HLS/DASH/live não herdam suporte sem testes próprios. O volume configurado e orçamento de prefetch são controles diferentes. Seek só será rápido quando o destino e dados de decodificação estiverem cobertos pelo cache.
+Disk session cache: Off, 256/512/1024 MiB (product labels 256 MB/512 MB/1 GB). Reserve free space, reduce/reject configuration if insufficient space, asynchronous writes, cleanup on exit and on launch after crash. Start with progressive HTTP VOD; HLS/DASH/live do not inherit support without dedicated tests. Configured volume and prefetch budget are distinct controls. Seek will only be fast when target and decoding data are covered by cache.
 
-Android: avaliar `CacheDataSource`/`SimpleCache` com `ParaleloDataSource`. HTTP Range, autenticação, redirecionamento, cancelamento e múltiplas conexões precisam preservar o contrato. LG/uMS, Samsung WGT/AVPlay e TPK: prova de proxy/fonte local compatível antes de oferecer a opção. Buffer interno AVPlay não equivale a cache de arquivo do app.
+Android: evaluate `CacheDataSource`/`SimpleCache` with `ParaleloDataSource`. HTTP Range, authentication, redirection, cancellation, and multiple connections must preserve contract. LG/uMS, Samsung WGT/AVPlay, and TPK: compatible proxy/local source proof before offering option. AVPlay internal buffer does not equate to app file cache.
 
-Volume: 0–100% usa caminho atual; 100–200% usa ganho real onde disponível. 200% de amplitude corresponde a aproximadamente +6,02 dB; `LoudnessEnhancer` recebe ganho em milibels, não percentagem. Controlar clipping/limitação, indicar vermelho acima de 100%, zerar ao fechar/trocar sessão. No controle remoto a barra recebe setas, sem depender de swipe. API ausente ou passthrough incompatível mantém teto100%; não elevar o volume físico da TV para simular ganho do player.
+Volume: 0–100% uses current path; 100–200% uses real gain where available. 200% amplitude corresponds to approximately +6.02 dB; `LoudnessEnhancer` takes gain in millibels, not percentage. Control clipping/limiting, indicate red above 100%, reset on session close/switch. Remote control bar accepts arrows without depending on swipe. Absent API or incompatible passthrough caps at 100%; do not raise TV physical volume to simulate player gain.
 
-## Fontes adequadas e speed test
+## Suitable Sources and Speed Test
 
-Aplicar partição estável sobre a ordem de base escolhida: adequadas/desconhecidas primeiro, provavelmente pesadas depois. Não ocultar fontes. Classificação fixada enquanto o seletor está aberto para preservar foco; novas respostas entram com identidade estável.
+Apply stable partition over chosen base order: suitable/unknown first, likely heavy later. Do not hide sources. Classification locked while selector is open to preserve focus; new responses enter with stable identity.
 
-Demanda: bitrate confiável ou bytes exatos ×8/duração/1e6. Tamanho de pacote de temporada não serve para episódio; resolução sozinha não prova bitrate. `vazao.h` já oferece p20×0,75 como orçamento conservador e mediana×0,9 como teto; reutilizar com proveniência e expiração, não uma constante arbitrária copiada do fork.
+Demand: reliable bitrate or exact bytes × 8 / duration / 1e6. Season pack size does not serve episode; resolution alone does not prove bitrate. `vazao.h` already offers p20 × 0.75 as conservative budget and median × 0.9 as ceiling; reuse with provenance and expiration, not an arbitrary constant copied from fork.
 
-Aprendizado passivo conta somente transferências de mídia com busca ativa, exclui cache hits, pausa e espera por buffer cheio. Stall enquanto download ativo é sinal; não excluí-lo para inflar a medida. `ParaleloDataSource` já recebe TransferListener: instrumentar bytes sem duplicar a contagem das conexões. LG/Samsung player fechado precisa de telemetria própria; na falta dela informar que a classificação vem do diagnóstico.
+Passive learning counts only media transfers with active fetching, excludes cache hits, pauses, and waiting for full buffer. Stall during active download is a signal; do not exclude it to inflate measurement. `ParaleloDataSource` already receives TransferListener: instrument bytes without duplicating connection counts. Closed LG/Samsung player requires own telemetry; in its absence inform that classification originates from diagnostics.
 
-Speed test deve oferecer: rápido com endpoint conhecido (rede) e teste da fonte/host (caminho real). Exibir Mbps sustentados, margem, instante e origem, junto de demanda estimada quando confiável. Não garantir resolução ou ausência de buffering. Invalidar após troca de rede/reteste e usar expiração candidata24h até calibração. Não disparar testes ativos durante reprodução sem pedido do usuário; eles competem com a mídia. Contabilizar bytes e permitir cancelar.
+Speed test must offer: quick with known endpoint (network) and source/host test (actual path). Display sustained Mbps, margin, timestamp, and origin, alongside estimated demand when reliable. Do not guarantee resolution or absence of buffering. Invalidate on network change/retest and use candidate 24h expiration until calibration. Do not launch active tests during playback without user request; they compete with media. Count bytes and allow cancellation.
 
-## Seekr — 50 consultas por dia por TV
+## Seekr — 50 Requests per Day per TV
 
-Usuário definiu limite50/dia por aparelho e retorno da chave pessoal. Na base examinada e1f2936b, `seekr.h` mantém a API de chave pessoal, enquanto `ajustes.c` esconde AJ_SEEKR_CHAVE/AJ_SEEKR_TESTAR quando `seekrEmbutida()` é verdadeiro (filtro próximo da linha3591). Restaurar a visibilidade e revisar precedência de chave pessoal versus embutida; editar a API operacional sozinha não restaura o campo.
+User defined 50/day limit per device and return of personal key. In examined base e1f2936b, `seekr.h` maintains personal key API, while `ajustes.c` hides AJ_SEEKR_CHAVE/AJ_SEEKR_TESTAR when `seekrEmbutida()` is true (filter near line 3591). Restore visibility and review precedence of personal versus embedded key; editing operational API alone does not restore field.
 
-Contar cada despacho HTTP de `/sprites`, incluindo retry/refresh; frames, VTT e JPEG em cache não gastam o limite local. Reserva atômica durável ANTES do despacho, mutex e escrita substitutiva; queda após reserva pode consumir uma chamada sem enviá-la, aceito para evitar ultrapassar50. Single-flight por título/duração/identidade de chave evita consultas concorrentes iguais. Cache lookup respeita validade; VTT/URL assinada não persiste além da expiração.
+Count each HTTP dispatch of `/sprites`, including retry/refresh; cached frames, VTT, and JPEG do not consume local quota. Durable atomic reservation BEFORE dispatch, mutex, and replacement write; crash after reservation may consume a call without sending it, accepted to avoid exceeding 50. Single-flight per title/duration/key identity avoids identical concurrent queries. Cache lookup respects validity; VTT/signed URL does not persist past expiration.
 
-Proposta de janela: dia UTC para combinar com a documentação do fornecedor; apresentar horário de reinício no fuso local. Salvar último dia observado e impedir clock rollback de liberar contador; sem relógio confiável, usar última janela válida e degradar com mensagem explicativa. Para enforcement forte, backend deve controlar contador e janela, sem expor a chave compartilhada no pacote. Usar chave pessoal não aumenta o limite50 da TV; quotas do fornecedor continuam independentes e podem ser menores.
+Proposed window: UTC day to align with vendor documentation; present reset time in local timezone. Save last observed day and prevent clock rollback from freeing counter; without reliable clock, use last valid window and degrade with explanatory message. For strong enforcement, backend must govern counter and window without exposing shared key in package. Using personal key does not raise 50 TV limit; vendor quotas remain independent and may be lower.
 
-Estados distintos: limite local atingido, 429 fornecedor com Retry-After, 401/403 chave recusada, título sem preview, rede indisponível. Nada disso bloqueia seek/playback. Campo mascarado com testar/remover; validação de chave não é chamada `/sprites` e não deve gastar quota50, mas respeita seus próprios limites. Não registrar chave, Bearer, URL assinada ou resposta que a contenha.
+Distinct states: local limit reached, 429 vendor with Retry-After, 401/403 key rejected, title without preview, network unavailable. None of these blocks seek/playback. Masked field with test/remove; key validation is not a `/sprites` call and must not consume 50 quota, but respects its own limits. Do not log key, Bearer, signed URL, or response containing it.
 
-## Diagnóstico, otimização e logs
+## Diagnostics, Optimization, and Logs
 
-Estender o relatório: backend/build/aparelho, memória livre/pico, armazenamento livre, bitrate e bytes por mídia, tempo de startup/seek, rebuffering, tempo de render/menu, capacidade cache/coverage, AutoSync tempo/resultado/erro/recusa, VAD/ASR RAM/CPU, Seekr uso local/status/latência. Dados agregados; conteúdo e identificadores pessoais não necessários.
+Extend report: backend/build/device, free/peak memory, free storage, bitrate and bytes per media, startup/seek time, rebuffering, render/menu time, cache capacity/coverage, AutoSync time/result/error/rejection, VAD/ASR RAM/CPU, Seekr local usage/status/latency. Aggregate data; content and personal identifiers unnecessary.
 
-A tabela `perfiltv.h` distingue LG, WGT e TPK, mas não traz entrada Android explícita: adicionar avaliação própria antes de compartilhar limites. Reutilizar decisão com histerese e reteste/rollback existente; automatizar somente knobs cuja melhoria foi medida com mesma amostra e respeitar override manual. Limite Seekr, idioma, consentimento de áudio e boost não são knobs a maximizar por otimização.
+The `perfiltv.h` table distinguishes LG, WGT, and TPK, but lacks explicit Android entry: add dedicated evaluation before sharing limits. Reuse decision with hysteresis and existing retest/rollback; automate only knobs whose improvement was measured with identical sample and respect manual override. Seekr limit, language, audio consent, and boost are not knobs to maximize via optimization.
 
-Logs novos em inglês com eventos/razões estáveis, por exemplo `subtitle_sync rejected reason=ambiguous_peak`, `seekr_lookup blocked reason=device_daily_limit used=50`, `stream_fit classified reason=estimated_bitrate`. UI continua traduzida. Preservar compatibilidade com ferramentas que parseiam logs antigos; migração por módulo com teste dos consumidores, sem trocar todos os textos de uma vez.
+New logs in English with stable events/reasons, e.g., `subtitle_sync rejected reason=ambiguous_peak`, `seekr_lookup blocked reason=device_daily_limit used=50`, `stream_fit classified reason=estimated_bitrate`. UI remains translated. Preserve compatibility with tools parsing old logs; module-by-module migration with consumer testing, without changing all texts at once.
 
-## Matriz de viabilidade
+## Feasibility Matrix
 
-| Capacidade | Android/Media3 | LG/uMS | Samsung WGT/AVPlay | Samsung TPK |
+| Capability | Android/Media3 | LG/uMS | Samsung WGT/AVPlay | Samsung TPK |
 |---|---|---|---|---|
-| Documentos/offset externo e seleção simples | Caminho comum C | Caminho comum C | Caminho comum C | Caminho comum C |
-| Referência embutida | Extração/track a demonstrar | ASS Range existe; expandir | ASS Range existe; expandir | ASS Range existe; expandir |
-| Bytes reais de playback | DataSource instrumentável | API fechada: prova pendente | API fechada: prova pendente | Contrato multimedia: prova pendente |
-| PCM para VAD/ASR | AudioProcessor/decoder; excluir modos incompatíveis | Prova pendente | Prova pendente | Prova pendente |
-| Cache arquivo app | Media3 candidato | Fonte/proxy: prova pendente | Fonte/proxy: prova pendente | Fonte/proxy: prova pendente |
-| Boost acima100 | LoudnessEnhancer candidato | Ganho/PCM: prova pendente | Ganho/PCM: prova pendente | Ganho/PCM: prova pendente |
-| Quota Seekr/performance local | Comum com adaptador storage | Comum | Comum | Comum |
+| External documents/offset and simple selection | Common C path | Common C path | Common C path | Common C path |
+| Embedded reference | Extraction/track to demonstrate | ASS Range exists; expand | ASS Range exists; expand | ASS Range exists; expand |
+| Actual playback bytes | Instrumentable DataSource | Closed API: pending proof | Closed API: pending proof | Multimedia contract: pending proof |
+| PCM for VAD/ASR | AudioProcessor/decoder; exclude incompatible modes | Pending proof | Pending proof | Pending proof |
+| App file cache | Media3 candidate | Source/proxy: pending proof | Source/proxy: pending proof | Source/proxy: pending proof |
+| Boost above 100 | LoudnessEnhancer candidate | Gain/PCM: pending proof | Gain/PCM: pending proof | Gain/PCM: pending proof |
+| Seekr quota / local performance | Common with storage adapter | Common | Common | Common |
 
-## Dependências prontas e fontes oficiais
+## Ready Dependencies and Official Sources
 
-| Projeto/API | Reutilização | Licença / condição |
+| Project / API | Reuse | License / Condition |
 |---|---|---|
-| [alass](https://github.com/kaegi/alass) | Engine temporal / baseline; FFI Rust-C necessária | GPL-3.0; verificar compatibilidade e toolchains antes de vendoring |
-| [ffsubsync](https://github.com/smacke/ffsubsync) | Baseline para referência e áudio | MIT; Python/FFmpeg inadequados para embutir sem estudo de footprint |
-| [Silero VAD](https://github.com/snakers4/silero-vad) | Detecção local de fala | MIT; pesos/runtime precisam inventário |
-| [sherpa-onnx](https://k2-fsa.github.io/sherpa/onnx/index.html) | ASR com interface nativa | Apache-2.0 no projeto; conferir licença de cada modelo |
-| [whisper.cpp](https://github.com/ggml-org/whisper.cpp) | ASR C/C++ alternativo | MIT no projeto; conferir modelos e RAM do alvo |
-| [Media3 network stacks](https://developer.android.com/media/media3/exoplayer/network-stacks) | Cache/transferências Android | Apache-2.0 nas bibliotecas AndroidX; usar versão pinada compatível |
-| [LoudnessEnhancer](https://developer.android.com/reference/android/media/audiofx/LoudnessEnhancer) | Ganho por sessão Android | API plataforma; disponibilidade depende do dispositivo |
-| [Seekr docs](https://seekr.tv/docs) | HTTP `/sprites`, SDK Android0.2.0 opcional | Serviço com quotas/termos; SDK precisa revisão de licença antes de adoção |
-| [TypeSafe](https://docs.typesafe.ai/introduction) | Julgamento semântico opcional | API proprietária; typed output não comprova timing |
-| [AVPlay](https://developer.samsung.com/smarttv/develop/api-references/samsung-product-api-references/avplay-api.html) | Capacidades/buffer backend | API plataforma; buffer interno não é cache disco |
+| [alass](https://github.com/kaegi/alass) | Temporal engine / baseline; Rust-C FFI needed | GPL-3.0; verify compatibility and toolchains before vendoring |
+| [ffsubsync](https://github.com/smacke/ffsubsync) | Baseline for reference and audio | MIT; Python/FFmpeg inadequate for embedding without footprint study |
+| [Silero VAD](https://github.com/snakers4/silero-vad) | Local speech detection | MIT; weights/runtime require inventory |
+| [sherpa-onnx](https://k2-fsa.github.io/sherpa/onnx/index.html) | ASR with native interface | Apache-2.0 in project; verify license of each model |
+| [whisper.cpp](https://github.com/ggml-org/whisper.cpp) | Alternative C/C++ ASR | MIT in project; verify models and target RAM |
+| [Media3 network stacks](https://developer.android.com/media/media3/exoplayer/network-stacks) | Android cache / transfers | Apache-2.0 in AndroidX libraries; use compatible pinned version |
+| [LoudnessEnhancer](https://developer.android.com/reference/android/media/audiofx/LoudnessEnhancer) | Gain per session Android | Platform API; availability depends on device |
+| [Seekr docs](https://seekr.tv/docs) | HTTP `/sprites`, optional Android 0.2.0 SDK | Service with quotas/terms; SDK requires license review before adoption |
+| [TypeSafe](https://docs.typesafe.ai/introduction) | Optional semantic judgment | Proprietary API; typed output does not prove timing |
+| [AVPlay](https://developer.samsung.com/smarttv/develop/api-references/samsung-product-api-references/avplay-api.html) | Capabilities / backend buffer | Platform API; internal buffer is not disk cache |
 
-Jev pode priorizar referências por trecho/metadados, mas não calcula offset nem substitui validação temporal. Começar em modo observação e comparar com regras locais. Sem ganho medido, remover do caminho crítico. Credencial fica no backend; enviar trechos mínimos sem URL/headers privados. ElevenLabs forced alignment é alternativa externa quando texto corresponde à fala, não solução direta para tradução. APIs externas não foram chamadas nesta tarefa.
+Jev may prioritize references by clip/metadata, but does not calculate offset or replace temporal validation. Start in observation mode and compare against local rules. Without measured gain, remove from critical path. Credential stays on backend; send minimal clips without private URL/headers. ElevenLabs forced alignment is an external alternative when text matches speech, not a direct solution for translation. External APIs were not invoked in this task.
 
-## Sequência e critérios de liberação
+## Sequence and Release Criteria
 
-1. Separar preferências aparelho/conta, quota Seekr e diagnóstico; migração preserva comportamento atual.
-2. Seletor simples, documentos independentes e partição estável de fontes com diagnóstico.
-3. AutoSync offset uma língua no host, depois extração em cada backend; segunda língua em seguida.
-4. Android cache/boost; VAD e ASR opt-in somente depois da prova de PCM.
-5. Provas LG/Samsung; habilitação por capability e não só macro da plataforma. Jev somente após avaliação comparativa.
+1. Separate device/account preferences, Seekr quota, and diagnostics; migration preserves current behavior.
+2. Simple selector, independent documents, and stable source partition with diagnostics.
+3. AutoSync offset single language on host, then extraction on each backend; secondary language subsequently.
+4. Android cache/boost; VAD and ASR opt-in only after PCM proof.
+5. LG/Samsung proofs; capability enablement rather than platform macro alone. Jev only following comparative evaluation.
 
-Benchmark em LG C9, Android TV/TCL identificado por modelo/SoC/build, Samsung identificada e WGT/TPK separados. Usar mesmos arquivos de teste legais, hashes, rede controlada, builds pinadas, execução fria/quente, pelo menos10 repetições por cenário; reportar mediana/p95 e número de falhas. Não agregar plataformas para esconder regressão.
+Benchmark on LG C9, Android TV/TCL identified by model/SoC/build, Samsung identified and WGT/TPK separated. Use identical legal test files, hashes, controlled network, pinned builds, cold/warm runs, at least 10 repetitions per scenario; report median/p95 and failure counts. Do not aggregate platforms to hide regression.
 
-Corpus temporal: offsets ±0,25/1/5/30s; edição incompatível/corte no meio; escala23,976→25; música, fala esparsa, diálogos repetitivos, forced/SDH; SRT/VTT/ASS embutido; legendas traduzidas e duas línguas com offsets diferentes. Medir erro contra anotação humana, aceites corretos, falsas correções e recusas corretas. Como gate inicial proposto: nenhuma falsa aplicação no conjunto adversarial, p95 erro≤tolerância configurada entre aceites; explicitar tamanho do corpus, pois zero observado não garante zero em produção.
+Temporal corpus: offsets ±0.25/1/5/30s; incompatible edit / cut in middle; scale 23.976→25; music, sparse speech, repetitive dialogue, forced/SDH; embedded SRT/VTT/ASS; translated subtitles and two languages with different offsets. Measure error against human annotation, correct accepts, false corrections, and correct rejections. Proposed initial gate: zero false applications on adversarial set, p95 error ≤ configured tolerance among accepts; state corpus size explicitly, as zero observed does not guarantee zero in production.
 
-Performance: tempo startup até primeiro frame, seek dentro/fora cache e keyframe, rebuffer por hora, frames/menu p95, pico RAM, CPU, watts se disponível e bytes adicionais. Comparar baseline1.8 sem feature versus cada feature isolada e conjunto. Toda medição deve incluir codec/HDR/passthrough/storage/rede. Escolher o método com menor latência ENTRE os que passam efetividade e não degradam playback; não premiar correção rápida e errada.
+Performance: startup time to first frame, seek inside/outside cache and keyframe, rebuffer per hour, frames/menu p95, peak RAM, CPU, watts if available, and additional bytes. Compare 1.8 baseline without feature versus each isolated feature and combined. Every measurement must include codec/HDR/passthrough/storage/network. Choose method with lowest latency AMONG those passing effectiveness and not degrading playback; do not reward fast and incorrect corrections.
 
-Testes determinísticos necessários: geração/cancelamento; offset independente e manual; quota50 com concorrência/restart/clock rollback/perfil/chave; cache ENOSPC/cancelamento/crash/Range; stable partition com metadados ausentes e chegada incremental; isolamento da mesma conta em duasTVs; rollback otimizador e overrides. Provas físicas: vídeo segue responsivo durante análise, seek realmente melhora sob cobertura, áudio não clipa/muda rota, overlay ASS/segunda língua não colidem.
+Required deterministic tests: generation/cancellation; independent and manual offset; 50 quota with concurrency/restart/clock rollback/profile/key; cache ENOSPC/cancellation/crash/Range; stable partition with missing metadata and incremental arrival; isolation of same account on two TVs; optimizer rollback and overrides. Physical proofs: video remains responsive during analysis, seek genuinely improves under coverage, audio does not clip/reroute, ASS/secondary language overlays do not collide.
 
-## Servidores pessoais
+## Personal Media Servers
 
-Jellyfin, Emby e Plex devem compartilhar negociação de capacidades, bitrate, idiomas e progresso com este player: [pesquisa e sequência](../media-servers-1.8/README.md). Servidores são um escopo futuro separado; ainda não implementados.
+Jellyfin, Emby, and Plex must share capabilities negotiation, bitrate, languages, and progress with this player: [research and sequence](../media-servers-1.8/README.md). Servers are a separate future scope; not yet implemented.
