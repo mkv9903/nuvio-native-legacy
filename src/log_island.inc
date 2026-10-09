@@ -1,32 +1,32 @@
-// O PAINEL DE REGISTRO NO GLASS UI (logs-mockup.html, aprovado pelo dono em
-// 03/10): duas ilhas sobre a tela congelada — a esquerda o log em mono
-// (JetBrains Mono), a direita o inspetor da sessao, da linha em foco, dos
-// problemas, da rede ou do aparelho — e o aviso de primeira vez como a ilha do
-// relogio crescida. Medidas: as do CSS do mockup, em px de 1080p. Os nomes
-// seguem as classes de la (lgl, ar, sv, lghead, lgfoot, seguindo, cart, dev)
-// para que a comparacao lado a lado ache cada peca. Incluido por registro.c.
+// THE LOG PANEL IN GLASS UI (logs-mockup.html, approved by owner on
+// 03/10): two islands over frozen screen — left monospace log
+// (JetBrains Mono), right session inspector, focused line,
+// problems, network or device — and first-time notice as expanded
+// clock island. Dimensions: CSS from mockup in 1080p px. Names
+// follow CSS classes (lgl, ar, sv, lghead, lgfoot, seguindo, cart, dev)
+// so side-by-side comparison finds each piece. Included by log.c.
 
 #define RG_TX 243, 242, 239
 #define RG_VERDE 0.298f, 0.765f, 0.541f
 #define RG_AMBAR 0.910f, 0.722f, 0.290f
 #define RG_VERM  0.898f, 0.325f, 0.294f
 
-// Geometria (o CSS do mockup).
+// Geometry (mockup CSS).
 #define RP_X   48.0f
 #define RP_Y  112.0f
-// TAMANHO DA INTERFACE (escala.h): o painel e camada ampliada e mede pela tela
-// virtual. A lista fica com o que sobra do inspetor (518) e, quando sobraria
-// menos de 840 para ela (150%), o inspetor SAI e a lista vai ate a borda. Em
-// 100% sao os numeros do mockup: 1290, 928 e 1362.
+// UI SIZE (escala.h): panel is magnified layer and measures by virtual
+// screen. List keeps remainder from inspector (518) and, when less than
+// 840 would remain for it (150%), inspector EXITS and list expands to edge.
+// In 100% these are mockup numbers: 1290, 928 and 1362.
 #define RG_SEM_INSP (NV_TELA_W - 630.0f < 840.0f)
 #define RP_W (RG_SEM_INSP ? NV_TELA_W - 88.0f : NV_TELA_W - 630.0f)
 #define RP_H (NV_TELA_H - 152.0f)
 #define RI_X (NV_TELA_W - 558.0f)
 #define RI_W  518.0f
 #define RL_TOPO   208.0f   // lghead: 26 + 56 + 14
-#define RL_BASE   (NV_TELA_H - 143.0f)   // 937 em 1080: acima do "seguindo" (30) e do rodape (72 + fio)
-#define RL_X       66.0f   // lgw: 18 de recuo na ilha
-#define RL_W     (RP_W - 36.0f)   // 1254 em 1080
+#define RL_BASE   (NV_TELA_H - 143.0f)   // 937 in 1080: above "following" (30) and footer (72 + line)
+#define RL_X       66.0f   // lgw: 18 margin in island
+#define RL_W     (RP_W - 36.0f)   // 1254 in 1080
 #define RL_H       32.0f
 #define RL_AREA_X (RL_X + 26.0f)
 #define RL_MSG_X  (RL_AREA_X + 136.0f)
@@ -43,7 +43,7 @@ static void rgIconeCor(const char *n, float x, float y, float l, float r, float 
 }
 static void rgMilhar(char *d, size_t tam, long n);
 static char rgSep(void) { return idioma_ponto_decimal(ajustes_idioma()) ? '.' : ','; }
-// "%.*f" com a virgula da lingua.
+// "%.*f" with language decimal point.
 static void rgNum(char *d, size_t tam, double v, int casas) {
   char *p;
   snprintf(d, tam, "%.*f", casas, v);
@@ -57,16 +57,16 @@ static float rgCaps(TxtEstilo e, const char *s, float track, float x, float y, i
 static float rgKicker(const char *s, float x, float y) { return rgCaps(TXT_MINI, s, 2.1f, x, y, RG_TX, 0.45f); }
 static float rgK2(const char *s, float x, float y) { return rgCaps(TXT_AJ_CAPS13, s, 1.82f, x, y, RG_TX, 0.42f); }
 
-// Ilha: sombra curta, miolo (vidro `vidA` / solido #15161A) e a luz larga do
-// canto de cima (gfx_luz_canto passa pelo dither: sem faixas no painel de 8
-// bits). A do log e DENSA (88%, decisao do dono): texto miudo sobre arte.
+// Island: short shadow, core (glass vidA / solid #15161A) and wide light from
+// top corner (gfx_luz_canto passes through dither: no banding on 8-bit panel).
+// Log island is DENSE (88%, owner decision): small text over artwork.
 static void rgIlha(GfxRect r, float raioPx, float vidA, float rr, float rg, float rb) {
   float raio = raioPx / r.h;
-  // O vidro daqui fica sobre a tela de tras CONGELADA e sem desfoque (app.c): a
-  // 80-88% de opacidade as linhas de Ajustes apareciam POR BAIXO das linhas do
-  // log ("About and help", "Send log"...). Opaco, o painel mantem o jeito de
-  // vidro (luz de canto, sombra, tom frio) sem texto de outra tela atras do texto
-  // que se esta lendo (medido: ate 98,5% ainda se lia o fantasma de Ajustes).
+  // Glass here sits over FROZEN background screen without blur (app.c): at
+  // 80-88% opacity Settings lines showed UNDER log lines ("About and help",
+  // "Send log"...). Opaque, panel maintains glass look (corner light, shadow,
+  // cool tone) without text from another screen behind the text being read
+  // (measured: up to 98.5% ghost of Settings was still legible).
   vidA = 1.0f;
   gfx_rect((GfxRect){ r.x - 20, r.y - 6, r.w + 40, r.h + 46 }, 0, GFX_SOMBRA, 1.0f, 0, 0, 0.5f,
            0, 0, 0, rgVid() ? 0.36f : 0.45f);
@@ -99,7 +99,7 @@ static void rgIconeT(const char *n, float x, float y, float l, float a) {
   float t = ajustes_tinta_foco() / 255.0f;
   gfx_icone((GfxRect){ x, y, l, l }, n, t, t, t, a);
 }
-// O ponto que respira da ilha (acento com halo de 6 px a 22%).
+// Breathing dot of island (accent with 6px halo at 22%).
 static void rgRespira(float x, float yc, float r, float g, float b) {
   float p = ajustes_animacoes_reduzidas() ? 1.0f
           : 0.6f + 0.4f * sinf((float)SDL_GetTicks() * (2.0f * 3.14159265f / 1400.0f));
@@ -110,7 +110,7 @@ static void rgPonto(float x, float yc, float d, float r, float g, float b) {
   gfx_cor((GfxRect){ x, yc - d * 0.5f, d, d }, 0.5f, r, g, b, 1);
 }
 
-// "Rotulo ........ valor" com fio de 7% (o .stat do mockup): 11 + 11.
+// "Label ........ value" with 7% hairline (.stat in mockup): 11 + 11.
 static float rgStat(const char *k, const char *v, float x, float y, float w) {
   TxtLinha lk = rgT(TXT_AJ_ESTADO, k), lv = rgTC(TXT_AJ_ESTADO, v, w - lk.w - 24);
   gfx_cor((GfxRect){ x, y, w, 1 }, 0, 1, 1, 1, 0.07f);
@@ -118,7 +118,7 @@ static float rgStat(const char *k, const char *v, float x, float y, float w) {
   txt_desenhar_alpha(lv, x + w - lv.w, y + 12, 0.88f);
   return 1 + 11 + 20.6f + 11;
 }
-// A caixa do fim de uma ilha (.cart): fundo 5% (solido #1B1C21), raio 22.
+// Box at end of island (.cart): background 5% (solid #1B1C21), radius 22.
 static void rgCart(GfxRect r) { rgNeutro(r, 22, 0.05f, RG_CART_SOL, 1); }
 static float rgBlocoAltura(TxtEstilo e, const char *s, float w, float lh, int maxL) {
   return txt_bloco(e, s, 0, 0, 0, 0, -4000, w, lh, 0, maxL);
@@ -126,7 +126,7 @@ static float rgBlocoAltura(TxtEstilo e, const char *s, float w, float lh, int ma
 static float rgBloco(TxtEstilo e, const char *s, float x, float y, float w, float lh, float al, int maxL) {
   return txt_bloco(e, s, RG_TX, x, y, w, lh, al, maxL);
 }
-// Cartao de nota no pe do inspetor (.cart com texto 16/1,45 a 58%).
+// Note card at foot of inspector (.cart with 16/1.45 text at 58%).
 static void rgCartNota(const char *icone, const char *s, float x, float yBase, float w) {
   float tw = w - 44 - (icone ? 32 : 0);
   float h = rgBlocoAltura(TXT_ILHA_GENERO, s, tw, 23.2f, 6) + 40;
@@ -135,7 +135,7 @@ static void rgCartNota(const char *icone, const char *s, float x, float yBase, f
   rgBloco(TXT_ILHA_GENERO, s, x + 22 + (icone ? 32 : 0), yBase - h + 19, tw, 23.2f, 0.58f, 6);
 }
 
-// Teclas de dica (kbd 14/700 numa pilula de 30) e o rotulo 17 a 50%.
+// Hint keys (kbd 14/700 in 30 pill) and label 17 at 50%.
 typedef struct { const char *k, *l; } RgDica;
 static float rgDicas(const RgDica *d, int n, float x, float y, float gap) {
   int i;
@@ -151,7 +151,7 @@ static float rgDicas(const RgDica *d, int n, float x, float y, float gap) {
   return x - x0 - gap;
 }
 
-// --- O SEGMENTADO DAS AREAS --------------------------------------------------
+// --- AREAS SEGMENTED CONTROL -------------------------------------------------
 static const char *const AREA_NOME[RG_N] = { "Tudo", "Problemas", "Vídeo", "Rede", "Fontes", "Imagens", "Sistema" };
 static float rgSeg(int comNumeros, float x, float yc) {
   float h = 56.0f, ih = 46.0f, w = 10.0f, x0 = x;
@@ -179,9 +179,9 @@ static float rgSeg(int comNumeros, float x, float yc) {
   return x - x0;
 }
 
-// --- UMA LINHA DO LOG ----------------------------------------------------------
-// Cor do texto por gravidade (o mockup: erro #F2A196, area de erro a 62%,
-// area de aviso ambar a 66%, o resto 80%/36%).
+// --- A LOG LINE --------------------------------------------------------------
+// Text color by severity (mockup: error #F2A196, error area at 62%,
+// warning area amber at 66%, remainder 80%/36%).
 typedef struct { int r, g, b; float a; } RgCor;
 static RgCor rgCorMsg(const RegLinha *L, int ctx, int focada) {
   if (L->sev == 2) return focada ? (RgCor){ 246, 178, 168, 1.0f } : (RgCor){ 242, 161, 150, 1.0f };
@@ -193,28 +193,27 @@ static RgCor rgCorArea(const RegLinha *L, int ctx, int focada) {
   if (L->sev == 1 && !ctx) return (RgCor){ 226, 186, 110, 0.66f };
   return (RgCor){ RG_TX, focada ? 0.6f : ctx ? 0.24f : 0.36f };
 }
-// Desenha um pedaco e devolve a largura. maxW > 0 corta com reticencias.
-// A linha de texto nao mede o espaco do FIM ("memória " saia colado no
-// numero): os espacos finais entram na largura a mao.
+// Draws a chunk and returns width. maxW > 0 cuts with ellipsis.
+// Text line does not measure END space ("memory " came glued to number):
+// trailing spaces are added to width manually.
 static float rgEspaco(TxtEstilo e) {
   return (float)(txt_largura(e, "a a") - txt_largura(e, "aa"));
 }
 static float rgPedaco(TxtEstilo e, const char *s, RgCor c, float x, float y, float al, float maxW) {
   TxtLinha t;
-  char b[REG_COL];
+  char b[LOG_COL];
   size_t n = strlen(s), ini = 0, fim = n;
   float antes, depois;
   if (!n) return 0;
-  // A linha com caractere fora do ASCII perde os espacos das pontas na
-  // medida: os espacos entram a mao, dos dois lados.
+  // Non-ASCII line loses edge spaces in measurement: add manually on both sides.
   while (ini < n && s[ini] == ' ') ini++;
   while (fim > ini && s[fim - 1] == ' ') fim--;
   antes = (float)ini * rgEspaco(e);
   depois = (float)(n - fim) * rgEspaco(e);
   if (fim == ini) return antes + depois;
   snprintf(b, sizeof b, "%.*s", (int)(fim - ini), s + ini);
-  // MONO: corta por CARACTERE, como o text-overflow do mockup ("addon-b.exe…"),
-  // e nao por palavra — numa linha de log a palavra e a URL inteira.
+  // MONO: cut by CHARACTER, like mockup text-overflow ("addon-b.exe…"),
+  // not by word — in log line word is entire URL.
   if (maxW > 0 && e >= TXT_MONO18 && e <= TXT_MONO19 && txt_largura(e, b) > maxW - antes) {
     float cw = (float)txt_largura(e, "0000000000") / 10.0f;
     int cabe = (int)((maxW - antes) / (cw > 1 ? cw : 1)) - 1, k = 0;
@@ -229,8 +228,8 @@ static float rgPedaco(TxtEstilo e, const char *s, RgCor c, float x, float y, flo
   return antes + (float)t.w + depois;
 }
 
-// A LINHA FPS= LEGIVEL (decisao do dono): os cinco numeros que importam em
-// "quadros"; a linha inteira volta no detalhe.
+// LEGIBLE FPS= LINE (owner decision): the five numbers that matter in "frames";
+// entire line returns in detail.
 typedef struct { float fps, pior, telaMb, rss; int janks, tela, ok; } RgFps;
 static RgFps rgFpsDe(const char *s) {
   RgFps f;
@@ -277,9 +276,9 @@ static float rgLinhaFpsE(const RegLinha *L, float x, float y, float al, TxtEstil
 static float rgLinhaFps(const RegLinha *L, float x, float y, float al) {
   return rgLinhaFpsE(L, x, y, al, TXT_MONO18, TXT_MONO18B, 9.9f, RL_MSG_W);
 }
-// Texto da linha em pedacos: o "/…" de uma URL cortada sai apagado (36%).
+// Line text in chunks: "/…" of a cut URL outputs dimmed (36%).
 static void rgMensagem(TxtEstilo e, const char *s, RgCor c, float x, float y, float al, float maxW) {
-  char buf[REG_COL];
+  char buf[LOG_COL];
   const char *p = s;
   RgCor apag = { RG_TX, 0.36f };
   float x0 = x;
@@ -301,8 +300,7 @@ static void rgMensagem(TxtEstilo e, const char *s, RgCor c, float x, float y, fl
   }
 }
 
-// Quebra por caractere (o pre-wrap/break-all do detalhe): devolve quantas
-// linhas e escreve os comecos em `ini` (bytes).
+// Character wrap (pre-wrap/break-all of detail): returns number of lines and writes start offsets in `ini`.
 static int rgQuebra(const char *s, int porLinha, int *ini, int max) {
   int n = 0, c = 0;
   const char *p = s;
@@ -323,7 +321,7 @@ static float rgCharW(void) {
   return w > 1 ? w : 10.8f;
 }
 
-// Linha em foco aberta: o texto inteiro quebrado e a linha de apoio embaixo.
+// Focused line open: full wrapped text and supporting line below.
 static void rgApoioDetalhe(int k, char *d, size_t tam) {
   const RegLinha *L = &lin[vis[k]];
   const char *m = L->t + L->msg;
@@ -345,7 +343,7 @@ static float rgAlturaFoco(int k) {
   int n = rgQuebra(L->fps ? L->t : L->t + L->msg, (int)(RL_MSG_W / rgCharW()), ini, 16);
   return 12 + n * RL_H + 6 + 24 + 12;
 }
-// Desenha a linha `k` de vis com topo em y; devolve a altura.
+// Draws line `k` of vis with top at y; returns height.
 static float rgDesenhaLinha(int k, float y, float al, int focada) {
   const RegLinha *L = &lin[vis[k]];
   int ctx = visCtx[k];
@@ -364,7 +362,7 @@ static float rgDesenhaLinha(int k, float y, float al, int focada) {
     rgPedaco(TXT_MONO16, L->fps ? "quadros" : L->area, ca, RL_AREA_X, y + 12 + 4.5f, al, 130);
     n = rgQuebra(s, (int)(RL_MSG_W / rgCharW()), ini, 16);
     for (i = 0; i < n; i++) {
-      char b[REG_COL];
+      char b[LOG_COL];
       int fim = i + 1 < n ? ini[i + 1] : (int)strlen(s);
       snprintf(b, sizeof b, "%.*s", fim - ini[i], s + ini[i]);
       rgMensagem(TXT_MONO18, b, cm, RL_MSG_X, y + 12 + 2.5f + i * RL_H, al, RL_MSG_W);
@@ -385,9 +383,8 @@ static float rgDesenhaLinha(int k, float y, float al, int focada) {
   return h;
 }
 
-// --- A LISTA -------------------------------------------------------------------
-// A mascara do mockup (sumir em 90 px no topo seguindo o fim; 70 nas pontas
-// rolado) como alfa por linha, medido no centro dela.
+// --- THE LIST ------------------------------------------------------------------
+// Mockup mask (fade in 90 px at top following end; 70 at edges scrolled) as alpha per line, measured at its center.
 static float rgMascara(float yc, float topo, float base, float fTopo, float fBase) {
   float a = 1.0f;
   if (fTopo > 0 && yc < topo + fTopo) a = (yc - topo) / fTopo;
@@ -398,7 +395,7 @@ static void desenhaLista(void) {
   int cabem = (int)((RL_BASE - RL_TOPO) / RL_H), k;
   gfx_recorte(RP_X, RL_TOPO, RP_W, RL_BASE - RL_TOPO);
   if (pausado && foco >= 0) {
-    // "topo": a linha em foco a ~11 linhas do topo, as pontas somem em 70.
+    // "top": focused line ~11 lines from top, ends fade in 70.
     int ini = foco - 11, kmax;
     float y = RL_TOPO + 4;
     if (ini > nVis - cabem + 2) ini = nVis - cabem + 2;
@@ -411,11 +408,11 @@ static void desenhaLista(void) {
       y += h;
     }
   } else if (nVis <= cabem) {
-    // "inicio": cabe tudo, a lista comeca em cima.
+    // "start": everything fits, list starts at top.
     float y = RL_TOPO + 6;
     for (k = 0; k < nVis; k++, y += RL_H) rgDesenhaLinha(k, y, rgMascara(y + RL_H * 0.5f, RL_TOPO, RL_BASE, 0, 70), 0);
   } else {
-    // Seguindo o fim: empilhada por baixo, o topo some em 90.
+    // Following end: stacked from bottom, top fades in 90.
     float y = RL_BASE - RL_H;
     for (k = nVis - 1; k >= 0 && y > RL_TOPO - RL_H; k--, y -= RL_H)
       rgDesenhaLinha(k, y, rgMascara(y + RL_H * 0.5f, RL_TOPO, RL_BASE, 90, 0), 0);
@@ -423,11 +420,10 @@ static void desenhaLista(void) {
   gfx_sem_recorte();
 }
 
-// --- AS ETAPAS (Sistema, .tpk 4/5) -------------------------------------------------
-// As linhas [etapa] do host .NET ("host begin X @0.42s", "host ok X ... @0.51s")
-// e do lado nativo ("native note X") viram uma linha do tempo: cada begin casa
-// com o seu ok ou fail; um begin sem fim e onde a sessao parou (ambar). As de
-// [etapa-anterior] sao a sessao anterior.
+// --- STAGES (System, .tpk 4/5) ------------------------------------------------
+// [stage] lines from .NET host ("host begin X @0.42s", "host ok X ... @0.51s")
+// and native side ("native note X") become timeline: each begin matches its ok or fail;
+// a begin without end is where session stopped (amber). [etapa-anterior] are previous session.
 typedef struct { char k; char tx[100]; char tm[40]; float t0, t1; int ant, crua; } RgEtapa;
 static RgEtapa etapas[48];
 static int nEtapas, nEtapasLinhas, nEtapasHost;
@@ -460,7 +456,7 @@ static void montaEtapas(void) {
     if (!strcmp(verbo, "ok") || !strcmp(verbo, "fail")) {
       for (j = nEtapas - 1; j >= 0; j--)
         if (etapas[j].k == 'a' && etapas[j].ant == ant && !strcmp(etapas[j].tx, nome)) break;
-      if (j < 0 && nativo) {   // ok nativo sem begin: um marco do lado nativo
+      if (j < 0 && nativo) {   // native ok without begin: a native landmark
         RgEtapa *e = &etapas[nEtapas++];
         memset(e, 0, sizeof *e);
         e->k = 'N'; e->ant = ant; e->t0 = -1; e->t1 = -1;
@@ -517,7 +513,7 @@ static int etapasN(void) {
   for (i = 0; i < nEtapas; i++) if (!etapas[i].ant) n++;
   return n;
 }
-// Uma etapa (.tl): circulo de 28 com o simbolo, texto mono 18, tempo mono 15.
+// One stage (.tl): 28 circle with symbol, mono 18 text, mono 15 timing.
 static void rgEtapa(const RgEtapa *e, float x, float y, float w, int focada, int conector) {
   float cx = x + 18, yc = y + 26;
   float vr = 0.298f, vg = 0.765f, vb = 0.541f;
@@ -586,7 +582,7 @@ static void desenhaEtapas(void) {
       if (y > RL_BASE - 260) break;
     }
   } else y = RL_TOPO + 10;
-  // A legenda do ambar: o que uma etapa sem fim quer dizer.
+  // Amber legend: what an unfinished stage means.
   { RgEtapa a = { 'o', "nv_tpk_iniciar", "", 0, 0, 0, 0 }, b = { 'a', "", "", 0, 0, 0, 0 };
     float cy = y + 22 - 10, ch;
     char t1[16], t2[16];
@@ -604,8 +600,8 @@ static void desenhaEtapas(void) {
             rx + 22, cy + 174, rw - 44, 21.75f, 0.5f, 3); }
 }
 
-// --- O APARELHO -------------------------------------------------------------------
-// O cartao do aparelho sai da linha [tv] do arranque quando ela existe.
+// --- THE DEVICE ------------------------------------------------------------------
+// Device card comes from [tv] startup line when it exists.
 static void rgAparelho(char *tit, size_t nt, char *sub, size_t ns, char *tvLinha, size_t ntv) {
   char modelo[64] = "", host[48] = "", dot[32] = "", tela[32] = "", os[64] = "";
   int i;
@@ -629,8 +625,7 @@ static void rgAparelho(char *tit, size_t nt, char *sub, size_t ns, char *tvLinha
     if ((p = strstr(m, "dotnet=")) != NULL) sscanf(p, "dotnet=%31s", dot);
     if ((p = strstr(m, "tela=")) != NULL) sscanf(p, "tela=%31s", tela);
   }
-  // A marca sai do host da linha [tv] quando ela existe (a previa no Mac le o
-  // log de uma TV).
+  // Brand comes from host of [tv] line when present (preview on Mac reads TV log).
   if (!strncmp(host, "webos-", 6)) marca = "LG";
   else if (!strncmp(host, "tizen-", 6)) marca = "Samsung";
   else if (!strncmp(host, "android-", 8)) marca = "";
@@ -680,17 +675,16 @@ static void rgHa(char *d, size_t tam, long seg) {
   else snprintf(d, tam, i18n("há %ld h"), seg / 3600);
 }
 
-// --- INSPETORES ---------------------------------------------------------------------
+// --- INSPECTORS ------------------------------------------------------------------
 static GfxRect rgInspR(void) { return (GfxRect){ RI_X, RP_Y, RI_W, RP_H }; }
 #define RI_CX (RI_X + 32.0f)
 #define RI_CW (RI_W - 64.0f)
 #define RI_BASE (RP_Y + RP_H - 30.0f)
 
-// Grafico de quadros: uma barra a cada 3 s (as linhas FPS= do log), ambar
-// abaixo de 45 fps, tracejado no corte.
+// Frames chart: a bar every 3s (FPS= lines from log), amber below 45 fps, dashed at cutoff.
 static int rgSerieFps(float *v, int max, RgFps *ult) {
   int i, n = 0, k;
-  float tmp[REG_MAX];
+  float tmp[LOG_MAX];
   memset(ult, 0, sizeof *ult);
   for (i = 0; i < nLin; i++) if (lin[i].fps) { RgFps f = rgFpsDe(lin[i].t); if (f.ok) { tmp[n++] = f.fps; *ult = f; } }
   k = n > max ? n - max : 0;
@@ -727,7 +721,7 @@ static void inspSessao(void) {
     y += rgStat(i18n("Aberta há"), v, x, y, w); }
   snprintf(v, sizeof v, i18n("%d das últimas %d"), nLin, nLidas);
   y += rgStat(i18n("Linhas no painel"), v, x, y, w);
-  // Problemas: "● 3 erros  ● 6 avisos", cada numero com o ponto da cor dele.
+  // Problems: "● 3 errors  ● 6 warnings", each number with dot of its color.
   { TxtLinha lk = rgT(TXT_AJ_ESTADO, "Problemas"), le, la;
     char e[48], av[48];
     snprintf(e, sizeof e, nErros == 1 ? i18n("%d erro") : i18n("%d erros"), nErros);
@@ -769,7 +763,7 @@ static void inspSessao(void) {
         txt_desenhar_alpha(l2, x + (w - l2.w) * 0.5f, y, 0.4f);
         txt_desenhar_alpha(l3, x + w - l3.w, y, 0.4f);
         y += 17; }
-      // Memoria: o app (rss da ultima FPS=) e as imagens contra o teto.
+      // Memory: the app (rss of last FPS=) and images against budget.
       { int itens, pend, quentes; long bytes, bytesQ, teto = tex_orcamento_bytes();
         float fr;
         tex_estatisticas(&itens, &pend, &bytes, &quentes, &bytesQ);
@@ -783,7 +777,7 @@ static void inspSessao(void) {
         gfx_cor((GfxRect){ x, y, w, 8 }, 0.5f, 1, 1, 1, 0.07f);
         if (fr > 0.005f) gfx_cor((GfxRect){ x, y, w * fr, 8 }, 0.5f, RG_VERDE, 0.75f); }
     } }
-  // O envio automatico, no pe.
+  // Automatic send at bottom.
   avisos_envio_info(&env);
   { const char *txt;
     char t[300];
@@ -833,7 +827,7 @@ static void inspSessao(void) {
     } }
 }
 
-// O que uma linha conhecida quer dizer, em portugues de gente.
+// What a known line means, in plain language.
 typedef struct { const char *titulo; char texto[400]; char k[5][40]; char v[5][120]; int n; const char *grupo; } RgExpl;
 static void rgExplicar(const RegLinha *L, RgExpl *x) {
   const char *m = L->t + L->msg, *p;
@@ -933,7 +927,7 @@ static void inspLinha(void) {
              x, RI_BASE, w);
 }
 
-// Os problemas agrupados por tipo: o que o suporte quer ver primeiro numa foto.
+// Problems grouped by type: what support wants to see first in a photo.
 typedef struct { char titulo[64]; int n, sev; char tags[48]; } RgTipo;
 static void rgTipoDe(const RegLinha *L, char *t, size_t tam) {
   const char *m = L->t + L->msg;
@@ -969,7 +963,7 @@ static void inspProblemas(void) {
       strcat(tp[j].tags, tag);
     }
   }
-  // erros primeiro, depois por quantidade
+  // errors first, then by quantity
   for (i = 1; i < nt; i++) for (j = i; j > 0 && (tp[j].sev > tp[j - 1].sev || (tp[j].sev == tp[j - 1].sev && tp[j].n > tp[j - 1].n)); j--) { RgTipo s = tp[j]; tp[j] = tp[j - 1]; tp[j - 1] = s; }
   rgKicker("Problemas nesta sessão", x, y);
   y += 18 + 12;
@@ -1051,7 +1045,7 @@ static void inspRede(void) {
 static void inspAparelho(void) {
   GfxRect ir = rgInspR();
   float x = RI_CX, w = RI_CW, y = ir.y + 34;
-  char tv[REG_COL], t[96], s[160], v[96], carreg[48] = "", curl[48] = "";
+  char tv[LOG_COL], t[96], s[160], v[96], carreg[48] = "", curl[48] = "";
   int i, parou = -1, temAnt = 0;
   rgIlha(ir, 36, 0.80f, 0.055f, 0.059f, 0.071f);
   rgAparelho(t, sizeof t, s, sizeof s, tv, sizeof tv);
@@ -1094,14 +1088,14 @@ static void inspVazio(void) {
   GfxRect ir = rgInspR();
   float x = RI_CX, w = RI_CW, y = ir.y + 34;
   AvisosEnvio env;
-  const char *arq = registro_arquivo();
+  const char *arq = log_file_path();
   rgIlha(ir, 36, 0.80f, 0.055f, 0.059f, 0.071f);
   avisos_envio_info(&env);
   rgKicker("Esta sessão", x, y);
   y += 18 + 18;
   y += rgDevCard(x, y) + 22;
   y += rgStat(i18n("Arquivo de log"), arq ? arq : i18n("nenhum"), x, y, w);
-  // Sem arquivo (Mac sem NUVIO_LOG) o envio manda texto vazio: indisponivel.
+  // Without file (Mac without NUVIO_LOG) sending produces empty text: unavailable.
 #ifdef __EMSCRIPTEN__
   y += rgStat(i18n("Envio de registro"), env.disponivel ? i18n("disponível") : i18n("indisponível"), x, y, w);
 #else
@@ -1117,7 +1111,7 @@ static void inspVazio(void) {
   rgCartNota(NULL, "“Não há de onde ler” e “ainda não há linha” são problemas diferentes; cada um tem a sua frase.", x, RI_BASE, w);
 }
 
-// --- O PAINEL --------------------------------------------------------------------
+// --- THE PANEL -------------------------------------------------------------------
 static void rgCabecalho(const char *sub) {
   TxtLinha t = rgT(TXT_LOG_T31, "Registro do app"), s = rgTC(TXT_AJ_18, sub, NV_TELA_W - 250 - t.w - 80);
   gfx_rect((GfxRect){ 250 - 30, 64 - 40, t.w + 20 + s.w + 60, 80 }, 0, GFX_SOMBRA, 1.0f, 0, 0, 0.5f, 0, 0, 0, 0.30f);
@@ -1138,7 +1132,7 @@ static void rgRodape(const RgDica *d, int n, const char *dir) {
   rgDicas(d, n, RP_X + 34, y, 22);
   if (dir && dir[0]) { TxtLinha t = rgTC(TXT_AJ_ESTADO, dir, 640); txt_desenhar_alpha(t, RP_X + RP_W - 34 - t.w, y + (30 - t.h) * 0.5f, 0.38f); }
 }
-// As etiquetas que a area mostra, as mais frequentes primeiro (o "filtro:").
+// Tags the area shows, most frequent first ("filter:").
 static void rgFiltroTags(char *d, size_t tam) {
   char tags[8][24];
   int nn[8], nt = 0, i, j;
@@ -1178,7 +1172,7 @@ static void desenhaVazio(void) {
   y += 96 + 28;
   { TxtLinha t = rgT(TXT_ILHA_PERGUNTA, tit); txt_desenhar(t, cx - t.w * 0.5f, y); y += 41; }
   if (txt) {
-    // centralizado: cada linha do bloco medida e posta no meio
+    // centered: each line of block measured and placed in middle
     char b[400], *p, *ult = NULL;
     snprintf(b, sizeof b, "%s", i18n(txt));
     y += 12;
@@ -1217,7 +1211,7 @@ static void desenhaPainel(void) {
   int etap = temEtapas(), vazio = semFonte || !nLin;
   float segFim;
   char t[160];
-  // O veu da tela congelada (DESIGN.md §2): 30% vidro, 42% solido.
+  // Veil of frozen screen (DESIGN.md §2): 30% glass, 42% solid.
   gfx_cor((GfxRect){ 0, 0, NV_TELA_W, NV_TELA_H }, 0, 0, 0, 0, rgVid() ? 0.30f : 0.42f);
   if (etap) {
     char a[96], s[160];
@@ -1226,12 +1220,11 @@ static void desenhaPainel(void) {
     snprintf(t, sizeof t, "%s · %s · .tpk 4/5", strncmp(a, "Samsung", 7) ? a : "Samsung", s);
     rgCabecalho(t);
   } else rgCabecalho(i18n("O que o app fez nesta sessão"));
-  // O VAO ENTRE OS DOIS PAINEIS NAO DEIXA PASSAR A TELA DE TRAS (M sweep,
-  // 04/10/2026: letras soltas de Ajustes — "n", "lly", "c", "e" — apareciam em
-  // x~1340 na TV do dono). O veu de 30%/42% e a tela congelada ficam inteiros
-  // por tras, e so o vao nao tem painel por cima. Um canal escuro e opaco,
-  // 2 px por baixo de cada painel e parado nas bordas retas (as pontas
-  // arredondadas dos paineis ficam de fora): le como o sulco entre duas ilhas.
+  // GAP BETWEEN TWO ISLANDS PREVENTS BACKGROUND SCREEN LEAKING THROUGH
+  // (M sweep, 04/10/2026: stray letters of Settings — "n", "lly", "c", "e" — appeared
+  // at x~1340 on owner TV). Veil of 30%/42% and frozen screen remain full behind,
+  // and only gap has no panel above it. Dark opaque channel, 2px under each panel
+  // and resting on straight borders: reads like groove between two islands.
   if (!RG_SEM_INSP)
     gfx_cor((GfxRect){ RP_X + RP_W - 2.0f, RP_Y + 18.0f, RI_X - (RP_X + RP_W) + 4.0f, RP_H - 36.0f },
             0.0f, 0.030f, 0.032f, 0.040f, 0.97f);
@@ -1244,8 +1237,7 @@ static void desenhaPainel(void) {
     if (!RG_SEM_INSP) inspVazio();
     return;
   }
-  // Estado a direita do segmentado: "Ao vivo" + o disco da pausa, ou a pilula
-  // "Pausado · N novas" no acento (e estado).
+  // State to right of segmented: "Live" + pause disk, or pill "Paused · N new" in accent.
   { float xd = RP_X + RP_W - 30, yc = RP_Y + 26 + 28, ar, ag, ab;
     ajustes_acento(&ar, &ag, &ab);
     if (pausado) {
@@ -1279,7 +1271,7 @@ static void desenhaPainel(void) {
     } }
   if (etap) desenhaEtapas();
   else desenhaLista();
-  // O fio de "seguindo" e o rodape de dicas, pelo estado.
+  // "Following" hairline and hint footer by state.
   if (!etap) {
     if (pausado) rgSeguindo(i18n("↓ até o fim volta a seguir"));
     else if (area == RG_PROB) {
@@ -1314,8 +1306,8 @@ static void desenhaPainel(void) {
     else rgFiltroTags(t, sizeof t);
     rgRodape(d, 4, t);
   }
-  // O inspetor pelo estado.
-  if (RG_SEM_INSP) { /* tela virtual estreita: sem inspetor */ }
+  // Inspector by state.
+  if (RG_SEM_INSP) { /* narrow virtual screen: no inspector */ }
   else if (pausado && foco >= 0 && detalhe) inspLinha();
   else if (etap) inspAparelho();
   else if (area == RG_PROB && !focoEnviar) inspProblemas();
@@ -1323,17 +1315,13 @@ static void desenhaPainel(void) {
   else inspSessao();
 }
 
-// --- O AVISO DE PRIMEIRA VEZ -----------------------------------------------------
-// A ilha do relogio crescida (mockup quadro 12): a dica nasce da pilula, com a
-// fileira de teclas coloridas e a vermelha marcada. O texto e por FABRICANTE:
-// uma instrucao errada sobre o proprio controle e pior que instrucao nenhuma.
-// No controle da Samsung foi conferido que as cores nao sao botoes fisicos nos
-// modelos novos (dividem o botao de numeros, abaixo do liga-desliga). No da LG
-// NAO foi possivel confirmar em quais modelos existe a fileira, e por isso a
-// frase diz "quando o controle tiver essa fileira" — e a saida para quem nao
-// tem e a linha nova de Ajustes, nao a instrucao da outra marca (a build LG
-// falava da Samsung aqui ate 03/10).
-// Texto "rico" (palavras de dois pesos) quebrado em linhas de `w`.
+// --- FIRST-TIME NOTICE -----------------------------------------------------------
+// Expanded clock island (mockup board 12): hint sprouts from pill, with color key
+// row and red highlighted. Text is per MANUFACTURER: wrong instruction on own
+// remote is worse than no instruction. On Samsung remote verified that colors
+// are not physical buttons on newer models (share number button below power).
+// On LG remote not possible to verify which models have color row, so phrase
+// says "when remote has this row" — exit for those without is new Settings row.
 typedef struct { const char *s; TxtEstilo e; float a; } RgRun;
 static float rgRico(const RgRun *r, int n, float x, float y, float w, float lh) {
   float cx = 0, cy = 0, esp = (float)txt_largura(TXT_AJ_ESTADO, "a a") - (float)txt_largura(TXT_AJ_ESTADO, "aa");
@@ -1388,7 +1376,7 @@ static void desenhaAviso(void) {
   { time_t tt = time(NULL); struct tm tmv; localtime_r(&tt, &tmv); snprintf(hora, sizeof hora, "%02d:%02d", tmv.tm_hour, tmv.tm_min); }
   h = 64 + 28 + 41 + 14 + fh + 26 + (teclas ? 107 : 64) + 24 + 30 + 32;
   rgIlha((GfxRect){ x, y, w, h }, 36, 0.80f, 0.055f, 0.059f, 0.071f);
-  // ig-h: icone, "Dica", fio, hora.
+  // ig-h: icon, "Tip", line, time.
   { float hx = x + 28;
     TxtLinha d = rgT(TXT_ILHA_NOME, "Dica"), hr = rgT(TXT_ILHA_NOME, hora);
     rgIcone("aj_scroll-text", hx, y + 20, 24, 1);

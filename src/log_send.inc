@@ -1,24 +1,24 @@
-// O PAINEL DE ENVIO DO REGISTRO (mockup quadros 8-11, aprovado em 03/10): ilha
-// modal sobre Ajustes > Sobre e ajuda. A esquerda o que vai (o fim do
-// nuvio.log no mono do painel, com o tamanho real); a direita o andamento, o
-// CODIGO de seis caracteres do recibo (regcodigo.h), ou o motivo da falha com
-// a sua frase: servidor (com o HTTP), TV sem internet (redesaude.h: nem tenta,
-// e "Tentar de novo" fica apagado ate a rede voltar), prazo, conexao. Sem
-// porcentagem no "Enviando…": rede_postar_st nao da progresso, entao a barra e
-// so o brilho correndo — nada de numero inventado. Incluido por registro.c.
+// THE LOG SEND PANEL (mockup boards 8-11, approved on 03/10): modal island
+// over Settings > About and help. Left shows payload (end of nuvio.log in
+// panel mono, with actual size); right shows progress, 6-character receipt
+// CODE (regcodigo.h), or failure reason with phrase: server (with HTTP),
+// TV offline (redesaude.h: doesn't attempt, and "Try again" stays dimmed
+// until network returns), timeout, connection. No percentage on "Sending...":
+// rede_postar_st gives no progress, so bar is just travelling shine — no
+// fabricated numbers. Included by log.c.
 
 static int envAberto, envFoco;
-static long envTam;          // bytes que vao (o fim do arquivo, ate 200 KB)
+static long envTam;          // bytes being sent (end of file, up to 200 KB)
 static int envLinhasArq;
 #ifdef REGISTRO_TESTE
-static int envTesteFixo;     // o harness fixa o estado (avisos_teste_envio)
+static int envTesteFixo;     // harness fixes state (avisos_teste_envio)
 #endif
 
-int registro_envio_aberto(void) { return envAberto; }
+int log_send_is_open(void) { return envAberto; }
 
-// O tamanho e as linhas do que vai, lidos uma vez ao abrir.
-static void envMedir(void) {
-  const char *arq = registro_arquivo();
+// Size and line count of payload, read once when opened.
+static void log_send_measure(void) {
+  const char *arq = log_file_path();
   FILE *f;
   envTam = 0; envLinhasArq = 0;
 #ifdef REGISTRO_TESTE
@@ -42,10 +42,10 @@ static void envMedir(void) {
   fclose(f);
 }
 
-void registro_envio_abrir(void) {
+void log_send_open(void) {
   envAberto = 1; envFoco = 0;
   fflush(stdout);
-  envMedir();
+  log_send_measure();
   if (!nLin || SDL_GetTicks() - ultLeitura > 1000) carregar();
 #ifdef REGISTRO_TESTE
   if (envTesteFixo) return;
@@ -53,7 +53,7 @@ void registro_envio_abrir(void) {
   avisos_enviar_registro_atual();
 }
 
-int registro_envio_evento(const SDL_Event *e) {
+int log_send_event(const SDL_Event *e) {
   AvisosEnvio env;
   SDL_Keycode k;
   if (!envAberto) return 0;
@@ -66,14 +66,14 @@ int registro_envio_evento(const SDL_Event *e) {
   if (e->type != SDL_KEYDOWN) return e->type == SDL_KEYUP || e->type == SDL_TEXTINPUT;
   k = e->key.keysym.sym;
   avisos_envio_info(&env);
-  if (ehVoltar(e)) { envAberto = 0; engolirSoltura(e); return 1; }   // o envio continua
+  if (ehVoltar(e)) { envAberto = 0; engolirSoltura(e); return 1; }   // sending continues
   if (env.estado == 3) {
     int podeTentar = env.motivo != AVISOS_ENVIO_OFFLINE && env.motivo != AVISOS_ENVIO_INDISPONIVEL;
-    // Erro: [Tentar de novo] [Fechar]. Sem internet: [Fechar] [Tentar apagado].
+    // Error: [Try again] [Close]. No internet: [Close] [Dimmed try].
     if (k == SDLK_LEFT || k == SDLK_RIGHT) { if (podeTentar) envFoco = !envFoco; return 1; }
     if (ehOk(k)) {
       int tentar = env.motivo == AVISOS_ENVIO_OFFLINE ? 0 : (envFoco == 0);
-      if (tentar && podeTentar) { envMedir(); avisos_enviar_registro_atual(); envFoco = 0; }
+      if (tentar && podeTentar) { log_send_measure(); avisos_enviar_registro_atual(); envFoco = 0; }
       else envAberto = 0;
       engolirSoltura(e);
     }
@@ -83,7 +83,7 @@ int registro_envio_evento(const SDL_Event *e) {
   return 1;
 }
 
-// --- O PACOTE: o fim do log em mono, numa caixa --------------------------------
+// --- THE PACKAGE: end of log in monospace, in a box --------------------------
 static void rgLinhaPacote(const RegLinha *L, float x, float y, float w, float al) {
   RgCor cm = rgCorMsg(L, 0, 0), ca = rgCorArea(L, 0, 0);
   if (L->sev) {
@@ -94,7 +94,7 @@ static void rgLinhaPacote(const RegLinha *L, float x, float y, float w, float al
   if (L->fps && L->sev != 2) rgLinhaFpsE(L, x + 22 + 96, y + 3, al, TXT_MONO14, TXT_MONO14B, 7.7f, w - 22 - 96 - 16);
   else rgMensagem(TXT_MONO14, L->t + L->msg, cm, x + 22 + 96, y + 3, al, w - 22 - 96 - 16);
 }
-void registro_pacote(float x, float y, float w, float h, int n, const char *rotDir, float a) {
+void log_packet(float x, float y, float w, float h, int n, const char *rotDir, float a) {
   int i, ini;
   float ly;
   if (!nLin || SDL_GetTicks() - ultLeitura > 1000) { int ar = area; carregar(); area = ar; filtrar(); }
@@ -107,7 +107,7 @@ void registro_pacote(float x, float y, float w, float h, int n, const char *rotD
   ini = nLin > n ? nLin - n : 0;
   gfx_recorte(x, ly, w, y + h - ly);
   for (i = ini; i < nLin; i++, ly += 25) {
-    // a mascara do pacote: de 15% a 100% nos primeiros 110 px
+    // package mask: 15% to 100% in first 110 px
     float t = (ly + 12 - (y + 22 + 18 + 14)) / 110.0f;
     float al = t >= 1 ? 1 : 0.15f + 0.85f * (t < 0 ? 0 : t);
     if (ly > y + h) break;
@@ -116,9 +116,9 @@ void registro_pacote(float x, float y, float w, float h, int n, const char *rotD
   gfx_sem_recorte();
 }
 
-// --- O MODAL ---------------------------------------------------------------------
-// Centrado na tela virtual (escala.h) e no maximo da largura dela menos 80:
-// 300, 250, 1320 e 580 em 100%.
+// --- THE MODAL -------------------------------------------------------------------
+// Centered on virtual screen (escala.h) and at most screen width minus 80:
+// 300, 250, 1320 and 580 at 100%.
 #define RE_W (NV_TELA_W - 80.0f < 1320.0f ? NV_TELA_W - 80.0f : 1320.0f)
 #define RE_H 580.0f
 #define RE_X ((NV_TELA_W - RE_W) * 0.5f)
@@ -130,7 +130,7 @@ static void rgKbdTexto(const char *k, const char *l, float xDir, float yc) {
   txt_desenhar_alpha(kt, x + (kw - kt.w) * 0.5f, yc - kt.h * 0.5f, 0.82f);
   txt_desenhar_alpha(lt, x + kw + 9, yc - lt.h * 0.5f, 0.5f);
 }
-// Botao pilula 56 (21/600): focado cheio no acento, o outro neutro 8%.
+// Pill button 56 (21/600): focused filled in accent, other neutral 8%.
 static float rgBotao(const char *rot, const char *icone, float x, float y, int foco, float a) {
   TxtLinha t = foco ? rgTT(TXT_ILHA_ITEM, rot) : rgT(TXT_ILHA_ITEM, rot);
   float w = 28 + (icone ? 20 + 10 : 0) + t.w + 28;
@@ -157,14 +157,14 @@ static void rgMilhar(char *d, size_t tam, long n) {
   d[j] = 0;
 }
 
-static void registro_envio_desenharCorpo_(void);
-// Camada ampliada (escala.h): o corpo desenha na tela virtual.
-void registro_envio_desenhar(void) {
+static void log_send_draw_internal(void);
+// Magnified layer (escala.h): body draws on virtual screen.
+void log_send_draw(void) {
   ESCALA_INI();
-  registro_envio_desenharCorpo_();
+  log_send_draw_internal();
   ESCALA_FIM();
 }
-static void registro_envio_desenharCorpo_(void) {
+static void log_send_draw_internal(void) {
   AvisosEnvio env;
   float x, y, w, base = RE_Y + RE_H - 56;
   char kb[32], v[200], a[96], s[160];
@@ -173,8 +173,8 @@ static void registro_envio_desenharCorpo_(void) {
   st = avisos_envio_info(&env);
   ajustes_ui_ilha((GfxRect){ RE_X, RE_Y, RE_W, RE_H }, 36, 1);
   rgTamTexto(kb, sizeof kb, env.bytes ? env.bytes : envTam);
-  registro_pacote(RE_X + 60, RE_Y + 56, 400, 452, 15, kb, st == 1 ? 1.0f : st == 2 ? 0.55f : 0.4f);
-  if (st == 1) {   // o brilho correndo embaixo do pacote
+  log_packet(RE_X + 60, RE_Y + 56, 400, 452, 15, kb, st == 1 ? 1.0f : st == 2 ? 0.55f : 0.4f);
+  if (st == 1) {   // travelling shimmer under package
     float ar, ag, ab, px = RE_X + 60, pw = 400, by = RE_Y + 56 + 452 - 4;
     float t = ajustes_animacoes_reduzidas() ? 0.3f : fmodf((float)SDL_GetTicks() / 1600.0f, 1.0f);
     ajustes_acento(&ar, &ag, &ab);
@@ -295,7 +295,7 @@ static void registro_envio_desenharCorpo_(void) {
       rgBotao("Fechar", NULL, bx, base - 56, !pode || envFoco == 1, 1); }
     return;
   }
-  // Enviando.
+  // Sending.
   ajustes_ui_kicker("Sobre e ajuda", x, y, 1);
   y += 18 + 8;
   y += rgBloco(TXT_ILHA_TITULO, "Enviando o registro", x, y, w, 48, 1, 2) + 14;
@@ -322,6 +322,17 @@ static void registro_envio_desenharCorpo_(void) {
 }
 
 #ifdef REGISTRO_TESTE
-void registro_teste_envio(int abrir) { envTesteFixo = 1; if (abrir) registro_envio_abrir(); else envAberto = 0; }
-void registro_teste_envio_foco(int f) { envFoco = f; }
+void log_test_send(int open) { envTesteFixo = 1; if (open) log_send_open(); else envAberto = 0; }
+void log_test_send_focus(int f) { envFoco = f; }
+void registro_teste_envio(int abrir) { log_test_send(abrir); }
+void registro_teste_envio_foco(int f) { log_test_send_focus(f); }
 #endif
+
+// Backward-compatibility shims
+int  registro_envio_aberto(void) { return log_send_is_open(); }
+void registro_envio_abrir(void) { log_send_open(); }
+int  registro_envio_evento(const SDL_Event *e) { return log_send_event(e); }
+void registro_envio_desenhar(void) { log_send_draw(); }
+void registro_pacote(float x, float y, float w, float h, int n, const char *rotDir, float a) {
+  log_packet(x, y, w, h, n, rotDir, a);
+}

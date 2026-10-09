@@ -1,6 +1,6 @@
 #include "app_id.h"
-#include "registro.h"
-#include "dados.h"
+#include "log.h"
+#include "data.h"
 #include "gfx.h"
 #include "text.h"
 #include "idioma.h"
@@ -10,7 +10,7 @@
 #include "avisos.h"
 #include "redesaude.h"
 #include "tex_cache.h"
-#define NV_ESCALA_TELA   // o arquivo inteiro mede pela tela virtual (escala.h)
+#define NV_ESCALA_TELA   // whole file measures by virtual screen (escala.h)
 #include "escala.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -26,48 +26,47 @@
 #define NV_VERSAO "dev"
 #endif
 
-// TECLA VERMELHA NO webOS: 486, CONFERIDO no header do SDK que compila o alvo
-// ARM (SDL_webOS.h: SDL_WEBOS_SCANCODE_RED 486, na mesma tabela de onde
-// layout.h tirou BACK=482 e BLUE=489). Nao esta em layout.h porque este arquivo
-// nao e dono dela.
+// RED KEY ON webOS: 486, VERIFIED in SDK header compiling ARM target
+// (SDL_webOS.h: SDL_WEBOS_SCANCODE_RED 486, in same table from which
+// layout.h took BACK=482 and BLUE=489). Not in layout.h because this file
+// does not own it.
 //
-// O que NAO foi conferido: se a tecla chega ao app no aparelho. O BACK precisou
-// de um hint proprio na criacao da janela (SDL_WEBOS_ACCESS_POLICY_KEYS_BACK);
-// para as coloridas nao existe hint equivalente. Se o vermelho nao abrir o
-// painel na TV da LG, a causa mais provavel e essa e nao o numero — e por isso
-// existe Ajustes > Sobre e ajuda > "Ver o registro na tela" (registro_abrir).
-#define REG_SCANCODE_VERMELHA 486
+// What was NOT verified: whether key reaches app on physical hardware. BACK needed
+// its own hint on window creation (SDL_WEBOS_ACCESS_POLICY_KEYS_BACK);
+// for color keys no equivalent hint exists. If red doesn't open panel on LG TV,
+// that is most likely cause rather than keycode number — which is why
+// Settings > About and help > "View log on screen" exists (log_open).
+#define LOG_SCANCODE_RED 486
 
-// A MESMA tecla precisa existir sem controle de TV: no Mac nao ha vermelha, e
-// no Tizen a vermelha e traduzida pelo shell (keyCode 403 -> F9). F9 e nao uma
-// letra: o painel e roteado ANTES de todas as telas, e uma letra abriria o
-// painel no meio de quem estivesse digitando na busca.
-#define REG_TECLA_TECLADO SDLK_F9
+// SAME key must exist without TV remote: on Mac there is no red key, and
+// on Tizen red is translated by shell (keyCode 403 -> F9). F9 and not a
+// letter: panel is routed BEFORE all screens, and a letter would open
+// panel while typing in search.
+#define LOG_KEY_KEYBOARD SDLK_F9
 
-// Quantos bytes do FIM do arquivo sao lidos, e quantas linhas ficam guardadas.
-// O que interessa e sempre o fim. As linhas que nao cabem nas 200 ainda entram
-// nas CONTAGENS das areas ("Tudo 214"): o painel mostra 200 das ultimas N.
+// How many bytes from END of file are read, and how many lines are kept.
+// What matters is always the end. Lines not fitting in 200 still count
+// in area COUNTS ("All 214"): panel shows 200 of last N.
 //
-// REG_COL e 512 e nao a largura que CABE na tela: guardar a linha inteira e o
-// que permite ao ehFalha achar o "<<< SEM PERSISTENCIA" que vive no FIM da
-// linha de FPS, e ao detalhe mostrar a linha toda.
-#define REG_JANELA 40960
-#define REG_MAX    200
-#define REG_COL    512
+// LOG_COL is 512 and not width that FITS on screen: keeping entire line allows
+// is_failure to find "<<< NO PERSISTENCE" living at END of FPS line, and
+// detail view to display entire line.
+#define LOG_WINDOW 40960
+#define LOG_MAX    200
+#define LOG_COL    512
 
-// AO VIVO (dono, 03/10): com o painel aberto o arquivo e relido a cada
-// segundo — so quando o tamanho mudou. Rolar para cima PAUSA (a lista para de
-// andar debaixo do foco) e conta as linhas novas; descer ate o fim volta a
-// seguir.
-#define REG_RELER_MS 1000u
+// LIVE (owner, 03/10): with panel open file is re-read every second —
+// only when file size changed. Scrolling up PAUSES (list stops moving under
+// focus) and counts new lines; descending to end resumes following.
+#define LOG_RELOAD_MS 1000u
 
-static int aberto;
-static int aviso;
-static int avisoDecidido;
-// A soltura do MESMO toque que abriu/fechou algo aqui. ARMADILHA JA PAGA NESTE
-// REPO: o KEYUP de um toque que fechou uma camada vaza para a tela de tras
-// (issue #8). Toda vez que este modulo age num KEYDOWN ele guarda a tecla e
-// engole o KEYUP. SYM E SCANCODE: as coloridas do webOS chegam por SCANCODE.
+static int is_open;
+static int notice_visible;
+static int notice_decided;
+// Release of SAME touch that opened/closed something here. PITFALL PAID IN THIS
+// REPO: KEYUP of a touch that closed a layer leaks to background screen
+// (issue #8). Every time this module acts on KEYDOWN it stores key and
+// swallows KEYUP. SYM AND SCANCODE: webOS color keys arrive by SCANCODE.
 static SDL_Keycode soltarSym;
 static int soltarScan = -1;
 static void engolirSoltura(const SDL_Event *e) {
@@ -75,34 +74,35 @@ static void engolirSoltura(const SDL_Event *e) {
   soltarScan = e->key.keysym.scancode;
 }
 
-// --- AS LINHAS ---------------------------------------------------------------
-// Areas: a etiqueta entre colchetes do printf ([rede], [video]...) agrupada em
-// cinco. Toda linha cai em exatamente uma (o que nao se reconhece vai para
-// Sistema), entao as contagens das cinco somam o "Tudo".
+// --- THE LINES ---------------------------------------------------------------
+// Areas: bracketed tag of printf ([net], [video]...) grouped into five.
+// Every line falls into exactly one (unrecognized goes to System), so counts
+// of the five sum up to "All".
 enum { RG_TUDO = 0, RG_PROB, RG_VIDEO, RG_REDE, RG_FONTES, RG_IMAGENS, RG_SISTEMA, RG_N };
 typedef struct {
-  char t[REG_COL];          // a linha inteira, com as URLs cortadas no host
-  short msg;                // onde o texto comeca, depois de "[area] "
-  char area[24];            // "video", "quadros" (a linha FPS=), "" sem etiqueta
-  unsigned char sev;        // 0 normal, 1 aviso, 2 erro
+  char t[LOG_COL];          // entire line, with URLs cut at host
+  short msg;                // where text starts, after "[area] "
+  char area[24];            // "video", "quadros" (FPS= line), "" without tag
+  unsigned char sev;        // 0 normal, 1 warning, 2 error
   unsigned char grupo;      // RG_VIDEO..RG_SISTEMA
-  unsigned char fps;        // linha FPS= de main.c
-} RegLinha;
-static RegLinha lin[REG_MAX];
-static int nLin;            // linhas guardadas (as ultimas REG_MAX)
-static int nLidas;          // linhas na janela lida (>= nLin)
-static int cont[RG_N];      // por area, sobre a janela lida
+  unsigned char fps;        // FPS= line from main.c
+} LogLine;
+typedef LogLine RegLinha;
+
+static LogLine lin[LOG_MAX];
+static int nLin;            // stored lines (last LOG_MAX)
+static int nLidas;          // lines in read window (>= nLin)
+static int cont[RG_N];      // per area, over read window
 static int nErros, nAvisos;
-static int semFonte;        // 1 = nao existe de onde ler nesta compilacao
-static long marcaLida;      // tamanho do arquivo (ou n de linhas no wasm) na ultima leitura
+static int semFonte;        // 1 = nowhere to read from in this build
+static long marcaLida;      // file size (or line count in wasm) on last read
 static Uint32 ultLeitura;
 
-static char cru[REG_JANELA + 1];
+static char cru[LOG_WINDOW + 1];
 
-const char *registro_arquivo(void) {
+const char *log_file_path(void) {
 #ifdef __EMSCRIPTEN__
-  // Nao ha arquivo util no navegador: o "sistema de arquivos" e MEMFS, morre a
-  // cada recarga, e o log ja esta no console. NULL faz main.c pular o freopen.
+  // No useful file in browser: "filesystem" is MEMFS, dies on reload, and log is in console.
   return NULL;
 #else
   static char caminho[256];
@@ -112,8 +112,8 @@ const char *registro_arquivo(void) {
     resolvido = 1;
     if (env && env[0]) snprintf(caminho, sizeof caminho, "%s", env);
 #if defined(__APPLE__) || defined(NV_LINUX_DESKTOP)
-    // No Mac o log vai para o TERMINAL e continua assim. Para exercitar o
-    // painel na previa:  NUVIO_LOG=/tmp/nuvio.log bash tools/mac.sh
+    // On Mac log goes to TERMINAL and stays that way. To exercise panel:
+    // NUVIO_LOG=/tmp/nuvio.log bash tools/mac.sh
     else caminho[0] = 0;
 #elif defined(NV_ANDROID)
     else snprintf(caminho, sizeof caminho, "%s/nuvio.log",
@@ -130,10 +130,9 @@ const char *registro_arquivo(void) {
 #endif
 }
 
-// Corta a URL no HOST. Ver a nota de privacidade em registro.h: a chave do
-// debrid viaja no CAMINHO da URL, e este painel aparece na TV da sala. So
-// mascara quando o caminho tem 4 bytes ou mais (o tamanho de "/…" em UTF-8):
-// a substituicao nunca cresce a linha.
+// Cuts URL at HOST. See privacy note in log.h: debrid key travels in URL PATH,
+// and this panel appears on living room TV. Only masks when path is 4+ bytes
+// (size of "/…" in UTF-8): replacement never grows the line.
 static void mascarar(char *s) {
   char *p = s;
   while ((p = strstr(p, "://")) != NULL) {
@@ -149,8 +148,8 @@ static void mascarar(char *s) {
   }
 }
 
-// Corta lixo de UTF-8 no FIM: snprintf trunca por BYTE, e uma sequencia
-// invalida faz o SDL_ttf devolver linha VAZIA.
+// Trims UTF-8 garbage at END: snprintf truncates by BYTE, and invalid
+// sequence makes SDL_ttf return EMPTY line.
 static void aparaUtf8(char *s) {
   size_t n = strlen(s), i;
   unsigned char c;
@@ -164,15 +163,14 @@ static void aparaUtf8(char *s) {
   if ((int)(n - i + 1) < quer) s[i - 1] = 0;
 }
 
-// ERRO: o que o painel ja pintava de vermelho, sem mudar (heuristica, nao
-// classificacao: o C nao sabe qual printf era erro; "Homem de Ferro" sai
-// vermelho. Falso positivo custa uma linha colorida; falso negativo, o
-// defeito passar batido numa foto da tela).
+// ERROR: what panel painted red, unchanged (heuristic, not classification:
+// C doesn't know which printf was error; "Iron Man" comes out red. False
+// positive costs a colored line; false negative, defect goes unnoticed on photo).
 static int ehFalha(const char *s) {
   return strstr(s, "<<<") || strstr(s, "FALH") || strstr(s, "falh") ||
          strstr(s, "erro") || strstr(s, "Erro") || strstr(s, "ERRO");
 }
-// "HTTP 4xx" ou "HTTP 5xx" em qualquer ponto da linha; devolve o codigo.
+// "HTTP 4xx" or "HTTP 5xx" anywhere on line; returns status code.
 static int httpErro(const char *s) {
   const char *p = s;
   while ((p = strstr(p, "HTTP ")) != NULL) {
@@ -182,9 +180,8 @@ static int httpErro(const char *s) {
   }
   return 0;
 }
-// AVISO (ambar, decisao do dono de 03/10): o servidor ou a conexao reclamou,
-// mas o app seguiu. A lista e curta de proposito: cada palavra e uma que os
-// printf do app usam para isso.
+// WARNING (amber, owner decision 03/10): server or connection complained,
+// but app continued. Short list deliberately: words app printfs use.
 static int ehAviso(const char *s) {
   return strstr(s, "sem resposta") || strstr(s, "caiu") || strstr(s, "corte") ||
          strstr(s, "nao se despediu") ||
@@ -217,7 +214,7 @@ static int grupoDe(const char *a) {
   return RG_SISTEMA;
 }
 
-// Etiqueta, gravidade e area de uma linha ja mascarada.
+// Tag, severity and area of an already masked line.
 static void classificar(RegLinha *L) {
   const char *s = L->t;
   L->msg = 0; L->area[0] = 0; L->fps = 0;
@@ -238,11 +235,11 @@ static void classificar(RegLinha *L) {
   L->grupo = (unsigned char)(L->fps ? RG_SISTEMA : grupoDe(L->area));
 }
 
-// Quebra o bloco lido em linhas e guarda as ultimas REG_MAX. `parcial` = a
-// primeira linha pode estar cortada no meio (o arquivo foi lido do fim) e e
-// descartada — meia linha de log confunde mais do que ajuda.
+// Splits read block into lines and keeps last LOG_MAX. `parcial` = first line
+// may be cut in half (file read from end) and is discarded — half a log line
+// confuses more than it helps.
 static void fatiar(char *texto, int parcial) {
-  static char *ptr[REG_JANELA / 2];
+  static char *ptr[LOG_WINDOW / 2];
   int n = 0, i, k;
   char *p = texto, *q;
   nLin = 0; nLidas = 0; nErros = nAvisos = 0;
@@ -262,11 +259,11 @@ static void fatiar(char *texto, int parcial) {
     p = q + 1;
   }
   nLidas = n;
-  k = n > REG_MAX ? n - REG_MAX : 0;
+  k = n > LOG_MAX ? n - LOG_MAX : 0;
   for (i = 0; i < n; i++) {
     static RegLinha tmp;
     RegLinha *L = i >= k ? &lin[i - k] : &tmp;
-    snprintf(L->t, REG_COL, "%s", ptr[i]);
+    snprintf(L->t, LOG_COL, "%s", ptr[i]);
     aparaUtf8(L->t);
     mascarar(L->t);
     classificar(L);
@@ -278,9 +275,6 @@ static void fatiar(char *texto, int parcial) {
 }
 
 #ifdef __EMSCRIPTEN__
-// As linhas que o shell (tools/tizen-shell.html) guarda em texto puro, a mesma
-// lista que alimenta o painel DOM. -1 = a lista nem existe (shell antigo), 0 =
-// existe e esta vazia: o painel tem frases diferentes para cada um.
 EM_JS(int, nv_registro_js, (char *dst, int tam, int *total), {
   try {
     var a = (typeof window !== "undefined") ? window.__nvLinhas : null;
@@ -295,7 +289,7 @@ EM_JS(int, nv_registro_js, (char *dst, int tam, int *total), {
 });
 #endif
 
-// Tamanho atual da fonte (bytes do arquivo, ou linhas no wasm); -1 sem fonte.
+// Current source mark (file bytes, or lines in wasm); -1 without source.
 static long marcaAtual(void) {
 #ifdef __EMSCRIPTEN__
   int total = 0;
@@ -303,14 +297,14 @@ static long marcaAtual(void) {
   return total;
 #else
   struct stat st;
-  const char *c = registro_arquivo();
+  const char *c = log_file_path();
   if (!c || stat(c, &st) != 0) return -1;
   return (long)st.st_size;
 #endif
 }
 
 #ifdef REGISTRO_TESTE
-static const char *regTesteTexto;   // linhas fixas do harness (tests/registro_shot.c)
+static const char *regTesteTexto;
 static int regTesteSemFonte;
 #endif
 
@@ -335,7 +329,7 @@ static void carregar(void) {
     if (r <= 0) { semFonte = (r < 0); return; }
     fatiar(cru, 0); }
 #else
-  { const char *caminho = registro_arquivo();
+  { const char *caminho = log_file_path();
     FILE *f;
     long tam, comeco;
     size_t n;
@@ -345,9 +339,9 @@ static void carregar(void) {
     if (fseek(f, 0, SEEK_END) != 0) { fclose(f); semFonte = 1; return; }
     tam = ftell(f);
     if (tam < 0) { fclose(f); semFonte = 1; return; }
-    comeco = tam > (long)REG_JANELA ? tam - (long)REG_JANELA : 0;
+    comeco = tam > (long)LOG_WINDOW ? tam - (long)LOG_WINDOW : 0;
     fseek(f, comeco, SEEK_SET);
-    n = fread(cru, 1, REG_JANELA, f);
+    n = fread(cru, 1, LOG_WINDOW, f);
     cru[n] = 0;
     fclose(f);
     marcaLida = tam;
@@ -355,21 +349,20 @@ static void carregar(void) {
 #endif
 }
 
-// --- O ESTADO DO PAINEL ------------------------------------------------------
-static int area;            // RG_* da aba
-static int segEd;           // escolhendo a area (o segmentado no acento)
-static int pausado;         // ↑ pausou: a lista nao anda
-static int foco = -1;       // linha em foco (indice em vis), pausado
-static int detalhe;         // a linha em foco aberta por inteiro
-static int focoEnviar;      // foco no "Enviar agora" do inspetor
-static int novas;           // linhas que chegaram desde a pausa
+// --- PANEL STATE -------------------------------------------------------------
+static int area;            // RG_* of tab
+static int segEd;           // picking area (segmented in accent)
+static int pausado;         // ↑ paused: list does not move
+static int foco = -1;       // line in focus (index in vis), paused
+static int detalhe;         // focused line open in full
+static int focoEnviar;      // focus on "Send now" in inspector
+static int novas;           // new lines arrived since pause
 static long marcaPausa;
-static int focoEtapa;       // Sistema com rastro de etapas: a etapa em foco
+static int focoEtapa;       // System with stage trail: stage in focus
 
-// A lista filtrada: indice em lin e se e linha de CONTEXTO (apagada, na aba
-// Problemas: a linha de antes de cada problema).
-static int vis[REG_MAX * 2];
-static unsigned char visCtx[REG_MAX * 2];
+// Filtered list: index in lin and whether line is CONTEXT (dimmed, in Problems tab).
+static int vis[LOG_MAX * 2];
+static unsigned char visCtx[LOG_MAX * 2];
 static int nVis;
 static void filtrar(void) {
   int i;
@@ -407,11 +400,11 @@ static void seguir(void) {
   recarregar();
 }
 
-// Chamado por quadro com o painel aberto: rele ao vivo, ou conta as novas.
+// Called per frame with panel open: reloads live, or counts new lines.
 static void passoAoVivo(void) {
   Uint32 agora = SDL_GetTicks();
   long m;
-  if (agora - ultLeitura < REG_RELER_MS) return;
+  if (agora - ultLeitura < LOG_RELOAD_MS) return;
   ultLeitura = agora;
 #ifdef REGISTRO_TESTE
   if (regTesteTexto || regTesteSemFonte) return;
@@ -420,15 +413,15 @@ static void passoAoVivo(void) {
   m = marcaAtual();
   if (m == marcaLida) return;
   if (!pausado) { recarregar(); return; }
-  // Pausado: conta as linhas que chegaram depois da pausa, sem mexer na lista.
+  // Paused: count lines arriving after pause without touching list.
 #ifdef __EMSCRIPTEN__
   novas = (int)(m - marcaPausa);
 #else
-  { const char *c = registro_arquivo();
+  { const char *c = log_file_path();
     FILE *f = c ? fopen(c, "rb") : NULL;
     if (f) {
-      static char buf[REG_JANELA];
-      long de = marcaPausa > m - (long)REG_JANELA ? marcaPausa : m - (long)REG_JANELA;
+      static char buf[LOG_WINDOW];
+      long de = marcaPausa > m - (long)LOG_WINDOW ? marcaPausa : m - (long)LOG_WINDOW;
       size_t n, k;
       int q = 0;
       fseek(f, de, SEEK_SET);
@@ -441,49 +434,46 @@ static void passoAoVivo(void) {
   if (novas < 0) novas = 0;
 }
 
-int registro_aberto(void) { return aberto; }
+int log_is_open(void) { return is_open; }
 
 static void abrir(void) {
-  aberto = 1;
+  is_open = 1;
   area = RG_TUDO; segEd = 0; pausado = 0; foco = -1; detalhe = 0; focoEnviar = 0;
   novas = 0; focoEtapa = 0;
-  fflush(stdout);   // o que este fio ja imprimiu entra no arquivo antes da leitura
+  fflush(stdout);
   recarregar();
 }
-// "NOVO" na linha de Ajustes ate a primeira abertura (a marca e um arquivo).
+// "NEW" in Settings row until first opening.
 static int jaAberto = -1;
-int registro_ja_aberto(void) {
-  if (jaAberto < 0) { char *s = dados_ler("registro-aberto.txt"); jaAberto = s != NULL; free(s); }
+int log_already_opened(void) {
+  if (jaAberto < 0) { char *s = data_read("registro-aberto.txt"); jaAberto = s != NULL; free(s); }
   return jaAberto;
 }
-void registro_abrir(void) {
-  if (aberto) return;
+void log_open(void) {
+  if (is_open) return;
   abrir();
-  if (!registro_ja_aberto()) { jaAberto = 1; dados_gravar("registro-aberto.txt", "1\n"); }
+  if (!log_already_opened()) { jaAberto = 1; data_write("registro-aberto.txt", "1\n"); }
 }
 
 static void fecharAviso(void) {
-  if (!aviso) return;
-  aviso = 0;
-  // Grava DEPOIS de ter sido visto: se o app morrer com o cartao na tela, a
-  // pessoa ve o aviso de novo. Sem pasta gravavel e no-op e o aviso volta.
-  dados_gravar("aviso-log.txt", "1\n");
+  if (!notice_visible) return;
+  notice_visible = 0;
+  data_write("aviso-log.txt", "1\n");
 }
 
-void registro_aviso_primeira_vez(void) {
+void log_first_time_notice(void) {
   char *s;
-  if (avisoDecidido) return;
-  avisoDecidido = 1;
-  s = dados_ler("aviso-log.txt");
+  if (notice_decided) return;
+  notice_decided = 1;
+  s = data_read("aviso-log.txt");
   if (s) { free(s); return; }
-  aviso = 1;
+  notice_visible = 1;
 }
 
 static int ehAlternar(const SDL_Event *e) {
   if (e->key.repeat) return 0;
-  if (e->key.keysym.sym == REG_TECLA_TECLADO) return 1;
-  // A AZUL (489) fica de fora de proposito: e o atalho do perfil em app.c.
-  if (e->key.keysym.scancode == REG_SCANCODE_VERMELHA) return 1;
+  if (e->key.keysym.sym == LOG_KEY_KEYBOARD) return 1;
+  if (e->key.keysym.scancode == LOG_SCANCODE_RED) return 1;
   return 0;
 }
 
@@ -494,7 +484,7 @@ static int ehVoltar(const SDL_Event *e) {
 }
 static int ehOk(SDL_Keycode k) { return k == SDLK_RETURN || k == SDLK_KP_ENTER || k == SDLK_SPACE; }
 
-static int etapasN(void);   // registro_ilha.inc
+static int etapasN(void);   // log_island.inc
 static int temEtapas(void) { return area == RG_SISTEMA && etapasN() > 0; }
 
 static void trocarArea(int d) {
@@ -505,10 +495,10 @@ static void trocarArea(int d) {
   filtrar();
 }
 
-int registro_envio_aberto(void);
-int registro_envio_evento(const SDL_Event *e);
+int log_send_is_open(void);
+int log_send_event(const SDL_Event *e);
 
-int registro_evento(const SDL_Event *e) {
+int log_event(const SDL_Event *e) {
   int ehTecla = (e->type == SDL_KEYDOWN || e->type == SDL_KEYUP || e->type == SDL_TEXTINPUT);
 
   if (e->type == SDL_KEYUP &&
@@ -520,25 +510,24 @@ int registro_evento(const SDL_Event *e) {
   }
 
   if (e->type == SDL_KEYDOWN && ehAlternar(e)) {
-    fecharAviso();   // quem faz o gesto nao precisa mais do aviso que o ensina
-    if (aberto) aberto = 0;
+    fecharAviso();
+    if (is_open) is_open = 0;
     else abrir();
     engolirSoltura(e);
     return 1;
   }
 
-  if (!aberto && aviso) {
-    // CARTAO, nao tela: QUALQUER tecla o dispensa, e a tecla morre aqui.
+  if (!is_open && notice_visible) {
     if (e->type == SDL_KEYDOWN) { fecharAviso(); engolirSoltura(e); return 1; }
     return ehTecla;
   }
 
-  if (!aberto) return 0;
+  if (!is_open) return 0;
 
-  // Daqui para baixo o painel e MODAL: nenhuma tecla chega a tela de tras.
+  // Panel is modal: no key reaches background screen.
   if (e->type == SDL_KEYDOWN) {
     SDL_Keycode k = e->key.keysym.sym;
-    if (ehVoltar(e)) { aberto = 0; engolirSoltura(e); return 1; }
+    if (ehVoltar(e)) { is_open = 0; engolirSoltura(e); return 1; }
     if (semFonte || !nLin) {
       if (ehOk(k)) { recarregar(); engolirSoltura(e); }
       return 1;
@@ -546,8 +535,8 @@ int registro_evento(const SDL_Event *e) {
     if (focoEnviar) {
       if (k == SDLK_LEFT || k == SDLK_UP) { focoEnviar = 0; segEd = 1; }
       else if (ehOk(k)) {
-        aberto = 0;
-        registro_envio_abrir();
+        is_open = 0;
+        log_send_open();
         engolirSoltura(e);
       }
       return 1;
@@ -578,8 +567,8 @@ int registro_evento(const SDL_Event *e) {
       }
       return 1;
     }
-    // Pausado: ↑ ↓ andam de linha, ← → de pagina, OK abre/fecha o detalhe, e
-    // descer alem da ultima volta a seguir o fim.
+    // Paused: ↑ ↓ move lines, ← → move pages, OK opens/closes detail,
+    // and descending past end resumes following.
     if (k == SDLK_UP) { if (foco > 0) foco--; else { segEd = 1; } }
     else if (k == SDLK_DOWN) { if (foco < nVis - 1) foco++; else seguir(); }
     else if (k == SDLK_LEFT || k == SDLK_PAGEUP) { foco -= 16; if (foco < 0) foco = 0; }
@@ -590,38 +579,53 @@ int registro_evento(const SDL_Event *e) {
   return ehTecla;
 }
 
-#include "registro_ilha.inc"
-#include "registro_envio.inc"
+#include "log_island.inc"
+#include "log_send.inc"
 
-static void registro_desenharCorpo_(void);
-// Camada ampliada (escala.h): o corpo desenha na tela virtual.
-void registro_desenhar(void) {
+static void log_draw_internal(void);
+void log_draw(void) {
   ESCALA_INI();
-  registro_desenharCorpo_();
+  log_draw_internal();
   ESCALA_FIM();
 }
-static void registro_desenharCorpo_(void) {
-  if (!aberto && !aviso) return;
-  // RECORTE DESLIGADO ANTES DE DESENHAR: se uma tela esquecer o recorte ligado,
-  // o unico sintoma seria o painel de DIAGNOSTICO nao aparecer.
+static void log_draw_internal(void) {
+  if (!is_open && !notice_visible) return;
   gfx_sem_recorte();
-  if (aberto) { passoAoVivo(); desenhaPainel(); }
+  if (is_open) { passoAoVivo(); desenhaPainel(); }
   else desenhaAviso();
 }
 
 #ifdef REGISTRO_TESTE
-void registro_teste_texto(const char *t) { regTesteTexto = t; regTesteSemFonte = 0; }
-void registro_teste_sem_fonte(int s) { regTesteSemFonte = s; }
-void registro_teste_estado(int a, int ed, int pausa, int focoLinha, int det, int nov) {
+void log_test_text(const char *t) { regTesteTexto = t; regTesteSemFonte = 0; }
+void log_test_no_source(int s) { regTesteSemFonte = s; }
+void log_test_state(int a, int ed, int pausa, int focoLinha, int det, int nov) {
   area = a; segEd = ed; focoEnviar = 0; focoEtapa = 0; filtrar();
   if (pausa) { pausado = 1; foco = focoLinha < 0 ? nVis + focoLinha : focoLinha; detalhe = det; novas = nov; }
   else { pausado = 0; foco = -1; detalhe = 0; novas = 0; }
 }
-int registro_teste_achar(const char *trecho, int ultima) {
+int log_test_find(const char *trecho, int ultima) {
   int i, r = -1;
   for (i = 0; i < nVis; i++) if (strstr(lin[vis[i]].t, trecho)) { r = i; if (!ultima) break; }
   return r;
 }
-void registro_teste_aviso(int a) { aviso = a; }
-void registro_teste_foco_etapa(int f) { focoEtapa = f; }
+void log_test_notice(int a) { notice_visible = a; }
+void log_test_stage_focus(int f) { focoEtapa = f; }
+
+void registro_teste_texto(const char *t) { log_test_text(t); }
+void registro_teste_sem_fonte(int s) { log_test_no_source(s); }
+void registro_teste_estado(int a, int ed, int pausa, int focoLinha, int det, int nov) {
+  log_test_state(a, ed, pausa, focoLinha, det, nov);
+}
+int  registro_teste_achar(const char *trecho, int ultima) { return log_test_find(trecho, ultima); }
+void registro_teste_aviso(int a) { log_test_notice(a); }
+void registro_teste_foco_etapa(int f) { log_test_stage_focus(f); }
 #endif
+
+// Backward-compatibility shims
+const char *registro_arquivo(void) { return log_file_path(); }
+int  registro_evento(const SDL_Event *e) { return log_event(e); }
+void registro_desenhar(void) { log_draw(); }
+void registro_aviso_primeira_vez(void) { log_first_time_notice(); }
+int  registro_aberto(void) { return log_is_open(); }
+void registro_abrir(void) { log_open(); }
+int  registro_ja_aberto(void) { return log_already_opened(); }
