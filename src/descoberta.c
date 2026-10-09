@@ -5184,8 +5184,8 @@ static void locGuardar(const char *chave, const char *tit, const char *sin,
 // perfil), como no cache do catalogo: a url de arte de addon pode carregar
 // configuracao, e arquivo de outra conta e descartado. Sem pasta gravavel
 // (dados_dir vazio, os testes) nao ha arquivo e tudo segue so na memoria.
-#ifdef __EMSCRIPTEN__
 #include "dados.h"
+#ifdef __EMSCRIPTEN__
 #define LOC_FS_TRAVAR()   dados_fs_travar()
 #define LOC_FS_LIBERAR()  dados_fs_liberar()
 #define LOC_MARCAR_SUJO() dados_marcar_sujo(1)
@@ -5194,7 +5194,6 @@ static void locGuardar(const char *chave, const char *tit, const char *sin,
 #define LOC_FS_LIBERAR()  ((void)0)
 #define LOC_MARCAR_SUJO() ((void)0)
 #endif
-const char *dados_dir(void);
 static int locDiscoLido;
 
 static int locCaminho(char *dst, size_t n) {
