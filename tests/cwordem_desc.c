@@ -22,6 +22,7 @@ int arte_reserva_episodios(const char *imdb, const char *corpo) { (void)imdb; (v
 int ajustes_social(void) { return 1; }
 int ajustes_hist_conta(void) { return 1; }
 int ajustes_busca_cinemeta(void) { return 1; }
+int ajustes_itens_fileira(void) { return 18; }
 #include "../src/descoberta.c"
 Uint32 SDL_GetTicks(void) { return 0; }
 #include <assert.h>
