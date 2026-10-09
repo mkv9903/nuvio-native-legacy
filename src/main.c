@@ -108,7 +108,6 @@ static void aoSinalTerminar(int sig) {
 #endif
 #include "layout.h"
 #include "plugins.h"
-#include "plex.h"
 #include "esmaecer.h"
 #include "descanso.h"
 
@@ -1180,7 +1179,6 @@ int main(int argc, char **argv) {
   // ligacao como mais uma origem da busca de fontes.
   plugins_iniciar();
   plugins_ligar_aos_addons();
-  plex_ligar_aos_addons();   // Plex: server file as one more source on matching titles
   // Ajustes tambem sao do USUARIO, nao do pacote.
   ajustes_dir(dirDados);
   // Icone do app (apoiadores): a arte vem do pacote; o alias do launcher do

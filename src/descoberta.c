@@ -26,7 +26,6 @@
 #include "artefontes.h"
 #include "idbase.h"
 #include "cwfrente.h"
-#include "servidores.h"
 #include <stdint.h>   /* uintptr_t: a geracao viaja no argumento do fio */
 #include <stdio.h>
 #include <string.h>
@@ -2247,10 +2246,7 @@ static int fileiraMontada(const CatFileira *v, int n, const char *chave) {
 }
 
 static int fileiraPodeSerPreservada(const CatFileira *f) {
-  // Personal-server rows come only from the live Jellyfin snapshot: after a
-  // sign-out, token expiry or profile switch they must vanish, not be
-  // re-attached from the previous Home.
-  return f && f->chave[0] && !servidores_chave_fileira(f->chave) && homeestado_contexto_valido() &&
+  return f && f->chave[0] && homeestado_contexto_valido() &&
          homeestado_tem_fileira(f->chave);
 }
 
@@ -4344,32 +4340,6 @@ static void *montar(void *u) {
   // a ordem salva ao conjunto inteiro impede que uma resposta parcial desloque
   // essas linhas para o fim da Home.
   ordenarPorSnapshot(filsLote, nFilsLote);
-  // PERSONAL SERVER ROWS (jellyfin.h). Copied from the module's snapshot, no
-  // network here; the module fetched them on its own worker. Fixed rows
-  // (empty base) so they never take an addon row's place in the limit, placed
-  // right after the leading fixed rows (Continue watching, social).
-  if (ajustes_jellyfin_ligado() && servidores_conectado()) {
-    int cabe = SRV_ITENS_MAX, jn = 0, jnf, k, pos = 0;
-    CatItem *jfItens = malloc(sizeof(CatItem) * (size_t)cabe);
-    CatFileira jfFils[SRV_FIL_MAX];
-    jnf = jfItens ? servidores_fileiras_copiar(jfItens, cabe, jfFils, SRV_FIL_MAX, &jn) : 0;
-    for (k = 0; k < nFilsLote; k++)
-      if (servidores_chave_fileira(filsLote[k].chave)) { jnf = 0; break; }
-    if (jnf > 0 && nFilsLote + jnf <= CAT_FIL_MAX) {
-      GARANTE(jn);
-      if (jn <= cap - n) {
-        memcpy(lote + n, jfItens, sizeof(CatItem) * (size_t)jn);
-        for (k = 0; k < jnf; k++) jfFils[k].ini += n;
-        n += jn;
-        while (pos < nFilsLote && !filsLote[pos].base[0]) pos++;
-        memmove(filsLote + pos + jnf, filsLote + pos, sizeof(CatFileira) * (size_t)(nFilsLote - pos));
-        memcpy(filsLote + pos, jfFils, sizeof(CatFileira) * (size_t)jnf);
-        nFilsLote += jnf;
-        printf("[desc] %d personal-server row(s)\n", jnf);
-      }
-    }
-    free(jfItens);
-  }
 #undef GARANTE
 
   if (n || nFilsLote > 0) {
@@ -4758,7 +4728,7 @@ static void repetirInterno(void) {
 // DELES SAEM DA TELA NA HORA, sem esperar o ciclo de rede (~20 s na TV, e a
 // Home de uma abertura vinda do cache — catalogo-rede.bin — tem as fileiras do
 // conjunto antigo ate la). So fileira de catalogo de addon (base != "") e
-// candidata; as fixas (continuar, social, servidores pessoais) nao tem base.
+// candidata; as fixas (continuar) nao tem base.
 // Casa pela base, a mesma que a montagem gravou em CatFileira.base. Sem lista
 // (nenhum addon conhecido) nada sai: lista vazia e "ainda nao sei", nao "tirei
 // todos". O ciclo que vem depois publica o conjunto certo por cima.
@@ -6318,20 +6288,6 @@ static void *buscarEps(void *u) {
   // entao o primeiro canal aberto "vazava" elenco/genero/nota para os
   // seguintes. Medido: nenhum canal tem tipo "movie" nem "series" (#37).
   if (ehCanal(orig->tipo)) { fioEpVivo = 0; return NULL; }
-  // PERSONAL SERVER ITEM: the server is the only source of its page. No
-  // Cinemeta, TMDB or addon /meta gets an opaque server id.
-  if (jfid_e(orig->imdb)) {
-    CatEp *eps = malloc(sizeof(CatEp) * VIDEOS_MAX);
-    CatItem ed = base;
-    int ne = eps ? servidores_ficha(&ed, eps, VIDEOS_MAX) : -1;
-    if (ne >= 0 && (alvoItem = epAlvo(alvoItem)) >= 0) {
-      cat_atualizar_item(alvoItem, &ed);
-      if (ne > 0) cat_definir_episodios(alvoItem, eps, ne);
-    }
-    free(eps);
-    fioEpVivo = 0;
-    return NULL;
-  }
   // FILME TAMBEM PASSA AQUI. O /meta/movie traz elenco, direcao, generos e
   // nota — antes so os titulos enriquecidos no catalogo tinham elenco, e a
   // pagina do filme abria sem a fileira. O que e so de serie (episodios,

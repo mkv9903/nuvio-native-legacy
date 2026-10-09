@@ -5,7 +5,6 @@
 static int cwlocal_enfeitar_lote(CatItem *v, int n);
 #define CWLOCAL_ENFEITAR
 #include "cwordem_desc.c"
-#include "jellyfin_stub.inc"
 #undef main
 #undef CWLOCAL_ENFEITAR
 

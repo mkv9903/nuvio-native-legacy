@@ -34,7 +34,6 @@ int ajustes_busca_cinemeta(void) { return 1; }
 #include <assert.h>
 #include <stdio.h>
 #include <unistd.h>
-#include "jellyfin_stub.inc"
 
 Uint32 SDL_GetTicks(void) { return 0; }
 

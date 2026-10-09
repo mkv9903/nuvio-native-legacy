@@ -1,4 +1,3 @@
-#include "jfid.h"
 #include "catalogo.h"
 #include "idbase.h"
 #include "tendencia.h"
@@ -1534,11 +1533,6 @@ void cat_salvar_progresso_ep(int indice, double posSeg, double durSeg, int tempo
   // O arquivo e de progresso.c: chave igual a do web, pendente, com hora. O
   // imdb do item pode vir composto ("tt123:4:9", itens do Trakt) — a funcao
   // corta e usa o episodio explicito quando ha.
-  // PERSONAL SERVER ITEMS never enter the Nuvio account progress: the
-  // server's own check-ins (jellyfin.c) are their authority, and an opaque
-  // server id would sync to every device of the account. The card still
-  // shows the new position in this session.
-  if (jfid_e(itens[indice].imdb)) { cat_aplicar_progresso(indice, posSeg, durSeg, temporada, episodio); return; }
   if (!prog_gravar_local(itens[indice].imdb, temporada, episodio, posSeg, durSeg)) return;
   cat_aplicar_progresso(indice, posSeg, durSeg, temporada, episodio);
 }

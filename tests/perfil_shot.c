@@ -24,7 +24,6 @@
 #include "gfx.h"
 #include "text.h"
 #include "tex_cache.h"
-#include "socialvis.h"
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
 #include <assert.h>
@@ -187,12 +186,6 @@ int main(int argc, char **argv) {
     ajustes_dir(dados_dir()); }
 
   montar(&d);
-  // O CARTAO DE AMIGOS le socialvis. Com -DNV_SOCIALVIS_DEMO (perfil_shot.sh)
-  // entram os amigos de exemplo de socialvis.c — tres, um vendo agora —, que
-  // e o caso do mockup; sem a flag o cartao sai no estado sem amigos.
-#ifdef NV_SOCIALVIS_DEMO
-  socialvis_demo(4);
-#endif
 
   // 1. CARREGANDO: o esqueleto tem de cair nas mesmas caixas do conteudo real.
   //    Compare esta captura com a seguinte — nada pode saltar de lugar.
@@ -220,45 +213,6 @@ int main(int argc, char **argv) {
   tecla(SDLK_DOWN);
   snprintf(nome, sizeof nome, "%s-destaques.bmp", prefixo);
   captura(nome);
-
-  // 4b. A TERCEIRA PARADA (2.0): direita no fim dos destaques vai ao cartao
-  //     Amigos, que vira superficie clara com o anel no primeiro rosto.
-  tecla(SDLK_RIGHT);
-  snprintf(nome, sizeof nome, "%s-amigos.bmp", prefixo);
-  captura(nome);
-
-#ifdef NV_SOCIALVIS_DEMO
-  // 4c. O DUELO com o Pedro (o amigo de exemplo com perfil do servidor). A
-  //     comparacao de exemplo SO existe aqui, na captura: a do app vem de
-  //     recomenda_amigo e nunca de numero fixo.
-  { SvPerfil pp;
-    int k = socialvis_amigo_indice("nuvio:pedro");
-    assert(k >= 0 && socialvis_perfil("nuvio:pedro", &pp));
-    pp.estado = SV_PERFIL_OK; pp.compartilha = 1;
-    pp.cmp[SV_CMP_MATCH].estado = SV_CMPE_OK; pp.cmp[SV_CMP_MATCH].pct = 82;
-    pp.cmp[SV_CMP_MATCH].iguais = 14; pp.cmp[SV_CMP_MATCH].total = 17;
-    pp.cmp[SV_CMP_COMUM].estado = SV_CMPE_OK;
-    pp.cmp[SV_CMP_COMUM].filmes = 9; pp.cmp[SV_CMP_COMUM].series = 5;
-    socialvis_definir_perfil_extra("nuvio:pedro", &pp);
-    for (i = 0; i < k; i++) tecla(SDLK_RIGHT);
-    snprintf(nome, sizeof nome, "%s-amigos-pedro.bmp", prefixo);
-    captura(nome); }
-  tecla(SDLK_RETURN);
-  snprintf(nome, sizeof nome, "%s-duelo.bmp", prefixo);
-  captura(nome);
-  tecla(SDLK_DOWN);
-  snprintf(nome, sizeof nome, "%s-duelo-cartazes.bmp", prefixo);
-  captura(nome);
-  // Um amigo SEM perfil do servidor: os numeros dele sao "—" com o motivo.
-  tecla(SDLK_UP); tecla(SDLK_LEFT);
-  snprintf(nome, sizeof nome, "%s-duelo-sem-dado.bmp", prefixo);
-  captura(nome);
-  // Voltar sai do duelo para o resumo, e nao da tela.
-  { SDL_Event e = { 0 };
-    e.type = SDL_KEYDOWN; e.key.keysym.sym = SDLK_ESCAPE;
-    perfil_evento(&e);
-    assert(perfil_aberto()); }
-#endif
 
   // 5. SEM IDENTIDADE E SEM GENERO: o caso do Trakt que so devolve historico.
   //    A banda de numeros nao pode desabar nem deslocar as secoes de baixo.

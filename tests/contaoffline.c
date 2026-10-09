@@ -245,7 +245,6 @@ void trakt_esquecer(void) {}
 TraEstado traktauth_estado(void) { return TRA_LIGADO; }
 void vistoep_esquecer(void) {}
 void xtream_esquecer(void) {}
-void servidores_esquecer_todos(void) {}
 
 // ------------------------------------------------------------ roteiro
 

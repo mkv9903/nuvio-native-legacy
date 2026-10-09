@@ -1,8 +1,6 @@
 // A FILEIRA DE AMIGOS (src/amigosfil.c) DE MENTIRA, para os testes que
 // compilam home.c com uma lista curta de fontes (home.sh, homepos.sh,
 // cwordem.sh...). Sem ela o link falha: home.c chama amigosfil_* desde o
-// redesenho do social (02/10/2026). Zero amigos = a fileira e o convite.
-#include "amigosfil.h"
 #include <SDL2/SDL.h>
 // Account row projection belongs to separate integration tests. A strong
 // implementation overrides this double in tests/colfileiras_home.c.

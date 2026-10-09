@@ -14,7 +14,6 @@
 //
 //   bash tests/ctxinfo_shot.sh [pasta]
 #include "ajustes.h"
-#include "amigostitulo.h"
 #include "agenda.h"
 #include "artehero.h"
 #include "catalogo.h"
@@ -299,21 +298,6 @@ int main(int argc, char **argv) {
 
   printf("\nContinuar assistindo:\n");
   tecla(SDLK_DOWN); quadros(90, NULL);
-  // Amigos (agora, com o feed social parado: a home so remonta o indice
-  // quando socialvis muda) (o indice que socialvis.h alimenta) e a agenda da primeira serie.
-  { SvEvento ev[3];
-    memset(ev, 0, sizeof ev);
-    snprintf(ev[0].pessoaId, sizeof ev[0].pessoaId, "a1"); snprintf(ev[0].pessoaNome, sizeof ev[0].pessoaNome, "Ana Lima");
-    ev[0].acao = SV_REACAO; ev[0].reacao = SV_REAC_GOSTOU;
-    snprintf(ev[1].pessoaId, sizeof ev[1].pessoaId, "a2"); snprintf(ev[1].pessoaNome, sizeof ev[1].pessoaNome, "Rafa Souza");
-    ev[1].acao = SV_FIM; ev[1].reacao = SV_REAC_NADA; ev[1].temporada = 2; ev[1].episodio = 8;
-    for (i = 0; i < 2; i++) {
-      snprintf(ev[i].imdb, sizeof ev[i].imdb, "%s", itens[0].imdb);
-      snprintf(ev[i].tipo, sizeof ev[i].tipo, "series");
-      snprintf(ev[i].titulo, sizeof ev[i].titulo, "%s", itens[0].titulo);
-      ev[i].quando = (long long)time(NULL) - 3600 * (i + 1);
-    }
-    amigostitulo_montar(ev, 2); }
   segurar();
   confere("o menu abriu no cartao da fileira", ctx_aberto());
   quadros(40, NULL);
@@ -324,7 +308,7 @@ int main(int argc, char **argv) {
     ctxinfo_texto(ctx_titulo(), NULL, t, sizeof t);
     confere("continuar: notas IMDb, RT e Trakt do resumo",
             strstr(t, " 0=860") && strstr(t, " 1=87") && strstr(t, " 3=970"));
-    confere("continuar: amigos e agenda", strstr(t, "friends: A") && !strstr(t, "schedule: \n")); }
+    confere("continuar: agenda", !strstr(t, "schedule: \n")); }
   fechar();
 
   printf("\nEm alta, cartaz na ponta direita:\n");

@@ -462,7 +462,6 @@ static int pedirFonteJob(int tipo, unsigned geracao, const char *id, int renovan
 #include "gfx.h"
 #include "catalogo.h"
 #include "layout.h"
-#include "servidores.h"
 #include <stdio.h>
 
 static Tela tela = TELA_HOME;
@@ -2514,10 +2513,6 @@ void app_atualizar(float dt, Uint32 agora) {
   // onde o vinculo e feito, "Aguardando a autorizacao" nunca saia do lugar
   // mesmo com a pessoa ja tendo autorizado no celular.
   traktauth_passo((unsigned)agora);
-  // PERSONAL SERVERS (servidores.h: Jellyfin, Emby, Plex): the modules fetches on its own workers; the
-  // Home is rebuilt when its row snapshot changes or the option flips. One
-  // integer compare per frame, no network here.
-  if (servidores_passo()) desc_repetir_silencioso();
   simklauth_passo((unsigned)agora);
 
   if (tela == TELA_ESCOLHA_PERFIL) {

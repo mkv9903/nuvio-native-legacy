@@ -11,7 +11,6 @@
 // Reaproveita as dubles de montagem_cedo.c (descoberta.c inteiro, rede falsa).
 #define main cedo_main
 #include "montagem_cedo.c"
-#include "jellyfin_stub.inc"
 #undef main
 
 

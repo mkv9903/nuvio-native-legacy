@@ -20,7 +20,6 @@
 #include "perfil.h"
 #include "salvospainel.h"
 #include "salvos.h"
-#include "social.h"
 #include <SDL2/SDL_image.h>
 #include <assert.h>
 #include <stdio.h>
@@ -465,13 +464,6 @@ int main(int argc,char **argv) {
   assert(SDL_Init(SDL_INIT_VIDEO|SDL_INIT_TIMER)==0);
   testar();
   if(argc<2)return 0;
-  if(!strcmp(argv[1],"--social")) {
-    rede_preparar();assert(trakt_carregar("deploy/app/art"));
-    CatItem *social=calloc(8,sizeof *social);assert(social);
-    int n=trakt_social(social,8);assert(n>0);
-    for(int i=0;i<n;i++)assert(social[i].imdb[0]&&social[i].pais[0]&&social[i].titulo[0]);
-    printf("PASS: %d atividades reais, com autoria e titulo.\n",n);free(social);return 0;
-  }
   if(!strcmp(argv[1],"--live")) {
     rede_preparar();
     addons_carregar("deploy/app/art");addons_buscar("tt14688458:2:4","series");

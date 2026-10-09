@@ -1,4 +1,3 @@
-void servidores_perfil_trocou(void);   // servidores.c: cancel in-flight work, load this profile
 #include "profiles.h"
 #include "session.h"
 #include "nuvem.h"
@@ -278,7 +277,6 @@ void profiles_set_active(int index) {
   fontepref_definir_perfil(index);
   arteesc_definir_perfil(index);
   plugins_perfil_mudou();
-  if (index != prev) servidores_perfil_trocou();
   chosen_this_session = 1;
   has_saved_profile = 1;
   snprintf(line, sizeof line, "%d\n", index);

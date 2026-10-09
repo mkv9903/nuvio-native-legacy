@@ -14,7 +14,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include "jellyfin_stub.inc"
 
 static int ok(const char *nome) { printf("ok  %s\n", nome); return 1; }
 #define IGUAL(a, b) do { if (strcmp((a), (b))) { \

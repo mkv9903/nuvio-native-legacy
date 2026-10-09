@@ -2,7 +2,6 @@
  * response completion instead of external network timing. */
 #define main montagem_cedo_main
 #include "montagem_cedo.c"
-#include "jellyfin_stub.inc"
 #undef main
 
 static unsigned long long inicio, primeiraPronta, primeiraPublicada, lentaAcabou;

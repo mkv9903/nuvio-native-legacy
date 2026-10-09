@@ -53,8 +53,6 @@ static inline const char *discord_erro(void) { return ""; }
 #include <time.h>
 #include "js.h"
 #include "artehero.h"
-#include "jellyfin.h"
-#include "plex.h"
 #include "artereserva.h"
 #include "corviva.h"
 #include "fundo.h"
@@ -1714,8 +1712,7 @@ int ajustes_foco_no_indice(void) { return focoIndice; }
 // e a opcao 0 do enum).
 static int sairArmado;
 static int pedeConfirmacao(int op) {
-  return op == AJ_SAIR || op == AJ_STALKER_LIMPAR || op == AJ_XTREAM_LIMPAR || op == AJ_JF_SAIR ||
-         op == AJ_EM_SAIR || op == AJ_PX_SAIR;
+  return op == AJ_SAIR || op == AJ_STALKER_LIMPAR || op == AJ_XTREAM_LIMPAR;
 }
 
 // --- folha "Ordenar e ativar fileiras" --------------------------------------
@@ -1994,8 +1991,7 @@ int ajustes_p2p_ligado(void) { return lig(AJ_P2P_LIGADO) && !SEGURO; }
 #endif
 // Servidores pessoais: ligado E com HTTP estrito neste backend (o WGT nao tem:
 // jellyfin_disponivel() e 0 la). Fica FORA do #ifdef acima: dentro do #else ela
-// sumia do WASM e o link do .wgt falhava (app.c e descoberta.c a chamam).
-int ajustes_jellyfin_ligado(void) { return lig(AJ_JF_LIGADO) && jellyfin_disponivel(); }
+int ajustes_jellyfin_ligado(void) { return 0; }
 void ajustes_definir_p2p_ligado(int ligado) { int a = valor[AJ_P2P_LIGADO]; valor[AJ_P2P_LIGADO] = ligado ? 0 : 1; gravar(); riscoNotar(AJ_P2P_LIGADO, a); }
 
 // Cor do ANEL DE FOCO. Ver TEMA_ACENTO: um tema aqui e so isto.
@@ -4296,172 +4292,12 @@ static const char *rotuloOpcao(int op) {
 
 // SERVIDORES PESSOAIS (jellyfin.h). Texto das linhas: so dado de exibicao
 // (host sem esquema, nome do usuario, codigo do Quick Connect); token e senha
-// nunca chegam aqui. A falha vem como codigo e e traduzida aqui.
-static char jfUsuario[128];   // entre o teclado do usuario e o da senha
-static const char *jfTexto(int op) {
-  static char buf[192];
-  char det[160];
-  JfEstado e;
-  if (!jellyfin_disponivel()) return i18n("Indisponível nesta plataforma");
-  e = jellyfin_estado(det, sizeof det);
-  if (op == AJ_JF_SERVIDOR) {
-    const char *s = jellyfin_servidor_curto();
-    if (e == JF_EST_VERIFICANDO) return i18n("Conferindo o servidor…");
-    if (e == JF_EST_ERRO && jellyfin_ultimo_erro() == JF_ERR_FORMATO) return i18n("Não é um servidor Jellyfin");
-    if (e == JF_EST_ERRO && jellyfin_ultimo_erro() == JF_ERR_ENTRADA) return i18n("Falhou");
-    if (e == JF_EST_ERRO && jellyfin_ultimo_erro() == JF_ERR_REDE && !s[0])
-      return i18n("O servidor não respondeu dentro do prazo.");
-    return s[0] ? s : i18n("Não configurado");
-  }
-  if (op == AJ_JF_ENTRAR) {
-    switch (e) {
-      case JF_EST_CONECTADO:
-        snprintf(buf, sizeof buf, i18n("Conectado: %s"), jellyfin_usuario());
-        return buf;
-      case JF_EST_QC_CODIGO:
-        snprintf(buf, sizeof buf, i18n("Código %s · aprove no Quick Connect"), det);
-        return buf;
-      case JF_EST_ENTRANDO: return i18n("Entrando…");
-      case JF_EST_EXPIROU: return i18n("expirou — reconectar");
-      case JF_EST_ERRO:
-        switch (jellyfin_ultimo_erro()) {
-          case JF_ERR_AUTH: return i18n("Usuário ou senha incorretos");
-          case JF_ERR_EXPIRADO: return i18n("o código expirou — OK pede outro");
-          case JF_ERR_REDE: return i18n("O servidor não respondeu dentro do prazo.");
-          default: return i18n("Falhou");
-        }
-      case JF_EST_SERVIDOR_OK: return det[0] ? (snprintf(buf, sizeof buf, "%s", det), buf) : "";
-      default: return i18n("Não configurado");
-    }
-  }
-  return "";
-}
-static void jfAtivar(int op) {
-  JfEstado e;
-  if (!ajustes_jellyfin_ligado()) return;
-  e = jellyfin_estado(NULL, 0);
-  if (op == AJ_JF_SERVIDOR) {
-    stCampo = op;
-    teclado_abrir_com("Endereço do Jellyfin",
-                      "IP e porta do servidor, como 192.168.1.5:8096, ou o endereço com https://",
-                      120, JF_ALFA_URL, jellyfin_servidor_curto()[0] ? jellyfin_servidor_curto() : NULL);
-    return;
-  }
-  if (op == AJ_JF_SAIR) { jellyfin_esquecer(); desc_repetir_silencioso(); return; }
-  if (op != AJ_JF_ENTRAR) return;
-  if (e == JF_EST_QC_CODIGO || e == JF_EST_ENTRANDO) { jellyfin_cancelar_entrada(); return; }
-  if (e == JF_EST_CONECTADO) { jellyfin_recarregar_bibliotecas(); return; }
-  if (e == JF_EST_SEM_SERVIDOR || e == JF_EST_VERIFICANDO) return;
-  // Quick Connect when the server allows it: nothing is typed on the TV.
-  if (jellyfin_qc_permitido() == 1 && jellyfin_entrar_quick_connect()) return;
-  stCampo = AJ_JF_ENTRAR;
-  jfUsuario[0] = 0;
-  teclado_abrir_com("Usuário do Jellyfin", "", 64, XT_ALFA_CONTA, NULL);
-}
-
-// EMBY: o mesmo desenho do Jellyfin, sem Quick Connect (so usuario e senha).
-static const char *emTexto(int op) {
-  static char buf[192];
-  char det[160];
-  JfEstado e;
-  if (!jellyfin_disponivel()) return i18n("Indisponível nesta plataforma");
-  e = emby_estado(det, sizeof det);
-  if (op == AJ_EM_SERVIDOR) {
-    const char *s = emby_servidor_curto();
-    if (e == JF_EST_VERIFICANDO) return i18n("Conferindo o servidor…");
-    if (e == JF_EST_ERRO && emby_ultimo_erro() == JF_ERR_FORMATO) return i18n("Não é um servidor Emby");
-    if (e == JF_EST_ERRO && emby_ultimo_erro() == JF_ERR_ENTRADA) return i18n("Falhou");
-    if (e == JF_EST_ERRO && emby_ultimo_erro() == JF_ERR_REDE && !s[0])
-      return i18n("O servidor não respondeu dentro do prazo.");
-    return s[0] ? s : i18n("Não configurado");
-  }
-  if (op == AJ_EM_ENTRAR) {
-    switch (e) {
-      case JF_EST_CONECTADO:
-        snprintf(buf, sizeof buf, i18n("Conectado: %s"), emby_usuario());
-        return buf;
-      case JF_EST_ENTRANDO: return i18n("Entrando…");
-      case JF_EST_EXPIROU: return i18n("expirou — reconectar");
-      case JF_EST_ERRO:
-        switch (emby_ultimo_erro()) {
-          case JF_ERR_AUTH: return i18n("Usuário ou senha incorretos");
-          case JF_ERR_REDE: return i18n("O servidor não respondeu dentro do prazo.");
-          default: return i18n("Falhou");
-        }
-      case JF_EST_SERVIDOR_OK: return det[0] ? (snprintf(buf, sizeof buf, "%s", det), buf) : "";
-      default: return i18n("Não configurado");
-    }
-  }
-  return "";
-}
-static void emAtivar(int op) {
-  JfEstado e;
-  if (!ajustes_jellyfin_ligado()) return;
-  e = emby_estado(NULL, 0);
-  if (op == AJ_EM_SERVIDOR) {
-    stCampo = op;
-    teclado_abrir_com("Endereço do Emby",
-                      "IP e porta do servidor, como 192.168.1.5:8096, ou o endereço com https://",
-                      120, JF_ALFA_URL, emby_servidor_curto()[0] ? emby_servidor_curto() : NULL);
-    return;
-  }
-  if (op == AJ_EM_SAIR) { emby_esquecer(); desc_repetir_silencioso(); return; }
-  if (op != AJ_EM_ENTRAR) return;
-  if (e == JF_EST_ENTRANDO) { emby_cancelar_entrada(); return; }
-  if (e == JF_EST_CONECTADO) { emby_recarregar_bibliotecas(); return; }
-  if (e == JF_EST_SEM_SERVIDOR || e == JF_EST_VERIFICANDO) return;
-  stCampo = AJ_EM_ENTRAR;
-  jfUsuario[0] = 0;
-  teclado_abrir_com("Usuário do Emby", "", 64, XT_ALFA_CONTA, NULL);
-}
-
-// PLEX: sem teclado. A TV mostra o codigo de 4 letras e a pessoa o digita em
-// plex.tv/link no celular; o token chega por polling.
-static const char *pxTexto(int op) {
-  static char buf[192];
-  char det[160];
-  PxEstado e;
-  if (!plex_disponivel()) return i18n("Indisponível nesta plataforma");
-  e = plex_estado(det, sizeof det);
-  if (op == AJ_PX_SERVIDOR) {
-    const char *s = plex_servidor_nome();
-    if (e == PX_EST_ENTRANDO) return i18n("Entrando…");
-    return s[0] && e == PX_EST_CONECTADO ? s : i18n("Não configurado");
-  }
-  if (op == AJ_PX_ENTRAR) {
-    switch (e) {
-      case PX_EST_CONECTADO:
-        snprintf(buf, sizeof buf, i18n("Conectado: %s"), plex_usuario()[0] ? plex_usuario() : plex_servidor_nome());
-        return buf;
-      case PX_EST_CODIGO:
-        if (!det[0]) return i18n("Entrando…");
-        snprintf(buf, sizeof buf, i18n("Código %s · digite em plex.tv/link"), det);
-        return buf;
-      case PX_EST_ENTRANDO: return i18n("Entrando…");
-      case PX_EST_EXPIROU: return i18n("expirou — reconectar");
-      case PX_EST_ERRO:
-        switch (plex_ultimo_erro()) {
-          case PX_ERR_EXPIRADO: return i18n("o código expirou — OK pede outro");
-          case PX_ERR_SEM_SERVIDOR: return i18n("Nenhum servidor Plex nesta conta");
-          case PX_ERR_REDE: return i18n("O servidor não respondeu dentro do prazo.");
-          default: return i18n("Falhou");
-        }
-      default: return i18n("Não configurado");
-    }
-  }
-  return "";
-}
-static void pxAtivar(int op) {
-  PxEstado e;
-  if (!ajustes_jellyfin_ligado()) return;
-  e = plex_estado(NULL, 0);
-  if (op == AJ_PX_SERVIDOR) { plex_proximo_servidor(); return; }
-  if (op == AJ_PX_SAIR) { plex_esquecer(); desc_repetir_silencioso(); return; }
-  if (op != AJ_PX_ENTRAR) return;
-  if (e == PX_EST_CODIGO || e == PX_EST_ENTRANDO) { plex_cancelar_entrada(); return; }
-  if (e == PX_EST_CONECTADO) { plex_recarregar_bibliotecas(); return; }
-  plex_entrar();
-}
+static const char *jfTexto(int op) { (void)op; return ""; }
+static void jfAtivar(int op) { (void)op; }
+static const char *emTexto(int op) { (void)op; return ""; }
+static void emAtivar(int op) { (void)op; }
+static const char *pxTexto(int op) { (void)op; return ""; }
+static void pxAtivar(int op) { (void)op; }
 
 static const char *frResumo(int plugin);
 static const char *frOrdemResumo(void);
@@ -4801,6 +4637,7 @@ static int visivel(int i) {
   if (TELA[i].tipo == IT_OPC) {
     int op = TELA[i].op;
     if (op == AJ_PERFIL_PESQ || op == AJ_PERFIL_EDITAR || op == AJ_SOCIAL) return 0;
+    if (op >= AJ_JF_LIGADO && op <= AJ_PX_SAIR) return 0;
     if (uxAvancada(op) && !lig(AJ_AVANCADAS)) return 0;
   }
   return 1;
@@ -6345,32 +6182,11 @@ void ajustes_atualizar(float dt, Uint32 agora) {
         sync_proteger_ajustes_locais();
         uxNotificar(e < 0 ? "Regex inválida: ignorada" : "Ajuste salvo nesta TV.");
       }
-      else if (stCampo == AJ_JF_SERVIDOR)     jellyfin_definir_servidor(teclado_texto());
-      else if (stCampo == AJ_EM_SERVIDOR)     emby_definir_servidor(teclado_texto());
-      else if ((stCampo == AJ_JF_ENTRAR || stCampo == AJ_EM_ENTRAR) && !jfUsuario[0] && teclado_texto()[0]) {
-        // Username typed: the password modal opens next, masked. The keyboard
-        // buffer is wiped as soon as each value is handed over.
-        snprintf(jfUsuario, sizeof jfUsuario, "%s", teclado_texto());
-        teclado_esquecer();
-        teclado_abrir_com(stCampo == AJ_EM_ENTRAR ? "Senha do Emby" : "Senha do Jellyfin", "", 128,
-                          JF_ALFA_SENHA, NULL);
-        teclado_tipo(TECLADO_TIPO_SENHA);
-        teclado_mascarar(1);
-        r = TECLADO_NADA;   // stay on this field: next result is the password
-      } else if ((stCampo == AJ_JF_ENTRAR || stCampo == AJ_EM_ENTRAR) && jfUsuario[0]) {
-        char senha[160];
-        snprintf(senha, sizeof senha, "%s", teclado_texto());
-        teclado_esquecer();
-        if (stCampo == AJ_EM_ENTRAR) emby_entrar_senha(jfUsuario, senha);   // wipes senha
-        else jellyfin_entrar_senha(jfUsuario, senha);                       // wipes senha
-        memset(jfUsuario, 0, sizeof jfUsuario);
-      }
       else if (stCampo >= AJ_POSTER_INST && stCampo <= AJ_POSTER_MODELO) pstDefinir(stCampo, teclado_texto());
       else if (debIdx(stCampo) >= 0)          debDefinir(stCampo, teclado_texto());
-      else if (stCampo != AJ_JF_ENTRAR && stCampo != AJ_EM_ENTRAR) stalker_definir_portal(teclado_texto());
+      else stalker_definir_portal(teclado_texto());
       if (r == TECLADO_PRONTO) stCampo = 0;
     } else if (r == TECLADO_CANCELOU) {
-      if (stCampo == AJ_JF_ENTRAR || stCampo == AJ_EM_ENTRAR) { teclado_esquecer(); memset(jfUsuario, 0, sizeof jfUsuario); }
       stCampo = 0;
     } }
   // Repouso da escolha de idioma de legenda: ver aplicarIdioma.

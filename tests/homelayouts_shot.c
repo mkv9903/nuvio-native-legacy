@@ -36,7 +36,6 @@
 #include "gl_compat.h"
 #include "posterprov.h"
 #include "trakt.h"
-#include "socialvis.h"
 #include <unistd.h>
 #include <assert.h>
 #include <stdio.h>
@@ -302,20 +301,6 @@ int main(int argc, char **argv) {
     assert(col_definir_json(js) == 4);
   }
   cat_definir_tudo(itens, total, fils, NF);
-  // NV_AMIGOS=1: amigos falsos nos tres primeiros titulos de "Popular" (feed externo).
-  if (getenv("NV_AMIGOS")) {
-    SvEvento e[6]; int k = 0, i;
-    memset(e, 0, sizeof e);
-    for (i = 0; i < 6; i++) { e[i].pct = -1; e[i].restanteMin = -1; e[i].quando = 1700000000LL - i;
-      snprintf(e[i].imdb, sizeof e[i].imdb, "%s", itens[fils[1].ini + (i < 3 ? 0 : i - 2)].imdb); }
-    snprintf(e[k].pessoaId, 96, "nuvio:fabi"); snprintf(e[k].pessoaNome, 64, "Fabi"); e[k].acao = SV_REACAO; e[k++].reacao = SV_REAC_GOSTOU;
-    snprintf(e[k].pessoaId, 96, "nuvio:rafa"); snprintf(e[k].pessoaNome, 64, "Rafa"); e[k++].acao = SV_FIM;
-    snprintf(e[k].pessoaId, 96, "nuvio:mari"); snprintf(e[k].pessoaNome, 64, "Mari"); e[k++].acao = SV_FIM;
-    snprintf(e[k].pessoaId, 96, "nuvio:mari"); snprintf(e[k].pessoaNome, 64, "Mari"); e[k++].acao = SV_FIM;
-    snprintf(e[k].pessoaId, 96, "nuvio:rafa"); snprintf(e[k].pessoaNome, 64, "Rafa"); e[k++].acao = SV_FIM;
-    snprintf(e[k].pessoaId, 96, "nuvio:leo"); snprintf(e[k].pessoaNome, 64, "Leo"); e[k++].acao = SV_FIM;
-    socialvis_definir_feed(e, 6);
-  }
   quadros(60, NULL);
   // NV_VISTOS=1 (#212): o selo de visto pelo HISTORICO, sem progresso. Dois
   // filmes de "Popular" pelo leitor de /sync/watched/movies (o corpo do Trakt)

@@ -1,6 +1,5 @@
 #include "progress.h"
 #include "idbase.h"
-#include "jfid.h"
 #include "dados.h"
 #include "perfis.h"
 #include <pthread.h>
@@ -271,7 +270,6 @@ int progress_write_local(const char *imdb, int season, int episode,
   ProgressRecord r;
   int i, ok;
   if (!imdb || !*imdb || !is_valid_time(pos_sec, dur_sec)) return 0;
-  if (jfid_e(imdb)) return 0;   // personal-server ids never sync to the account
   memset(&r, 0, sizeof r);
   {
     int s_id = 0, e_id = 0;

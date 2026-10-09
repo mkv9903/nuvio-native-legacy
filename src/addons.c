@@ -12,7 +12,6 @@
 #include "fontecache.h"
 #include "sessao.h"
 #include "perfis.h"
-#include "servidores.h"
 #include "badges.h"
 // So para a cache UNICA de manifesto (desc_manifesto_cache_obter/guardar): ver
 // a nota grande em sondar(), mais abaixo.
@@ -73,10 +72,6 @@ static unsigned versaoLista;   // ver addons_versao
 static _Atomic AddEstado estado = ADD_PARADO;
 static pthread_t fio;
 static char alvoId[64], alvoTipo[16];
-// The current target is a personal-server item (jfid.h: Jellyfin/Emby/Plex): sources come from the
-// server's PlaybackInfo, never from addons (an opaque server id must not
-// reach third-party addons).
-static int jfAlvo;
 // BASE DO ADDON QUE PUBLICOU O ALVO, quando se sabe (canal vindo do guia).
 // Com ela, a consulta vai SO a esse addon. Vazia = todos, como sempre foi.
 //
@@ -459,27 +454,6 @@ int addons_tem_catalogo(int i) {
 }
 AddEstado addons_estado(void) {
   AddEstado e = atomic_load(&estado);
-  if (jfAlvo) {
-    Stream *l = NULL;
-    int n = 0, r = servidores_fontes_colher(alvoId, &l, &n), i;
-    if (r == JF_FONTES_PENDENTE) return ADD_BUSCANDO;
-    jfAlvo = 0;
-    if (r == JF_FONTES_PRONTO) {
-      for (i = 0; i < n; i++) {
-        char t[2400];
-        snprintf(t, sizeof t, "%s %s", l[i].rotulo, l[i].descricao);
-        l[i].badges = badges_detectar(t);
-      }
-      stream_definir_lista(l, n);
-      printf("[addons] %d personal-server source(s)\n", n);
-    } else {
-      stream_definir_lista(NULL, 0);
-      printf("[addons] personal-server sources unavailable\n");
-    }
-    free(l);
-    estado = n ? ADD_PRONTO : ADD_VAZIO;
-    return atomic_load(&estado);
-  }
   // As respostas que ja chegaram vao para a folha antes de tudo (#221).
   progDrenar();
   // Publica no fio da UI: nenhum desenho observa uma lista parcialmente escrita.
@@ -1647,7 +1621,7 @@ static void dispararLegendas(int juntar);
 void addons_buscar_legendas(const char *imdb, const char *tipo) {
   int serie, juntar = 0;
   char id[64], tp[16];
-  if (!nAddon || !imdb || !*imdb || jfid_e(imdb)) return;   // never send server ids to addons
+  if (!nAddon || !imdb || !*imdb) return;
   serie = tipo && !strcmp(tipo, "series");
   if (serie && !idbase_tem_episodio(imdb))
     snprintf(id, sizeof id, idbase_e_imdb(imdb) ? "%s:1:1" : "%s:1", imdb);
@@ -1679,7 +1653,7 @@ void addons_legendas_fonte(const char *imdb, const char *tipo, const char *arqui
   int serie, juntar, manter;
   char id[64], tp[16];
   LegExtras novo;
-  if (!nAddon || !imdb || !*imdb || jfid_e(imdb)) return;
+  if (!nAddon || !imdb || !*imdb) return;
   serie = tipo && !strcmp(tipo, "series");
   if (serie && !idbase_tem_episodio(imdb))
     snprintf(id, sizeof id, idbase_e_imdb(imdb) ? "%s:1:1" : "%s:1", imdb);
@@ -2432,26 +2406,6 @@ void addons_definir_origem(const char *base) {
 static void buscarPedido(const char *imdb, const char *tipo, int forcar) {
   int serie, renovar;
   if (!imdb || !*imdb) return;
-  if (jfid_e(imdb)) {
-    // PERSONAL SERVER ITEM. No addon, no source cache, no "where to watch":
-    // the target is already the exact movie/episode item on that server.
-    if (fioVivo) {
-      snprintf(pendId, sizeof pendId, "%s", imdb);
-      snprintf(pendTipo, sizeof pendTipo, "%s", tipo ? tipo : "movie");
-      pendRenovar = forcar;
-      return;
-    }
-    resumo.valido = 0;
-    adotado = 0;
-    snprintf(alvoId, sizeof alvoId, "%s", imdb);
-    snprintf(alvoTipo, sizeof alvoTipo, "%s", tipo && *tipo ? tipo : "movie");
-    alvoBase[0] = 0;
-    stream_definir_lista(NULL, 0);
-    jfAlvo = servidores_fontes_pedir(alvoId);
-    estado = jfAlvo ? ADD_BUSCANDO : ADD_VAZIO;
-    return;
-  }
-  jfAlvo = 0;
   ondever_pedir(imdb, tipo && (!strcmp(tipo, "tv") || !strcmp(tipo, "series")), 0);
   resumo.valido = 0;
   // Recusa de conta do debrid vale por busca: a nova volta a tentar todos.
