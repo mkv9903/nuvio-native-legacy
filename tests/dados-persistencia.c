@@ -4,7 +4,7 @@ static char *fixture_getenv(const char *name) {
   return !strcmp(name, "HOME") || !strcmp(name, "NUVIO_DADOS") ? "/dev/null" : NULL;
 }
 #define getenv fixture_getenv
-#include "../src/dados.c"
+#include "../src/data.c"
 #undef getenv
 #include <stdio.h>
 

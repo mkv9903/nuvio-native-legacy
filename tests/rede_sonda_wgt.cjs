@@ -1,7 +1,7 @@
 // Executa o EM_JS da sonda com XHR falso; nao substitui teste na Samsung.
 const fs = require('node:fs');
 const assert = require('node:assert/strict');
-const source = fs.readFileSync('src/rede.c', 'utf8');
+const source = fs.readFileSync('src/net.c', 'utf8');
 const body = source.match(/EM_JS\(int, nv_url_sonda,[\s\S]*?, \{([\s\S]*?)\n\}\);/)[1];
 let resposta, destino, header, leuCorpo = 0;
 global.HEAP32 = new Int32Array(32);

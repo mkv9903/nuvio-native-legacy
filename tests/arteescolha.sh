@@ -28,7 +28,7 @@ for alvo in lg tizen; do
   if [ "$alvo" = tizen ]; then def=(-D__EMSCRIPTEN__); fi
   cc ${flags[@]+"${flags[@]}"} ${def[@]+"${def[@]}"} "${comum[@]}" -c src/artehero.c -o "$obj/hero-$alvo.o"
   cc ${flags[@]+"${flags[@]}"} ${def[@]+"${def[@]}"} "${comum[@]}" -c tests/arteescolha.c -o "$obj/teste-$alvo.o"
-  cc ${flags[@]+"${flags[@]}"} "${comum[@]}" src/arteescolha.c src/dados.c \
+  cc ${flags[@]+"${flags[@]}"} "${comum[@]}" src/arteescolha.c src/data.c \
     "$obj/hero-$alvo.o" "$obj/teste-$alvo.o" -o "$obj/arteesc-$alvo"
   find "$NUVIO_DADOS" -mindepth 1 -delete
   echo "== $alvo"

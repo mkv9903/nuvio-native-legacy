@@ -290,7 +290,7 @@ static void realDebrid(void) {
   OK("Real-Debrid: filme escolhe o maior video");
 
   // A URL RESOLVIDA E CREDENCIAL: quem tem o "/d/QQ/" baixa na conta de quem
-  // pediu. Este teste linka o rede_url_publica DE VERDADE (src/redeurl.c) em
+  // pediu. Este teste linka o rede_url_publica DE VERDADE (src/net_url.c) em
   // vez de um stub — com stub, uma regressao que passasse a imprimir o link
   // inteiro sairia verde.
   { char seg[120];

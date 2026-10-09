@@ -1,5 +1,5 @@
 #define NV_DADOS_TEST 1
-#include "../src/dados.c"
+#include "../src/data.c"
 
 int main(void) {
   if (sujo || sujoLeve || dados_sync_falhas || dados_sync_sucessos) return 1;

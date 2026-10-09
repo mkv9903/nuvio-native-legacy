@@ -8,7 +8,7 @@
 // seta apagada aquele webOS nao manda movimento: o limiar da seta nunca vence
 // e o ponteiro nao volta. 12 vezes numa sessao, 3 movimentos, 0 cliques.
 //
-// Compila src/ponteiro.c com -DNV_PONT_WEBOS_TESTE (o ramo do webOS) e uma
+// Compila src/pointer.c com -DNV_PONT_WEBOS_TESTE (o ramo do webOS) e uma
 // SDL_webOSCursorVisibility de mentira que guarda o ultimo pedido.
 #include "ponteiro.h"
 #include "gfx.h"

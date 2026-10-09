@@ -1,6 +1,6 @@
 #!/bin/bash
 # TESTE DE VELOCIDADE do diagnostico: a conta (src/vazao.c) e a medida
-# (rede_medir_vazao em src/rede.c) contra um servidor HTTP local com Range e
+# (rede_medir_vazao em src/net.c) contra um servidor HTTP local com Range e
 # vazao LIMITADA, sem rede de fora:
 #   /lento     arquivo "de 1 GB" (nada alocado) a 1 MB/s, com Range 206/416
 #   /redir     302 para /lento (o endereco final volta para quem chama)
@@ -20,7 +20,7 @@ DIR=$(mktemp -d /tmp/nuvio-vazao.XXXXXX)
 SRV=
 trap 'if [ -n "$SRV" ]; then kill $SRV 2>/dev/null || true; fi; rm -rf "$DIR"' EXIT
 
-cc -Isrc tests/vazao.c src/vazao.c src/rede.c src/redeurl.c -lpthread \
+cc -Isrc tests/vazao.c src/vazao.c src/net.c src/net_url.c -lpthread \
   -o "$DIR/t" -O1 -g -Wall -Wextra
 
 # A regra do ciclo completo e do "por add-on" (selecao, agendador de uma fonte

@@ -3,7 +3,7 @@
 #
 # Gera o MKV AQUI (ffmpeg do Homebrew: 2 min de testsrc2 + sine + um .ass com
 # 40 Dialogue, com \an8 e \pos), serve por tests/servidor_range.py e roda o
-# teste contra src/mkvass.c + src/legenda.c + src/rede.c + src/dados.c —
+# teste contra src/mkvass.c + src/legenda.c + src/net.c + src/data.c —
 # sem SDL. Nada de rede externa.
 #   bash tests/mkvass.sh
 set -eu
@@ -101,7 +101,7 @@ PORTA=$(awk '/porta/{print $2}' "$DIR/porta.txt")
 
 # Janela da VARREDURA em 30 s (padrao 120) para a fixture de 120 s poder
 # provar que os bytes lidos sao proporcionais a janela, nao ao arquivo.
-cc -Isrc -DMKVASS_VARRE_JANELA_SEG=30.0 tests/mkvass.c src/mkvass.c src/assrender.c src/legenda.c src/rede.c src/redeurl.c src/dados.c src/mkv.c \
+cc -Isrc -DMKVASS_VARRE_JANELA_SEG=30.0 tests/mkvass.c src/mkvass.c src/assrender.c src/legenda.c src/net.c src/net_url.c src/data.c src/mkv.c \
   -o /tmp/nuvio-mkvass-tests -O1 -g -Wall -I/opt/homebrew/include \
   -Wno-deprecated-declarations
 mkdir -p "$DIR/dados"

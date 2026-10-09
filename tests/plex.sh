@@ -27,7 +27,7 @@ if [ "${NV_SANITIZERS:-0}" = 1 ]; then flags+=(-fsanitize=address,undefined -fno
 if [ "${NV_TSAN:-0}" = 1 ]; then flags+=(-fsanitize=thread -fno-omit-frame-pointer); fi
 # plex.tv is the fake too: the override is compile-time only.
 flags+=("-DNV_PX_TV=\"$base\"")
-cc "${flags[@]}" tests/plex.c src/plex.c src/jellyfin.c src/rede.c src/redeurl.c src/js.c src/jsw.c \
+cc "${flags[@]}" tests/plex.c src/plex.c src/jellyfin.c src/net.c src/net_url.c src/js.c src/jsw.c \
   -o "$tmp/teste"
 "$tmp/teste" "$base" "$tmp/dados" > "$tmp/log" 2>&1 || { cat "$tmp/log"; exit 1; }
 # Logs carry operation/status/latency only: no token, private path, e-mail or address.

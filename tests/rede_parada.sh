@@ -66,6 +66,6 @@ s.serve_forever()
 PY
 SRV=$!
 for i in $(seq 50); do [ -s "$DIR/porta" ] && break; sleep 0.1; done
-cc -Isrc tests/rede_parada.c src/rede.c src/redeurl.c -lpthread -o "$DIR/t" -O1 -g -Wall
+cc -Isrc tests/rede_parada.c src/net.c src/net_url.c -lpthread -o "$DIR/t" -O1 -g -Wall
 # Limite de ociosidade curto so para o teste nao demorar (o padrao e 20 s).
 NUVIO_REDE_OCIOSO_MS=1000 "$DIR/t" "$(cat "$DIR/porta")"

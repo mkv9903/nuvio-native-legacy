@@ -9,7 +9,7 @@ tmp="$(mktemp -d "${TMPDIR:-/tmp}/nuvio-avisodisp-XXXXXX")"
 trap 'rm -rf "$tmp"' EXIT
 flags=()
 if [ "${SANITIZE:-0}" = 1 ]; then flags+=(-fsanitize=address,undefined -fno-omit-frame-pointer); fi
-cc ${flags[@]+"${flags[@]}"} src/avisodisp.c src/dados.c tests/avisodisp.c -Isrc -o "$tmp/unidade" \
+cc ${flags[@]+"${flags[@]}"} src/avisodisp.c src/data.c tests/avisodisp.c -Isrc -o "$tmp/unidade" \
   -O1 -g -Wall -Wextra
 mkdir -p "$tmp/nuvio-avisodisp-1"
 NUVIO_DADOS="$tmp/nuvio-avisodisp-1" "$tmp/unidade" | grep -v "^\[dados\]"

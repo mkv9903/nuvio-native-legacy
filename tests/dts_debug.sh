@@ -11,7 +11,7 @@ for mode in production debug; do
     -Wl,--gc-sections -pthread -lm -o "$TMP/identity"
   "$TMP/identity"
   ${CC:-cc} -std=gnu11 -Wall -Wextra -Wno-format-truncation -Isrc $FLAGS \
-    tests/dts_debug_data.c src/dados.c -pthread -o "$TMP/data"
+    tests/dts_debug_data.c src/data.c -pthread -o "$TMP/data"
   mkdir "$TMP/$mode"
   "$TMP/data" "$TMP/$mode" env
   "$TMP/data" "$TMP/$mode" home

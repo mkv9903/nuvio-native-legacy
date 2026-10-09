@@ -12,7 +12,7 @@ static void *medirRealloc(void *p, size_t n) {
   return falhar ? NULL : realloc(p, n);
 }
 #define realloc medirRealloc
-#include "../src/rede.c"
+#include "../src/net.c"
 #undef realloc
 
 int main(void) {

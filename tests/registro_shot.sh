@@ -20,7 +20,7 @@ trap 'rm -rf "$NUVIO_DADOS" "$B"' EXIT
 
 sources=()
 for source in src/*.c src/dts/*.c; do
-  case "$source" in src/main.c|src/registro.c) continue;; esac
+  case "$source" in src/main.c|src/log.c) continue;; esac
   sources+=("$source")
 done
 cc "${sources[@]}" tests/registro_shot.c -Isrc -Itests -o "$B" \

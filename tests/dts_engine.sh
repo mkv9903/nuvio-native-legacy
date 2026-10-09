@@ -73,7 +73,7 @@ with open(sys.argv[2],'wb') as out:
     out.seek(ftyp+gap); out.write(source[ftyp:])
 PY
 ${CC:-gcc} -std=gnu11 -Wall -Wextra -Werror -Wno-misleading-indentation -DNV_DTS_FFMPEG -DDTS_ENGINE_HTTP -I"$PREFIX/include" \
-  src/dts/dts_engine.c tests/dts_engine.c src/rede.c src/redeurl.c -o "$TMP/http-engine" \
+  src/dts/dts_engine.c tests/dts_engine.c src/net.c src/net_url.c -o "$TMP/http-engine" \
   -L"$PREFIX/lib" -Wl,--start-group -lavformat -lavcodec -lswresample -lavutil -Wl,--end-group -lm -lpthread -ldl
 python3 tests/dts_engine_server.py "$TMP" "$TMP/port" "$TMP/requests" &
 SERVER_PID=$!
@@ -90,13 +90,13 @@ with open(sys.argv[1].replace("range.bin", "prefetch.bin"),"wb") as out:
     out.write((pattern*((count+250)//251))[:count])
 PY
 ${CC:-gcc} -std=gnu11 -Wall -Wextra -Werror -Wno-misleading-indentation -I"$PREFIX/include" \
-  tests/dts_engine_avio.c src/rede.c src/redeurl.c -o "$TMP/range" \
+  tests/dts_engine_avio.c src/net.c src/net_url.c -o "$TMP/range" \
   -L"$PREFIX/lib" -Wl,--start-group -lavformat -lavcodec -lswresample -lavutil -Wl,--end-group -lm -lpthread -ldl
 "$TMP/range" "http://127.0.0.1:$PORT/parallel/range.bin"
 "$TMP/range" "http://127.0.0.1:$PORT/slow/range.bin"
 "$TMP/range" "http://127.0.0.1:$PORT/prefetch/prefetch.bin"
 ${CC:-gcc} -std=gnu11 -Wall -Wextra -Werror -Wno-misleading-indentation -DRANGE_WORKERS=1 -I"$PREFIX/include" \
-  tests/dts_engine_avio.c src/rede.c src/redeurl.c -o "$TMP/serial-range" \
+  tests/dts_engine_avio.c src/net.c src/net_url.c -o "$TMP/serial-range" \
   -L"$PREFIX/lib" -Wl,--start-group -lavformat -lavcodec -lswresample -lavutil -Wl,--end-group -lm -lpthread -ldl
 "$TMP/serial-range" "http://127.0.0.1:$PORT/parallel/range.bin"
 "$TMP/serial-range" "http://127.0.0.1:$PORT/prefetch/prefetch.bin"

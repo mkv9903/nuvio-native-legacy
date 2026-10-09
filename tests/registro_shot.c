@@ -9,7 +9,7 @@
 // _AJ, _TEL (os fundos do mockup) ou a embarcada. NUVIO_SHOT_VIDRO=0 = solido.
 // Uso: bash tests/registro_shot.sh <pasta> [ids...]
 #define REGISTRO_TESTE 1
-#include "../src/registro.c"
+#include "../src/log.c"
 #include "registro_shot_sessao.h"
 #include "shot_arte.h"
 #include "ilha.h"

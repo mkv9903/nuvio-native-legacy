@@ -13,7 +13,7 @@ static void *alocar(void *p, size_t n) {
   return falhar ? NULL : realloc(p, n);
 }
 #define realloc alocar
-#include "../src/rede.c"
+#include "../src/net.c"
 #undef realloc
 int main(void) {
   RedePedido p = {0}; RedeResposta r = {0}; PedidoCtx c = {0};

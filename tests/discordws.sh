@@ -9,6 +9,6 @@ flags=(-O1 -g -Isrc -ffunction-sections -fdata-sections -Wl,-dead_strip \
        -I/opt/homebrew/include -I/opt/homebrew/include/SDL2 \
        -Wno-deprecated-declarations -Wno-macro-redefined)
 if [ "${SANITIZE:-0}" = 1 ]; then flags+=(-fsanitize=address,undefined -fno-omit-frame-pointer); fi
-cc "${flags[@]}" src/discordws.c src/rede.c src/js.c tests/discordws.c -o /tmp/nuvio-discordws-tests
+cc "${flags[@]}" src/discordws.c src/net.c src/js.c tests/discordws.c -o /tmp/nuvio-discordws-tests
 /tmp/nuvio-discordws-tests | tee /dev/stderr | grep -q 'discordws: ok'
 echo "discordws.sh: ok"

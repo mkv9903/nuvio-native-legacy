@@ -1,7 +1,7 @@
 'use strict';
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
-const src = fs.readFileSync('src/rede.c', 'utf8');
+const src = fs.readFileSync('src/net.c', 'utf8');
 const found = src.match(/EM_JS\(char \*, nv_http,[\s\S]*?, \{([\s\S]*?)\n\}\);/);
 assert(found, 'production nv_http body');
 const heap = new ArrayBuffer(4096);

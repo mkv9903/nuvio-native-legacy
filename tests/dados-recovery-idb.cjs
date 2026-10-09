@@ -4,7 +4,7 @@ const path = require('node:path');
 const { chromium } = require('playwright');
 
 const root = path.resolve(__dirname, '..');
-const source = fs.readFileSync(path.join(root, 'src/dados.c'), 'utf8');
+const source = fs.readFileSync(path.join(root, 'src/data.c'), 'utf8');
 
 function emAsyncBody(name) {
   const start = source.indexOf(`EM_ASYNC_JS(int, ${name},`);

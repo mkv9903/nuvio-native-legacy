@@ -14,6 +14,6 @@ bin="$NUVIO_DADOS.bin"
 trap 'rm -rf "$NUVIO_DADOS" "$bin"' EXIT
 flags=()
 if [ "${SANITIZE:-0}" = 1 ]; then flags+=(-fsanitize=address,undefined -fno-omit-frame-pointer); fi
-cc tests/buscasrec.c src/buscasrec.c src/dados.c -Isrc -o "$bin" -Wall -Wextra \
+cc tests/buscasrec.c src/buscasrec.c src/data.c -Isrc -o "$bin" -Wall -Wextra \
   ${flags[@]+"${flags[@]}"}
 "$bin"

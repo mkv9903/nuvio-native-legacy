@@ -25,7 +25,7 @@ T=$(mktemp -d /tmp/nv-p2pmotor-real.XXXXXX); trap 'rm -rf "$T"' EXIT
 san=()
 if [ "${SANITIZE:-0}" = 1 ]; then san=(-fsanitize=address,undefined -fno-omit-frame-pointer)
 elif [ "${SANITIZE:-0}" = thread ]; then san=(-fsanitize=thread -fno-omit-frame-pointer); fi
-for f in tests/p2pmotor_real.c src/p2p.c src/p2pmotor.c src/p2pmotor_motor.c src/js.c src/rede.c src/redeurl.c src/dados.c; do
+for f in tests/p2pmotor_real.c src/p2p.c src/p2pmotor.c src/p2pmotor_motor.c src/js.c src/net.c src/net_url.c src/data.c; do
   cc -c -O1 -g "${san[@]}" -DNV_P2P_MOTOR -Isrc -I"$E/include" -I/opt/homebrew/include -I/opt/homebrew/include/SDL2 \
     -Wno-deprecated-declarations "$f" -o "$T/$(basename "${f%.c}").o"
 done

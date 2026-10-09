@@ -3,7 +3,7 @@
 //
 //   bash tests/ponteiro.sh
 //
-// Compila so src/ponteiro.c. O desenho do cursor usa gfx_cor e o recorte, que
+// Compila so src/pointer.c. O desenho do cursor usa gfx_cor e o recorte, que
 // aqui sao de mentira: o que se testa e a decisao (qual alvo, qual tecla), nao
 // o pixel. O relogio e a janela sao injetados para o teste nao depender de SDL
 // de video nem de tempo real.

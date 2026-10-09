@@ -11,7 +11,7 @@ cd "$(dirname "$0")/.."
 flags=()
 if [ "${SANITIZE:-1}" = 1 ]; then flags+=(-fsanitize=address,undefined -fno-omit-frame-pointer); fi
 cc ${flags[@]+"${flags[@]}"} -DNV_CAT_TEST_CACHE_MEIO=nv_cat_teste_cache_meio \
-  src/catalogo.c src/contalib.c src/js.c src/vistoep.c src/colecoes.c src/redeurl.c \
+  src/catalogo.c src/contalib.c src/js.c src/vistoep.c src/colecoes.c src/net_url.c \
   tests/catcachecorrida.c \
   -Isrc -o /tmp/nuvio-catcachecorrida-tests -O1 -g -pthread \
   -Wall -Wno-deprecated-declarations -Wno-macro-redefined

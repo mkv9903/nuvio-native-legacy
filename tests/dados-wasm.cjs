@@ -11,7 +11,7 @@ const { chromium } = require('playwright');
   let server, browser;
   try {
     const emcc = process.env.EMCC || path.join(os.homedir(), 'emsdk/upstream/emscripten/emcc');
-    const build = spawnSync(emcc, [path.resolve(__dirname, '../src/dados.c'), '-pthread',
+    const build = spawnSync(emcc, [path.resolve(__dirname, '../src/data.c'), '-pthread',
       '-sASYNCIFY=1', '-lidbfs.js', '--no-entry', '-sALLOW_MEMORY_GROWTH=1',
       '-sEXPORTED_FUNCTIONS=["_dados_iniciar","_dados_gravar","_dados_sincronizar","_dados_persistente"]',
       '-sEXPORTED_RUNTIME_METHODS=["ccall","FS"]', '-o', path.join(dir, 'dados.js')], { encoding: 'utf8' });

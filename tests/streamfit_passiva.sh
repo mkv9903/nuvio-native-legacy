@@ -11,6 +11,6 @@ case "${SANITIZE:-0}" in
   thread) flags+=(-fsanitize=thread -fno-omit-frame-pointer);;
 esac
 cc "${flags[@]}" tests/streamfit_passiva.c src/streamfit.c src/streamfitpassiva.c src/streamfitdur.c \
-  src/redemarca.c src/vazao.c -o "$dir/test"
+  src/net_epoch.c src/vazao.c -o "$dir/test"
 "$dir/test" > "$dir/out"
 grep -c "passive accepted" "$dir/out" >/dev/null

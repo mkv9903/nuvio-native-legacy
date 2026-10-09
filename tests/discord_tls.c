@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "../src/rede.c"
+#include "../src/net.c"
 typedef struct { long peer, host, redirects; const char *ca; } Fake;
 static int cleaned, performed, transportError, attempts;
 static void *init(void) { return calloc(1, sizeof(Fake)); }

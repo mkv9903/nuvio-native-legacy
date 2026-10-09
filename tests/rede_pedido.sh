@@ -20,13 +20,13 @@ if [ "${NV_TSAN:-0}" = 1 ]; then flags+=(-fsanitize=thread -fno-omit-frame-point
 if [ "${NV_TPK40_TEST:-0}" = 1 ]; then
   printf '%s\n' 'void nv_tpk40_etapa(const char *);' > "$tmp/tpk40.h"
   flags+=(-DNV_TPK40 -include "$tmp/tpk40.h")
-  cc "${flags[@]}" -c src/rede.c -o "$tmp/rede40.o"
+  cc "${flags[@]}" -c src/net.c -o "$tmp/rede40.o"
   if nm "$tmp/rede40.o" | rg 'tlv_bootstrap|tls_get_addr|emutls'; then
     echo 'TPK40 compiler TLS detected' >&2; exit 1
   fi
 fi
-cc "${flags[@]}" tests/rede_pedido.c src/rede.c src/redeurl.c -o "$tmp/teste"
+cc "${flags[@]}" tests/rede_pedido.c src/net.c src/net_url.c -o "$tmp/teste"
 "$tmp/teste" "$base" "$tlsbase" "$tmp/cert.pem"
-cc "${flags[@]}" tests/rede_pedido_buffer.c src/redeurl.c -o "$tmp/buffer"
+cc "${flags[@]}" tests/rede_pedido_buffer.c src/net_url.c -o "$tmp/buffer"
 "$tmp/buffer"
 node tests/rede_retry_wgt.cjs
