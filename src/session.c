@@ -19,8 +19,16 @@
 // battery and shows a dead code on screen.
 #define LOGIN_TIMEOUT_MS 600000
 
-static char access_token[3000];
-static char refresh_token[3000];
+// Never hold token_lock across network calls. Lock order: token_lock -> data.
+// One worker refreshes; waiters reuse its result and every request owns a copy.
+static pthread_mutex_t token_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t refresh_cond = PTHREAD_COND_INITIALIZER;
+static int refreshing;
+static unsigned refresh_generation;
+static int refresh_result, refresh_http_status;
+#define TOKEN_MAX 3000
+static char access_token[TOKEN_MAX];
+static char refresh_token[TOKEN_MAX];
 static char sub[80];
 static int  is_anonymous;          // 1 when token belongs to anonymous session
 static long expires_at;            // `exp` from JWT, in seconds
@@ -73,22 +81,21 @@ static int b64url(const char *s, size_t n, char *dst, size_t size) {
 // Reads `sub` and `exp` from payload. Without this the app does not know who
 // owns the session or when it expires, discovering only upon 401 — after the
 // operation has already failed once.
+// Called under token_lock, or during initialization before workers exist.
+// Keep sub unchanged during refresh so existing user-ID readers stay stable.
 static void parse_jwt(const char *token) {
   const char *p1, *p2;
-  char payload[2200];
-  sub[0] = 0;
-  expires_at = 0;
-  if (!token || !*token) return;
-  p1 = strchr(token, '.');
-  if (!p1) return;
-  p2 = strchr(p1 + 1, '.');
-  if (!p2) return;
-  if (!b64url(p1 + 1, (size_t)(p2 - p1 - 1), payload, sizeof payload)) return;
-  {
-    const char *end = payload + strlen(payload);
-    js_texto(payload, end, "sub", sub, sizeof sub);
-    expires_at = (long)js_num(payload, end, "exp", 0);
+  char payload[2200], s[sizeof sub];
+  long exp = 0;
+  s[0] = 0;
+  if (token && *token && (p1 = strchr(token, '.')) && (p2 = strchr(p1 + 1, '.')) &&
+      b64url(p1 + 1, (size_t)(p2 - p1 - 1), payload, sizeof payload)) {
+    const char *fim = payload + strlen(payload);
+    js_texto(payload, fim, "sub", s, sizeof s);
+    exp = (long)js_num(payload, fim, "exp", 0);
   }
+  if (strcmp(sub, s)) snprintf(sub, sizeof sub, "%s", s);
+  expires_at = exp;
 }
 
 // JWT format check (three non-empty parts, no spaces): format only, signature
@@ -153,29 +160,48 @@ static void clear_session(void) {
 // Stores tokens from an auth response. Handles three formats:
 // /auth/v1/signup, /auth/v1/token, and exchange function — all return
 // access_token/refresh_token, either at root or nested under "session".
-static int store_tokens(const char *body, int anonymous_flag) {
-  const char *end, *ses;
-  char a[3000], r[3000];
-  if (!body) return 0;
-  end = body + strlen(body);
+// Parse outside the lock; publish and save a complete token pair together.
+static int extract_tokens(const char *corpo, char *a, char *r ) {
+  const char *fim, *ses;
+  if (!corpo) return 0;
+  fim = corpo + strlen(corpo);
   a[0] = r[0] = 0;
-  js_texto(body, end, "access_token", a, sizeof a);
-  js_texto(body, end, "refresh_token", r, sizeof r);
+  js_texto(corpo, fim, "access_token", a, TOKEN_MAX);
+  js_texto(corpo, fim, "refresh_token", r, TOKEN_MAX);
   if (!a[0]) {
-    ses = strstr(body, "\"session\"");
+    ses = strstr(corpo, "\"session\"");
     if (ses) {
-      js_texto(ses, end, "access_token", a, sizeof a);
-      js_texto(ses, end, "refresh_token", r, sizeof r);
+      js_texto(ses, fim, "access_token", a, TOKEN_MAX);
+      js_texto(ses, fim, "refresh_token", r, TOKEN_MAX);
     }
   }
-  if (!a[0] || !is_valid_jwt(a)) return 0;
-  // ATOMIC (#223): existing tokens only replaced when new response is complete.
+  return a[0] && is_valid_jwt(a);
+}
+
+// token_lock held; saving follows the token_lock -> data lock order.
+static void save_tokens_locked(const char *a, const char *r, int anonymous_flag) {
+
   snprintf(access_token, sizeof access_token, "%s", a);
   snprintf(refresh_token, sizeof refresh_token, "%s", r);
   is_anonymous = anonymous_flag ? 1 : 0;
   parse_jwt(access_token);
   save_session();
+}
+
+static int store_tokens(const char *corpo, int anonymous_flag) {
+  char a[TOKEN_MAX], r[TOKEN_MAX];
+  a[0] = r[0] = 0;
+  if (!extract_tokens(corpo, a, r)) return 0;
+  pthread_mutex_lock(&token_lock);
+  save_tokens_locked(a, r, anonymous_flag);
+  pthread_mutex_unlock(&token_lock);
   return 1;
+}
+
+static void copy_access_token(char *dst, size_t n) {
+  pthread_mutex_lock(&token_lock);
+  snprintf(dst, n, "%s", access_token);
+  pthread_mutex_unlock(&token_lock);
 }
 
 // ---------------------------------------------------------------- anonymous
@@ -200,66 +226,121 @@ static int anonymous_session(void) {
 
 // ---------------------------------------------------------------- refresh
 
-// HTTP status of last refresh, so caller gets real cause (504 on refresh != 401 on RPC).
-static int refresh_status;
+static void zero_memory(volatile char *p, size_t n) { while (n--) *p++ = 0; }
 
-// 1 = refreshed; 0 = rejected (session terminated); -1 = server unresponsive (session KEPT).
-static int refresh_token_call(void) {
+// The observed token identifies the failed request. Waiters reuse one refresh
+// result; an old response must not overwrite or clear a newer login.
+static int refresh_token_call(const char *observed_token, int *status_out) {
   Jsw w;
   char *resp;
-  int st = 0, ok;
-  refresh_status = 0;
-  if (!refresh_token[0]) return 0;
+  char r[TOKEN_MAX], a2[TOKEN_MAX], r2[TOKEN_MAX];
+  int st = 0, ok, ehAnon;
+  *status_out = 0;
+  pthread_mutex_lock(&token_lock);
+  for (;;) {
+    if (observed_token ? (access_token[0] && strcmp(access_token, observed_token)) : (access_token[0] && !is_expired())) {
+      pthread_mutex_unlock(&token_lock);
+      return 1;
+    }
+    if (!refresh_token[0]) { pthread_mutex_unlock(&token_lock); return 0; }
+    if (!refreshing) break;
+    { unsigned minha = refresh_generation;
+      while (refreshing && refresh_generation == minha) pthread_cond_wait(&refresh_cond, &token_lock);
+      if (refresh_generation != minha && refresh_result <= 0) {
+
+        int res = refresh_result;
+        *status_out = refresh_http_status;
+        pthread_mutex_unlock(&token_lock);
+        return res;
+      }
+    }
+
+  }
+  refreshing = 1;
+  snprintf(r, sizeof r, "%s", refresh_token);
+  ehAnon = is_anonymous;
+  pthread_mutex_unlock(&token_lock);
+
   jsw_iniciar(&w);
   jsw_obj_ini(&w);
-  jsw_cs(&w, "refresh_token", refresh_token);
+  jsw_cs(&w, "refresh_token", r);
   jsw_obj_fim(&w);
   resp = nuvem_post("/auth/v1/token?grant_type=refresh_token",
                     jsw_texto_final(&w), NULL, &st);
   jsw_livre(&w);
-  ok = (resp && st >= 200 && st < 300 && store_tokens(resp, is_anonymous));
+  ok = (resp && st >= 200 && st < 300 && extract_tokens(resp, a2, r2));
   free(resp);
-  refresh_status = st;
-  if (!ok && is_server_failure(st)) {
-    // SERVER OUTAGE, NOT INVALID TOKEN (#215). Only explicit 4xx terminates session.
-    printf("[session] refresh without response from server (HTTP %d): session retained\n", st);
-    nuvem_falhou();
-    return -1;
-  }
-  if (!ok) {
-    // Rejected refresh terminates session permanently.
+
+  pthread_mutex_lock(&token_lock);
+
+  if (strcmp(refresh_token, r)) {
+    refresh_result = 1;
+  } else if (ok) {
+    save_tokens_locked(a2, r2, ehAnon);
+    refresh_result = 1;
+  } else if (is_server_failure(st)) {
+    refresh_result = -1;
+  } else {
+
     printf("[session] refresh rejected (HTTP %d): logging out\n", st);
     clear_session();
     dados_apagar(SESSION_FILE);
     state = SESSION_LOGGED_OUT;
+    refresh_result = 0;
+  }
+  refresh_http_status = st;
+  refresh_generation++;
+  refreshing = 0;
+  ok = refresh_result;
+  pthread_cond_broadcast(&refresh_cond);
+  pthread_mutex_unlock(&token_lock);
+  zero_memory(r, sizeof r);
+  *status_out = st;
+  if (ok < 0) {
+
+    printf("[session] refresh without response from server (HTTP %d): session retained\n", st);
+    nuvem_falhou();
   }
   return ok;
 }
 
-// ---------------------------------------------------------------- RPC
-
-static char *invoke_cloud(const char *path, const char *body, int *status) {
+// Share the same refresh/copy path for POST requests and table reads.
+static char *request_cloud(int tabela, const char *a1, const char *a2, int *status) {
+  char tok[TOKEN_MAX];
   char *resp;
-  int st = 0;
+  int st = 0, precisa, temR;
   if (!nuvem_pronta()) { if (status) *status = 0; return NULL; }
-  // Expired token and server unresponsive on refresh: don't attempt RPC.
-  if (is_expired() && refresh_token[0] && refresh_token_call() < 0) {
-    if (status) *status = refresh_status;
-    return NULL;
+
+  pthread_mutex_lock(&token_lock);
+  precisa = is_expired() && refresh_token[0];
+  pthread_mutex_unlock(&token_lock);
+  if (precisa) {
+    int stR;
+    if (refresh_token_call(NULL, &stR) < 0) { if (status) *status = stR; return NULL; }
   }
-  resp = nuvem_post(path, body, access_token, &st);
-  if (st == 401 && refresh_token[0]) {
-    int rr;
+  copy_access_token(tok, sizeof tok);
+  resp = tabela ? nuvem_tabela(a1, a2, tok, &st) : nuvem_post(a1, a2, tok, &st);
+  pthread_mutex_lock(&token_lock);
+  temR = refresh_token[0] != 0;
+  pthread_mutex_unlock(&token_lock);
+  if (st == 401 && temR) {
+    int rr, stR;
     free(resp);
-    rr = refresh_token_call();
-    if (rr <= 0) { if (status) *status = rr < 0 ? refresh_status : 401; return NULL; }
-    resp = nuvem_post(path, body, access_token, &st);
+    rr = refresh_token_call(tok, &stR);
+    if (rr <= 0) { if (status) *status = rr < 0 ? stR : 401; return NULL; }
+    copy_access_token(tok, sizeof tok);
+    resp = tabela ? nuvem_tabela(a1, a2, tok, &st) : nuvem_post(a1, a2, tok, &st);
   }
+  zero_memory(tok, sizeof tok);
   if (status) *status = st;
-  // 429 also triggers backoff.
+
   if (!resp || st == 0 || st == 429 || st >= 500) nuvem_falhou();
   else nuvem_ok();
   return resp;
+}
+
+static char *invoke_cloud(const char *caminho, const char *corpo, int *status) {
+  return request_cloud(0, caminho, corpo, status);
 }
 
 char *session_rpc(const char *function_name, const char *body_json, int *status) {
@@ -270,25 +351,7 @@ char *session_rpc(const char *function_name, const char *body_json, int *status)
 }
 
 char *session_table(const char *table_name, const char *query, int *status) {
-  char *resp;
-  int st = 0;
-  if (!nuvem_pronta()) { if (status) *status = 0; return NULL; }
-  if (is_expired() && refresh_token[0] && refresh_token_call() < 0) {
-    if (status) *status = refresh_status;
-    return NULL;
-  }
-  resp = nuvem_tabela(table_name, query, access_token, &st);
-  if (st == 401 && refresh_token[0]) {
-    int rr;
-    free(resp);
-    rr = refresh_token_call();
-    if (rr <= 0) { if (status) *status = rr < 0 ? refresh_status : 401; return NULL; }
-    resp = nuvem_tabela(table_name, query, access_token, &st);
-  }
-  if (status) *status = st;
-  if (!resp || st == 0 || st == 429 || st >= 500) nuvem_falhou();
-  else nuvem_ok();
-  return resp;
+  return request_cloud(1, table_name, query, status);
 }
 
 char *session_function(const char *name, const char *body_json, int *status) {
@@ -304,13 +367,17 @@ char *session_function(const char *name, const char *body_json, int *status) {
 static void *thread_request(void *u) {
   Jsw w;
   char *resp;
-  int st = 0;
+  char tok[TOKEN_MAX];
+  int st = 0, needs_anonymous;
   (void)u;
   error_msg[0] = 0;
   code[0] = 0;
   login_url[0] = 0;
 
-  if (!access_token[0] || (is_anonymous && is_expired())) {
+  pthread_mutex_lock(&token_lock);
+  needs_anonymous = !access_token[0] || (is_anonymous && is_expired());
+  pthread_mutex_unlock(&token_lock);
+  if (needs_anonymous) {
     if (!anonymous_session()) { state = SESSION_ERROR; step_done = 1; return NULL; }
   }
 
@@ -322,6 +389,8 @@ static void *thread_request(void *u) {
     return NULL;
   }
 
+  copy_access_token(tok, sizeof tok);
+
   // Nonce MUST be a UUID.
   dados_uuid(nonce, sizeof nonce);
 
@@ -331,7 +400,7 @@ static void *thread_request(void *u) {
   jsw_cs(&w, "p_redirect_base_url", nuvem_base_login());
   jsw_cs(&w, "p_device_name", "LG webOS (Nuvio native)");
   jsw_obj_fim(&w);
-  resp = nuvem_rpc_com("start_tv_login_session", jsw_texto_final(&w), access_token, &st);
+  resp = nuvem_rpc_com("start_tv_login_session", jsw_texto_final(&w), tok, &st);
 
   // Older servers reject p_device_name; retry without it.
   if (resp && nuvem_erro_ausente(resp)) {
@@ -342,7 +411,7 @@ static void *thread_request(void *u) {
     jsw_cs(&w, "p_device_nonce", nonce);
     jsw_cs(&w, "p_redirect_base_url", nuvem_base_login());
     jsw_obj_fim(&w);
-    resp = nuvem_rpc_com("start_tv_login_session", jsw_texto_final(&w), access_token, &st);
+    resp = nuvem_rpc_com("start_tv_login_session", jsw_texto_final(&w), tok, &st);
   }
   jsw_livre(&w);
 
@@ -370,6 +439,7 @@ static void *thread_request(void *u) {
     if (!email_requested && state != SESSION_EMAIL) state = SESSION_WAITING;
   }
   free(resp);
+  zero_memory(tok, sizeof tok);
   step_done = 1;
   return NULL;
 }
@@ -379,15 +449,16 @@ static void *thread_poll(void *u) {
   Jsw w;
   char *resp;
   int st = 0;
-  char status[48];
+  char status[48], tok[TOKEN_MAX];
   (void)u;
+  copy_access_token(tok, sizeof tok);
 
   jsw_iniciar(&w);
   jsw_obj_ini(&w);
   jsw_cs(&w, "p_code", code);
   jsw_cs(&w, "p_device_nonce", nonce);
   jsw_obj_fim(&w);
-  resp = nuvem_rpc_com("poll_tv_login_session", jsw_texto_final(&w), access_token, &st);
+  resp = nuvem_rpc_com("poll_tv_login_session", jsw_texto_final(&w), tok, &st);
   jsw_livre(&w);
 
   status[0] = 0;
@@ -404,7 +475,7 @@ static void *thread_poll(void *u) {
     jsw_cs(&w, "device_nonce", nonce);
     jsw_obj_fim(&w);
     resp = nuvem_post("/functions/v1/tv-logins-exchange", jsw_texto_final(&w),
-                      access_token, &st);
+                      tok, &st);
     jsw_livre(&w);
     if (resp && st >= 200 && st < 300 && store_tokens(resp, 0)) {
       state = SESSION_LOGGED_IN;
@@ -423,13 +494,12 @@ static void *thread_poll(void *u) {
     snprintf(error_msg, sizeof error_msg, "o código expirou");
     state = SESSION_ERROR;
   }
+  zero_memory(tok, sizeof tok);
   step_done = 1;
   return NULL;
 }
 
 // ---------------------------------------------------------------- email
-
-static void zero_memory(volatile char *p, size_t n) { while (n--) *p++ = 0; }
 
 void session_email_error_from(int st, const char *body, char *dst, unsigned size) {
   char cod[80], desc[200];
@@ -548,12 +618,26 @@ void session_init(void) {
 }
 
 SessionState session_state(void)        { return state; }
-int          session_is_logged_in(void) { return access_token[0] != 0 && !is_anonymous; }
+int session_is_logged_in(void) {
+  int result;
+  pthread_mutex_lock(&token_lock);
+  result = access_token[0] != 0 && !is_anonymous;
+  pthread_mutex_unlock(&token_lock);
+  return result;
+}
 const char  *session_code(void)         { return code; }
 const char  *session_login_url(void)    { return login_url; }
 const char  *session_error(void)        { return error_msg; }
 const char  *session_user(void)         { return sub; }
-const char  *session_token(void)        { return session_is_logged_in() ? access_token : ""; }
+int session_copy_token(char *dst, size_t n) {
+  int tem;
+  if (!dst || !n) return 0;
+  pthread_mutex_lock(&token_lock);
+  tem = access_token[0] != 0 && !is_anonymous;
+  snprintf(dst, n, "%s", tem ? access_token : "");
+  pthread_mutex_unlock(&token_lock);
+  return tem && dst[0];
+}
 
 void session_login_start(void) {
   if (!nuvem_pronta()) {
@@ -616,8 +700,10 @@ void session_cancel(void) {
 }
 
 void session_logout(void) {
+  pthread_mutex_lock(&token_lock);
   clear_session();
   dados_apagar(SESSION_FILE);
+  pthread_mutex_unlock(&token_lock);
   code[0] = 0;
   error_msg[0] = 0;
   state = SESSION_LOGGED_OUT;
@@ -632,7 +718,7 @@ const char *sessao_codigo(void) { return session_code(); }
 const char *sessao_url_login(void) { return session_login_url(); }
 const char *sessao_erro(void) { return session_error(); }
 const char *sessao_usuario(void) { return session_user(); }
-const char *sessao_token(void) { return session_token(); }
+int sessao_token_copiar(char *dst, size_t n) { return session_copy_token(dst, n); }
 void sessao_login_comecar(void) { session_login_start(); }
 void sessao_passo(unsigned agoraMs) { session_step(agoraMs); }
 void sessao_cancelar(void) { session_cancel(); }

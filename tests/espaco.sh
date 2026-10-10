@@ -1,7 +1,7 @@
 #!/bin/bash
 # A tecla de espaco da Busca e do Spotlight: digitar "the office" da "the
 # office" (D-pad e teclado fisico) e o rotulo e a BARRA em todo idioma, nao o
-# tema "espaco sideral" do mapa (tests/espaco.c).
+# word for outer space.
 #
 #   bash tests/espaco.sh
 set -eu

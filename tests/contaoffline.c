@@ -225,7 +225,6 @@ void debrid_esquecer(void) {}
 void extras_definir_chave(const char *c) { (void)c; }
 void fontepref_esquecer(void) {}
 void homeestado_esquecer(void) {}
-void mapa_esquecer(void) {}
 void prog_esquecer_tudo(void) {}
 void perfilcont_esquecer(void) {}
 void psparede_esquecer(void) {}   // sync.c 2.0 chama no logout; faltava aqui e o teste nao ligava

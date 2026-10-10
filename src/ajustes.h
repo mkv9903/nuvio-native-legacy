@@ -28,7 +28,6 @@ int  ajustes_pediu_diagnostico(void);
 // OK em "Teste de velocidade" (Ajustes › Diagnóstico). Lido e zerado pelo app.c.
 int  ajustes_pediu_velocidade(void);
 // Itens da barra lateral que a pessoa pode esconder (#162). 1 = aparece.
-int  ajustes_menu_explorar(void);
 int  ajustes_menu_guia(void);
 int  ajustes_menu_perfil(void);
 // "Trailer do cartaz em foco" (#124, focusedPosterBackdropTrailerEnabled),
@@ -59,9 +58,9 @@ void ajustes_abrir_na_espera_fonte(void);
 void ajustes_abrir_no_guia(void);
 // O guia esta na tela (por cima das ilhas de Ajustes).
 int  ajustes_guia_aberto(void);
-// Os atalhos "Abrir o Guia de TV / a Biblioteca / o Explorar /
+// Os atalhos "Abrir o Guia de TV / a Biblioteca /
 // Perfil e Stats" do guia: 1..5 na ordem, lido e zerado pelo app.c.
-enum { AJ_TELA_GUIA_TV = 1, AJ_TELA_BIBLIOTECA, AJ_TELA_EXPLORAR = 4, AJ_TELA_PERFIL };
+enum { AJ_TELA_GUIA_TV = 1, AJ_TELA_BIBLIOTECA, AJ_TELA_PERFIL = 5 };
 int  ajustes_pediu_tela(void);
 // O guia para o Spotlight no modo guia (spot_abrir_guia): as entradas que
 // casam com `consulta` (titulo antes de texto), os textos de cada uma e a

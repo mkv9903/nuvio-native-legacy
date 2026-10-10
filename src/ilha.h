@@ -183,7 +183,7 @@ int ilha_atividade_expansivel(void);
 
 
 // Onde o relogio pode ficar, decidido por quadro por app.c (a home tem o topo
-// esquerdo livre; Ajustes e Explorar tem titulo ali).
+// esquerdo livre; Ajustes tem titulo ali).
 void ilha_relogio_visivel(int visivel);
 
 // PONTO UNICO DA POSICAO. Sem chamada, a ilha fica no topo esquerdo, na coluna

@@ -1040,34 +1040,6 @@ static const char *FS_CORPO[GFX_NMODOS] = {
   "  gl_FragColor = vec4(uCor.rgb, uCor.a * m);\n"
   "}\n",
 
-  // GFX_CEU — hash de celula sem seno (o seno de numero grande em mediump vira
-  // listra na Mali); highp so onde existe.
-  "\n#ifdef GL_ES\n#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#endif\n#endif\n"
-  "float h12(vec2 c){\n"
-  "  vec3 p3 = fract(vec3(c.xyx) * 0.1031);\n"
-  "  p3 += dot(p3, p3.yzx + 33.33);\n"
-  "  return fract((p3.x + p3.y) * p3.z);\n"
-  "}\n"
-  "void main(){\n"
-  "  vec2 q = vUv * vec2(uAspect, 1.0);\n"
-  "  vec2 gr = q * 58.0 + uPar;\n"
-  "  vec2 c = floor(gr);\n"
-  "  vec2 f = fract(gr) - 0.5;\n"
-  "  float h = h12(c);\n"
-  "  float h2 = fract(h * 17.13);\n"
-  "  vec2 o = (vec2(h2, fract(h * 31.7)) - 0.5) * 0.55;\n"
-  "  float d = length(f - o);\n"
-  "  float tw = 0.62 + 0.38 * sin(uFoco * (0.6 + 1.8 * h2) + h * 40.0);\n"
-  "  float s = step(0.972, h) * (1.0 - smoothstep(0.02, 0.07 + 0.10 * h2 * h2, d)) * tw * (0.35 + 0.65 * h2);\n"
-  "  float s2 = step(0.996, h) * (1.0 - smoothstep(0.0, 0.40, d)) * 0.20;\n"
-  // A coluna de leitura (direita) fica com metade das estrelas.
-  "  s *= 1.0 - 0.55 * smoothstep(0.68, 0.72, vUv.x);\n"
-  "  float n1 = 1.0 - smoothstep(0.0, 0.95, length((q - vec2(uAspect * 0.36, 0.50)) * vec2(0.62, 1.0)));\n"
-  "  float n2 = 1.0 - smoothstep(0.0, 0.70, length((q - vec2(uAspect * 0.80, 0.18)) * vec2(0.80, 1.0)));\n"
-  "  vec3 base = vec3(0.018, 0.019, 0.030) + uCor.rgb * (0.20 * n1 * n1) + vec3(0.20, 0.24, 0.42) * (0.07 * n2 * n2);\n"
-  "  gl_FragColor = nv_dither(base + vec3(0.82, 0.86, 1.0) * (s + s2), 1.0);\n"
-  "}\n",
-
   // GFX_COR_GRAD — o GFX_COR com as tres paradas do degrade no lugar da cor.
   // A direcao e quase horizontal (78/22): num botao deitado o degrade inteiro
   // cabe no que o olho ve, e a sombra fica no canto de baixo a direita, onde a
@@ -1388,7 +1360,6 @@ static const struct { int sdf, cover; } PRECISA[GFX_NMODOS] = {
   {0,0},   /* GFX_SINO — glifo vetorial, sem textura nem SDF de retangulo */
   {1,0}    /* GFX_ESQUELETO — SDF para os cantos do card */,
   {0,0},   /* GFX_LINHA — distancia ao segmento, sem SDF de retangulo */
-  {0,0},   /* GFX_CEU — procedural, sem textura */
   {1,0},   /* GFX_COR_GRAD — SDF do GFX_COR */
   {1,0},   /* GFX_ANEL_GRAD — SDF do GFX_ANEL */
   {0,0},   /* GFX_AMBIENTE — procedural, tela cheia */
@@ -1906,9 +1877,8 @@ void gfx_rect(GfxRect r, GLuint tex, GfxModo modo, float foco,
            ca * gfx_opacidade_grupo >= 0.999f && gfx_desliza_atual == 0.0f && !snapAtivo)
     opaco = 1;
   // Modos cujo alfa de saida e o proprio uCor.a (ou 1): com alfa 1 a mistura
-  // tambem era um no-op com leitura da tela. Fundo social, ceu da Explorar,
-  // snapshot/luz assada e a arte desfocada do fundo.
-  else if ((modo == GFX_CEU || modo == GFX_SNAP || modo == GFX_FUNDO ||
+  // tambem era um no-op com leitura da tela. Snapshot/luz assada e a arte desfocada do fundo.
+  else if ((modo == GFX_SNAP || modo == GFX_FUNDO ||
             (modo == GFX_FOSCO && raio <= 0.0f) ||
             (modo == GFX_JANELA && raio <= 0.0f && cr > 0.5f &&
              nv_ambiente_forca <= 0.001f && parx <= 0.0f)) &&

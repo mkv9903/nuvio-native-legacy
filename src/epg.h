@@ -108,16 +108,13 @@ int  epg_janela(int epg, time_t *ini, time_t *fim);
 // Uniao das janelas de todos os canais. 0 = grade vazia.
 int  epg_janela_total(time_t *ini, time_t *fim);
 
-// Quantos programas a grade retem para o canal (para dimensionar buffers).
-
-// Programas do canal que TOCAM o intervalo [de, ate) — fim > de e ini < ate —
-// em ordem de inicio. Escreve no maximo `cap` em `out` (out pode ser NULL com
-// cap 0 para so contar) e devolve quantos EXISTEM, que pode ser maior que
-// `cap`: quem chamou sabe que cortou e pode continuar chamando com
-// de = out[cap-1].fim. Um programa que atravessa `de` entra inteiro, com o
-// ini real (anterior a `de`); o guia decide como desenhar a parte de fora.
-// Sem alocacao; O(log n + resultado).
+// Programmes overlapping [de, ate), in start order. With out, fills and returns
+// at most cap; with out NULL, returns the total. A programme crossing de keeps
+// its original start. Use the positional iterator to page overlapping entries.
 int  epg_faixa(int epg, time_t de, time_t ate, EpgProg *out, int cap);
+// Skip the first pular entries. Advance by the number returned, rather than
+// by programme end time: overlapping programmes can have non-monotonic ends.
+int  epg_faixa_desde(int epg, time_t de, time_t ate, int pular, EpgProg *out, int cap);
 
 // --- SUPERFICIE DE TESTE ----------------------------------------------------
 // epg_xml_processar alimenta o parser sem rede nem disco: os testes chamam

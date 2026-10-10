@@ -20,7 +20,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-// Janela escondida e desenho num FBO (padrao de explorar_shot): nada aparece
+// Janela escondida e desenho num FBO: nada aparece
 // na tela de quem roda.
 static GLuint fbo, fboTex;
 

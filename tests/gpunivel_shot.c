@@ -77,7 +77,6 @@ static const char *NOMES[GFX_NMODOS] = {
   [GFX_SINO] = "SINO",
   [GFX_ESQUELETO] = "ESQUELETO",
   [GFX_LINHA] = "LINHA",
-  [GFX_CEU] = "CEU",
   [GFX_COR_GRAD] = "COR_GRAD",
   [GFX_ANEL_GRAD] = "ANEL_GRAD",
   [GFX_AMBIENTE] = "AMBIENTE",

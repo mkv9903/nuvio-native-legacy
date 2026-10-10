@@ -70,6 +70,9 @@ static int fake_native_audio(LSHandle *h,const char *uri,const char *payload,
   assert(strstr(payload,"\"type\":\"audio\""));native_audio_calls++;return 1;
 }
 int main(void) {
+  assert(!dvVersaoLiberada(3));
+  assert(dvVersaoLiberada(4));
+  assert(dvVersaoLiberada(11));
   /* OLED A1: LG rejects DTS and returns an empty string, followed by a video
    * array. That video must never become a fake H264 audio track. */
   eventoPayload("{\"sourceInfo\":{\"programInfo\":[{\"numAudioTracks\":0,\"audioTrackInfo\":\"\",\"videoTrackInfo\":[{\"codec\":\"H264\"}],\"subtitleTrackInfo\":\"\"}]}}",sessao);

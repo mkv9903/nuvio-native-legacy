@@ -123,7 +123,7 @@ int main(int argc, char **argv) {
   menu_abrir();
   snprintf(nome, sizeof nome, "%s-2-abrindo.bmp", saida); quadros(5, nome);
   snprintf(nome, sizeof nome, "%s-3-aberta-inicio.bmp", saida); quadros(60, nome);
-  tecla(SDLK_DOWN);   // ordem do original: Inicio, Busca, Explorar...
+  tecla(SDLK_DOWN);   // ordem do original: Inicio, Busca, Guia TV...
   snprintf(nome, sizeof nome, "%s-4-foco-busca.bmp", saida); quadros(30, nome);
   tecla(SDLK_UP); tecla(SDLK_UP);
   snprintf(nome, sizeof nome, "%s-5-foco-perfil.bmp", saida); quadros(30, nome);
@@ -133,7 +133,7 @@ int main(int argc, char **argv) {
   snprintf(nome, sizeof nome, "%s-7-fechando.bmp", saida); quadros(6, nome);
   snprintf(nome, sizeof nome, "%s-8-fechada-ajustes.bmp", saida); quadros(60, nome);
 
-  // Tema colorido (Ocean = 2) e itens escondidos (Guia e Agenda).
+  // Tema colorido (Ocean = 2) e Guia escondido.
   ajusta(2, "menuGuiaLocal 1\n");
   menu_definir_destino(MENU_INICIO);
   menu_abrir();

@@ -13,7 +13,7 @@
 //   bash tests/detalhe_glass_shot.sh <saida> [id...]
 //   NUVIO_SHOT_VIDRO=1 -> material vidro; sem ele, solido.
 //
-// Ids: filme-topo filme-explorar ("..." em foco) filme-mais serie-mais
+// Ids: filme-topo filme-opcoes ("..." em foco) filme-mais serie-mais
 //      filme-trailers filme-elenco filme-notas filme-comentarios
 //      filme-relacionados filme-colecao filme-fim serie-topo serie-ep
 //      serie-temp serie-baixo
@@ -398,15 +398,15 @@ int main(int argc, char **argv) {
 
   if (quer(argc, argv, "filme-topo")) { abrir(1, 0, 0, 0); gravar("filme-topo"); }
   // O ULTIMO circular da linha aberta em foco: hoje o "..." (Mais opcoes).
-  if (quer(argc, argv, "filme-explorar")) {
+  if (quer(argc, argv, "filme-opcoes")) {
     abrir(1, 0, 0, 0);
     maisAcoes = 1; botao = nBotoesTodos() - 1;
     // A linha abre com mola em tempo REAL (SDL_GetTicks): quadros espacados.
     for (int k = 0; k < 50; k++) { quadros(1); SDL_Delay(16); }
     quadros(4);
-    gravar("filme-explorar");
+    gravar("filme-opcoes");
   }
-  // "MAIS OPCOES" (06/10/2026): OK no "..." abre a ilha com Trailer, Explorar,
+  // "MAIS OPCOES" (06/10/2026): OK no "..." abre a ilha com Trailer,
   // Trocar arte (e Recomendar com o servico), foco na segunda linha.
   if (quer(argc, argv, "filme-mais") || quer(argc, argv, "serie-mais")) {
     int k, serie;

@@ -1,9 +1,9 @@
 // "MAIS OPCOES" DA PAGINA DO TITULO (dono, 06/10/2026: "muitos botoes na
-// pagina de titulos. Vamos deixar o Trailer, Explorar e Trocar background em
+// pagina de titulos. Vamos deixar o Trailer e Trocar background em
 // outro lugar, mas de facil acesso").
 //
 // A linha de acoes do detalhe chegava a DEZ pecas num filme (Reproduzir, +,
-// olho, fontes, recomendar, trocar arte, trailer, explorar...). Agora ela
+// olho, fontes, recomendar, trocar arte, trailer...). Agora ela
 // guarda so o que se usa a cada visita — reproduzir/retomar, salvar, assistido,
 // fontes — e o resto mora num circular "..." no fim
 // dela. O OK nele ABRE ESTA ILHA ancorada no proprio botao: o circular cresce
@@ -23,7 +23,7 @@
 #include "gfx.h"
 
 // Ordem FIXA das linhas (a do uso: o trailer e o que mais se procura).
-enum { DMAIS_TRAILER = 0, DMAIS_EXPLORAR, DMAIS_ARTE, DMAIS_N };
+enum { DMAIS_TRAILER = 0, DMAIS_ARTE, DMAIS_N };
 
 // Abre com as acoes que existem neste titulo (`disp[i]` != 0), foco na
 // primeira. Sem nenhuma disponivel, nao abre.

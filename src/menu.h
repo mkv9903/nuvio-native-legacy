@@ -17,12 +17,9 @@
 
 // Os destinos do app, na ordem em que aparecem na barra. MENU_N fecha o enum
 // para quem quiser dimensionar vetor por destino sem repetir o numero 4.
-// ORDEM DA REFERENCIA: Inicio primeiro, depois Explorar e os destinos de
-// catalogo. A descoberta fica perto da Home porque e uma porta de entrada,
-// enquanto Biblioteca e Perfil continuam mais abaixo, como no shell legado.
+// Home, TV Guide, Search, Library, Profile and Settings.
 typedef enum {
   MENU_INICIO,
-  MENU_EXPLORAR,
   MENU_GUIA,
   MENU_BUSCAR,
   MENU_BIBLIOTECA,
@@ -119,7 +116,7 @@ float menu_barra_borda(void);
 #define NV_MENU_PILULA_VAO   16.0f
 int   menu_pilula_rect(float *x, float *y, float *w, float *h);
 // 1 no layout Dinamica: a pilula diz o nome da secao, entao as telas do menu
-// (Explorar, Busca, Biblioteca, Agenda, Perfil, Ajustes) NAO desenham o
+// (Busca, Biblioteca, Perfil, Ajustes) NAO desenham o
 // proprio titulo grande — ele ficaria duplicado atras dela.
 int   menu_pilula_titulo(void);
 float menu_pilula_alfa(void);

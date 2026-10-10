@@ -162,7 +162,7 @@ static int ajCenaSecao(int op) {
     case AJ_FIL_ORDEM: case AJ_FIL_LIMITE: case AJ_ITENS_FILEIRA: case AJ_ESPACO_FILEIRAS: case AJ_ESPACO_TITULOS: case AJ_OCULTAR_NLANC: case AJ_NOTAS_HOME:
     case AJ_ROTULOS: case AJ_NOME_ADDON: case AJ_SUFIXO_TIPO: case AJ_SELO_VISTO:
       return AJC_HOME_FILEIRAS;
-    case AJ_RAIL_MODERNA: case AJ_RAIL: case AJ_MENU_EXPLORAR: case AJ_MENU_GUIA:
+    case AJ_RAIL_MODERNA: case AJ_RAIL: case AJ_MENU_GUIA:
     case AJ_MENU_PERFIL: case AJ_RAIL_BLUR: case AJ_DESCOBRIR:
       return AJC_HOME_BARRA;
     case AJ_PS_FUNDO: case AJ_PS_CONTINUAR: return AJC_HOME_PERFIL;
@@ -395,9 +395,9 @@ static void ajcHomeFileiras(int A) {
 }
 // Barra lateral: o menu do app, com os itens que as opcoes ligam e desligam.
 static void ajcHomeBarra(int A) {
-  static const struct { const char *ico, *nome; int op; } IT[7] = {
-    { "aj_house", "Início", -1 }, { "aj_search", "Buscar", AJ_DESCOBRIR }, { "aj_compass", "Explorar", AJ_MENU_EXPLORAR },
-    { "aj_tv-minimal-play", "Guia TV", AJ_MENU_GUIA },
+  static const struct { const char *ico, *nome; int op; } IT[] = {
+    { "aj_house", "Início", -1 }, { "aj_tv-minimal-play", "Guia TV", AJ_MENU_GUIA },
+    { "aj_search", "Buscar", AJ_DESCOBRIR }, { "aj_library", "Biblioteca", -1 },
     { "aj_user-round", "Perfil", AJ_MENU_PERFIL }, { "aj_settings-2", "Ajustes", -1 } };
   int larga = !ajustes_rail_recolhida() || ajustes_rail_moderna(), i;
   float rw = larga ? 200 : 64;
@@ -407,7 +407,7 @@ static void ajcHomeBarra(int A) {
   CACC(rw + 70, 236, 104, 30, 1);
   if (ajustes_rail_moderna_blur() && ajustes_rail_moderna()) ajcBorrada(ajArte(AJA_FUNDO, A), CR(28, 24, rw, 312), 26 * ajc.s, 1);
   CVID(28, 24, rw, 312, 26);
-  for (i = 0; i < 7; i++) {
+  for (i = 0; i < (int)(sizeof IT / sizeof IT[0]); i++) {
     float iy = 44 + i * 40, al = IT[i].op == AJ_DESCOBRIR || IT[i].op < 0 ? 1.0f : ON(IT[i].op);
     if (i == 0) gfx_cor(CR(36, iy - 6, rw - 16, 32), 0.5f, 1, 1, 1, 0.14f);
     CICON(IT[i].ico, 48, iy, 20, 0.85f * al);
@@ -881,7 +881,7 @@ static void ajcRepSeekr(int A) {
 // --- IDIOMAS E LEGENDAS ---------------------------------------------------------------
 // Interface e metadados: o menu e a pagina do titulo no idioma escolhido.
 static void ajcIdiInterface(int A) {
-  static const char *const M[4] = { "Início", "Buscar", "Explorar", "Ajustes" };
+  static const char *const M[4] = { "Início", "Buscar", "Biblioteca", "Ajustes" };
   int i;
   ajCenaArte(ajArte(AJA_FUNDO, A), (GfxRect){ ajc.x, ajc.y, 640 * ajc.s, ajc.h }, 22, 0.55f);
   CVID(36, 36, 210, 288, 24);

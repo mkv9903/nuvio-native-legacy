@@ -166,7 +166,17 @@ static int nRegistro;
 // Dubles da escolha da cota (#126): nada escolhido na TV, e o registro dos
 // catalogos fora da cota nao interessa a este teste.
 int fil_escolhida(const char *c) { (void)c; return -1; }
-int fil_migrar_197(const char *const *c, int n) { (void)c; (void)n; return 0; }
+static int migration_expected, migrations;
+int fil_migrar_197(const char *const *c, int n) {
+  if (migration_expected) {
+    assert(n == 3);
+    assert(!strcmp(c[0], AID "_movie_cat_a"));
+    assert(!strcmp(c[1], AID "_movie_cat_b"));
+    assert(!strcmp(c[2], AID "_movie_cat_c"));
+    __atomic_add_fetch(&migrations, 1, __ATOMIC_RELAXED);
+  }
+  return 0;
+}
 void fil_registrar_se_couber(const char *c, const char *t, const char *a,
                              const char *tp) { (void)c; (void)t; (void)a; (void)tp; }
 void fil_registrar(const char *c, const char *t, const char *a, const char *tp, int itens) {
@@ -202,6 +212,10 @@ void  marco(const char *n)                 { if (!strcmp(n, "montar: inicio")) m
 void  SDL_Delay(Uint32 ms)                 { usleep(ms * 1000); }
 int   ajustes_idioma_ingles(void)          { return 0; }
 int ajustes_idioma(void) { return 0; }
+int ajustes_cw_do_episodio_mais_alto(void) { return 0; }
+int contalib_sementes_a_seguir(ContaSemente *out, int cap, int doMaisAlto) {
+  (void)out; (void)cap; (void)doMaisAlto; return 0;
+}
 int   ajustes_cw_ordem(void)               { return 0; }   // Padrao (issue #127)
 int   ajustes_cw_concluido(void)           { return 90; }  // Percentual assistido de fabrica
 int   ajustes_itens_fileira(void)          { return 12; }   // padrao (#163)
@@ -291,9 +305,9 @@ static int itensSoDe(const char *quem) {
 
 int main(void) {
   const char *tmp = getenv("TMPDIR");
-  snprintf(dirDados, sizeof dirDados, "%snuvio-montagem-estrutura-%d",
-           tmp && *tmp ? tmp : "/tmp/", (int)getpid());
-  assert(mkdir(dirDados, 0700) == 0);
+  snprintf(dirDados, sizeof dirDados, "%s/nuvio-montagem-estrutura-XXXXXX",
+           tmp && *tmp ? tmp : "/tmp");
+  assert(mkdtemp(dirDados));
   desc_tmdb(dirDados);      // e quem guarda a pasta da descoberta (dirArteDesc)
   homeestado_iniciar();
 
@@ -357,6 +371,16 @@ int main(void) {
   snprintf(dono, sizeof dono, "dono-A");
   assert(cat_ler_cache(dirDados) == 0);       // e o do B nao serve ao A
   puts("ok  identidade no meio: descarta, e nada do dono anterior na tela ou no cache");
+
+  // Catalogue-order readers return one thread-local key at a time. The
+  // discovery migration must retain independent copies of the whole batch.
+  assert(catordem_ler("{\"catalog_order_keys\":[\"" AID "_movie_cat_a\",\""
+                      AID "_movie_cat_b\",\"" AID "_movie_cat_c\"]}"));
+  migration_expected = 1;
+  desc_repetir();
+  esperarQuieto();
+  assert(__atomic_load_n(&migrations, __ATOMIC_RELAXED) == 1);
+  puts("ok  migration retains three independent catalogue keys");
 
   puts("montagem_estrutura: tudo ok");
   return 0;

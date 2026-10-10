@@ -60,7 +60,6 @@
 #include "busca.h"
 #include "spotlight.h"
 #include "biblioteca.h"
-#include "explorar.h"
 #include "releaseinfo.h"
 #include "perfil.h"
 #include "salvos.h"
@@ -473,7 +472,7 @@ static int sair = 0;
 // vidro em Episodios do custo em qualquer outra. So letras minusculas e '-'.
 const char *app_tela_nome(void) {
   static const char *const NOMES[] = {
-    "login", "escolha-perfil", "home", "explorar", "guia", "busca", "biblioteca", "perfil",
+    "login", "escolha-perfil", "home", "guia", "busca", "biblioteca", "perfil",
     "ajustes", "diagnostico", "player", "addons", "livetv-diag", "plugins"
   };
   if (stream_folha_aberta()) return "fontes";
@@ -585,7 +584,6 @@ static void trocarTela(Tela nova) {
   // Cada tela zera o proprio estado ao ser aberta: voltar para a busca com o
   // texto de duas navegacoes atras seria lixo, nao memoria util.
   switch (tela) {
-    case TELA_EXPLORAR:   explorar_iniciar();   break;
     case TELA_GUIA:       guia_abrir();         break;
     case TELA_BUSCA:      busca_iniciar();      break;
     case TELA_BIBLIOTECA: biblioteca_iniciar(); break;
@@ -1978,7 +1976,7 @@ int app_na_home(void) {
 // para abrir as notificacoes e a sidebar social da parte de titulos tambem e em
 // outros lugares"). Antes so na Home. Agora tambem na pagina do titulo (e a
 // ficha da pessoa, que vive nela), "Ver tudo"/colecao e nas telas de menu
-// (Explorar, Busca, Biblioteca, Perfil, Add-ons, Plugins).
+// (Busca, Biblioteca, Perfil, Add-ons, Plugins).
 // Nunca sobre o player, o guia, Ajustes ou diagnosticos, e nunca com uma
 // folha/menu do cartaz por cima: elas tem a tecla. A tecla "S" de teclado de
 // Mac nao vale com um campo de texto ativo (e a letra, nao a AZUL).
@@ -1993,7 +1991,7 @@ static int azulPodeAbrirSalvos(const SDL_Event *e) {
   if (e->key.keysym.sym == SDLK_s && e->key.keysym.scancode != NV_SCANCODE_BLUE &&
       SDL_IsTextInputActive()) return 0;
   switch (tela) {
-    case TELA_HOME: case TELA_EXPLORAR: case TELA_BUSCA: case TELA_BIBLIOTECA:
+    case TELA_HOME: case TELA_BUSCA: case TELA_BIBLIOTECA:
     case TELA_PERFIL: case TELA_ADDONS: case TELA_PLUGINS: return 1;
     default: return 0;
   }
@@ -2011,18 +2009,6 @@ static void alternarSalvos(int comModal) {
   else if (comModal && (ilha_cartao_na_tela() || ilha_atividade_expansivel()) && ilha_modal_abrir()) {}
   else if (ajustes_relogio_ligado() && ilha_rect(&ix, &iy, &iw, &ih)) spainel_abrir_de(ix, iy, iw, ih);
   else spainel_abrir();
-}
-
-// O circular "Explorar" da pagina do titulo: a pagina fecha e a toca do coelho
-// comeca nele. Voltar no primeiro degrau da toca pede a pagina de volta
-// (explorar_pediu_abrir), com a grade de climas por baixo.
-static void abrirExplorarNoTitulo(void) {
-  MapaObra o;
-  if (!mapa_obra_do_catalogo(detail_indice(), &o)) return;
-  detail_fechar_seco();
-  trocarTela(TELA_EXPLORAR);
-  menu_definir_destino(MENU_EXPLORAR);
-  explorar_abrir_titulo(&o);
 }
 
 void app_evento(const SDL_Event *e) {
@@ -2219,7 +2205,6 @@ void app_evento(const SDL_Event *e) {
       menu_abrir_sobre(1);
       saiuPorEsquerda = 0;
     }
-    if (detail_aberto() && detail_pediu_explorar()) abrirExplorarNoTitulo();
     return;
   }
   // O MENU DO CARTAZ ABERTO PELO PAINEL (segurar OK numa linha de Salvos)
@@ -2245,7 +2230,6 @@ void app_evento(const SDL_Event *e) {
   }
 
   switch (tela) {
-    case TELA_EXPLORAR:   explorar_evento(e);   break;
     case TELA_GUIA:       guia_evento(e);       break;
     case TELA_BUSCA:      busca_evento(e);      break;
     case TELA_BIBLIOTECA: biblioteca_evento(e); break;
@@ -2846,7 +2830,6 @@ void app_atualizar(float dt, Uint32 agora) {
     switch (ajustes_pediu_tela()) {
       case AJ_TELA_GUIA_TV:    trocarTela(TELA_GUIA);       menu_definir_destino(MENU_GUIA);       break;
       case AJ_TELA_BIBLIOTECA: trocarTela(TELA_BIBLIOTECA); menu_definir_destino(MENU_BIBLIOTECA); break;
-      case AJ_TELA_EXPLORAR:   trocarTela(TELA_EXPLORAR);   menu_definir_destino(MENU_EXPLORAR);   break;
       case AJ_TELA_PERFIL:     trocarTela(TELA_PERFIL);     menu_definir_destino(MENU_PERFIL);     break;
       default: break;
     }
@@ -2907,8 +2890,7 @@ void app_atualizar(float dt, Uint32 agora) {
 
   // Fora da home, o Back tem para onde voltar: a home. So nela ele fecha o app.
   if (tela != TELA_HOME) {
-    int fechar = (tela == TELA_EXPLORAR   && explorar_quer_sair())
-              || (tela == TELA_GUIA       && guia_quer_sair())
+    int fechar = (tela == TELA_GUIA       && guia_quer_sair())
               || (tela == TELA_BUSCA      && busca_quer_sair())
               || (tela == TELA_BIBLIOTECA && biblioteca_quer_sair())
               || (tela == TELA_PERFIL      && perfil_quer_sair())
@@ -2965,7 +2947,6 @@ void app_atualizar(float dt, Uint32 agora) {
         if (player_mini_ativo() && player_id_canal()[0]) guiaComCanalNoAr();
         else trocarTela(TELA_GUIA);
         break;
-      case MENU_EXPLORAR:   trocarTela(TELA_EXPLORAR);   break;
       case MENU_BUSCAR:     trocarTela(TELA_BUSCA);      break;
       case MENU_BIBLIOTECA: trocarTela(TELA_BIBLIOTECA); break;
       // DIRETO PARA A TELA, e nao mais para o painel lateral. O item do menu
@@ -2985,8 +2966,6 @@ void app_atualizar(float dt, Uint32 agora) {
     SpotPedido pedPessoa;
     if (tela == TELA_HOME && home_pediu_abrir()) {
       if (home_item_focado(&it)) abrirTitulo(&it);
-    } else if (tela == TELA_EXPLORAR && explorar_pediu_abrir(&idx)) {
-      abrirPorIndice(idx);
     } else if (tela == TELA_HOME && home_pediu_tocar()) {
       // OK no card da retomada com "OK no card" = Retomar (issue #93): abre a
       // pagina do titulo E pede reproducao no mesmo passe. A pagina fica
@@ -3984,7 +3963,6 @@ void app_atualizar(float dt, Uint32 agora) {
       detail_abrir(&it);
     } }
   switch (tela) {
-    case TELA_EXPLORAR:   explorar_atualizar(dt, agora);   break;
     case TELA_BUSCA:      busca_atualizar(dt, agora);      break;
     case TELA_BIBLIOTECA: biblioteca_atualizar(dt, agora); break;
     case TELA_PERFIL:     break;
@@ -4044,7 +4022,6 @@ static void desenharAtrasDoPainel(void *ctx) {
   // nao precisa ser desenhada por baixo — a mesma conta do detail_cobre_tela.
   if (!detail_cobre_tela() && !vertudo_aberta()) {
     switch (tela) {
-      case TELA_EXPLORAR:   explorar_desenhar(agora);   break;
       case TELA_GUIA:       guia_desenhar(agora);       break;
       case TELA_BUSCA:      busca_desenhar(agora);      break;
       case TELA_BIBLIOTECA: biblioteca_desenhar(agora); break;
@@ -4102,7 +4079,7 @@ static void desenharAtrasDoPainel(void *ctx) {
     // barra abre pelo ESQUERDA na borda e pela faixa do ponteiro.
     menu_pilula_mostrar(vertudo_aberta() || detail_aberto() ? -1.0f   // "Ver tudo"/colecao/pagina tem cabecalho proprio
                         : tela == TELA_HOME ? home_topo_fracao()
-                        : (tela == TELA_EXPLORAR || tela == TELA_BUSCA ||
+                        : (tela == TELA_BUSCA ||
                            tela == TELA_BIBLIOTECA ||
                            tela == TELA_PERFIL || tela == TELA_AJUSTES) ? 1.0f : -1.0f);
     CAMADA_SE(menu_aberto());
@@ -4199,8 +4176,8 @@ static void desenharTelas(Uint32 agora) {
   gfx_osd_mult = 1.0f;
 }
 
-// ONDE O RELOGIO DA ILHA CABE (ilha.h). Em toda tela de menu (Home, Explorar,
-// Guia, Busca, Biblioteca, Perfil, Social, Add-ons, Agenda), no carrossel
+// ONDE O RELOGIO DA ILHA CABE (ilha.h). Em toda tela de menu (Home, Busca,
+// Biblioteca, Perfil, Add-ons, Plugins), no carrossel
 // ampliado ("Ver tudo") e na pagina do titulo — pedido do dono (03/10): antes
 // so a Home mostrava. Ele fica sempre na DIREITA. Nunca com uma camada de tela cheia na frente
 // (explicadores, cartoes de
@@ -4218,7 +4195,7 @@ static int relogioCabe(void) {
   // estica para a pagina.
   if (detail_aberto() && detail_relogio_oculto()) return 0;
   if (tela == TELA_HOME) { if (!homePronta) return 0; }
-  else if (tela != TELA_EXPLORAR && tela != TELA_BUSCA &&
+  else if (tela != TELA_BUSCA &&
            tela != TELA_BIBLIOTECA && tela != TELA_PERFIL &&
            tela != TELA_ADDONS && tela != TELA_PLUGINS) return 0;
   // O MENU ABERTO NAO ESCONDE MAIS O RELOGIO (Glass UI, mockup "ilha" tela 1):
@@ -4431,7 +4408,6 @@ void app_encerrar(void) {
   diagnostico_encerrar();
   livetvdiag_encerrar();
   biblioteca_encerrar();
-  explorar_encerrar();
   perfil_encerrar();
   busca_encerrar();
   home_encerrar();

@@ -1250,7 +1250,10 @@ static const char *urlLog(const char *url, char *buf, size_t n) {
 typedef struct { unsigned long h; long ate; int fixa; } NegArte;
 static NegArte negArte[NV_NEG_N];
 static pthread_mutex_t negMtx = PTHREAD_MUTEX_INITIALIZER;
-static int negCarregada;
+// pthread_once e nao flag solta (#203, TSAN: negTem x negTem em dois fios de
+// download). Com a flag, o segundo fio via 1 antes de o primeiro terminar de
+// ler o disco e consultava a tabela vazia; e dois podiam carregar juntos.
+static pthread_once_t negCarregada = PTHREAD_ONCE_INIT;
 static int negAcertos;   // pedidos que a memoria poupou nesta sessao
 static void negCaminho(char *dst, size_t tam) {
   snprintf(dst, tam, "%s/.arte-negativa", dirCache);
@@ -1297,7 +1300,7 @@ static int negTem(const char *url) {
   unsigned long h = hashCaminho(url);
   long agora = (long)time(NULL);
   int i, r = 0;
-  if (!negCarregada) { negCarregada = 1; negCarregar(); }
+  pthread_once(&negCarregada, negCarregar);
   pthread_mutex_lock(&negMtx);
   for (i = 0; i < NV_NEG_N; i++)
     if (negArte[i].h == h && negArte[i].ate > agora) { r = 1; negAcertos++; break; }
@@ -2243,8 +2246,8 @@ static int threadDecode(void *arg) {
       Uint64 c0 = SDL_GetPerformanceCounter();
       corviva_extrair((const unsigned char *)conv->pixels, conv->w, conv->h,
                       conv->pitch, &pal);
-      if (!medido) {
-        medido = 1;
+      // Troca atomica: dois fios de decodificacao chegavam juntos (TSAN).
+      if (!__atomic_exchange_n(&medido, 1, __ATOMIC_RELAXED)) {
         printf("[cor] extracao: %.0f us (%dx%d, %s)\n",
                (double)(SDL_GetPerformanceCounter() - c0) * 1e6 /
                  (double)SDL_GetPerformanceFrequency(),

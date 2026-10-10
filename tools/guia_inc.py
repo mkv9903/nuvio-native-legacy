@@ -44,7 +44,6 @@ TARGET = {
     "p-trava": "AJ_VELOCIDADE",
 }
 SCREEN = {"Abrir o Guia de TV": "GT_GUIA_TV", "Abrir a Biblioteca": "GT_BIBLIOTECA",
-          "Abrir o Explorar": "GT_EXPLORAR",
           "Abrir Perfil e Stats": "GT_PERFIL"}
 # "See example" scenes:
 EXAMPLE = {

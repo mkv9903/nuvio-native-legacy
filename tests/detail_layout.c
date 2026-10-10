@@ -134,49 +134,42 @@ int main(void) {
   // Back never carries a menu request.
   nivel = 0; e.key.keysym.sym = SDLK_ESCAPE; detail_evento(&e);
   assert(saindo && !detail_pediu_menu());
-  // "MAIS OPCOES" (06/10/2026): Trailer, Explorar, Trocar arte and Recomendar
+  // "MAIS OPCOES" (06/10/2026): Trailer and Trocar arte
   // left the row. The LAST circular is "...", OK on it opens the island; the
   // row of a movie is Play, +, watched, sources, "..." (5, no resume).
   { CatItem m = {0};
-    int i, achou = -1;
+    int i;
     snprintf(m.tipo, sizeof m.tipo, "movie");
     snprintf(m.titulo, sizeof m.titulo, "Prisoners");
     snprintf(m.imdb, sizeof m.imdb, "tt1392214");
     cat_definir_tudo(&m, 1, NULL, 0); idx = 0;
     carro = 0; saindo = 0; nivel = 0; pessoaAberta = 0; maisAcoes = 1;
-    assert(temExplorar() && temMais());
+    assert(temArte() && temMais());
     assert(nBotoesTodos() == 5 && acaoEm(nBotoesTodos() - 1) == ACAO_MAIS);
     for (i = 0; i < nBotoesTodos(); i++) {
       int ac = acaoEm(i);
-      assert(ac != ACAO_TRAILER && ac != ACAO_EXPLORAR && ac != ACAO_ARTE && ac != ACAO_RECOMENDAR);
+      assert(ac != ACAO_TRAILER && ac != ACAO_ARTE && ac != ACAO_RECOMENDAR);
     }
     botao = nBotoesTodos() - 1;
     SDL_Delay(2);
     e.type = SDL_KEYDOWN; e.key.keysym.sym = SDLK_RETURN; detail_evento(&e);
     e.type = SDL_KEYUP; detail_evento(&e);
-    assert(detmais_aberto() && !detail_pediu_explorar());
-    for (i = 0; i < detmais_n(); i++) if (detmais_acao(i) == DMAIS_EXPLORAR) achou = i;
-    // Fixed order, only what this title has: no Recomendar without the service.
-    assert(achou >= 0 && detmais_acao(detmais_n()) == -1);
+    assert(detmais_aberto());
+    assert(detmais_acao(detmais_n()) == -1);
     for (i = 1; i < detmais_n(); i++) assert(detmais_acao(i) > detmais_acao(i - 1));
-    assert(temArte() && detmais_n() == (temTrailer() ? 1 : 0) + 2);
+    assert(temArte() && detmais_n() == (temTrailer() ? 1 : 0) + 1);
     // Back closes the island and keeps the focus on "..." (the page stays).
     e.type = SDL_KEYDOWN; e.key.keysym.sym = SDLK_ESCAPE; detail_evento(&e);
     assert(!detmais_aberto() && !saindo && botao == nBotoesTodos() - 1);
-    // Reopen, walk down to Explorar, OK: the router gets one request.
+    // Reopening keeps the artwork action; opening OK must not pick a row.
     e.type = SDL_KEYDOWN; e.key.keysym.sym = SDLK_RETURN; detail_evento(&e);
     e.type = SDL_KEYUP; detail_evento(&e);
-    // The KEYUP of the OK that opened it must not pick a row.
     assert(detmais_aberto() && detmais_foco() == 0);
-    for (i = 0; i < achou; i++) { e.type = SDL_KEYDOWN; e.key.keysym.sym = SDLK_DOWN; detail_evento(&e); }
-    assert(detmais_foco() == achou);
-    e.type = SDL_KEYDOWN; e.key.keysym.sym = SDLK_RETURN; detail_evento(&e);
-    e.type = SDL_KEYUP; detail_evento(&e);
-    assert(!detmais_aberto());
-    assert(detail_pediu_explorar() && !detail_pediu_explorar());
+    e.type = SDL_KEYDOWN; e.key.keysym.sym = SDLK_ESCAPE; detail_evento(&e);
+    assert(!detmais_aberto() && !saindo);
     snprintf(m.tipo, sizeof m.tipo, "tv");
     cat_definir_tudo(&m, 1, NULL, 0);
-    assert(!temExplorar() && !temMais()); }
+    assert(!temMais()); }
   puts("PASS: title/navigation and focus-only action group");
   return 0;
 }

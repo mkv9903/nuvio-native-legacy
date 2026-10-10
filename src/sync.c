@@ -16,7 +16,6 @@
 #include "contalib.h"
 #include "salvosorg.h"
 #include "salvos.h"
-#include "mapa.h"
 #include "fontepref.h"
 #include "buscasrec.h"
 #include "trakt.h"
@@ -56,8 +55,41 @@
 
 static pthread_t fio;
 static int fioVivo, fioPronto;
+// A ENTREGA DO FIO DE SYNC PARA O PRINCIPAL (#203). `fioPronto` e
+// `addonsCedo` sao porteiras: o fio enche buffers (catHomeBlob, colBlob,
+// addonsRem...) e SO DEPOIS liga a porteira; o principal ve a porteira e
+// consome/libera os buffers. Escrita e leitura simples nao garantem essa ordem
+// no ARM da TV (nem para o compilador): o principal podia ver a porteira antes
+// dos ponteiros e dar free() num valor velho. Release na escrita, acquire na
+// leitura. O TSAN apontava a porteira (sync.c:1249 x 1485) e, por ela, os
+// campos que ela protege (cicloInterrompido em 1499).
+//
+// O que continua sem barreira, de proposito, e documentado: `estado`,
+// `fioVivo` e `perfilAplicado` lidos pelo fio da descoberta
+// (esperaAddonsDaConta -> sync_estado/sync_perfil_pronto) — inteiros de
+// sondagem, relidos a cada volta de espera; nenhum ponteiro sai deles.
+#define PRONTO_PUBLICAR(v, x) __atomic_store_n(&(v), (x), __ATOMIC_RELEASE)
+#define PRONTO_LER(v)         __atomic_load_n(&(v), __ATOMIC_ACQUIRE)
 static SyncEstado estado = SYNC_PARADO;
-static char resumo[220] = "sem sincronizar";
+// Publish the whole status under one lock; the UI formats a local copy.
+enum { RES_FIXO, RES_FORA_COPIA, RES_FORA_SEM, RES_CICLO };
+typedef struct {
+  int  tipo, http, trakt, pend, n[5];
+  char data[32];
+  char fixo[220];
+} SyncResumo;
+static SyncResumo resumoDados = { .tipo = RES_FIXO, .fixo = "sem sincronizar" };
+static pthread_mutex_t resumoTrava = PTHREAD_MUTEX_INITIALIZER;
+static void resumoPublicar(const SyncResumo *r) {
+  pthread_mutex_lock(&resumoTrava); resumoDados = *r; pthread_mutex_unlock(&resumoTrava);
+}
+static void resumoFixo(const char *frase) {
+  SyncResumo r;
+  memset(&r, 0, sizeof r);
+  r.tipo = RES_FIXO;
+  snprintf(r.fixo, sizeof r.fixo, "%s", frase);
+  resumoPublicar(&r);
+}
 static unsigned ultimoOk;
 static int sujoProgresso, sujoAjustes;
 // Capturado no fio principal: o worker nao le a lista enquanto ela muda.
@@ -276,7 +308,7 @@ static volatile int addonsDeFora;
 // sync_passo. `volatile` porque quem escreve e o fio de sync e quem le e o fio
 // principal, e a barreira aqui e a mesma que `fioPronto` sempre foi: o valor so
 // e ligado DEPOIS de o buffer estar cheio.
-static volatile int addonsCedo;
+static int addonsCedo;   // PRONTO_PUBLICAR/PRONTO_LER, ver fioPronto
 
 static char traktTok[300];
 static int  temTraktRem;
@@ -1214,7 +1246,7 @@ static void *rodar(void *u) {
   perfis_puxar();
   if (!contaDoCicloAtual()) {
     estado = SYNC_PRONTO;
-    fioPronto = 1;
+    PRONTO_PUBLICAR(fioPronto, 1);
     return NULL;
   }
   // ESCOLHA DE PERFIL PENDENTE: PARA AQUI, e nao adivinha o perfil 1.
@@ -1241,10 +1273,10 @@ static void *rodar(void *u) {
     printf("[sync] ciclo interrompido: %d perfis e nenhum escolhido nesta TV\n",
            perfis_n());
     fflush(stdout);
-    snprintf(resumo, sizeof resumo, "aguardando escolha de perfil");
+    resumoFixo("aguardando escolha de perfil");
     cicloInterrompido = 1;
     estado = SYNC_PRONTO;
-    fioPronto = 1;
+    PRONTO_PUBLICAR(fioPronto, 1);
     return NULL;
   }
   // Lido DEPOIS da porteira: quando a pessoa responde enquanto perfis_puxar
@@ -1252,17 +1284,17 @@ static void *rodar(void *u) {
   perfilDoCiclo = perfis_ativo();
   if (puxarAddons() < 0) {
     char d[32];
-    if (temAddonsRem && !addonsPendentes()) addonsCedo = 1;
+    if (temAddonsRem && !addonsPendentes()) PRONTO_PUBLICAR(addonsCedo, 1);
     soLeituraDaCopia(foraCiclo > 0 ? foraCiclo : 0);
     contacache_data(copiaQuandoCiclo, d, sizeof d);
-    if (copiaCiclo)
-      snprintf(resumo, sizeof resumo, i18n("servidor da conta fora do ar (HTTP %d) · usando a cópia de %s"),
-               foraCiclo > 0 ? foraCiclo : 0, d);
-    else
-      snprintf(resumo, sizeof resumo, i18n("servidor da conta fora do ar (HTTP %d) · sem cópia salva"),
-               foraCiclo > 0 ? foraCiclo : 0);
+    { SyncResumo r;
+      memset(&r, 0, sizeof r);
+      r.http = foraCiclo > 0 ? foraCiclo : 0;
+      snprintf(r.data, sizeof r.data, "%s", d);
+      r.tipo = copiaCiclo ? RES_FORA_COPIA : RES_FORA_SEM;
+      resumoPublicar(&r); }
     estado = SYNC_PRONTO;
-    fioPronto = 1;
+    PRONTO_PUBLICAR(fioPronto, 1);
     return NULL;
   }
   // OS ADDONS SAO A SEGUNDA RPC DO CICLO, E ERAM APLICADOS NA ULTIMA LINHA DELE.
@@ -1285,7 +1317,7 @@ static void *rodar(void *u) {
   // addon que a pessoa acabou de ligar, e so depois a lista da conta e
   // aplicada. Antecipar ali sobrescreveria a escolha antes de ela ser enviada,
   // e a pessoa veria o proprio toque desaparecer.
-  if (temAddonsRem && !addonsPendentes()) addonsCedo = 1;
+  if (temAddonsRem && !addonsPendentes()) PRONTO_PUBLICAR(addonsCedo, 1);
   puxarCredenciais();
   syncprog_puxar();
   puxarSoLeitura();
@@ -1303,9 +1335,9 @@ static void *rodar(void *u) {
     printf("[sync] perfil trocado no meio do ciclo (%d -> %d): nada sobe\n",
            perfilDoCiclo, perfis_ativo());
     fflush(stdout);
-    snprintf(resumo, sizeof resumo, "perfil trocado; sincronizando de novo");
+    resumoFixo("perfil trocado; sincronizando de novo");
     estado = SYNC_PRONTO;
-    fioPronto = 1;
+    PRONTO_PUBLICAR(fioPronto, 1);
     return NULL;
   }
   if (addonsLocalCiclo) empurrarAddons();
@@ -1324,16 +1356,17 @@ static void *rodar(void *u) {
   // novo o que ainda nao teve 2xx.
   contapend_enviar();
 
-  { int pend = contapend_pendentes();
-    char sufixo[48] = "";
-    if (pend > 0) snprintf(sufixo, sizeof sufixo, i18n(" · %d pendentes"), pend);
-  snprintf(resumo, sizeof resumo,
-           i18n("%d addons · %d progressos · %d vistos · %d na lista · %d coleções%s%s"),
-           nAddonsRem, syncprog_puxadas(), cVistos < 0 ? 0 : cVistos,
-           cBiblio < 0 ? 0 : cBiblio, cColecoes < 0 ? 0 : cColecoes,
-           temTraktRem ? " · Trakt" : "", sufixo); }
+  { SyncResumo r;
+    memset(&r, 0, sizeof r);
+    r.pend = contapend_pendentes();
+    r.n[0] = nAddonsRem; r.n[1] = syncprog_puxadas();
+    r.n[2] = cVistos < 0 ? 0 : cVistos; r.n[3] = cBiblio < 0 ? 0 : cBiblio;
+    r.n[4] = cColecoes < 0 ? 0 : cColecoes;
+    r.trakt = temTraktRem;
+    r.tipo = RES_CICLO;
+    resumoPublicar(&r); }
   estado = SYNC_PRONTO;
-  fioPronto = 1;
+  PRONTO_PUBLICAR(fioPronto, 1);
   return NULL;
 }
 
@@ -1400,9 +1433,9 @@ void sync_iniciar(void) {
   snprintf(usuarioDoCiclo, sizeof usuarioDoCiclo, "%s", sessao_usuario());
   copiaGeracaoDoCiclo = contacache_geracao();
   estado = SYNC_RODANDO;
-  fioPronto = 0;
+  __atomic_store_n(&fioPronto, 0, __ATOMIC_RELAXED);
   if (pthread_create(&fio, NULL, rodar, NULL) == 0) { pthread_detach(fio); fioVivo = 1; }
-  else { estado = SYNC_FALHOU; snprintf(resumo, sizeof resumo, "sem fio para sincronizar"); }
+  else { estado = SYNC_FALHOU; resumoFixo("sem fio para sincronizar"); }
 }
 
 // Um ciclo automatico, se ja passou o intervalo. Devolve 1 quando disparou.
@@ -1456,8 +1489,8 @@ void sync_passo(unsigned agoraMs) {
   // ANTES DA PORTEIRA de `fioPronto`: ver o comentario em rodar(). O resto do
   // ciclo continua sendo aplicado de uma vez, no fim — so os addons saem na
   // frente, porque so eles mudam O QUE a descoberta vai buscar.
-  if (addonsCedo) {
-    addonsCedo = 0;
+  if (PRONTO_LER(addonsCedo)) {
+    __atomic_store_n(&addonsCedo, 0, __ATOMIC_RELAXED);
     if (temAddonsRem && perfilDoCicloAtual() && !addonsPendentes()) {
       // _addons: a volta que ainda nao leu a lista (o caso do arranque e da
       // escolha de perfil) atende o pedido sozinha, sem ser jogada fora.
@@ -1480,9 +1513,9 @@ void sync_passo(unsigned agoraMs) {
   // Custo no caso comum: uma comparacao de inteiro (cat_n) e um strcmp de 16
   // bytes. Nada e refeito enquanto o catalogo for o mesmo.
   contalib_reconciliar();
-  if (!fioVivo || !fioPronto) return;
+  if (!fioVivo || !PRONTO_LER(fioPronto)) return;
   fioVivo = 0;
-  fioPronto = 0;
+  __atomic_store_n(&fioPronto, 0, __ATOMIC_RELAXED);
   memset(spMs, 0, sizeof spMs);
   spMarca = syncRelogioMs();
 
@@ -1712,9 +1745,34 @@ int  sync_usando_copia(void)  { return foraHttp && usandoCopia; }
 long sync_copia_quando(void)  { return copiaQuando; }
 int  sync_addons_fora(void)   { return foraHttp ? addonsFora : 0; }
 SyncEstado  sync_estado(void)      { return estado; }
-// As frases fixas (resumo guarda o portugues) passam pela tabela aqui; as com
-// numero ja foram montadas com o formato traduzido.
-const char *sync_resumo(void)      { return i18n(resumo); }
+// Format a locked snapshot in the current UI language.
+const char *sync_resumo(void) {
+  static char saida[260];
+  char sufixo[64] = "";
+  SyncResumo r;
+  pthread_mutex_lock(&resumoTrava); r = resumoDados; pthread_mutex_unlock(&resumoTrava);
+  switch (r.tipo) {
+    case RES_FORA_COPIA:
+      snprintf(saida, sizeof saida, i18n("servidor da conta fora do ar (HTTP %d) · usando a cópia de %s"),
+               r.http, r.data);
+      return saida;
+    case RES_FORA_SEM:
+      snprintf(saida, sizeof saida, i18n("servidor da conta fora do ar (HTTP %d) · sem cópia salva"), r.http);
+      return saida;
+    case RES_CICLO:
+      if (r.pend > 0) snprintf(sufixo, sizeof sufixo, i18n(" · %d pendentes"), r.pend);
+      snprintf(saida, sizeof saida,
+               i18n("%d addons · %d progressos · %d vistos · %d na lista · %d coleções%s%s"),
+               r.n[0], r.n[1], r.n[2], r.n[3], r.n[4],
+               r.trakt ? " · Trakt" : "", sufixo);
+      return saida;
+    default:
+      // i18n devolve a propria entrada quando nao ha traducao: copia para
+      // `saida`, nunca um ponteiro para o resumo que o fio reescreve.
+      snprintf(saida, sizeof saida, "%s", i18n(r.fixo));
+      return saida;
+  }
+}
 unsigned    sync_ultimo_ok(void)   { return ultimoOk; }
 void        sync_sujar_progresso(void) { sujoProgresso = 1; }
 void        sync_sujar_addons(void) {
@@ -1968,8 +2026,6 @@ void sync_esquecer_usuario(void) {
   salvos_esquecer();
   // As categorias e o jeito de ver os Salvos (salvosorg.h) vao junto.
   sorg_esquecer();
-  // O mapa do gosto da Explorar e derivado do historico de quem saiu.
-  mapa_esquecer();
   // Release metadata belongs to the account that is signing out.
   releaseinfo_forget();
   // E os lembretes de programa do guia, pelo mesmo motivo.
@@ -2019,7 +2075,7 @@ void sync_esquecer_usuario(void) {
   // As caixas que o fio preenche tambem: um ciclo que terminou logo antes do
   // logout aplicaria os addons da conta anterior no proximo sync_passo.
   memset(addonsRem, 0, sizeof addonsRem);
-  nAddonsRem = 0; temAddonsRem = 0; addonsCedo = 0;
+  nAddonsRem = 0; temAddonsRem = 0; __atomic_store_n(&addonsCedo, 0, __ATOMIC_RELAXED);
   traktTok[0] = 0; temTraktRem = 0;
   memset(tmdbKey, 0, sizeof tmdbKey); temTmdb = 0;
   memset(mdbKey, 0, sizeof mdbKey);   temMdb = 0;
@@ -2034,6 +2090,6 @@ void sync_esquecer_usuario(void) {
   temAjustesBlob = 0;
   aplicarAjustes = 1;
   dados_apagar(SY_AJUSTES_LOCAIS);
-  snprintf(resumo, sizeof resumo, "sem conta");
+  resumoFixo("sem conta");
   printf("[sync] dados do usuario apagados deste aparelho\n");
 }

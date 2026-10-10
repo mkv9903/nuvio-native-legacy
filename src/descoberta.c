@@ -966,6 +966,10 @@ static unsigned geracaoLida;
 // completa.
 static pthread_mutex_t listaTrava = PTHREAD_MUTEX_INITIALIZER;
 static int listaLidaNaVolta;
+// Fim de volta: `buscando` cai sob a mesma trava em que desc_iniciar o testa e marca.
+static void buscandoSoltar(void) {
+  pthread_mutex_lock(&listaTrava); buscando = 0; pthread_mutex_unlock(&listaTrava);
+}
 // O QUE ESTA NA TELA E PARCIAL: publicado em partes por uma volta que nao
 // chegou ao fim (condenada no meio, ou ainda no ar). A volta seguinte continua
 // publicando em partes por cima disso em vez de montar em silencio: sem isto,
@@ -977,7 +981,7 @@ static int catalogosFora;
 // Quantos catalogos NAO DESLIGADOS o teto impediu de pedir na ultima montagem,
 // sem o clamp de catalogosFora. Ver o uso em desc_remontar_fileiras.
 static int catalogosNaoPedidos;
-static pthread_t fio, fioEp;
+static pthread_t fioEp;
 static int epItem = -1, epTemp, fioEpVivo;
 
 int desc_buscando(void) {
@@ -3612,7 +3616,7 @@ static void *montar(void *u) {
   pthread_mutex_lock(&cargaTrava);
   memset(&carga, 0, sizeof carga); cargaDesde = SDL_GetTicks();
   pthread_mutex_unlock(&cargaTrava);
-  if (!lote) { buscando = 0; return NULL; }
+  if (!lote) { buscandoSoltar(); return NULL; }
 
   // O "continue assistindo" vem PRIMEIRO e do Trakt. A home usa as primeiras
   // posicoes do catalogo nessa fileira, entao a ordem aqui e o que define o
@@ -3625,16 +3629,21 @@ static void *montar(void *u) {
   { int nc = catordem_n();
     if (nc > 0) {
       const char **lig = (const char **)malloc(sizeof *lig * (size_t)nc);
+      char (*chaves)[CATORD_CHAVE] = malloc(sizeof *chaves * (size_t)nc);
       int q, m = 0;
-      if (lig) {
+      if (lig && chaves) {
         for (q = 0; q < nc; q++) {
-          const char *ch = catordem_chave(q);
+          // catordem_chave returns one thread-local copy; migration retains
+          // several keys until the loop ends, so give each its own storage.
+          snprintf(chaves[q], sizeof chaves[q], "%s", catordem_chave(q));
+          const char *ch = chaves[q];
           if (ch[0] && !catordem_oculta(ch, ch)) lig[m++] = ch;
         }
         // Mudou algo: gravar() sobe fil_revisao e a home remonta sozinha.
         fil_migrar_197(lig, m);
-        free(lig);
       }
+      free(chaves);
+      free(lig);
     } }
   // OS MANIFESTOS COMECAM A CHEGAR AGORA, nao daqui a seis segundos. Ver o
   // cabecalho de maniLargar: eles nao dependem do Trakt, e eram o bloco de 7 s
@@ -4362,7 +4371,7 @@ static void *montar(void *u) {
                  homeestado_mudancas_texto(mudou & HOMEESTADO_MUDOU_FONTE,
                                            txt, sizeof txt)); }
       fflush(stdout);
-      free(lote); repetirAoFim = 0; buscando = 0;
+      free(lote); repetirAoFim = 0; buscandoSoltar();
       desc_iniciar();
       return NULL;
     }
@@ -4478,7 +4487,7 @@ static void *montar(void *u) {
   fflush(stdout);
   free(lote);
   listasAbandonar(listas);   // so sobra se o lote veio vazio antes de usa-las
-  buscando = 0;
+  buscandoSoltar();
   // Um pedido que chegou COM o ciclo no ar roda agora, com as credenciais que
   // entraram no meio do caminho. Zerar a marca antes de disparar evita que uma
   // falha de pthread_create deixe o pedido preso para sempre.
@@ -4504,7 +4513,7 @@ condenada:
   listasAbandonar(listas);
   free(lote);
   repetirAoFim = 0;
-  buscando = 0;
+  buscandoSoltar();
   desc_iniciar();
   return NULL;
 #undef CONDENADA
@@ -4512,22 +4521,26 @@ condenada:
 }
 
 void desc_iniciar(void) {
-  if (buscando) { printf("[desc] ja montando; pedido ignorado\n"); fflush(stdout); return; }
+  pthread_t th;
+  // Test and claim the worker slot together. A restart from a worker can
+  // otherwise race the main loop and start two catalogue builders.
   pthread_mutex_lock(&listaTrava);
+  if (buscando) {
+    pthread_mutex_unlock(&listaTrava);
+    printf("[desc] ja montando; pedido ignorado\n"); fflush(stdout);
+    return;
+  }
   buscando = 1;
   listaLidaNaVolta = 0;
-  pthread_mutex_unlock(&listaTrava);
   montagemGeracao++;
-  if (pthread_create(&fio, NULL, montar, NULL) != 0) {
-    // NAO FALHAR CALADO. No webOS um pthread_create nunca falhou e o caminho de
-    // erro era so uma bandeira; no alvo WASM o fio e um Worker do navegador,
-    // que E um recurso limitado e PODE acabar. Quando acaba, a home fica com o
-    // catalogo do pacote para sempre e nao ha uma linha no log dizendo por que.
-    buscando = 0;
+  pthread_mutex_unlock(&listaTrava);
+  // The worker takes listaTrava itself, so create it after releasing the lock.
+  if (pthread_create(&th, NULL, montar, NULL) != 0) {
+    buscandoSoltar();
     printf("[desc] pthread_create FALHOU: o catalogo nao vai remontar\n");
     fflush(stdout);
   }
-  else pthread_detach(fio);
+  else pthread_detach(th);
 }
 
 // Remontar depois de uma mudanca de credencial (vincular o Trakt, receber a
@@ -7047,8 +7060,8 @@ static void *buscarTitulo(void *arg) {
   // chamada so, feita apenas quando o dono abre o credito.
   if (sobTmdb > 0) {
     // TRADUCAO DE ID NAO E INTEGRACAO (#187), a mesma regra da reserva de arte:
-    // com o ajuste TMDB desligado a chave era "" e toda estrela do Explorar
-    // (o mapa monta com a reserva) morria em "sem imdb" sem pedido nenhum.
+    // com o ajuste TMDB desligado a chave era "" e toda consulta
+    // morria em "sem imdb" sem pedido nenhum, mesmo com a reserva disponivel.
     const char *chave = desc_chave_tmdb()[0] ? desc_chave_tmdb() : desc_chave_tmdb_reserva();
     id[0] = 0;
     if (chave && chave[0]) {

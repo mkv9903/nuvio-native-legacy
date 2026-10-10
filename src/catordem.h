@@ -41,7 +41,9 @@ unsigned catordem_revisao(void);
 
 int         catordem_tem_ordem(void);
 int         catordem_n(void);
-const char *catordem_chave(int i);        // "" fora da faixa
+// Thread-local copy, valid until this thread's next call; "" outside the range.
+// Callers collecting multiple keys must keep their own copies.
+const char *catordem_chave(int i);
 
 // 1 quando a conta desligou esta fileira. Confere as DUAS chaves como o web:
 // a curta (<addonId>_<tipo>_<catalogoId>) e a de desativar, que carrega a URL

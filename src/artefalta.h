@@ -7,7 +7,7 @@
 // entrou no repositorio depois da versao instalada pelo .tpk falta no disco, e
 // o codigo novo pede por ele. Medido no D1 (06/10, tizen-tpk 2.0.x): 14 pessoas
 // com "[tex] decode falhou (Couldn't open .../res/art/icones/pl_pause-f.png: No
-// such file)" — os botoes do player e os da ficha (Explorar, Ver trailer)
+// such file)" — os botoes do player e os da ficha (Trocar arte, Ver trailer)
 // apareciam como circulos vazios.
 //
 // Saida: o arquivo que falta no res/art vem da MESMA tag no GitHub

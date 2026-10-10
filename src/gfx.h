@@ -162,40 +162,26 @@ typedef enum {
   // atravessa a tela (skeleton shimmer). Use gfx_esqueleto, que calcula a onda
   // e cai no GFX_COR parado com animacoes reduzidas.
   GFX_ESQUELETO = 27,
-  // GFX_LINHA — segmento de reta com nucleo e halo, resolvido no fragmento.
-  // Existe para a constelacao da tela Explorar: nao havia primitiva de linha
-  // (so retangulos alinhados), e pontilhar com dezenas de discos custava um
-  // desenho por ponto. O segmento vai de um canto ao oposto do retangulo,
-  // descontada a margem do halo:
-  //   uPar.x = 0 -> do alto-esquerda ao baixo-direita; 1 -> baixo-esq ao alto-dir
-  //   uFoco  = meia espessura do nucleo, em fracao da ALTURA do retangulo
-  //   uRaio  = alcance do halo (e margem), na mesma unidade
-  // O retangulo e o envelope do segmento: quem chama parte linhas longas em
-  // pedacos para o envelope nao virar area de tela cheia (ver explorar.c).
+  // Line segment with a smooth core and halo, used by local diagnostics.
+  // uPar.x selects diagonal; uFoco is core width, uRaio halo width (by height).
   GFX_LINHA = 28,
-  // GFX_CEU — ceu procedural da Explorar numa passada: base escura, nebulosa
-  // tingida por uCor e estrelas por celula de grade com cintilacao.
-  //   uPar  = deriva da grade (parallax), em celulas
-  //   uFoco = tempo em segundos (0 = parado, para animacoes reduzidas)
-  // Substitui o preenchimento de fundo da tela, entao nao soma camada cheia.
-  GFX_CEU = 29,
   // COR VIVA (corviva.h). Os dois primeiros NAO se pedem pelo nome: gfx_rect
   // troca GFX_COR e GFX_ANEL por eles quando a cor passada e exatamente o
   // destaque vivo e o tema e "Dinâmica gradiente" ou "imersiva" — e assim que
   // o botao, a linha em foco e o anel de ~40 arquivos viram degrade sem que
   // nenhum mude. As paradas vem de nv_grad_viva, e a luz anda devagar com
   // nv_tempo_viva (o degrade "respira"; parado com animacoes reduzidas).
-  GFX_COR_GRAD = 30,
-  GFX_ANEL_GRAD = 31,
+  GFX_COR_GRAD = 29,
+  GFX_ANEL_GRAD = 30,
   // GFX_AMBIENTE — a cor da arte VAZANDO na interface: quatro luzes grandes e
   // macias (esquerda, direita, topo, base) com as cores de regiao da arte,
   // numa passada so de tela cheia, com dither contra faixas. Use gfx_ambiente.
-  GFX_AMBIENTE = 32,
+  GFX_AMBIENTE = 31,
   // GFX_COPIA — a textura INTEIRA, RGB e ALPHA, sem SDF nem efeito. E a
   // ampliacao do alvo interno de 1280x720 (gpunivel.h, nivel 2): o alpha tem
   // de passar junto, senao o furo do plano de video some. uPar.y > 0.5 = a
   // fonte e um FBO (origem embaixo), como no GFX_SNAP.
-  GFX_COPIA = 35,
+  GFX_COPIA = 34,
   // GFX_VITRINE — a arte do destaque nos layouts PADRAO e DINAMICA da home
   // (ajustes_home_layout). Cover com ANCORAGEM vertical, cantos por SDF, o veu
   // de leitura (esquerda e base) ASSADO na propria passada, e um esvanecer
@@ -211,16 +197,16 @@ typedef enum {
   //   uFoco   = forca do veu de leitura, 0 a 1 (0 = arte pura, sobre o trailer)
   //   uRaio   = canto, como no GFX_CARD (fracao da altura)
   //   uTexAsp = w/h da textura (gfx_tex_aspect_atual)
-  GFX_VITRINE = 33,
+  GFX_VITRINE = 32,
   // GFX_FUNDO_DIN — o fundo da home DINAMICA: SO COR, um degrade vertical de
   // uma cor (a do titulo em foco). Sem textura e sem arte desfocada.
   //   uCor.rgb = cor do topo; uCor.a = alfa
   //   uFoco    = quanto da cor sobra na base (0..1)
-  GFX_FUNDO_DIN = 34,
+  GFX_FUNDO_DIN = 33,
   // GFX_HERO_CAM / GFX_HERO_CHEIO_CAM — as camadas do destaque numa passada
   // (o crossfade). So por gfx_hero_camadas.
-  GFX_HERO_CAM = 36,
-  GFX_HERO_CHEIO_CAM = 37,
+  GFX_HERO_CAM = 35,
+  GFX_HERO_CHEIO_CAM = 36,
   // GFX_JANELA — o CARTAO DO CARROSSEL da Dinamica (detail.c): a arte em
   // "cover" na TELA CHEIA, vista por uma janela arredondada. A arte nunca
   // escala: o rect e a abertura, e gfx_janela_atual diz onde ela fica no
@@ -232,7 +218,7 @@ typedef enum {
   // dois modos dao o mesmo pixel, e a troca entre eles nao se ve.
   // Cor com r < 0.5 = SO O VEU (cor do fundo com alpha, sem a arte): por cima
   // do furo do trailer que toca no cartao.
-  GFX_JANELA = 38,
+  GFX_JANELA = 37,
   // VEU EM DEGRADE DE CSS (Glass UI do player, 03/10): o preto (ou uCor.rgb)
   // cheio numa borda do rect e zero na outra, pelo dither de nv_dither. Os
   // veus do mockup sao linear-gradient de varias paradas; aqui viram uma curva
@@ -240,25 +226,25 @@ typedef enum {
   // distancia da borda cheia, em fracao do rect, dividida por uPar.y (o ponto
   // em que o veu zera; 1 = a borda oposta). uPar.x escolhe a borda cheia:
   // 0 = baixo, 1 = cima, 2 = esquerda, 3 = direita. Use por gfx_veu_css.
-  GFX_VEU_CSS = 39,
+  GFX_VEU_CSS = 38,
   // GFX_MINI — o alvo de uma miniatura (gfx_mini_desenhar): FBO lido de cabeca
   // para cima, cantos por SDF.
-  GFX_MINI = 40,
+  GFX_MINI = 39,
   // GFX_TEXTURA — o recorte do titulo numa pilula/barra (cor de destaque
   // "Textura"). Nao se pede direto: gfx_rect troca para ele todo GFX_COR
   // cheio na cor exata do destaque enquanto gfx_textura_definir tem textura.
-  GFX_TEXTURA = 41,
+  GFX_TEXTURA = 40,
   // GFX_FOSCO — a luz assada (320x180, a arte borrada do fundo) lida em
   // COORDENADA DE TELA (vAmb) e recortada pelos cantos do painel: o vidro
   // fosco. uTex = o assado; uCor.a = alfa. Use gfx_vidro_fosco.
-  GFX_FOSCO = 42,
+  GFX_FOSCO = 41,
   // GFX_VITRINE_DIN — o GFX_VITRINE OPACO sobre o fundo da Dinamica
   // (GFX_FUNDO_DIN) calculado no proprio fragmento: o destaque e o fundo numa
   // passada so. Nao se pede direto: gfx_rect troca o GFX_VITRINE por ele
   // quando o fundo da Dinamica esta pendente e o destaque cobre o topo da tela
   // (ver gfx_fundo_din_desenhar). uDin = cor do topo e queda.
-  GFX_VITRINE_DIN = 43,
-  GFX_NMODOS = 44
+  GFX_VITRINE_DIN = 42,
+  GFX_NMODOS = 43
 } GfxModo;
 
 typedef struct {
@@ -408,7 +394,7 @@ void gfx_snap_desenhar(void);  // pinta o snapshot ocupando a tela toda
 void gfx_snap_encerrar(void);
 int  gfx_snap_ativo(void);     // 1 enquanto o desenho vai para o snapshot
 // Cresce a cada gfx_snap_comecar: quem guardou algo no FBO sabe se outro
-// desenho passou por cima desde entao (explorar.c, o ceu assado).
+// desenho passou por cima desde entao.
 unsigned gfx_snap_geracao(void);
 
 void gfx_tamanho_alvo(int w, int h);

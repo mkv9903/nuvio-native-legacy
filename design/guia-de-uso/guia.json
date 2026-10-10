@@ -254,7 +254,7 @@
       "cap": "home",
       "t": "Barra lateral",
       "ic": "panel-left",
-      "txt": "Explorar, Guia TV e Perfil e Stats podem sair do menu. Recolhida, a barra vira uma pílula de ícones embaixo da ilha do relógio.",
+      "txt": "Guia TV e Perfil e Stats podem sair do menu. Recolhida, a barra vira uma pílula de ícones embaixo da ilha do relógio.",
       "onde": "Ajustes › Tela inicial › Barra lateral",
       "acao": [
         "Abrir em Ajustes"
@@ -740,20 +740,6 @@
       "fonte": "Sem cartão",
       "prova": "ajustes.c:742, ajustes.c:449 (V_SALVOS)",
       "visual": "Linha com o valor e o botão + da página do título"
-    },
-    {
-      "id": "s-explorar",
-      "cap": "salvos",
-      "t": "Explorar",
-      "ic": "telescope",
-      "txt": "Um céu com as suas histórias: o que você viu ligado ao que vem a seguir. Setas navegam, OK abre.",
-      "onde": "Menu › Explorar",
-      "acao": [
-        "Abrir o Explorar"
-      ],
-      "fonte": "novidades142.c:255-256",
-      "prova": "explorar.c:769, explorar.c:830",
-      "visual": "Céu do Explorar"
     },
     {
       "id": "s-stats",

@@ -2,19 +2,12 @@
 // "the office", e a tecla tem de se chamar ESPACO (a barra) em todo idioma, nao
 // "espaco sideral".
 //
-// A COLISAO MEDIDA: a chave de i18n "espaço" servia a dois textos — o rotulo da
-// tecla (busca.c, spotlight.c, teclado.c) e o nome do TEMA "space" do mapa
-// (mapa.c, keyword do TMDB). As traducoes foram feitas pelo tema: a tecla saia
-// "Outer space" em alemao, "космос" em russo, "宇宙" em japones. Uma tabela, uma
-// traducao por chave: o tema ganhou chave propria ("espaço sideral").
-//
 // Digitacao por dois caminhos: D-pad + OK na grade da tela (o controle) e tecla
 // fisica (SDLK_SPACE).
 #include "../src/ajustes.c"
 #include "busca.h"
 #include "spotlight.h"
 #include "teclado.h"
-#include "mapa.h"
 #include "idioma.h"
 #include <assert.h>
 #include <stdio.h>
@@ -103,10 +96,6 @@ int main(void) {
   confere("spotlight teclado fisico", spot_consulta(), "the office");
   spot_fechar();
 
-  // O tema do mapa nao pode usar a chave da tecla.
-  assert(strcmp(mapa_tema_nome("space"), "espaço") != 0);
-  confere("tema \"space\" (pt)", mapa_tema_nome("space"), "espaço sideral");
-
   for (i = 0; i < sizeof ROTULO / sizeof ROTULO[0]; i++) {
     char onde[40];
     valor[AJ_IDIOMA] = ROTULO[i].lg + 1;
@@ -114,7 +103,6 @@ int main(void) {
     confere(onde, i18n("espaço"), ROTULO[i].tecla);
   }
   valor[AJ_IDIOMA] = IDIOMA_EN + 1;
-  confere("tema \"space\" (de)", i18n(mapa_tema_nome("space")), "Outer space");
   puts("espaco: tudo certo");
   return 0;
 }

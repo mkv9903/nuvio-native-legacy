@@ -44,7 +44,6 @@ int detmais_foco(void) { return foco; }
 const char *detmais_rotulo(int acao) {
   switch (acao) {
     case DMAIS_TRAILER:    return "Assistir trailer";
-    case DMAIS_EXPLORAR:   return "Explorar a partir daqui";
     case DMAIS_ARTE:       return "Trocar arte";
     }
   return "";
@@ -54,7 +53,6 @@ const char *detmais_rotulo(int acao) {
 const char *detmais_icone(int acao) {
   switch (acao) {
     case DMAIS_TRAILER:    return "aj_clapperboard";
-    case DMAIS_EXPLORAR:   return "aj_compass";
     case DMAIS_ARTE:       return "arte";
     }
   return "";

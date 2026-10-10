@@ -469,7 +469,7 @@ static float ajPreviaCor(float x, float y, float w) {
     gfx_cor((GfxRect){ x + 40, y + 251, 6, 6 }, 0.5f, ar, ag, ab, 1);
     txt_desenhar(l, x + 53, y + 236 + (36 - l.h) * 0.5f); }
   { GfxRect mb = { x + w - 20 - 150, y + 20, 150, 8 + 3 * 34 + 8 };
-    static const char *const M[3] = { "Início", "Explorar", "Ajustes" };
+    static const char *const M[3] = { "Início", "Biblioteca", "Ajustes" };
     if (ajVid()) gfx_cor(mb, 20.0f / mb.h, 0.055f, 0.059f, 0.071f, 0.82f);
     else gfx_cor(mb, 20.0f / mb.h, 0.082f, 0.086f, 0.102f, 1);
     for (i = 0; i < 3; i++) {

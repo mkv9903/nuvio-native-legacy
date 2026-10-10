@@ -135,7 +135,7 @@
   0,                /* chave do fanart.tv: acao (o valor mora em fanart.txt) */
   0,                /* diagnostico */
   0,                /* teste de velocidade: acao */
-  0, 0, 0,          /* explorar, guia, perfil na barra lateral: ligados */
+  0, 0,             /* guia, perfil na barra lateral: ligados */
   1,                /* trailer do cartaz em foco: desligado (DEFAULT do web) */
   0,                /* itens por fileira: 12, como sempre foi (ver V_ITENS_FIL) */
   TXT_FAMILIA_INTER,/* fonte da interface: independente da legenda */

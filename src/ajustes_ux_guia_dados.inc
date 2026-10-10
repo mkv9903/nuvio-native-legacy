@@ -55,7 +55,7 @@ static const GuiaEnt GUIA_ENT[] = {
     "Parado num título, o cartaz cresce e mostra nota do IMDb, ano, classificação e uma seta: subiu, caiu ou é novo na fileira.",
     "Ajustes › Cartazes e arte › Expandir pôster ao focar", AJ_EXPANDIR, GT_NADA, GX_NADA, GV_NADA },
   { 1, "Barra lateral", "aj_panel-left", 0, "h-barra",
-    "Explorar, Guia TV e Perfil e Stats podem sair do menu. Recolhida, a barra vira uma pílula de ícones embaixo da ilha do relógio.",
+    "Guia TV e Perfil e Stats podem sair do menu. Recolhida, a barra vira uma pílula de ícones embaixo da ilha do relógio.",
     "Ajustes › Tela inicial › Barra lateral", AJ_RAIL, GT_NADA, GX_NADA, GV_NADA },
   { 1, "Fundo da escolha de perfil", "aj_image", 1, "h-perfis",
     "A tela Quem está assistindo? mostra a arte do catálogo atrás dos perfis. Desligado, fica o fundo de listras do login.",
@@ -159,9 +159,6 @@ static const GuiaEnt GUIA_ENT[] = {
   { 6, "Onde o + salva", "aj_plus", 0, "s-mais",
     "O botão + guarda na lista do Nuvio, na watchlist do Trakt ou no Simkl.",
     "Ajustes › Conta e perfis › Trakt e Simkl › Onde o + salva", AJ_SALVOS_DEST, GT_NADA, GX_NADA, GV_NADA },
-  { 6, "Explorar", "aj_telescope", 0, "s-explorar",
-    "Um céu com as suas histórias: o que você viu ligado ao que vem a seguir. Setas navegam, OK abre.",
-    "Menu › Explorar", -1, GT_EXPLORAR, GX_NADA, GV_NADA },
   { 6, "Perfil e Stats", "aj_chart-column", 0, "s-stats",
     "Quanto você assistiu, o seu ritmo, os mais vistos, em cartões.",
     "Menu › Perfil e Stats", -1, GT_PERFIL, GX_NADA, GV_NADA },
@@ -257,4 +254,4 @@ static const GuiaEnt GUIA_ENT[] = {
     "Ajustes › Desempenho desta TV › Teste de velocidade", AJ_VELOCIDADE, GT_NADA, GX_NADA, GV_NADA },
 };
 #define GUIA_NCAPS 12
-#define GUIA_NENT 80
+#define GUIA_NENT 79

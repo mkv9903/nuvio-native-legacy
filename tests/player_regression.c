@@ -143,6 +143,9 @@ static void testar(void) {
   assert(episodios_escolheu(&t,&e) && t==2 && e==5);
   assert(!episodios_escolheu(&t,&e));
   player_abrir(0,NULL);player_definir_episodio(2,4);
+  // Exercise playback controls after loading; Down during loading expands
+  // the loading card. The fixture has no decoder or TV pipeline.
+  assert(player_carregando());player_shot_carregando(0);
   // A ABREVIACAO SEGUE O IDIOMA: T de Temporada em portugues, S de Season em
   // ingles. Foi o conserto do issue #12 — a frase e montada com snprintf, e o
   // i18n passou a envolver o FORMATO, entao "T%dE%d" tem par na tabela.
@@ -161,12 +164,13 @@ static void testar(void) {
   teclaPlayer(SDLK_DOWN);assert(player_controles_visiveis());
   teclaPlayer(SDLK_RIGHT);teclaPlayer(SDLK_RIGHT);teclaPlayer(SDLK_RIGHT);teclaPlayer(SDLK_RETURN);
   assert(player_pediu_fontes());   /* legendas -> audio -> proporcao -> fontes */
-  assert(player_carregando());player_encerrar();
+  assert(!player_carregando());player_encerrar();
   // #109: a tecla que revela os controles decide o foco. Com o foco em
   // Legendas e os controles escondidos, OK pausa e os controles sobem NO PLAY
   // — o OK seguinte alterna de novo em vez de abrir a folha de legendas.
   // Sessao sem URL tambem nao tem video proprio (registro 1518).
   player_abrir(0,NULL);assert(!player_tem_video());player_definir_episodio(2,4);
+  player_shot_carregando(0);
   teclaPlayer(SDLK_RIGHT);      // foco em Legendas
   teclaPlayer(SDLK_DOWN);assert(!player_controles_visiveis());
   teclaPlayer(SDLK_RETURN);assert(player_controles_visiveis());
@@ -196,6 +200,7 @@ static void testar(void) {
   // toque ja anda 10 s. Antes subiam com o foco nos botoes e o toque seguinte
   // trocava de botao em vez de avancar.
   player_abrir(0,NULL);player_definir_episodio(2,4);
+  player_shot_carregando(0);
   teclaPlayer(SDLK_DOWN);assert(!player_controles_visiveis());
   { float p0=player_posicao_seg();
     teclaPlayer(SDLK_RIGHT);
@@ -228,6 +233,7 @@ static void testar(void) {
   // FOCO NA BARRA (pedido do dono, 03/10): a fileira de botoes FECHA e volta
   // quando o foco desce; e CIMA na barra nao faz NADA — abria o Audio.
   player_abrir(0,NULL);player_definir_episodio(2,4);
+  player_shot_carregando(0);
   assert(player_controles_visiveis()&&!player_foco_na_barra());
   { Uint32 t0=SDL_GetTicks();int i;
     for(i=0;i<60;i++)player_atualizar(1.f/60,t0);
@@ -331,16 +337,15 @@ static void testar(void) {
   assert(!player_regra_proximo(1200,1500,1100));   /* 400s left: still refused */
   assert(!player_regra_concluiu(0,0,0));      // sem duracao nao ha o que concluir
 
-  // Ordem da rail: Inicio, Explorar, Guia TV, Busca. Um DOWN para em Explorar,
-  // o Guia fica a dois e Buscar a tres. A ordem e a assercao dos itens novos.
+  // Ordem da rail: Inicio, Guia TV, Busca, Biblioteca.
   menu_iniciar();menu_abrir();teclaMenu(SDLK_DOWN);teclaMenu(SDLK_RETURN);
-  assert(menu_destino()==MENU_EXPLORAR && menu_mudou_destino() && !menu_mudou_destino());
-  menu_abrir();teclaMenu(SDLK_DOWN);teclaMenu(SDLK_RETURN);
-  assert(menu_destino()==MENU_GUIA && menu_mudou_destino());
+  assert(menu_destino()==MENU_GUIA && menu_mudou_destino() && !menu_mudou_destino());
   menu_abrir();teclaMenu(SDLK_DOWN);teclaMenu(SDLK_RETURN);
   assert(menu_destino()==MENU_BUSCAR && menu_mudou_destino());
+  menu_abrir();teclaMenu(SDLK_DOWN);teclaMenu(SDLK_RETURN);
+  assert(menu_destino()==MENU_BIBLIOTECA && menu_mudou_destino());
   menu_abrir();teclaMenu(SDLK_DOWN);teclaMenu(SDLK_ESCAPE);
-  assert(!menu_aberto() && menu_destino()==MENU_BUSCAR);
+  assert(!menu_aberto() && menu_destino()==MENU_BIBLIOTECA);
   char pasta[]="/tmp/nuvio-progress-test-XXXXXX",arquivo[256];assert(mkdtemp(pasta));
   snprintf(arquivo,sizeof arquivo,"%s/catalogo.txt",pasta);
   FILE *fp=fopen(arquivo,"w");assert(fp);fclose(fp);

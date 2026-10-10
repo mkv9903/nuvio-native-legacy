@@ -21,6 +21,8 @@
 #ifndef NV_SESSION_H
 #define NV_SESSION_H
 
+#include <stddef.h>
+
 typedef enum {
   SESSION_LOGGED_OUT = 0,
   SESSION_REQUESTING,      // requesting code
@@ -51,16 +53,11 @@ const char  *session_login_url(void);       // URL to display
 const char  *session_error(void);           // last failure, for screen display
 const char  *session_user(void);            // `sub` of JWT; "" when logged out
 
-// RAW ACCESS TOKEN, for callers that need to authenticate with a server that IS
-// NOT Nuvio's Supabase. Today only the recommendations service (recomenda.c),
-// which sends `Authorization: Bearer <this>` and asks Supabase itself who it
-// belongs to — which is why it needs the token and not the `sub`.
-//
-// Returns "" when there is no USER session: an anonymous session (see step 1
-// of flow above) has a token but no owner, and sending that token to another
-// server would create a new "person" on every startup. Caller must never
-// write the value to disk or logs.
-const char *session_token(void);
+// Copy the user access token under the session lock. Returns 0 and an empty
+// string for anonymous/logged-out sessions; 3000 bytes hold the complete token.
+// The caller must not write the token to disk or logs. Raw shared pointers are
+// unsafe while refresh runs in other threads.
+int session_copy_token(char *dst, size_t size);
 
 // Begins the login flow on its own thread (blocking calls). Idempotent while
 // a flow is in progress.
@@ -91,9 +88,9 @@ void session_email_error_from(int status, const char *body, char *dst, unsigned 
 void session_logout(void);
 
 // AUTHENTICATED RPC as the user. Returns body (free by caller) or NULL.
-// On 401 refreshes token and retries ONCE; if refresh fails, session drops
-// to SESSION_LOGGED_OUT instead of staying in limbo where app appears logged in
-// and nothing syncs. BLOCKS — call from sync thread, never draw loop.
+// On 401 refreshes once and retries with a private token copy. Concurrent
+// callers share one refresh. Server outages preserve the session; rejection
+// logs out. BLOCKS — call from a worker, never the draw loop.
 char *session_rpc(const char *function_name, const char *body_json, int *status);
 
 // Same thing for /functions/v1/<name>.
@@ -112,7 +109,7 @@ const char *sessao_codigo(void);
 const char *sessao_url_login(void);
 const char *sessao_erro(void);
 const char *sessao_usuario(void);
-const char *sessao_token(void);
+int sessao_token_copiar(char *dst, size_t size);
 void sessao_login_comecar(void);
 void sessao_passo(unsigned agoraMs);
 void sessao_cancelar(void);

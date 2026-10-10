@@ -2,6 +2,7 @@
 #include "js.h"
 #include <limits.h>
 #include <math.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -21,6 +22,14 @@ static Marca *mapa;
 static int n, cap, avisouTeto;
 // Sobe a cada mudanca de estado no mapa (vistoep_revisao).
 static unsigned revisao;
+// TRAVA DO MAPA. Escrevem nele o fio de extras (extras.c, parte 0, ao abrir a
+// pagina de uma serie) e o fio principal (sync_passo, player, episodios,
+// agenda, logout); le o desenho do detalhe. Sem ela o realloc de definir()
+// num fio soltava o vetor que o outro estava lendo ou escrevendo — o ASAN
+// pegou no Mac (heap-use-after-free em achar, lido pelo desenho do detalhe
+// enquanto o fio de extras crescia o mapa). Toda funcao publica trava; as
+// estaticas (achar, definir) supoem a trava tomada.
+static pthread_mutex_t trava = PTHREAD_MUTEX_INITIALIZER;
 
 // So o id do titulo. "tt123:2:8" e "tt123" tem de casar: o primeiro e o formato
 // que CatItem.imdb carrega num item de "Continuar assistindo", e quem chama
@@ -80,10 +89,12 @@ static int definir(const char *imdb, int temporada, int episodio, int visto) {
 }
 
 void vistoep_definir(const char *imdb, int temporada, int episodio, int visto) {
+  pthread_mutex_lock(&trava);
   definir(imdb, temporada, episodio, visto);
+  pthread_mutex_unlock(&trava);
 }
 
-int vistoep_estado(const char *imdb, int temporada, int episodio) {
+static int estado(const char *imdb, int temporada, int episodio) {
   char id[16];
   int i;
   base(imdb, id, sizeof id);
@@ -91,13 +102,22 @@ int vistoep_estado(const char *imdb, int temporada, int episodio) {
   i = achar(id, temporada, episodio);
   return i < 0 ? -1 : (int)mapa[i].visto;
 }
+int vistoep_estado(const char *imdb, int temporada, int episodio) {
+  int r;
+  pthread_mutex_lock(&trava);
+  r = estado(imdb, temporada, episodio);
+  pthread_mutex_unlock(&trava);
+  return r;
+}
 
 int vistoep_contar(const char *imdb) {
   char id[16];
   int i, k = 0;
   base(imdb, id, sizeof id);
   if (!id[0]) return 0;
+  pthread_mutex_lock(&trava);
   for (i = 0; i < n; i++) if (mapa[i].visto && !strcmp(mapa[i].id, id)) k++;
+  pthread_mutex_unlock(&trava);
   return k;
 }
 
@@ -106,18 +126,23 @@ int vistoep_conhecido(const char *imdb) {
   int i;
   base(imdb, id, sizeof id);
   if (!id[0]) return 0;
-  for (i = 0; i < n; i++) if (!strcmp(mapa[i].id, id)) return 1;
-  return 0;
+  pthread_mutex_lock(&trava);
+  for (i = 0; i < n; i++) if (!strcmp(mapa[i].id, id)) break;
+  i = i < n;
+  pthread_mutex_unlock(&trava);
+  return i;
 }
 
 int vistoep_marcar_lote(const char *imdb, const VistoPar *pares, int qtd, int visto) {
   int i, mudou = 0;
   if (!pares) return 0;
+  pthread_mutex_lock(&trava);
   for (i = 0; i < qtd; i++) {
-    if (vistoep_estado(imdb, pares[i].temporada, pares[i].episodio) == (visto ? 1 : 0))
+    if (estado(imdb, pares[i].temporada, pares[i].episodio) == (visto ? 1 : 0))
       continue;
     mudou += definir(imdb, pares[i].temporada, pares[i].episodio, visto);
   }
+  pthread_mutex_unlock(&trava);
   return mudou;
 }
 
@@ -140,6 +165,7 @@ int vistoep_ate_aqui(const char *imdb, int temporada, int episodio,
   // NUMERO antes de decidir se cabe pedir a acao ("Ate aqui (7 episodios)"), e
   // sem isto ela teria de alocar um vetor so para descobrir o tamanho — ou,
   // pior, passar max=0 e receber 0 sempre, que foi o primeiro erro aqui.
+  pthread_mutex_lock(&trava);
   for (i = 0; i < n; i++) {
     if (strcmp(mapa[i].id, id)) continue;
     if (!antesOuIgual(mapa[i].temp, mapa[i].ep, temporada, episodio)) continue;
@@ -150,6 +176,7 @@ int vistoep_ate_aqui(const char *imdb, int temporada, int episodio,
     }
     k++;
   }
+  pthread_mutex_unlock(&trava);
   return k;
 }
 
@@ -158,6 +185,7 @@ int vistoep_temporada(const char *imdb, int temporada, VistoPar *saida, int max)
   int i, k = 0;
   base(imdb, id, sizeof id);
   if (!id[0]) return 0;
+  pthread_mutex_lock(&trava);
   for (i = 0; i < n; i++) {                 // saida nula = contagem, ver acima
     if (mapa[i].temp != temporada || strcmp(mapa[i].id, id)) continue;
     if (saida) {
@@ -167,6 +195,7 @@ int vistoep_temporada(const char *imdb, int temporada, VistoPar *saida, int max)
     }
     k++;
   }
+  pthread_mutex_unlock(&trava);
   return k;
 }
 
@@ -199,12 +228,22 @@ int vistoep_lote(const char *imdb, int ateAqui, int temporada, int episodio,
   return k;
 }
 
-int vistoep_n(void) { return n; }
-unsigned vistoep_revisao(void) { return revisao; }
+int vistoep_n(void) {
+  int r;
+  pthread_mutex_lock(&trava); r = n; pthread_mutex_unlock(&trava);
+  return r;
+}
+unsigned vistoep_revisao(void) {
+  unsigned r;
+  pthread_mutex_lock(&trava); r = revisao; pthread_mutex_unlock(&trava);
+  return r;
+}
 
 void vistoep_esquecer(void) {
+  pthread_mutex_lock(&trava);
   free(mapa); mapa = NULL; n = 0; cap = 0; avisouTeto = 0;
   revisao++;
+  pthread_mutex_unlock(&trava);
 }
 
 // ------------------------------------------------------------------- Trakt
@@ -252,7 +291,9 @@ int vistoep_ler_progresso(const char *imdb, const char *json) {
       if (!strcmp(concluido, "true")) feito = 1;
       else if (!strcmp(concluido, "false")) feito = 0;
       else continue;
+      pthread_mutex_lock(&trava);
       total += definir(imdb, nt, ne, feito);
+      pthread_mutex_unlock(&trava);
       if (fe >= ft) break;
     }
     if (ft >= fim) break;

@@ -230,7 +230,6 @@ static GfxRect maisAncora;  // onde o "..." foi desenhado (ilha detmais.h)
 // um alvo focavel do nivel 0, entre os botoes e as secoes. Baixo nos botoes cai
 // nela, baixo nela entra nas secoes, cima volta aos botoes. OK pede ao roteador
 // (app.c) para abrir o painel Social na atividade deste titulo.
-static int  pedExplorar = 0;   // circular "Explorar": o roteador abre a toca neste titulo
 // O ULTIMO EPISODIO da serie (a ultima temporada que o extras conhece), para
 // "Rafa terminou a série". 0/0 = nao se sabe ainda: a frase nunca e afirmada.
 static int  pedReproduzir = 0, pedMarcar = 0, pedFontes = 0;
@@ -1926,21 +1925,9 @@ static int temTrailer(void) {
   if (trailer_suportado() && trailerFonte(NULL)) return 1;
   return extras_n_trailers() > 0;
 }
-// "EXPLORAR" (Explorar 2.0): linha da ilha "Mais opcoes". Abre a toca
-// do coelho neste titulo (explorar.h); so filme e serie, que sao o que a
-// vizinhanca sabe cruzar.
-static int temExplorar(void) {
-  const CatItem *ci = cat_item(idx);
-  if (!ci || !ci->titulo[0]) return 0;
-  return !strcmp(ci->tipo, "movie") || !strcmp(ci->tipo, "series");
-}
-// "MAIS OPCOES" (dono, 06/10/2026: "muitos botoes na pagina de titulos"): o
-// trailer, o Explorar, o Trocar arte e o Recomendar sairam da linha e moram
-// na ilha do circular "..." (detmais.h), o ULTIMO da linha. Ele so existe
-// quando ha ao menos uma delas — senao seria um botao que abre nada.
+// More options holds trailer and artwork actions when available.
 static void maisDisponiveis(int d[DMAIS_N]) {
   d[DMAIS_TRAILER] = temTrailer();
-  d[DMAIS_EXPLORAR] = temExplorar();
   d[DMAIS_ARTE] = temArte();
 }
 static int temMais(void) {
@@ -1971,7 +1958,7 @@ static int nBotoes(void) {
 // e os circulares escorregam um para a direita.
 enum { ACAO_PRIMARIO = 0, ACAO_LISTA = 1, ACAO_ASSISTIDO = 2, ACAO_FONTES = 3,
        ACAO_INICIO = 4, ACAO_RECOMENDAR = 5, ACAO_ARTE = 7,
-       ACAO_TRAILER = 8, ACAO_EXPLORAR = 9, ACAO_MAIS = 10 };
+       ACAO_TRAILER = 8, ACAO_MAIS = 10 };
 static int acaoEm(int n) {
   if (n == 0) return ACAO_PRIMARIO;
   if (temInicio()) {
@@ -2081,10 +2068,6 @@ static void abrirCredito(void) {
 static void executarMais(int dm) {
   if (dm == DMAIS_TRAILER) {
     tocarTrailerCheio(0);
-  } else if (dm == DMAIS_EXPLORAR) {
-    // O roteador (app.c) fecha a pagina e abre a toca neste titulo.
-    trailer_fechar();
-    pedExplorar = 1;
   } else if (dm == DMAIS_ARTE) {
     // A tela de escolha come o teclado ate fechar (topo de detail_evento).
     trailer_fechar();
@@ -6510,7 +6493,7 @@ void detail_volta_notar(int novo) {
 int detail_pediu_assistido(void) { int v = pedAssistido; pedAssistido = 0; return v; }
 int detail_pediu_marcar(void)     { int v = pedMarcar;     pedMarcar = 0;     return v; }
 int detail_pediu_fontes(void)     { int v = pedFontes;     pedFontes = 0;     return v; }
-int detail_pediu_explorar(void)   { int v = pedExplorar;   pedExplorar = 0;   return v; }
+
 // "Reproduzir desde o inicio" ainda cai no mesmo caminho do primario: o
 // roteador so sabe abrir o player no ponto salvo. Consumir o pedido aqui evita
 // que ele fique pendurado.

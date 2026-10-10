@@ -24,7 +24,7 @@
 
 typedef struct { const char *titulo, *icone, *sub; } GuiaCap;
 enum { GT_NADA = 0, GT_GUIA_TV = AJ_TELA_GUIA_TV, GT_BIBLIOTECA = AJ_TELA_BIBLIOTECA,
-       GT_EXPLORAR = AJ_TELA_EXPLORAR, GT_PERFIL = AJ_TELA_PERFIL };
+       GT_PERFIL = AJ_TELA_PERFIL };
 enum { GX_NADA = 0, GX_N180_FONTES, GX_N180_ILHA, GX_N170_ILHA, GX_N170_SPOT };
 enum { GV_NADA = 0, GV_GUIA, GV_LAYOUTS, GV_FILEIRAS, GV_FONTES, GV_ILHA, GV_ASS, GV_VIDRO,
        GV_N170_SPOT, GV_N170_ILHA };
@@ -48,7 +48,7 @@ static const char *const GUIA_CAP_TXT[GUIA_NCAPS] = {
   "Da folha de Fontes ao player: como o app escolhe o que tocar e o que dá para mudar.",
   "Legendas, áudio e o idioma do app e do conteúdo.",
   "A pílula do canto da tela, os avisos que saem dela e a central onde eles ficam.",
-  "O que você guarda, as listas da conta e dos serviços e o Explorar.",
+  "O que você guarda e as listas da conta e dos serviços.",
   "Amigos no Nuvio, quem pode te encontrar, Trakt e Simkl, perfis e addons.",
   "O Guia de TV, os canais dos addons e do seu provedor, e o que fazer quando um canal não abre.",
   "Vidro ou sólido, a cor de destaque, a fonte e os cartazes.",
@@ -117,7 +117,6 @@ static const char *guiaRotTela(int t) {
   switch (t) {
     case GT_GUIA_TV: return "Abrir o Guia de TV";
     case GT_BIBLIOTECA: return "Abrir a Biblioteca";
-    case GT_EXPLORAR: return "Abrir o Explorar";
     case GT_PERFIL: return "Abrir Perfil e Stats";
     default: return "";
   }
@@ -126,7 +125,6 @@ static const char *guiaIcTela(int t) {
   switch (t) {
     case GT_GUIA_TV: return "aj_tv-minimal-play";
     case GT_BIBLIOTECA: return "aj_library";
-    case GT_EXPLORAR: return "aj_telescope";
     default: return "aj_chart-column";
   }
 }

@@ -122,8 +122,9 @@ if [ -n "${NUVIO_DTS_ROOT:-}" ]; then DTS_ENV=(-e "NUVIO_DTS_ROOT=$NUVIO_DTS_ROO
     -DNV_VERSAO="\"$NV_VERSAO\"" \
     -I$SR/usr/include -I$SR/usr/include/SDL2 \
     -lSDL2 -lSDL2_image -lSDL2_ttf -lGLESv2 -lEGL -ldl -lpthread -lz -lm $ASS_LIBS $DTS_LIBS \
-    -Wl,--export-dynamic-symbol=pthread_create
+    -Wl,--exclude-libs,ALL -Wl,--export-dynamic-symbol=pthread_create
   # src/dts/rt_shim.c: LG audio sink (KADP_OSA_CreateThread) binds to our pthread_create
+  # Keep static FreeType private: older TV SDL_ttf must use its own ABI.
   mkdir -p deploy/app/lib
   find deploy/app/lib -maxdepth 1 -type f -name "dts-starfish-webos*.so" -delete
   if [ -d deploy/app/licenses/dts ]; then

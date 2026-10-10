@@ -32,18 +32,17 @@ int main(void) {
   assert(mkdtemp(dir));
   snprintf(caminho, sizeof caminho, "%s/ajustes.txt", dir);
   f = fopen(caminho, "w"); assert(f);
-  fputs("menuGuiaLocal 1\nmenuAgendaLocal 1\n", f);
+  fputs("menuGuiaLocal 1\nmenuAgendaLocal 1\nmenuExplorarLocal 1\n", f);
   fclose(f);
   ajustes_dir(dir);
-  assert(ajustes_menu_explorar() && !ajustes_menu_guia());
+  assert(!ajustes_menu_guia());
   assert(ajustes_menu_perfil());  // obsolete menuAgendaLocal is ignored
 
   menu_iniciar();
-  assert(descer(1) == MENU_EXPLORAR);
-  assert(descer(2) == MENU_BUSCAR);       // pulou o Guia
-  assert(descer(3) == MENU_BIBLIOTECA);
-  assert(descer(4) == MENU_PERFIL);       // follows Library directly
-  assert(descer(5) == MENU_AJUSTES);
+  assert(descer(1) == MENU_BUSCAR);       // pulou o Guia
+  assert(descer(2) == MENU_BIBLIOTECA);
+  assert(descer(3) == MENU_PERFIL);       // follows Library directly
+  assert(descer(4) == MENU_AJUSTES);
   // Subindo a partir dos Ajustes tambem pula.
   menu_fechar(); menu_definir_destino(MENU_AJUSTES); menu_abrir();
   tecla(SDLK_UP); tecla(SDLK_UP); tecla(SDLK_RIGHT);
@@ -74,7 +73,12 @@ int main(void) {
   assert(!menu_aberto() && menu_escolheu() && !menu_mudou_destino());
   for (int i = 0; i < 200; i++) menu_atualizar(0.016f, 0);
   menu_abrir_sobre(0); tecla(SDLK_DOWN); tecla(SDLK_RETURN);
-  assert(menu_escolheu() && menu_mudou_destino() && menu_destino() == MENU_EXPLORAR);
+  // Search distinguishes a short press from a hold; selection happens on release.
+  SDL_Event soltar;
+  SDL_memset(&soltar, 0, sizeof soltar);
+  soltar.type = SDL_KEYUP; soltar.key.keysym.sym = SDLK_RETURN;
+  menu_evento(&soltar);
+  assert(menu_escolheu() && menu_mudou_destino() && menu_destino() == MENU_BUSCAR);
   // A plain open keeps Right = choose.
   for (int i = 0; i < 200; i++) menu_atualizar(0.016f, 0);
   menu_abrir(); assert(!menu_sobre()); tecla(SDLK_RIGHT);

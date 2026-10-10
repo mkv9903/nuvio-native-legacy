@@ -16,7 +16,7 @@
 #include <SDL2/SDL_image.h>
 #include <assert.h>
 
-// Janela escondida e desenho num FBO (padrao de explorar_shot): nada aparece
+// Janela escondida e desenho num FBO: nada aparece
 // na tela de quem roda.
 static GLuint fbo, fboTex;
 

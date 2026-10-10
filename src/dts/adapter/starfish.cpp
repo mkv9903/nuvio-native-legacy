@@ -35,8 +35,13 @@ struct Native {
     return out != nullptr;
   }
   bool open() {
-    lib = dlopen("libplayerAPIs.so", RTLD_NOW | RTLD_LOCAL);
-    if (!lib) lib = dlopen("libplayerAPIs.so.1", RTLD_NOW | RTLD_LOCAL);
+    /* RTLD_NODELETE: a sonda roda a cada video e fecha a lib no fim. No
+     * webOS 3 a libplayerAPIs e quem traz GLib/GObject/GStreamer para o
+     * processo, e elas sobem fios ao carregar; o dlclose as descarregava
+     * com os fios rodando e a 2a sonda da sessao caia (SIGSEGV com pc fora
+     * de qualquer modulo, 65SJ800V/OLED55B7P). Carregada uma vez, fica. */
+    lib = dlopen("libplayerAPIs.so", RTLD_NOW | RTLD_LOCAL | RTLD_NODELETE);
+    if (!lib) lib = dlopen("libplayerAPIs.so.1", RTLD_NOW | RTLD_LOCAL | RTLD_NODELETE);
     if (!lib) {
       fprintf(stderr, "[dts] firmware library load failed: %s\n", dlerror());
       return false;

@@ -207,7 +207,7 @@ typedef enum {
   // vivo, nao quero Perfil e Stats nem o Guia"). NO FIM do enum de proposito:
   // valor[] e CHAVE sao posicionais, e inserir no meio deslocaria o padrao de
   // tudo o que vem depois (o defeito do #149).
-  AJ_MENU_EXPLORAR, AJ_MENU_GUIA, AJ_MENU_PERFIL,
+  AJ_MENU_GUIA, AJ_MENU_PERFIL,
   // Trailer do cartaz em foco no destaque (#124). No fim pelo mesmo motivo.
   AJ_FOCO_TRAILER,
   // Itens por fileira da Home (#163). No fim pelo mesmo motivo.
@@ -1048,7 +1048,6 @@ static const Opcao OPCOES[AJ_N] = {
   ACAO("Chave do fanart.tv"),
   ACAO("Diagnóstico e otimização"),
   ACAO("Teste de velocidade"),
-  ESC("Explorar na barra lateral",       V_LIGA, 2),   // local: menuExplorarLocal
   ESC("Guia TV na barra lateral",        V_LIGA, 2),   // local: menuGuiaLocal
   ESC("Perfil e Stats na barra lateral", V_LIGA, 2),   // local: menuPerfilLocal
   ESC("Trailer do cartaz em foco",       V_LIGA, 2),   // focusedPosterBackdropTrailerEnabled
@@ -1278,7 +1277,7 @@ static const char *CHAVE[] = {
   "-diagnostico",
   "-velocidade",
   // Locais e SEM o "-": sobrevivem ao fechamento, e o web nao tem a escolha.
-  "menuExplorarLocal", "menuGuiaLocal", "menuPerfilLocal",
+  "menuGuiaLocal", "menuPerfilLocal",
   // A MESMA chave do web (layoutPreferences), entao segue a conta.
   "focusedPosterBackdropTrailerEnabled",
   "itensFileiraLocal",
@@ -2002,7 +2001,6 @@ float ajustes_trailer_zoom(void)      { static const float z[] = { 1.34f, 1.15f,
 int   ajustes_trailer_qualidade(void) { static const int t[] = { 0, 1080, 720, 480 }; int v = valor[AJ_TRAILER_QUAL]; return (v >= 0 && v < 4) ? t[v] : 0; }
 // Fonte do trailer: o TRF_* de trailerfonte.h. Fora da lista le Automatico.
 int   ajustes_trailer_fonte(void)     { int v = valor[AJ_TRAILER_FONTE]; return (v >= 0 && v < nValores(AJ_TRAILER_FONTE)) ? v : 0; }
-int  ajustes_menu_explorar(void)      { return lig(AJ_MENU_EXPLORAR); }
 int  ajustes_menu_guia(void)          { return lig(AJ_MENU_GUIA); }
 int  ajustes_menu_perfil(void)        { return lig(AJ_MENU_PERFIL); }
 int  ajustes_gpu_efeitos(void) { return valor[AJ_GPU_EFEITOS]; }
@@ -3492,7 +3490,7 @@ static int somenteDesteAparelho(int op) {
     case AJ_SELO_VISTO:     /* o web nao tem a escolha */
      /* o web nao tem a pergunta */
     case AJ_SEEKR_LIGADO: case AJ_SEEKR_FITA: case AJ_SEEKR_AJUSTE: /* o web nao tem o Seekr */
-    case AJ_MENU_EXPLORAR: case AJ_MENU_GUIA: case AJ_MENU_PERFIL:
+    case AJ_MENU_GUIA: case AJ_MENU_PERFIL:
     // Linha do titulo: o web nao tem, e nenhuma conta pode desliga-las aqui.
     case AJ_NT_IMDB: case AJ_NT_TOMATES: case AJ_NT_AUDIENCIA: case AJ_NT_META:
     case AJ_NT_METAUSER: case AJ_NT_TRAKT: case AJ_NT_TMDB: case AJ_NT_LETTER:
@@ -4095,7 +4093,7 @@ static int inativa(int op) {
     // Dinamica ele e sempre de ponta a ponta e rola junto com as fileiras.
     case AJ_HERO_CHEIO:   return ajustes_home_layout() != HOME_LAYOUT_MODERNA;
     // #162: o Descobrir do app web (navegar catalogos por tipo e genero) ainda
-    // nao existe nesta TV — o "Explorar" daqui e outra tela. A escolha vem e
+    // nao existe nesta TV. A escolha vem e
     // vai para a conta, mas aqui nao muda nada, e a linha tem de dizer isso.
     case AJ_DESCOBRIR:    return 1;
     // Tela de descanso: o estilo depende de haver descanso; os titulos, de ele
@@ -4513,7 +4511,7 @@ static const char *ajudaOpcao(int op) {
     case AJ_MEDIDOR: return "Mostra quadros por segundo, o pior quadro e a memória dentro da ilha do relógio, atualizados a cada 3 s. Mínimo fica na linha da hora, Menor ganha uma segunda linha e Grande abre o painel completo. Quando a ilha mostra um aviso, o medidor se recolhe e volta depois.";
     case AJ_GUIA: return "O que o Nuvio faz, em 12 capítulos. Cada recurso diz onde fica e tem um atalho para ele.";
     case AJ_DIAGNOSTICO: return "Testa manifestos, fontes e artes dos addons, mede os tempos e aplica um perfil seguro de Qualidade ou Desempenho. O teste não marca títulos como assistidos.";
-    case AJ_MENU_EXPLORAR: case AJ_MENU_GUIA: case AJ_MENU_PERFIL:
+    case AJ_MENU_GUIA: case AJ_MENU_PERFIL:
       return "Desligado, o item some da barra lateral. Nada é apagado: ligue de novo para ele voltar.";
     case AJ_VELOCIDADE: return "Mede a velocidade dos seus addons e das fontes nesta TV e diz até quantos GB por filme e por episódio tocam sem travar. Não muda nenhum ajuste.";
 
