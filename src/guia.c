@@ -2145,8 +2145,6 @@ static void epgPaisesEscolher(void) {
   { // 2. regiao do idioma dos metadados
     const char *t = ajustes_tmdb_idioma();
     if (t && strlen(t) == 5 && t[2] == '-') { char r[3] = { t[3], t[4], 0 }; if (!strcmp(r, "GB")) snprintf(r, 3, "UK"); ADD(r); } }
-  // 3. idioma do app
-  if (ajustes_idioma() == IDIOMA_RO) ADD("RO");
   #undef ADD
   // Portugues (e o pt-BR que o "da interface" devolve) cai nas cinco de sempre
   // sem precisar dizer: BR sozinho seria menos do que quem ja usa tinha.
@@ -3590,8 +3588,7 @@ static void desenharPainelAddons(float a) {
         txt_desenhar_alpha(t, x + 24.0f, yi + 48.0f, a);
       } else if (rc->desc[0]) {
         // Em ingles usa a quarta coluna se existir; senao a portuguesa, que e
-        // melhor que linha vazia.
-        const char *desc = (ajustes_idioma() != IDIOMA_PT && ajustes_idioma() != IDIOMA_PTPT && rc->descEn[0]) ? rc->descEn : rc->desc;
+        const char *desc = rc->descEn[0] ? rc->descEn : rc->desc;
         if (f) txt_bloco(TXT_CAPTION, desc, 190, 192, 200,     x + 24.0f, yi + 46.0f, txtW, 27.0f, a, 2);
         else   txt_bloco(TXT_CAPTION, desc, 150, 153, 162,  x + 24.0f, yi + 46.0f, txtW, 27.0f, a, 2);
       }

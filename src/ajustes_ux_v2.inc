@@ -488,10 +488,7 @@ static void aj2Cor8(const float c[3], int *r, int *g, int *b) {
 // no escuro, chip ligado e "HDR" de grupo, cada uma com a razao de contraste
 // e a meta (verde passa, vermelho nao); embaixo, a familia e o OKLCH.
 static void aj2Num(char *d, size_t n, const char *fmt, float v) {
-  char *p;
   snprintf(d, n, fmt, v);
-  if (ajustes_idioma() == IDIOMA_PT || ajustes_idioma() == IDIOMA_PTPT)
-    for (p = d; *p; p++) if (*p == '.') *p = ',';
 }
 static float aj2CorMedidas(float x, float y, float w, float fim, float a) {
   static const float ILHA[3] = { 18 / 255.0f, 19 / 255.0f, 22 / 255.0f };

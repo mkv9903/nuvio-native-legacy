@@ -50,10 +50,8 @@ import re, sys, pathlib
 
 RAIZ = pathlib.Path(__file__).resolve().parent.parent
 SRC = RAIZ / "src"
-# Na ordem de IDIOMA_* (idiomacod.h). O nome do arquivo e idioma_<cod>.h.
-IDIOMAS = ("ro", "uk", "ru", "fr", "de", "es", "it", "nl", "pl", "tr", "ptpt", "sv",
-           "da", "no", "cs", "sk", "sl", "hu", "lt", "bs", "sr", "bg", "el", "id",
-           "vi", "ja", "zhcn", "zhtw")
+# English-only: no sibling translation headers.
+IDIOMAS = ()
 CIRILICOS = ("uk", "ru", "bg")
 NAO_LATINOS = CIRILICOS + ("el", "ja", "zhcn", "zhtw")
 CJK = ("ja", "zhcn", "zhtw")

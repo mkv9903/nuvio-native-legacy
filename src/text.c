@@ -595,8 +595,7 @@ static int faltantes(TTF_Font *fonte, const char *s, Uint32 *primeiro) {
 
 // A variante CJK que a INTERFACE pede (ver Escrita).
 static Escrita variacaoCjk(void) {
-  int lg = ajustes_idioma();
-  return lg == IDIOMA_ZHCN ? ESC_CJK_SC : lg == IDIOMA_ZHTW ? ESC_CJK_TC : ESC_CJK;
+  return ESC_CJK;
 }
 
 // A fonte de reserva de `e` que melhor desenha `s`, na lista da escrita: a

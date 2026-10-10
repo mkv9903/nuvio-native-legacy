@@ -458,9 +458,6 @@ IGNORAR = {
 }
 
 def sem_corpo_em_js(txt):
-    """Apaga o corpo dos EM_JS/EM_ASM, trocando por espaco e mantendo o \n.
-
-    O corpo de um EM_JS e JAVASCRIPT escrito dentro de um arquivo .c, e esta
     """Erases EM_JS/EM_ASM body, replacing with spaces and keeping \n.
 
     The body of an EM_JS is JAVASCRIPT written inside a .c file, and this

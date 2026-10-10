@@ -653,15 +653,7 @@ static const char *V_TRAILFONTE[] = { "Automático", "Apple TV", "IMDb", "YouTub
 // demais sao nativos de proposito). Ele nao e um idioma: valor[AJ_IDIOMA] e o
 // INDICE DESTA LISTA (0 = automatico, 1 + IDIOMA_* = escolha manual), e o que
 // vai para o disco e outra coisa (ver "IDIOMA AUTOMATICO" mais abaixo).
-static const char *V_IDIOMA[]    = { "Automático", "Português", "English", "Română", "Українська", "Русский",
-                                     "Français", "Deutsch", "Español",
-                                     // Os 22 de 2026-09, na ordem de IDIOMA_IT... IDIOMA_ZHTW. Os tres
-                                     // ultimos (日本語, 简体中文, 繁體中文) so desenham porque text.c manda
-                                     // a linha para a fonte de reserva CJK (ver fonteDe).
-                                     "Italiano", "Nederlands", "Polski", "Türkçe", "Português (Portugal)",
-                                     "Svenska", "Dansk", "Norsk", "Čeština", "Slovenčina", "Slovenščina",
-                                     "Magyar", "Lietuvių", "Bosanski", "Srpski", "Български", "Ελληνικά",
-                                     "Bahasa Indonesia", "Tiếng Việt", "日本語", "简体中文", "繁體中文" };
+static const char *V_IDIOMA[]    = { "Automático", "English" };
 static const char *V_ANIM[]      = { "Completas", "Reduzidas" };
 static const char *V_FONTE_UI[]  = { "Inter", "LG Display", "Droid Sans",
                                      "Montserrat", "Roboto",
@@ -1868,11 +1860,9 @@ static char contaLegLing[24];       // subtitle_preferred_language cru
 static char sistemaLoc[32];         // locale da TV ("pt-BR"), "" = desconhecido
 
 int ajustes_idioma(void) {
-  if (valor[AJ_IDIOMA] == 0) return idiomaEfetivo;
-  { int v = valor[AJ_IDIOMA] - 1;
-    return v >= 0 && v < IDIOMA_N ? v : IDIOMA_PT; }
+  return IDIOMA_EN;
 }
-int ajustes_idioma_ingles(void)       { return ajustes_idioma() == IDIOMA_EN; }
+int ajustes_idioma_ingles(void)       { return 1; }
 
 // 1 = o tema escolhido e um dos dinamicos (cor viva), que so existem nesta TV.
 static int temaEhDinamico(int v) {
@@ -2320,38 +2310,7 @@ const char *ajustes_tmdb_idioma(void) {
   // "Da interface" resolve AQUI, na hora de perguntar, e nao na gravacao:
   // trocar o idioma do app tem de refletir sem tocar neste ajuste.
   if (!L[v]) {
-    switch (ajustes_idioma()) {
-      case IDIOMA_EN: return "en-US";
-      case IDIOMA_RO: return "ro-RO";
-      case IDIOMA_UK: return "uk-UA";
-      case IDIOMA_RU: return "ru-RU";
-      case IDIOMA_FR: return "fr-FR";
-      case IDIOMA_DE: return "de-DE";
-      case IDIOMA_ES: return "es-ES";
-      case IDIOMA_IT: return "it-IT";
-      case IDIOMA_NL: return "nl-NL";
-      case IDIOMA_PL: return "pl-PL";
-      case IDIOMA_TR: return "tr-TR";
-      case IDIOMA_PTPT: return "pt-PT";
-      case IDIOMA_SV: return "sv-SE";
-      case IDIOMA_DA: return "da-DK";
-      case IDIOMA_NO: return "nb-NO";    // o TMDB chama o bokmal de "nb"
-      case IDIOMA_CS: return "cs-CZ";
-      case IDIOMA_SK: return "sk-SK";
-      case IDIOMA_SL: return "sl-SI";
-      case IDIOMA_HU: return "hu-HU";
-      case IDIOMA_LT: return "lt-LT";
-      case IDIOMA_BS: return "bs-BA";
-      case IDIOMA_SR: return "sr-RS";
-      case IDIOMA_BG: return "bg-BG";
-      case IDIOMA_EL: return "el-GR";
-      case IDIOMA_ID: return "id-ID";
-      case IDIOMA_VI: return "vi-VN";
-      case IDIOMA_JA: return "ja-JP";
-      case IDIOMA_ZHCN: return "zh-CN";
-      case IDIOMA_ZHTW: return "zh-TW";
-      default:        return "pt-BR";
-    }
+    return "en-US";
   }
   return L[v];
 }
@@ -6888,7 +6847,7 @@ void ajustes_teste_ux_captura(int cenario) {
   if (getenv("NUVIO_SHOT_TEMA") || getenv("NUVIO_SHOT_VIDRO"))   // idem NUVIO_SHOT_TEMA / _VIDRO
     ajustes_teste_tema(getenv("NUVIO_SHOT_TEMA") ? atoi(getenv("NUVIO_SHOT_TEMA")) : -1,
                        getenv("NUVIO_SHOT_VIDRO") && atoi(getenv("NUVIO_SHOT_VIDRO")));
-  valor[AJ_IDIOMA] = IDIOMA_PT + 1;
+  valor[AJ_IDIOMA] = 0;
   uxCancelar(); uxAviso[0] = 0; uxRetornarOp = -1;
   scrollY = velY = 0; paginaA = 1;
   focarSecao(0); focoIndice = 1;
@@ -6903,7 +6862,7 @@ void ajustes_teste_ux_captura(int cenario) {
   if (cenario == 6) focarOpcao(AJ_TEX_MB);
   if (cenario == 7) { focarOpcao(AJ_LARGURA_DP); uxAbrirEditor(AJ_LARGURA_DP); uxEvento(SDLK_DOWN); }
   if (cenario == 8) { focarSecao(0); uxIndice = 1; focoIndice = 1; uxChipAv = 1; }
-  if (cenario == 9) { valor[AJ_IDIOMA] = IDIOMA_EN + 1; focarOpcao(AJ_HOME_LAYOUT); uxAbrirEditor(AJ_HOME_LAYOUT); }
+  if (cenario == 9) { valor[AJ_IDIOMA] = 0; focarOpcao(AJ_HOME_LAYOUT); uxAbrirEditor(AJ_HOME_LAYOUT); }
   if (cenario == 21) focarOpcao(AJ_FOCO_TRAILER);
   if (cenario == 22) { focarOpcao(AJ_FOCO_TRAILER); uxAbrirEditor(AJ_FOCO_TRAILER); }
   if (cenario >= 10 && cenario < 21) { focarSecao(cenario - 10); focoIndice = 1; }
@@ -6965,7 +6924,7 @@ int ajustes_teste_quadro(const char *id) {
   int tema = valor[AJ_TEMA], vidro = valor[AJ_VIDRO];
   memcpy(valor, valorPadrao, sizeof valor);
   valor[AJ_TEMA] = tema; valor[AJ_VIDRO] = vidro;
-  valor[AJ_IDIOMA] = IDIOMA_PT + 1;
+  valor[AJ_IDIOMA] = 0;
   // NUVIO_SHOT_IDIOMA=N (IDIOMA_*: 1 en, 4 ru, 6 de...): o quadro sai nesse idioma.
   if (getenv("NUVIO_SHOT_IDIOMA") && *getenv("NUVIO_SHOT_IDIOMA")) valor[AJ_IDIOMA] = atoi(getenv("NUVIO_SHOT_IDIOMA")) + 1;
   // NUVIO_SHOT_LAYOUT=2 (HOME_LAYOUT_*): the owner's Dinamica layout, whose menu

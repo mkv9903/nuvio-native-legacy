@@ -590,8 +590,7 @@ static void *fioCanalFn(void *u) {
       char tit[160] = "", titEn[160] = "", txt[420] = "", txtEn[420] = "";
       // Todo idioma que nao o portugues le o texto em ingles: o canal so tem pt e en, e
       // o ingles e o que mais gente entende. So o portugues (o do Brasil e o de
-      // Portugal) le o portugues.
-      int ingles = ajustes_idioma() != IDIOMA_PT && ajustes_idioma() != IDIOMA_PTPT, ok = 1;
+      int ingles = 1, ok = 1;
       js_texto(p, f, "id", id, sizeof id);
       js_texto(p, f, "desde", desde, sizeof desde);
       js_texto(p, f, "ate", ate, sizeof ate);
