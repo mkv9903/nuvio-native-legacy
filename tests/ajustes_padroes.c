@@ -67,7 +67,6 @@ int main(void) {
   // que caia aqui era o do envio automatico. As duas pontas da faixa agora.
   assert(valor[AJ_SALVOS_DEST] == 1);
   assert(valor[AJ_STALKER_PORTAL] == 0 && valor[AJ_XTREAM_LIMPAR] == 0);
-  assert(valor[AJ_ENVIO_AUTO] == 0);          // envio sozinho: LIGADO (dono)
   assert(valor[AJ_TEX_MB] == 0);              // memoria para imagens: auto
   // #163: itens por fileira nasce em 12 (o de sempre); 18 e 24 sao escolha,
   // com o aviso de memoria para TV de 1 GB. E a opcao vive neste aparelho.

@@ -37,18 +37,18 @@ int main(void) {
           "7e000000-7e100000 rw-p 00000000 00:00 0 [stack]\n", g);
     fclose(g); }
   fflush(stdout);
-  { char sai[256]; FILE *g; char tudo[2048] = ""; int fd, velho;
+  { char sai[sizeof arq + 4]; FILE *g; char tudo[2048] = ""; int fd, velho;
     snprintf(sai, sizeof sai, "%s.out", arq);
     velho = dup(1); g = fopen(sai, "wb"); fd = fileno(g); dup2(fd, 1);
     assert(queda_relatar(arq));
     fflush(stdout); dup2(velho, 1); close(velho); fclose(g);
     g = fopen(sai, "rb"); fread(tudo, 1, sizeof tudo - 1, g); fclose(g); remove(sai);
-    assert(strstr(tudo, "sinal 11"));
+    assert(strstr(tudo, "signal 11"));
     assert(strstr(tudo, "pc nuvio-proto.arm+0x234"));
     assert(strstr(tudo, "lr libSDL2-2.0.so.0+0x2010"));
-    assert(strstr(tudo, "pilha nuvio-proto.arm+0x400"));
-    assert(strstr(tudo, "pilha libSDL2-2.0.so.0+0x3000"));
-    assert(!strstr(tudo, "stack")); }
+    assert(strstr(tudo, "stack nuvio-proto.arm+0x400"));
+    assert(strstr(tudo, "stack libSDL2-2.0.so.0+0x3000"));
+    assert(!strstr(tudo, "[stack]")); }
   puts("queda: relato gravado no sinal, traduzido para modulo+deslocamento e apagado");
   return 0;
 }

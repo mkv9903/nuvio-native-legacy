@@ -83,7 +83,6 @@ static void resultadoC9(void) {
   d.medAntes = (PtvMedida){ 1886, 10, 0, 33, 0 };
   d.medDepois = (PtvMedida){ 1650, 10, 0, 30, 0 };
   d.aplicacao = DA_MANTIDO;
-  d.enviado = 1;
   d.sug = (PtvSugestao){ 1, PTV_FONTE_METAHUB, 1, PTV_FONTE_TMDB, PTV_FONTE_CATALOGO, 1930, 420 };
   d.sugEstado = DS_PROPOSTA;
   d.relatorio[0] = 'x';
@@ -169,14 +168,13 @@ int main(int argc, char **argv) {
   captura(nome, w, 0);
 
   // O outro desfecho: reteste pior, restaurado sozinho; sugestao desfeita;
-  // envio sem recibo, com o botao de reenviar; foco no segundo botao.
+  // Local result after rollback; focus on the second remaining button.
   resultadoC9();
   d.medDepois = (PtvMedida){ 2710, 10, 0, 64, 0 };
   d.aplicacao = DA_RESTAURADO_AUTO;
   d.motivo = "Artes ficaram mais lentas depois da mudança";
   d.sugEstado = DS_DESFEITA;
   d.sugMotivo = "Artes ficaram mais lentas depois da mudança";
-  d.enviado = 0; d.envioFalhou = 1;
   d.botao = 1;
   snprintf(nome, sizeof nome, "%s-5-restaurado.bmp", saida);
   captura(nome, w, 0);
@@ -226,14 +224,6 @@ int main(int argc, char **argv) {
   vz.resultado = VR_OK;
   atomic_store(&vz.estado, 2);
   snprintf(nome, sizeof nome, "%s-9-velocidade-resultado.bmp", saida);
-  captura(nome, w, 0);
-
-  // Samsung com CDN sem CORS: diz que nao mediu, sem numero inventado.
-  atomic_store(&vz.nFonte, 0);
-  vz.nAmostra = 0;
-  memset(&vz.resumo, 0, sizeof vz.resumo);
-  vz.resultado = VR_NAVEGADOR;
-  snprintf(nome, sizeof nome, "%s-10-velocidade-navegador.bmp", saida);
   captura(nome, w, 0);
 
   // CICLO COMPLETO e POR ADD-ON (numeros inventados, do tamanho do real): 37

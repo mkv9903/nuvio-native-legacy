@@ -106,7 +106,7 @@ static void dgApresentacao(int primeiraAbertura) {
   y += 150 + 28;
   y += dgBloco(TXT_AJ_TEXTO, "O app lê manifestos e catálogos, testa artes e fontes de vídeo e compara o caminho de carregamento desta TV.",
                x, y, m.w - 112, 30, 0.62f, 2) + 18;
-  y += ajustes_ui_ef("aj_triangle-alert", i18n("Haverá testes de rede e consumo de dados. O relatório técnico será enviado automaticamente ao suporte."),
+  y += ajustes_ui_ef("aj_triangle-alert", i18n("Haverá testes de rede e consumo de dados. O relatório técnico ficará guardado neste aparelho."),
                      x, y, m.w - 112);
   y += 30;
   { TxtLinha n = dgT(TXT_ILHA_GENERO, "Não altera assistidos, histórico, progresso ou scrobbling.");
@@ -140,7 +140,7 @@ static void dgObjetivo(void) {
   ajustes_ui_ilha(e, 36, 0);
   y = e.y + 42;
   y += dgTitulo("Desempenho desta TV", "Diagnóstico e otimização", TXT_ILHA_TITULO, x, y, w);
-  y += 8 + dgBloco(TXT_AJ_SUB, "Teste os addons, artes e fontes desta TV; o relatório é enviado ao suporte.", x, y + 8, w, 26.6f, 0.55f, 2);
+  y += 8 + dgBloco(TXT_AJ_SUB, "Teste os addons, artes e fontes desta TV; o relatório fica guardado neste aparelho.", x, y + 8, w, 26.6f, 0.55f, 2);
   y += 34;
   { TxtLinha t = dgT(TXT_AJ_SECAO, "Objetivo"), d2 = dgT(TXT_ILHA_GENERO, "Esquerda e direita escolhem o objetivo");
     txt_desenhar(t, x, y); txt_desenhar_alpha(d2, x + w - d2.w, y + t.h - d2.h - 2, 0.42f); y += t.h + 16; }
@@ -192,19 +192,19 @@ static void dgObjetivo(void) {
     txt_bloco(TXT_AJ_ITEM, i18n(PASSOS[i]), 243, 242, 239, x + 78, cy - (18 + 4 + h) * 0.5f + 22, w - 78, 29.4f, 0.88f, 2);
   }
   { float h2 = 0, yb = dr.y + dr.h - 42;
-    float a1 = txt_bloco(TXT_AJ_ESTADO, i18n("O relatório compacto é guardado localmente e só fica como enviado após confirmação do servidor."), 0, 0, 0, 0, -4000, w - 64, 24.65f, 0, 3);
+    float a1 = txt_bloco(TXT_AJ_ESTADO, i18n("O relatório técnico fica guardado localmente neste aparelho."), 0, 0, 0, 0, -4000, w - 64, 24.65f, 0, 3);
     h2 = 28 + 24.65f;
     yb -= h2;
     ajustes_ui_ef("aj_eye", i18n("Não altera assistidos, histórico, progresso ou scrobbling."), x, yb, w);
     yb -= 10 + a1 + 28;
-    ajustes_ui_ef("aj_file-text", i18n("O relatório compacto é guardado localmente e só fica como enviado após confirmação do servidor."), x, yb, w); }
+    ajustes_ui_ef("aj_file-text", i18n("O relatório técnico fica guardado localmente neste aparelho."), x, yb, w); }
 }
 
 // --- ESTADO 1: EM ANDAMENTO ----------------------------------------------------
 static void dgAndamento(Uint32 agora) {
   static const char *const ETAPAS[6] = {
     "Sondando manifestos, catálogos e fontes", "Medindo cada fonte de arte", "Artes com o cache frio",
-    "Artes com o perfil atual", "Artes com o perfil candidato", "Gravando e enviando o relatório",
+    "Artes com o perfil atual", "Artes com o perfil candidato", "Gravando o relatório local",
   };
   int fase = atomic_load(&d.fase), feito = atomic_load(&d.feitos), total = atomic_load(&d.total), i;
   float pct, ar, ag, ab;
@@ -333,15 +333,11 @@ static void dgResultado(void) {
     for (k = 1; k < PTV_N_FONTES; k++) { ok += d.fonte[k].ok; fal += d.fonte[k].falhas; }
     snprintf(v, sizeof v, i18n("%d ok · %d falhas"), ok, fal);
     y += dgStat("Artes", v, x, y, w); }
-  { const char *rel = atomic_load(&d.enviando) ? "enviando…" : d.envioFalhou ? "guardado; envio falhou"
-                    : d.enviado ? "enviado ao suporte" : "guardado localmente";
-    TxtLinha k = dgT(TXT_AJ_ESTADO, "Relatório");
-    TxtLinha r = d.envioFalhou ? txt_linha(TXT_AJ_ESTADO, rel, 229, 83, 75, 255) : d.enviado ? txt_linha(TXT_AJ_ESTADO, rel, 76, 195, 138, 255) : dgT(TXT_AJ_ESTADO, rel);
+  { TxtLinha k = dgT(TXT_AJ_ESTADO, "Relatório");
+    TxtLinha r = dgT(TXT_AJ_ESTADO, "guardado localmente");
     gfx_cor((GfxRect){ x, y, w, 1 }, 0, 1, 1, 1, 0.07f);
     txt_desenhar_alpha(k, x, y + 13, 0.45f);
-    txt_desenhar(r, x + w - r.w, y + 13);
-    if (d.envioFalhou) dgPonto(x + w - r.w - 17, y + 13 + r.h * 0.5f, DG_VERM);
-    else if (d.enviado) dgPonto(x + w - r.w - 17, y + 13 + r.h * 0.5f, DG_VERDE); }
+    txt_desenhar(r, x + w - r.w, y + 13); }
   // Artes por fonte
   ajustes_ui_ilha(tr, 32, 0);
   x = tr.x + 34; w = tr.w - 68; y = tr.y + 30;

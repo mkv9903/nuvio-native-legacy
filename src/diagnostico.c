@@ -3,7 +3,7 @@
 //
 // Este modulo mede o que esta sob controle do Nuvio e deixa claro quando um
 // defeito esta no servidor externo. Nenhuma URL completa, token ou titulo
-// pessoal entra no relatorio enviado.
+// pessoal entra no relatorio local.
 //
 // O FLUXO, na ordem em que acontece:
 //   1. fio do diagnostico: manifestos, catalogos, fontes de video e os assets
@@ -19,7 +19,7 @@
 //      diz o motivo; dentro do ruido (sem ganho alem da margem) -> o anterior
 //      tambem volta, `mantido_ruido`; ganho medido -> o perfil fica e vai
 //      para o disco;
-//   5. fio do diagnostico: relatorio e envio.
+//   5. fio do diagnostico: gravacao do relatorio local.
 //
 // O TESTE DE VELOCIDADE ("Teste de velocidade", botao proprio) roda SOZINHO,
 // em outro fio e com estado fora de `d`: tempo do endpoint de fontes de cada
@@ -149,16 +149,15 @@ typedef struct {
 
 typedef struct {
   _Atomic int estado; // 0 parado, 1 rodando, 2 pronto, 3 cancelado, 4 falhou
-  _Atomic int fase;   // 1 addons, 2 fontes de arte, 3 frio, 4 antes, 5 depois, 6 envio
+  _Atomic int fase;   // 1 addons, 2 fontes de arte, 3 frio, 4 antes, 5 depois, 6 gravacao local
   _Atomic int total;
   _Atomic int feitos;
   _Atomic int cancelado;
   _Atomic int sondasProntas;   // fio -> desenho: fases 1 e 2 acabaram
   _Atomic int passesProntos;   // desenho -> fio: comparacao decidida
   _Atomic int experimento;     // 0 nenhum, 1 teste, 2 dono desenho, -1 timeout
-  _Atomic int enviando;
   _Atomic int sugPronta;       // fio da sugestao terminou a medida
-  SDL_Thread *fio, *fioEnvio, *fioSug;
+  SDL_Thread *fio, *fioSug;
   DiagnosticoModo modo;
   char id[40];
   DiagAddon addon[DIAG_MAX_ADDONS];
@@ -218,16 +217,10 @@ typedef struct {
   char sugUrlA[DIAG_MAX_TITULOS][512], sugUrlB[DIAG_MAX_TITULOS][512];
   PtvMedida sugA, sugB;
   const char *sugMotivo;
-  int enviado;
-  int envioFalhou;
-  char registroId[96];
   int intro;
   int botao;
   Uint32 inicioMs;
   int coberturaParcial;
-  // O teste de velocidade terminou DEPOIS do envio: o relatorio foi remontado
-  // com ele e o "Enviar de novo" aparece (botaoVisivel).
-  int vazaoPendente;
   char erro[128];
   char relatorio[20000];
 } Diagnostico;
@@ -264,7 +257,7 @@ static int focoLinha;
 
 typedef enum {
   VR_OK = 0, VR_SEM_ADDONS, VR_SEM_FONTES, VR_AVISO, VR_RECUSADO,
-  VR_SEM_RESPOSTA, VR_NAVEGADOR, VR_CURTO, VR_CANCELADO, VR_N
+  VR_SEM_RESPOSTA, VR_CURTO, VR_CANCELADO, VR_N
 } VazResultado;
 
 typedef struct {
@@ -1076,7 +1069,7 @@ static int candidatasMediveis(void) {
 static const char *vazaoNome(VazResultado r) {
   static const char *const NOMES[VR_N] = {
     "ok", "sem_addons", "sem_fontes", "aviso", "recusado", "sem_resposta",
-    "navegador", "curto", "cancelado"
+    "curto", "cancelado"
   };
   return r >= 0 && r < VR_N ? NOMES[r] : "desconhecido";
 }
@@ -1177,9 +1170,9 @@ static void montarRelatorio(void) {
                  vz.ciclo == VCM_ADDON ? "addon" : "completo", VAZ_CICLO_JANELA_S,
                  vz.agenda.tentadas, vz.agenda.medidas, vz.agenda.falhas, vz.debridTotal,
                  vz.sel.duplicadas, vz.sel.foraDoLimite, vz.agenda.restantes);
-    ACRESCENTA("vazao_falhas=aviso:%d|recusado:%d|sem_resposta:%d|navegador:%d|curto:%d\n",
+    ACRESCENTA("vazao_falhas=aviso:%d|recusado:%d|sem_resposta:%d|curto:%d\n",
                vz.falhas[VR_AVISO], vz.falhas[VR_RECUSADO], vz.falhas[VR_SEM_RESPOSTA],
-               vz.falhas[VR_NAVEGADOR], vz.falhas[VR_CURTO]);
+               vz.falhas[VR_CURTO]);
     for (i = 0; vz.ciclo == VCM_RAPIDO && i < nf && left > 40; i++) {
       const VazFonte *f = &vz.fonte[i];
       ACRESCENTA("vazao_fonte=%d|mediana_kbps=%d|p20_kbps=%d|segundos=%d|mb=%lld|http=%d\n",
@@ -1332,25 +1325,9 @@ static int diagnosticoWorker(void *arg) {
            d.id, d.nAddon, d.nAssets, d.streamOk, d.streamFalhas, aplicacaoNome(d.aplicacao));
     printf("[diagnostico] relatorio fim\n");
     fflush(stdout);
-    // O relatorio segue por um envio proprio, com a execucao correlacionada.
-    // O log geral da sessao nao entra neste caminho. So conta como enviado
-    // com o `registro_id` da resposta (avisos.c: extrairRegistroId).
-    d.enviado = avisos_enviar_diagnostico(d.id, d.relatorio,
-                                          d.registroId, sizeof d.registroId);
-    d.envioFalhou = !d.enviado;
   }
   if (atomic_load(&d.cancelado)) atomic_store(&d.estado, 3);
   else atomic_store(&d.estado, 2);
-  return 0;
-}
-
-static int envioWorker(void *arg) {
-  (void)arg;
-  d.enviado = avisos_enviar_diagnostico(d.id, d.relatorio,
-                                        d.registroId, sizeof d.registroId);
-  d.envioFalhou = !d.enviado;
-  if (d.enviado) d.vazaoPendente = 0;
-  atomic_store(&d.enviando, 0);
   return 0;
 }
 
@@ -1520,7 +1497,6 @@ static void vazaoAddons(void) {
 static VazResultado falhaDaMedida(const RedeVazao *r, int amostras) {
   if (r->cancelado) return VR_CANCELADO;
   if (r->status >= 400) return VR_RECUSADO;
-  if (r->erro == -1) return VR_NAVEGADOR;
   if (!r->status) return VR_SEM_RESPOSTA;
   return amostras > 0 ? VR_OK : VR_CURTO;
 }
@@ -1886,32 +1862,26 @@ static void acionarVazBotao(int b) {
 
 #define VAZ_LINHAS_RANKING 8
 
-// O teste acabou (fio de desenho). Com um relatorio de diagnostico ja
-// montado, ele e remontado com a vazao e o "Enviar de novo" aparece: o
-// relatorio que ja saiu nao a tinha.
+// After the speed test, update the existing local diagnostic report.
 static void concluirVazao(void) {
   if (vz.fio) { SDL_WaitThread(vz.fio, NULL); vz.fio = NULL; }
-  if (atomic_load(&vz.estado) != 2 || atomic_load(&d.estado) != 2 || !d.relatorio[0] ||
-      atomic_load(&d.enviando))
+  if (atomic_load(&vz.estado) != 2 || atomic_load(&d.estado) != 2 || !d.relatorio[0])
     return;
   montarRelatorio();
   dados_gravar("diagnostico-otimizacao.txt", d.relatorio);
-  if (d.enviado) d.vazaoPendente = 1;
 }
 
 static void juntarFios(int esperarTodos) {
   if (d.fio && (esperarTodos || atomic_load(&d.estado) != 1)) {
     SDL_WaitThread(d.fio, NULL); d.fio = NULL;
   }
-  if (d.fioEnvio && (esperarTodos || !atomic_load(&d.enviando))) {
-    SDL_WaitThread(d.fioEnvio, NULL); d.fioEnvio = NULL;
-  }
+
 }
 
 void diagnostico_iniciar(void) {
   // VOLTAR A TELA NO MEIO DE UM TESTE nao pode zerar o estado: o fio ainda
   // escreve em `d`. A barra lateral deixa sair durante o teste.
-  if (atomic_load(&d.estado) == 1 || atomic_load(&d.experimento) != 0 || d.fioSug || atomic_load(&d.enviando) ||
+  if (atomic_load(&d.estado) == 1 || atomic_load(&d.experimento) != 0 || d.fioSug ||
       atomic_load(&vz.estado) == 1) {
     sairTela = 0;
     // O atalho com um teste de velocidade JA rodando (a barra lateral deixa
@@ -1981,7 +1951,7 @@ void diagnostico_recuperar_checkpoint(void) {
 
 static void iniciarTeste(void) {
   int intro = d.intro, i, t, f;
-  if (atomic_load(&d.estado) == 1 || atomic_load(&d.experimento) != 0 || d.fioSug || atomic_load(&d.enviando)) return;
+  if (atomic_load(&d.estado) == 1 || atomic_load(&d.experimento) != 0 || d.fioSug) return;
   // Um teste por vez: o diagnostico mediria a rede ocupada pela vazao.
   if (atomic_load(&vz.estado) == 1) return;
   juntarFios(1);
@@ -2025,9 +1995,9 @@ static void iniciarTeste(void) {
 // coloridas ja tem dono (vermelha = painel de registro, verde = painel DOM no
 // Tizen, azul = Salvos): a acao vira botao navegavel por esquerda/direita.
 
-enum { B_RETESTAR, B_RESTAURAR, B_SUGESTAO, B_REENVIAR, B_VELOCIDADE, B_OBJETIVO, B_N };
+enum { B_RETESTAR, B_RESTAURAR, B_SUGESTAO, B_VELOCIDADE, B_OBJETIVO, B_N };
 static const char *const BOTAO_ROTULO[B_N] = {
-  "Testar de novo", "Restaurar anterior", "Aplicar sugestão", "Enviar de novo",
+  "Testar de novo", "Restaurar anterior", "Aplicar sugestão",
   "Teste de velocidade", "Trocar objetivo"
 };
 
@@ -2035,8 +2005,6 @@ static int botaoVisivel(int b) {
   switch (b) {
     case B_RESTAURAR: return d.aplicacao == DA_MANTIDO || d.aplicacao == DA_RESTAURADO_SESSAO;
     case B_SUGESTAO: return d.sugEstado == DS_PROPOSTA;
-    case B_REENVIAR: return (d.envioFalhou || d.vazaoPendente) && d.relatorio[0] &&
-                            !atomic_load(&d.enviando);
     default: return 1;
   }
 }
@@ -2052,11 +2020,6 @@ static void acionarBotao(int b) {
     case B_RETESTAR: iniciarTeste(); break;
     case B_RESTAURAR: restaurarManual(); break;
     case B_SUGESTAO: aplicarSugestao(); break;
-    case B_REENVIAR:
-      atomic_store(&d.enviando, 1);
-      d.fioEnvio = SDL_CreateThread(envioWorker, "nuvio-diag-envio", NULL);
-      if (!d.fioEnvio) atomic_store(&d.enviando, 0);
-      break;
     case B_VELOCIDADE: iniciarVazao(); break;
     case B_OBJETIVO: atomic_store(&d.estado, 0); focoLinha = 0; break;
   }
@@ -2303,7 +2266,7 @@ static void desenharApresentacao(int primeiraAbertura) {
   miniCartao((GfxRect){ cartao.x + 760.0f, cartao.y + 180.0f, 320.0f, 142.0f }, 2, "Fontes de vídeo");
   txt_bloco(TXT_BODY, i18n("O app lê manifestos e catálogos, testa artes e fontes de vídeo e compara o caminho de carregamento desta TV."),
             192, 196, 206, cartao.x + 64.0f, cartao.y + 388.0f, cartao.w - 128.0f, 34.0f, 1, 3);
-  txt_bloco(TXT_BODY, i18n("Haverá testes de rede e consumo de dados. O relatório técnico será enviado automaticamente ao suporte."),
+  txt_bloco(TXT_BODY, i18n("Haverá testes de rede e consumo de dados. O relatório técnico ficará guardado neste aparelho."),
             214, 190, 170, cartao.x + 64.0f, cartao.y + 500.0f, cartao.w - 128.0f, 34.0f, 1, 3);
   txt_desenhar(txt_linha(TXT_CAPTION, i18n("Não altera assistidos, histórico, progresso ou scrobbling."), 164, 168, 178, 255),
                cartao.x + 64.0f, cartao.y + 650.0f);
@@ -2378,8 +2341,7 @@ static void desenharBotoes(float y, float ar, float ag, float ab) {
   int lista[B_N], n = botoesVisiveis(lista), i;
   float x = areaX(), soma = 0.0f, folga = 64.0f, vao = 20.0f;
   if (d.botao >= n) d.botao = n > 0 ? n - 1 : 0;
-  // COM SEIS BOTOES (sugestao, restaurar e reenvio juntos, raro) a fileira
-  // passava da margem direita: mede antes e encolhe o respiro para caber.
+  // Measure the action labels and reduce spacing when needed.
   for (i = 0; i < n; i++)
     soma += (float)txt_linha(TXT_BODY, i18n(BOTAO_ROTULO[lista[i]]), 232, 236, 244, 255).w;
   if (soma + (float)n * folga + (float)(n - 1) * vao > areaW()) {
@@ -2516,9 +2478,6 @@ static const char *textoFalhaVazao(VazResultado r, const char **detalhe) {
       *detalhe = "O link levou a um vídeo de aviso: expirado ou fora de cache.";
       return "As fontes responderam com vídeo de aviso.";
     case VR_RECUSADO: return "O servidor da fonte recusou o download.";
-    case VR_NAVEGADOR:
-      *detalhe = "O servidor da fonte não libera acesso pelo app da Samsung (CORS). Nenhum número foi estimado.";
-      return "Não foi possível medir o stream pelo navegador da TV.";
     case VR_CURTO: return "A fonte respondeu, mas não entregou dados suficientes.";
     case VR_CANCELADO: return "O teste foi cancelado.";
     default: return "A fonte não respondeu a tempo.";
@@ -2946,7 +2905,7 @@ static void diagnosticoAntigo(Uint32 agora) {
   // O SUBTITULO ABAIXO DO TITULO PELA ALTURA MEDIDA, e nao por +52 cravado: o
   // TITULO1 e mais alto que 52 e a frase era desenhada por cima dele (C9).
   { TxtLinha tit = txt_linha(TXT_TITULO1, i18n("Diagnóstico e otimização"), 255, 255, 255, 255);
-    TxtLinha sub = txt_linha_corta(TXT_BODY, i18n("Teste os addons, artes e fontes desta TV; o relatório é enviado ao suporte."),
+    TxtLinha sub = txt_linha_corta(TXT_BODY, i18n("Teste os addons, artes e fontes desta TV; o relatório fica guardado neste aparelho."),
                                    178, 182, 190, 255, W);
     txt_desenhar(tit, x0, NV_MARGEM_Y);
     txt_desenhar(sub, x0, NV_MARGEM_Y + (float)tit.h + 4.0f);
@@ -3009,7 +2968,7 @@ static void diagnosticoAntigo(Uint32 agora) {
       txt_desenhar(txt_linha_corta(TXT_BODY, i18n(PASSOS[i]), 220, 226, 236, 255, dir.w - 120.0f),
                    dir.x + 84.0f, y + 2.0f);
     }
-    txt_bloco(TXT_CAPTION, i18n("O relatório compacto é guardado localmente e só fica como enviado após confirmação do servidor."),
+    txt_bloco(TXT_CAPTION, i18n("O relatório técnico fica guardado localmente neste aparelho."),
               170, 178, 190, dir.x + 28.0f, dir.y + 410.0f, dir.w - 56.0f, 30.0f, 1, 2);
     txt_desenhar(txt_linha_corta(TXT_CAPTION, i18n("Não altera assistidos, histórico, progresso ou scrobbling."),
                                  160, 170, 182, 255, dir.w - 56.0f), dir.x + 28.0f, dir.h + dir.y - 50.0f);
@@ -3048,7 +3007,7 @@ static void diagnosticoAntigo(Uint32 agora) {
       "Artes com o cache frio",
       "Artes com o perfil atual",
       "Artes com o perfil candidato",
-      "Gravando e enviando o relatório",
+      "Gravando o relatório local",
     };
     int fase = atomic_load(&d.fase), i;
     float pct;
@@ -3108,10 +3067,7 @@ static void diagnosticoAntigo(Uint32 agora) {
       for (k = 1; k < PTV_N_FONTES; k++) { ok += d.fonte[k].ok; fal += d.fonte[k].falhas; }
       snprintf(v, sizeof v, i18n("%d ok · %d falhas"), ok, fal); }
     metrica(tl, tl.y + 250.0f, "Artes", v, 210, 218, 230);
-    snprintf(v, sizeof v, "%s", i18n(atomic_load(&d.enviando) ? "enviando…"
-                                    : d.envioFalhou ? "guardado; envio falhou"
-                                    : d.enviado ? "enviado ao suporte" : "guardado localmente"));
-    metrica(tl, tl.y + 294.0f, "Relatório", v, d.envioFalhou ? 240 : 170, d.envioFalhou ? 170 : 220, d.envioFalhou ? 150 : 190);
+    metrica(tl, tl.y + 294.0f, "Relatório", i18n("guardado localmente"), 170, 220, 190);
 
     desenharFontes(tr, ar, ag, ab);
 
@@ -3162,7 +3118,6 @@ void diagnostico_encerrar(void) {
     SDL_WaitThread(d.fioSug, NULL); d.fioSug = NULL;
     if (d.sugEstado == DS_TESTANDO) ajustes_definir_destaque(d.sugFonteAntes, d.sugDifAntes);
   }
-  if (d.fioEnvio) { SDL_WaitThread(d.fioEnvio, NULL); d.fioEnvio = NULL; }
   atomic_store(&vz.cancelado, 1);
   if (vz.fio) { SDL_WaitThread(vz.fio, NULL); vz.fio = NULL; }
   liberarCandidatas();

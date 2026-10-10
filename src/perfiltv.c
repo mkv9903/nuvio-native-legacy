@@ -26,7 +26,7 @@
 //   HIPOTESE (nao ha log do sistema); o que e medido e o rss subir com as
 //   texturas. A tela mais cheia do registro usou 26 MB (tela=27/26.2MB), entao
 //   48 ainda cobre a tela com folga, e o preco e redecodificar mais ao voltar.
-//   O agregado de 23/09 (tools/diag-agregado.py) propunha 96 para esta faixa,
+//   O agregado de 23/09 propunha 96 para esta faixa,
 //   mas so porque a replica da tabela no script ainda dizia 64/96; os
 //   relatorios com pico 61,7/64 MB sao de builds de antes do 48. Fica 48/64.
 // - LG 1,2-2 GB subiu de 96 para 128 (23/09/2026, agregado de ~38 relatorios

@@ -138,10 +138,9 @@ static const Item TELA[] = {
   SEC("Sobre e ajuda", "Guia de uso, versão, atualização e registros", "aj_info"),
     OPC(AJ_GUIA),
 
-    OPC(AJ_APOIAR),
     ROTS("App", ""), OPC(AJ_VERSAO_I), OPC(AJ_ATUALIZAR), OPC(AJ_AVANCADAS),
-    ROTS("Registro", "para quem faz o app"),
-      OPC(AJ_VER_REGISTRO), OPC(AJ_ENVIAR_LOG), OPC(AJ_ENVIO_AUTO),
+    ROTS("Registro", "somente neste aparelho"),
+      OPC(AJ_VER_REGISTRO),
 };
 #define AJ_N_TELA (int)(sizeof TELA / sizeof *TELA)
 #define AJ_MAX_SECOES 16
@@ -159,7 +158,7 @@ static const char *SECAO_AJUDA[] = {
   "Conexão dos provedores e diagnóstico de reprodução de canais ao vivo.",
   "Perfil desta TV, sincronização, Trakt, Simkl e notificações.",
   "Recursos e diagnóstico deste aparelho.",
-  "Versão instalada, atualização e envio de registros para a equipe do app.",
+  "Versão instalada, atualização e registros locais.",
 };
 
 // Basic by default. Glass and its outline remain visible together in Appearance.

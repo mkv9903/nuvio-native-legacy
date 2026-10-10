@@ -40,7 +40,7 @@ TARGET = {
     "a-logo": "AJ_COR_LOGO", "a-fonte": "AJ_FONTE_UI", "a-cartaz": "AJ_LARGURA_DP",
     "a-posters": "AJ_POSTER_PROV", "a-selo": "AJ_SELO_VISTO", "d-diag": "AJ_DIAGNOSTICO",
     "d-vel": "AJ_VELOCIDADE", "d-mem": "AJ_TEX_MB", "d-img": "AJ_QUALIDADE_IMG",
-    "d-leve": "AJ_RESOLUCAO", "p-registro": "AJ_ENVIAR_LOG", "p-canal": "AJ_LIVETV_DIAG",
+    "d-leve": "AJ_RESOLUCAO", "p-registro": "AJ_VER_REGISTRO", "p-canal": "AJ_LIVETV_DIAG",
     "p-trava": "AJ_VELOCIDADE",
 }
 SCREEN = {"Abrir o Guia de TV": "GT_GUIA_TV", "Abrir a Biblioteca": "GT_BIBLIOTECA",

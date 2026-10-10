@@ -633,7 +633,7 @@
       "cap": "ilha",
       "t": "Central de avisos",
       "ic": "inbox",
-      "txt": "Versão nova e recados de quem faz o app. Chegam pela ilha e ficam na aba Avisos, em Salvos.",
+      "txt": "Versões novas e avisos locais de recuperação ou interrupção. Chegam pela ilha e ficam na aba Avisos, em Salvos.",
       "onde": "AZUL › Avisos",
       "acao": [
         "Ver exemplo"
@@ -1091,15 +1091,15 @@
     {
       "id": "p-registro",
       "cap": "problemas",
-      "t": "Enviar registro",
-      "ic": "send",
-      "txt": "Quando algo dá errado, mande o registro desta sessão para quem faz o app. Vai sem senhas nem chaves. Na LG, a tecla VERMELHA abre o painel do registro.",
-      "onde": "Ajustes › Sobre e ajuda › Enviar registro",
+      "t": "Ver registro local",
+      "ic": "scroll-text",
+      "txt": "Quando algo dá errado, consulte o registro desta sessão no próprio aparelho. Na LG, a tecla VERMELHA abre o painel do registro. Nenhum registro é enviado.",
+      "onde": "Ajustes › Sobre e ajuda › Ver registro na tela",
       "acao": [
         "Abrir em Ajustes"
       ],
-      "fonte": "novidades11.c:945-952; novidades134.c:133-134",
-      "prova": "ajustes.c:753; ajustes.c:3874; registro.c:21",
+      "fonte": "log.c; log_island.inc",
+      "prova": "log_open; log_file_path",
       "visual": "Painel do registro"
     },
     {
@@ -1107,12 +1107,12 @@
       "cap": "problemas",
       "t": "O app fechou sozinho",
       "ic": "triangle-alert",
-      "txt": "Na abertura seguinte, a central de avisos oferece enviar o registro daquela vez.",
-      "onde": "Ilha do relógio, ao abrir",
+      "txt": "Na abertura seguinte, a central de avisos informa a interrupção. O registro da sessão anterior e o relatório da queda ficam no aparelho.",
+      "onde": "Painel de Salvos › Avisos",
       "acao": [],
-      "fonte": "novidades132.c:75-77",
-      "prova": "avisos.h:19, avisos.h:26",
-      "visual": "Aviso com Enviar registro"
+      "fonte": "avisos.c; crash.c",
+      "prova": "avisos_iniciar; crash_report",
+      "visual": "Aviso de interrupção local"
     },
     {
       "id": "p-rede",

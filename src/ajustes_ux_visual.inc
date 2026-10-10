@@ -218,12 +218,9 @@ static const char *ajVisualIcone(int op) {
     case AJ_ESPACO: return "aj_database";
     case AJ_TEX_MB: return "aj_memory-stick";
     case AJ_GUIA: return "aj_book-open";
-    case AJ_APOIAR: return "aj_heart";
     case AJ_VERSAO_I: return "aj_info";
     case AJ_ATUALIZAR: return "aj_download";
     case AJ_VER_REGISTRO: return "aj_scroll-text";
-    case AJ_ENVIAR_LOG: return "aj_send";
-    case AJ_ENVIO_AUTO: return "aj_scroll-text";
     default: return "aj_settings-2";
   }
 }

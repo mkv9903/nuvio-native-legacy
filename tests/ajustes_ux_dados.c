@@ -13,6 +13,31 @@ static int indiceResultado(int op, int n) {
   return -1;
 }
 
+/* The gallery must be reachable through normal Settings, search, and the
+ * changed-preferences list without any supporter flag or account. */
+static void appIconsAvailableLocally(void) {
+  int previous = valor[AJ_ICONE_APP], language = valor[AJ_IDIOMA];
+  int rows = 0, found = 0, n;
+  montarTela();
+  for (int i = 0; i < AJ_N_TELA; i++) {
+    if (TELA[i].tipo != IT_OPC || TELA[i].op != AJ_ICONE_APP) continue;
+    rows++;
+    assert(visivel(i) && focavel(i) && !inativa(AJ_ICONE_APP));
+  }
+  assert(rows == 1);
+  valor[AJ_IDIOMA] = IDIOMA_EN + 1;
+  n = ajustes_buscar("App icon", resultados, AJ_N);
+  assert(indiceResultado(AJ_ICONE_APP, n) >= 0);
+  valor[AJ_ICONE_APP] = 7;
+  assert(ajustes_icone_app() == 7 && iconeapp_atual() == 7);
+  uxListarDiferencas();
+  for (int i = 0; i < uxNDifs; i++) found += uxDifs[i] == AJ_ICONE_APP;
+  assert(found == 1);
+  valor[AJ_ICONE_APP] = previous;
+  valor[AJ_IDIOMA] = language;
+  uxListarDiferencas();
+}
+
 /* #221 sobreviveu a reorganizacao da tela: default, escopo local, prazo
  * efetivo, entrada unica em Fontes e addons (era Reproducao ate 2.0.1) e
  * descoberta pela busca. */
@@ -428,6 +453,13 @@ static void autoplay202(const char *dir) {
 }
 
 int main(void) {
+  // The retained local log action still has its About preview and one row.
+  assert(familiaPreviaOpcao(AJ_VER_REGISTRO) == AJPV_ABOUT);
+  { int count = 0;
+    for (int i = 0; i < AJ_N_TELA; i++)
+      if (TELA[i].tipo == IT_OPC && TELA[i].op == AJ_VER_REGISTRO) count++;
+    assert(count == 1);
+  }
   char dir[] = "/tmp/nuvio-aj-ux-dados-XXXXXX";
 
   assert(!strcmp(CHAVE[AJ_LOGO_APP], "logoAppLocal") && !strcmp(CHAVE[AJ_ABERTURA], "aberturaAppLocal") && OPCOES[AJ_LOGO_APP].n == 2 && OPCOES[AJ_ABERTURA].n == 3 && valorPadrao[AJ_LOGO_APP] == 0 && valorPadrao[AJ_ABERTURA] == 0 && somenteDesteAparelho(AJ_LOGO_APP) && somenteDesteAparelho(AJ_ABERTURA));
@@ -465,7 +497,7 @@ int main(void) {
 
   assert(!strcmp(CHAVE[AJ_TAM_MAX], "tamanhoMaxLocal") && !strcmp(CHAVE[AJ_TAM_MIN], "tamanhoMinLocal"));
   assert(valorPadrao[AJ_TAM_MAX] == 0 && valorPadrao[AJ_TAM_MIN] == 0 && OPCOES[AJ_TAM_MAX].n == 7 && OPCOES[AJ_TAM_MIN].n == 7);
-  // Espaco da Home: duas NUM locais depois do Apoiar, padrao 100 %, preso em 50..150.
+  // Espaco da Home: duas NUM locais, padrao 100 %, preso em 50..150.
 
   assert(!strcmp(CHAVE[AJ_ESPACO_FILEIRAS], "espacoFileirasLocal") && !strcmp(CHAVE[AJ_ESPACO_TITULOS], "espacoTitulosLocal"));
   assert(valorPadrao[AJ_ESPACO_FILEIRAS] == 100 && valorPadrao[AJ_ESPACO_TITULOS] == 100);
@@ -473,8 +505,6 @@ int main(void) {
   assert(ajustes_espaco_fileiras() == 1.0f && ajustes_espaco_titulos() == 1.0f);
   assert(ajustes_espaco_fator(0) == 0.5f && ajustes_espaco_fator(50) == 0.5f && ajustes_espaco_fator(100) == 1.0f);
   assert(ajustes_espaco_fator(150) == 1.5f && ajustes_espaco_fator(900) == 1.5f && ajustes_espaco_fator(-5) == 0.5f);
-  // Apoiar o projeto (apoio.h): acao no fim, sem valor, uma vez na tela.
-  assert(!strcmp(CHAVE[AJ_APOIAR], "-apoiar") && valorPadrao[AJ_APOIAR] == 0);
   assert(!strcmp(CHAVE[AJ_PLR_CLASSIF], "classifPlayerLocal") && valorPadrao[AJ_PLR_CLASSIF] == 0);
   assert(!strcmp(CHAVE[AJ_PROPORCAO_PADRAO], "proporcaoPadraoLocal") && valorPadrao[AJ_PROPORCAO_PADRAO] == 0 && OPCOES[AJ_PROPORCAO_PADRAO].n == 9 && ajustes_proporcao_padrao() == -1 && somenteDesteAparelho(AJ_PROPORCAO_PADRAO) && !dePerfil(AJ_PROPORCAO_PADRAO));
   // 2.0.2: "Tambem em Continuar assistindo". Local, last, default OFF (= one title, one place), once on screen.
@@ -553,7 +583,6 @@ int main(void) {
   assert(somenteDesteAparelho(AJ_DTS_AC3) && !dePerfil(AJ_DTS_AC3));
   { int vz = 0, k; for (k = 0; k < AJ_N_TELA; k++) if (TELA[k].tipo == IT_OPC && TELA[k].op == AJ_DTS_AC3) vz++; assert(vz == 1); }
   assert(indiceResultado(AJ_DTS_AC3, ajustes_buscar("dolby digital", resultados, AJ_N)) >= 0);
-  { int vz = 0, k; for (k = 0; k < AJ_N_TELA; k++) if (TELA[k].tipo == IT_OPC && TELA[k].op == AJ_APOIAR) vz++; assert(vz == 1); }
   // #287: forced subtitle when the audio is in your language. Local, last, default ON, once on screen.
   assert(!strcmp(CHAVE[AJ_LEG_FORCADA], "legendaForcadaLocal"));
   assert(valorPadrao[AJ_LEG_FORCADA] == 0 && ajustes_legenda_forcada_auto() && somenteDesteAparelho(AJ_LEG_FORCADA));
@@ -587,6 +616,7 @@ int main(void) {
     valor[AJ_LEG2_POS] = 1; valor[AJ_LEG2_TAMANHO] = 3; valor[AJ_LEG2_COR] = 2; valor[AJ_LEG2_FUNDO] = 5; valor[AJ_LEG2_BORDA] = 3;
     assert(ajustes_leg2_junto() && ajustes_leg2_tamanho() == 100 && ajustes_leg2_cor() == 1 && ajustes_leg2_fundo() == 4 && ajustes_leg2_borda() == 2);
     valor[AJ_LEG2_POS] = a0; valor[AJ_LEG2_TAMANHO] = t0; valor[AJ_LEG2_COR] = valor[AJ_LEG2_FUNDO] = valor[AJ_LEG2_BORDA] = 0; }
+  appIconsAvailableLocally();
   artePorSubmenu();
   reorganizacao202();
   prazoDosAddonsIntegrado();

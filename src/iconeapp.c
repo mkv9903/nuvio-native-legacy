@@ -1,10 +1,8 @@
-// Icone do app para apoiadores. Ver iconeapp.h.
+// Local app-icon selection. See iconeapp.h.
 #include "iconeapp.h"
 #include "ajustes.h"
-#include "dados.h"
 #include "tex_cache.h"
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 // A ORDEM E A DA GALERIA e o INDICE gravado em ajustes.txt (iconeAppLocal):
@@ -17,25 +15,6 @@ static const char *ID[ICONEAPP_N] = {
 
 static char dirArteIc[512] = ".";
 static char caminhos[ICONEAPP_N][600];
-static int  apoiadorLido = -1;
-
-int apoiador_ativo(void) {
-  const char *e;
-  char *s;
-  if (apoiadorLido >= 0) return apoiadorLido;
-  // O PORTAO DE VERDADE (Patreon, conta) entra AQUI e so aqui. Hoje: ninguem,
-  // a nao ser forcado pelo dono para ver a galeria.
-  e = getenv("NUVIO_APOIADOR");
-  if (e && e[0] == '1') return apoiadorLido = 1;
-  // Sem pasta de dados ainda, nao guarda a resposta: perguntar de novo depois.
-  if (!dados_dir() || !dados_dir()[0]) return 0;
-  s = dados_ler("apoiador.txt");
-  apoiadorLido = (s && s[0] == '1');
-  free(s);
-  if (apoiadorLido) { printf("[app-icon] supporter enabled through local override\n"); fflush(stdout); }
-  return apoiadorLido;
-}
-void apoiador_reler(void) { apoiadorLido = -1; }
 
 void iconeapp_iniciar(const char *dirArte) {
   snprintf(dirArteIc, sizeof dirArteIc, "%s", dirArte && dirArte[0] ? dirArte : ".");
@@ -44,7 +23,7 @@ void iconeapp_iniciar(const char *dirArte) {
 
 int iconeapp_atual(void) {
   int v = ajustes_icone_app();
-  if (!apoiador_ativo() || v < 0 || v >= ICONEAPP_N) return 0;
+  if (v < 0 || v >= ICONEAPP_N) return 0;
   return v;
 }
 

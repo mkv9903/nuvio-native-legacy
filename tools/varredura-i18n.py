@@ -29,12 +29,12 @@ RAIZ = pathlib.Path(__file__).resolve().parent.parent
 DESENHO = ("txt_linha", "txt_linha_corta", "txt_linha_familia",
            "txt_linha_corta_familia", "txt_bloco", "txt_bloco_dir",
            "txt_tracking",
-           # App log shortcuts (registro_ilha.inc, registro_envio.inc,
-           # desempenho.c, telemetria.c): all pass text through txt_linha /
+           # App log shortcuts (log_island.inc,
+           # desempenho.c): all pass text through txt_linha /
            # txt_bloco / txt_tracking, which translate.
            "rgT", "rgTC", "rgTT", "rgBloco", "rgKicker", "rgK2", "rgCaps",
            "rgStat", "rgCartNota", "rgBotao", "rgKbdTexto", "rgCabecalho",
-           "rgSeguindo", "rgBlocoAltura", "dsT", "tlT", "tlCaps", "tlBotao")
+           "rgSeguindo", "rgBlocoAltura", "dsT")
 
 # A C literal can come split ("abc" "def") and with escapes. Joins and decodes.
 LIT = re.compile(r'"((?:[^"\\]|\\.)*)"(?:\s*"((?:[^"\\]|\\.)*)")*')
@@ -221,9 +221,6 @@ NAO_E_TELA = ("printf", "fprintf", "puts", "fputs", "perror", "marco",
               # non-defects teaches ignoring the test, which is how this defect class survives.
               "gfx_icone", "gfx_icones_dir", "extras_caminho_marca_nome",
               "tex_obter", "tex_arquivo",
-              # DEMO DATA from notification center (NUVIO_AVISOS_DEMO): mocks
-              # what network returns, not a UI label.
-              "demoAviso",
               # JSON READER in recomenda.c: objeto(r, "agora") is server response
               # key, not label.
               "objeto(")
@@ -481,7 +478,7 @@ def varrer():
     arquivos = sorted(src.glob("*.c")) + [
         src / nome for nome in ("ajustes_ux_tela.inc", "ajustes_ux_interacao.inc",
                                 "ajustes_ux_desenho.inc", "ajustes_ux_ilha.inc",
-                                "registro_ilha.inc", "registro_envio.inc") if (src / nome).exists()
+                                "log_island.inc", "diagnostico_ilha.inc") if (src / nome).exists()
     ]
     for arq in sorted(arquivos):
         if arq.name == "idioma.c":

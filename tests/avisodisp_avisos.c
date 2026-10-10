@@ -23,22 +23,33 @@ int main(void) {
   assert(avisos_lista_item(0, id, sizeof id, tit, sizeof tit));
   assert(!strcmp(id, "demo:update"));
 
+  // The retained update action opens the updater once. Crash notices stay
+  // local: OK has no external action, Close keeps the entry, Dismiss removes it.
+  assert(avisos_lista_ok(0) == 1);
+  assert(avisos_pediu() == AVISOS_ABRIR_ATUALIZACAO);
+  assert(avisos_pediu() == AVISOS_NADA);
+  assert(avisos_lista_ok(2) == 0 && avisos_pediu() == AVISOS_NADA);
+  avisos_ilha_acao("av:demo:crash", 1);
+  assert(avisos_lista_n() == 3 && avisos_pediu() == AVISOS_NADA);
+  avisos_ilha_acao("av:demo:crash", 2);
+  assert(avisos_lista_n() == 2 && avisos_pediu() == AVISOS_NADA);
+
   // Dispensar um: sai da lista.
-  avisos_dispensar("demo:canal");
-  assert(avisos_lista_n() == 2);
+  avisos_dispensar("demo:local");
+  assert(avisos_lista_n() == 1);
 
   // Reinicio: a RAM esquece, a origem repoe os mesmos ids — o dispensado nao volta.
   avisos_encerrar();
   avisodisp_esquecer();
   avisos_iniciar();
-  assert(avisos_lista_n() == 2);
+  assert(avisos_lista_n() == 1);
 
   // Evento novo (outra chave) avisa normalmente.
   avisos_modo_seguro("seguro:teste-2", "Ajuste desfeito", "texto");
-  assert(avisos_lista_n() == 3);
+  assert(avisos_lista_n() == 2);
 
   // Dispensar pela linha (o menu do painel) e "Dispensar todos" (a ultima linha).
-  assert(avisos_lista_dispensar(0) && avisos_lista_n() == 2);
+  assert(avisos_lista_dispensar(0) && avisos_lista_n() == 1);
   assert(avisos_lista_ok(avisos_lista_n()) == 0);
   assert(avisos_lista_n() == 0 && avisos_lista_linhas() == 0);
 

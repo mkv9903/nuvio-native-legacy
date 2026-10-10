@@ -207,7 +207,6 @@ static const char REG_SHOT_SESSAO[] =
   "[video] reconectando: alvo 2712s, tentativa 1\n"
   "[video] reconexao: retomado em 4s\n"
   "[sync] titulo tt0000001 na conta -> ok (HTTP 200)\n"
-  "[avisos] registro enviado (sozinho): HTTP 200\n"
   "FPS=50.0 pior=24.6ms janks=0 | pior-quadro: texto 3.1ms em 4 linhas | gpu-cache=212 99.0MB tela=41/99.0MB fila-tex=0 tex-despejos=41(q=0) | despejos=3 | cache-arte=164/50331648B hit=1290 miss=212 grav=208 err=0 essenciais=24/24 | fs-backend=on idbfs=native sync=idle ok=4 err=0 pend=0 custo=2/1.4ms recovery=0 | cache-disco=48.2MB | rss=238MB\n"
   "[rede] falha 6 em https://addon-b.exemplo/stream/k/KEY (conexao nova, 0 bytes, 3012 ms)\n"
   "[addons] Addon B: respondeu na segunda tentativa\n"

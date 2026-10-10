@@ -763,13 +763,7 @@ static const char *ajEstadoAcao(int op) {
     return b;
   }
   if (op == AJ_GUIA) { snprintf(b, sizeof b, i18n("%d recursos"), guiaTotal()); return b; }
-  if (op == AJ_APOIAR) {
-    int i, u = 0;
-    b[0] = 0;
-    for (i = 0; i < apoio_n() && u < (int)sizeof b; i++)
-      u += snprintf(b + u, sizeof b - (size_t)u, "%s%s", i ? " · " : "", apoio_nome(apoio_qual(i)));
-    return b;
-  }
+
   return textoLeitura(op);
 }
 

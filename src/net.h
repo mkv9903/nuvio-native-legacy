@@ -294,13 +294,9 @@ char *net_download_etag(const char *url, int seconds,
 // `headers` as in net_download_with (addon proxyHeaders); `final` (optional) receives
 // address after redirects. `cancelled` is checked during reception.
 //
-// ON TIZEN cannot count bytes while arriving (synchronous XHR delivers whole body at once):
-// uses increasing Range chunks, each discarded in JavaScript and timed; each chunk becomes
-// as many samples as seconds it took. CDN without CORS for app origin (debrid) appears
-// as status 0 error -1: caller reports "could not measure via browser" without guessing.
 typedef struct NetThroughput {
   int status;                               // final response HTTP; 0 = no response
-  union { int error; int erro; };           // libcurl (0 = ok); -1 on Tizen: browser refused
+  union { int error; int erro; };           // libcurl (0 = ok)
   long long bytes;                          // received (and discarded)
   unsigned long ms;                         // from first byte to end of measurement
   union { unsigned long wait_ms; unsigned long esperaMs; }; // from request to first byte

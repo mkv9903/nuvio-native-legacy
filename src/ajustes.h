@@ -335,7 +335,6 @@ int   ajustes_salvos_no_simkl(void);
 enum { AJ_SALVOS_LOCAL = 0, AJ_SALVOS_TRAKT = 1, AJ_SALVOS_SIMKL = 2 };
 enum { AJ_CWF_AMBAS = 0, AJ_CWF_CONTA = 1, AJ_CWF_TRAKT = 2, AJ_CWF_SIMKL = 3 };
 // Envio automatico do registro (Sobre). 1 = ligado.
-int   ajustes_envio_auto(void);
 // Forca da vinheta do fundo do titulo, 0..1 (1 = a medida do web).
 float ajustes_detalhe_veu(void);
 int   ajustes_trailer_auto(void);      // trailer mudo no fundo da pagina de titulo
@@ -359,7 +358,6 @@ Uint32 ajustes_trailer_hero_espera_ms(void); // repouso no titulo antes do trail
 int   ajustes_trailer_qualidade(void); // teto em linhas (1080/720/480); 0 = a maior
 int   ajustes_trailer_fonte(void);     // TRF_* de trailerfonte.h; 0 = automatico
 float ajustes_trailer_zoom(void);      // ampliacao do trailer (1.0 = quadro inteiro)
-void  ajustes_definir_envio_auto(int ligado);
 // Fonte do destaque (ARTEHERO_*) e "Destaque com outra arte", gravados na hora.
 void  ajustes_definir_destaque(int fonte, int diferente);
 // homeImdbRatingsVisibility: 0 SHOW_ALL, 1 HIDE_ALL

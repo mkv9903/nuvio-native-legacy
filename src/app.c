@@ -68,8 +68,6 @@
 #include "contalib.h"
 #include "salvospainel.h"
 #include "salvosintro.h"
-#include "apoio.h"
-#include "telemetria.h"
 #include "avisos.h"
 #include "ilha.h"
 #include "ilhasalvar.h"
@@ -1791,7 +1789,6 @@ int app_iniciar(const char *dirArte) {
   diagnostico_recuperar_checkpoint();
   stream_fit_fonte_metadados(fitRuntimeMeta);
   homePronta = home_iniciar(dirArte);
-  apoio_dir(dirArte);
   if (!homePronta)
     printf("[app] sem arte no pacote: a home so aparece depois do primeiro sync\n");
   menu_iniciar();
@@ -2052,9 +2049,6 @@ void app_evento(const SDL_Event *e) {
   // mais importa. Enquanto aberto ele engole todo o teclado, incluindo o KEYUP
   // do toque que o abriu ou fechou (ver a nota da armadilha em registro.c).
   if (registro_evento(e)) return;
-  // O painel de envio do registro (Ajustes > Enviar registro, ou o "Enviar
-  // agora" do painel): modal, come o teclado enquanto aberto.
-  if (registro_envio_evento(e)) return;
   // A CENTRAL DE CONTROLE (central.h, CH+ segurado) e uma camada: aberta, come
   // o teclado todo, por cima do player, das folhas e das ilhas.
   if (central_aberta()) { central_evento(e); return; }
@@ -2145,7 +2139,6 @@ void app_evento(const SDL_Event *e) {
   // baixo dele moveria o foco de uma tela que a pessoa nem esta vendo.
   if (sintro_aberto()) { sintro_evento(e); return; }
   if (pipintro_aberto()) { pipintro_evento(e); return; }
-  if (telemetria_aberto()) { telemetria_evento(e); return; }
   if (atualizacao_aberta()) { atualizacao_evento(e); return; }
 
   // A folha de fontes fica acima de tudo: ela e uma pergunta, e enquanto ela
@@ -2394,8 +2387,8 @@ static const char *homeTrailerBloqueio(void) {
   if (spainel_aberto()) return "saved-panel";
   if (menu_aberto() || ctx_aberto()) return "menu";
   if (vertudo_aberta()) return "see-all";
-  if (avisos_aberto() || avisos_cartao_aberto()) return "notices";
-  if (sintro_aberto() || pipintro_aberto() || telemetria_aberto()) return "intro";
+  if (avisos_aberto()) return "notices";
+  if (sintro_aberto() || pipintro_aberto()) return "intro";
   if (atualizacao_aberta()) return "update-notice";
   if (faixas_aberta() || episodios_aberto() || stream_folha_aberta()) return "sheet";
   if (guia_overlay_aberta()) return "guide";
@@ -2691,13 +2684,9 @@ void app_atualizar(float dt, Uint32 agora) {
     if (!diagnostico_intro_aberto()) {
       registro_aviso_primeira_vez();
       if (!registro_aberto()) sintro_primeira_vez();
-      if (!registro_aberto() && !sintro_aberto() && !pipintro_aberto())
-        telemetria_primeira_vez();
       if (!player_mini_ativo()) atualizacao_verificar();
-      if (!registro_aberto() && !sintro_aberto() && !telemetria_aberto() && !pipintro_aberto())
+      if (!registro_aberto() && !sintro_aberto() && !pipintro_aberto())
         atualizacao_mostrar_se_houver();
-      if (!registro_aberto() && !sintro_aberto() && !telemetria_aberto() && !pipintro_aberto() && !atualizacao_aberta())
-        avisos_mostrar_se_houver();
     }
   }
 
@@ -2762,11 +2751,9 @@ void app_atualizar(float dt, Uint32 agora) {
   // local, ver salvospainel.c), e um indice para esses nao existe. Sem item no
   // catalogo, pede o titulo a descoberta — o mesmo caminho que perfil.c e
   // social.c ja usam para um id que so eles conhecem.
-  // Acoes pedidas pela central de avisos: abrir Salvos (recomendacao) ou o
-  // cartao de atualizacao. O titulo escolhido nos Salvos segue pelo contrato de baixo.
+  // Open the update card requested by the notice center.
   { int c = avisos_pediu();
-    if (c == AVISOS_ABRIR_SALVOS && !spainel_aberto()) spainel_abrir();
-    else if (c == AVISOS_ABRIR_ATUALIZACAO) atualizacao_abrir(); }
+    if (c == AVISOS_ABRIR_ATUALIZACAO) atualizacao_abrir(); }
   // A ILHA: cartoes (ilhacart.c) e o que o modal pediu.
   { IlhaCartao ic;
     int qual = 0, o;
@@ -4016,7 +4003,6 @@ void app_atualizar(float dt, Uint32 agora) {
   perfil_atualizar(dt, agora);
   spainel_atualizar(dt, agora);
   sintro_atualizar(dt, agora);
-  telemetria_atualizar(dt, agora);
   atualizacao_atualizar(dt, agora);
   avisos_atualizar(dt, agora);
   // Lembretes de programa: so com alguem dentro do app (nao no login nem na
@@ -4149,7 +4135,7 @@ static void desenharTelas(Uint32 agora) {
     GfxRect fundo = { 0, 0, NV_TELA_W, NV_TELA_H };
     TxtLinha t, sb;
     gfx_cor(fundo, 0.0f, NV_COR_FUNDO_R, NV_COR_FUNDO_G, NV_COR_FUNDO_B, 1.0f);
-    // A ABERTURA com a marca do icone escolhido (apoiadores); com o Original,
+    // A ABERTURA com a marca do icone escolhido; com o Original,
     // a tela de sempre, so com o texto.
     logoapp_marca((GfxRect){ (NV_TELA_W - 160.0f) * 0.5f, 260.0f, 160.0f, 160.0f }, 1.0f);
     t = txt_linha(TXT_TITULO2, "Preparando seu catálogo…", 255, 255, 255, 255);
@@ -4239,8 +4225,8 @@ static int relogioCabe(void) {
   // a ilha do menu nasce logo abaixo da do relogio, na mesma margem
   // (ilha_posicionar), e as duas formam a coluna da esquerda.
   if (ctx_aberto() || stream_folha_aberta() || faixas_aberta() || episodios_aberto()) return 0;
-  if (sintro_aberto() || telemetria_aberto() ||
-      atualizacao_aberta() || avisos_cartao_aberto() ||
+  if (sintro_aberto() ||
+      atualizacao_aberta() ||
       glem_cartao_aberto() || pipintro_aberto() || diagnostico_intro_aberto())
     return 0;
   return 1;
@@ -4317,8 +4303,6 @@ void app_desenhar(Uint32 agora) {
   player_mini_desenhar(agora);
   CAMADA_SE(sintro_aberto());
   if (!registro_aberto()) sintro_desenhar(agora);
-  CAMADA_SE(telemetria_aberto());
-  if (!registro_aberto()) telemetria_desenhar(agora);
   CAMADA_SE(atualizacao_aberta());
   if (!registro_aberto()) atualizacao_desenhar(agora);
   // A central so aparece com a pessoa DENTRO do app: no login e na escolha de

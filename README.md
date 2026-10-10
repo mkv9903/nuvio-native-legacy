@@ -9,8 +9,10 @@ Upstream attribution and third-party licenses are retained.
 
 Android, Samsung/Tizen, WebAssembly/VIDAA and macOS builds have been removed,
 along with the previously deleted social, P2P, Discord and personal media-server
-features. Upstream update checks, notices and diagnostic uploads remain enabled
-when configured. Source translation to English is a separate, later step.
+features. Upstream update checks remain enabled. The announcement feed, donation
+UI and log/report uploads have been removed. Logs, crash reports and diagnostics
+stay on the device; the user guide and first-use explanations remain available.
+Source translation to English is a separate, later step.
 
 ## Linux UI preview
 
@@ -77,6 +79,9 @@ The user guide is generated from `design/guia-de-uso/guia.json`:
 ```bash
 python3 tools/guia_inc.py
 ```
+
+All ten app icons are available in Settings and change branding inside the app.
+The installed LG package icon stays fixed.
 
 Icon artwork and generator sources remain in `design/icones-apoio` and
 `design/logo-novo`. Upstream vendor sources retain their own platform portability

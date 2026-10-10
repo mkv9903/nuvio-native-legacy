@@ -18,8 +18,7 @@ static void uxListarDiferencas(void) {
   int i;
   uxNDifs = 0;
   for (i = 0; i < AJ_N_TELA; i++)
-    if (TELA[i].tipo == IT_OPC && uxDiferente(TELA[i].op) &&
-        (TELA[i].op != AJ_ICONE_APP || apoiador_ativo())) uxDifs[uxNDifs++] = TELA[i].op;
+    if (TELA[i].tipo == IT_OPC && uxDiferente(TELA[i].op)) uxDifs[uxNDifs++] = TELA[i].op;
   if (uxDifFoco >= uxNDifs) uxDifFoco = uxNDifs ? uxNDifs - 1 : 0;
 }
 static int uxRequisito(int op) {

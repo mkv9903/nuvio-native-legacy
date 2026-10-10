@@ -57,7 +57,7 @@ int logoapp_marca(GfxRect r, float alpha) {
   GLuint t;
   const char *c;
   float asp, w, h;
-  if (iconeapp_marca(r, alpha)) return 1;       // icone de apoiador em vigor vence
+  if (iconeapp_marca(r, alpha)) return 1;       // chosen alternative icon takes priority
   if (logoapp_atual() != LOGO_NOVO || alpha <= 0.004f) return 0;
   c = logoapp_caminho(LOGO_NOVO, LOGO_F_SIMBOLO);
   t = tex_obter_larg(c, r.w);

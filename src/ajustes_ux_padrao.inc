@@ -107,23 +107,13 @@
   // DIFERENTE de zero nesta faixa (a de agora) teria caido no lugar errado.
   // Explicitados um a um, e nao contados de cabeca.
   0, 0, 0,          /* perfil, sincronizacao, addons: linhas de leitura/acao */
-  // AS SETE DO STALKER E DO XTREAM FALTAVAM AQUI (#149). Elas entraram no enum
-  // entre os addons e "onde o + salva" sem entrar nesta lista, e dali para
-  // baixo cada padrao caiu sete casas antes: o 1 de "envio sozinho" pousava em
-  // "onde o + salva" (que por acaso tambem nasce 1, e por isso nada se viu), e
-  // o envio ficava no 0 da inicializacao parcial. O remendo que forcava o
-  // desligado em ajustes_iniciar apagava a escolha da pessoa a cada abertura
-  // da tela, que e o #149.
+  // Keep provider actions aligned with the positional settings table.
   0, 0, 0,          /* portal Stalker, MAC, remover: acoes */
   0, 0, 0, 0,       /* servidor, usuario, senha Xtream, remover: acoes */
   0, 0,             /* conta Xtream (leitura); grade: automatica */
   1,                /* onde o + salva: watchlist do Trakt (ver V_SALVOS) */
   0, 0, 0,          /* trakt, simkl, sair: acoes */
-  // ENVIO SOZINHO LIGADO DE FABRICA (dono, 26/09/2026: "melhor deixar
-  // automatico o log, isso que ajuda a gente"). O registro nao leva senha nem
-  // chave, e e dele que sai a triagem. No Tizen o cartao de consentimento
-  // (telemetria.c) continua perguntando na primeira abertura, e o nao grava.
-  0, 0, 0, 0,       /* versao, atualizar, registro, envio sozinho: LIGADO */
+  0, 0,       /* versao e atualizar: acoes */
   0,                /* espaco */
   0,                /* memoria para imagens: automatico */
 
@@ -149,7 +139,7 @@
   1,                /* trailer do cartaz em foco: desligado (DEFAULT do web) */
   0,                /* itens por fileira: 12, como sempre foi (ver V_ITENS_FIL) */
   TXT_FAMILIA_INTER,/* fonte da interface: independente da legenda */
-  0,                /* efeitos visuais do .tpk: automatico (adaptativo, ate o nivel 1) */
+  0,                /* efeitos visuais: automatico (adaptativo, ate o nivel 1) */
   1,             /* endereco, testar: acoes */
   0,                /* posteres personalizados: DESLIGADO (indice 0) */
   0, 0, 0, 0, 0, 0,/* endereco, token, parametros, chave, modelo, testar: acoes */
@@ -213,7 +203,6 @@
   0, /* showcase titles: Catalogo */
   0, /* clock format: 24 horas */
   0, 0, /* automatic source size range: max and min, Sem limite */
-  0, /* support the project (Sobre e ajuda): action */
   0, /* forced subtitle when the audio is in your language (#287): Ligado (V_LIGA: 0 = Ligado) */
   0, /* content rating in the player: Ligado (V_LIGA: 0) */
   0, /* auto-play scope (#202): Todas as fontes (ALL_SOURCES, the official default) */

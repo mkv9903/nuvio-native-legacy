@@ -29,18 +29,13 @@ static const char *respStreams =
   " {\"num\":4,\"name\":\"Sem categoria\",\"stream_id\":404}]";
 static const char *respAuth0 = "{\"user_info\":{\"auth\":0,\"status\":\"Disabled\"}}";
 static int recusar, mudo, statusHttp = 200, pagina, semFormatos, soTs;
-static char ultimaUrl[1200];      // a url DO PAINEL (desfeito o proxy)
+static char ultimaUrl[1200];      // the direct provider URL
 static char ultimaPedida[4000];   // o endereco que a rede recebeu de fato
-static char ultimoCorpo[1200];    // o corpo do POST ao proxy (Tizen)
-static int ultimoPost;
-// Build do teste do Tizen (-DNV_XTREAM_PROXY_TESTE): a chamada chega como
-// POST <NV_REC_URL>/v1/xtream com a url do painel crua no corpo.
 static char *responder(const char *url);
 // #158: o chamar() do xtream.c agora usa rede_baixar_st (corpo + status),
 // para o log e a tela saberem se foi 401, 403, 458, 429 ou pagina HTML.
 char *rede_baixar_st(const char *url, int segundos, const char *const *cab, int *status) {
   (void)segundos; (void)cab;
-  ultimoPost = 0;
   snprintf(ultimaPedida, sizeof ultimaPedida, "%s", url);
   snprintf(ultimaUrl, sizeof ultimaUrl, "%s", url);
   if (status) *status = mudo ? 0 : statusHttp;
@@ -49,18 +44,6 @@ char *rede_baixar_st(const char *url, int segundos, const char *const *cab, int 
 char *rede_baixar_st_retry(const char *url, int segundos, const char *const *cab, int *status, int *ra) {
   if (ra) *ra = 0;
   return rede_baixar_st(url, segundos, cab, status);
-}
-char *rede_postar_st(const char *url, int segundos, const char *const *cab,
-                     const char *corpo, int *status) {
-  (void)segundos;
-  ultimoPost = 1;
-  assert(cab && !strcmp(cab[0], "Content-Type: text/plain"));
-  snprintf(ultimaPedida, sizeof ultimaPedida, "%s", url);
-  snprintf(ultimoCorpo, sizeof ultimoCorpo, "%s", corpo);
-  snprintf(ultimaUrl, sizeof ultimaUrl, "%s", corpo);
-  if (status) *status = mudo ? 504 : statusHttp;
-  if (mudo) return strdup("{\"erro\":\"painel nao respondeu no prazo\"}");
-  return responder(corpo);
 }
 // Resposta real de player_api.php sem action, no formato do Dispatcharr #652
 // (quase tudo texto).
@@ -128,18 +111,8 @@ int main(void) {
   assert(!strcmp(c[2].id, "xtream:404") && !strcmp(c[2].categoria, "Outros"));
   assert(strstr(ultimaUrl, "username=joao%40x&password=s%26nha%201&action=get_live_streams"));
   puts("ok  canais: id numero ou texto, categoria por id, sem categoria = Outros");
-#ifdef NV_XTREAM_PROXY_TESTE
-  // Tizen: painel http vai pelo worker, com a url INTEIRA escapada num
-  // parametro so (o & da senha nao pode virar outro parametro do worker).
-  // Tizen: painel http vai pelo worker, com a url no CORPO e o endereco de
-  // entrada sem nada da pessoa (o que a plataforma registra).
-  assert(ultimoPost && !strcmp(ultimaPedida, "https://rec.teste/v1/xtream"));
-  assert(!strcmp(ultimoCorpo, "http://meu.servidor.tv:8080/player_api.php?username=joao%40x&password=s%26nha%201&action=get_live_streams"));
-  puts("ok  tizen: lista http por POST NV_REC_URL/v1/xtream, url no corpo");
-#else
-  assert(!ultimoPost && !strncmp(ultimaPedida, "http://meu.servidor.tv:8080/player_api.php?", 43));
-  puts("ok  lg: lista direto no painel");
-#endif
+  assert(!strncmp(ultimaPedida, "http://meu.servidor.tv:8080/player_api.php?", 43));
+  puts("ok  lg/linux: lista direto no painel");
 
   assert(xtream_e_id("xtream:101") && !xtream_e_id("stalker:1") && !xtream_e_id(NULL));
   assert(xtream_url("xtream:101", url, sizeof url));
@@ -251,7 +224,6 @@ int main(void) {
   // https nao tem o bloqueio: vai direto nos dois alvos, sem terceiro no meio.
   xtream_definir_usuario("u"); xtream_definir_senha("p");
   assert(xtream_canais(c, 16) == 3);
-  assert(!ultimoPost && !strncmp(ultimaPedida, "https://seguro.tv/player_api.php?username=u&password=p&action=", 62));
   // O video nunca passa pelo proxy: e a url do painel, que vai ao AVPlay.
   assert(xtream_url("xtream:9", url, sizeof url) && !strcmp(url, "https://seguro.tv/live/u/p/9.m3u8"));
   xtream_definir_servidor("http://meu.servidor.tv:8080");

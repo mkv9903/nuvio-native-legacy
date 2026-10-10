@@ -1,5 +1,5 @@
 #!/bin/bash
-# Capturas do icone do app (apoiadores) no login e na barra. Precisa de janela
+# Capturas do icone do app no login e na barra. Precisa de janela
 # GL e de olho humano; nao entra na suite.
 set -eu
 cd "$(dirname "$0")/.."

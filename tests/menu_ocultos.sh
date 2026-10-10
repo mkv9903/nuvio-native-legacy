@@ -1,7 +1,7 @@
 #!/bin/bash
 # #162: itens escondidos da barra lateral. Ver o .c.
 #
-#   bash tests/ajustes_envio_auto.sh
+#   bash tests/menu_ocultos.sh
 set -eu
 cd "$(dirname "$0")/.."
 sources=()

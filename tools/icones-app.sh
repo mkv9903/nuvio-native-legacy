@@ -1,5 +1,5 @@
 #!/bin/bash
-# ALTERNATIVE APP ICONS (supporters, see src/iconeapp.h).
+# ALTERNATIVE APP ICONS (local gallery, see src/iconeapp.h).
 #
 # Source: design/icones-apoio/1..7 (owner artwork, unedited). Sheet 7 contains
 # three sticker logos with labels; this script crops each sticker without the label,

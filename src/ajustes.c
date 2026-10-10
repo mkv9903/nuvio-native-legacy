@@ -60,7 +60,6 @@
 #include "iconeapp.h"
 #include "logoapp.h"
 #include "abertura.h"
-#include "apoio.h"
 
 // Settings has its own canvas and scale, independent of the global UI zoom.
 // Layout, text measurement, drawing and pointer targets share this factor.
@@ -186,7 +185,7 @@ typedef enum {
   AJ_XTREAM_CONTA, AJ_EPG_PAIS,
   AJ_SALVOS_DEST, AJ_TRAKT, AJ_SIMKL, AJ_SAIR,
   // Sobre
-  AJ_VERSAO_I, AJ_ATUALIZAR, AJ_ENVIAR_LOG, AJ_ENVIO_AUTO, AJ_ESPACO, AJ_TEX_MB,
+  AJ_VERSAO_I, AJ_ATUALIZAR, AJ_ESPACO, AJ_TEX_MB,
   // Integracoes — TMDB (tmdb_settings do blob da conta, ver
   // profileSettingsSyncService.js do web)
   AJ_TMDB_LIGADO, AJ_TMDB_IDIOMA, AJ_TMDB_ARTE, AJ_TMDB_BASICO, AJ_TMDB_FICHA,
@@ -347,7 +346,7 @@ typedef enum {
   // Indiferente / Evitar). LOCAIS. No fim: valor[]/CHAVE[] posicionais.
   AJ_FONTE_PRIORIDADE, AJ_FONTE_HDR,
   // 2.0 (N1): logo do app (Novo | Classico) and opening style (Padrao | So esmaece |
-  // Direto). LOCAL, for everyone (no supporter gate). Append-only.
+  // Direto). LOCAL. Append-only.
   AJ_LOGO_APP, AJ_ABERTURA,
   // #231: "Buscar no Cinemeta" (Ligado = como sempre). LOCAL. No fim: valor[]/CHAVE[] posicionais.
   AJ_BUSCA_CINEMETA,
@@ -372,9 +371,6 @@ typedef enum {
   // dados limitada): tamanho maximo e minimo do arquivo, em GB. LOCAIS (o web
   // nao tem estas chaves). No fim: valor[]/CHAVE[] posicionais.
   AJ_TAM_MAX, AJ_TAM_MIN,
-  // APOIAR O PROJETO (Sobre e ajuda, apoio.h): a previa mostra os QRs do
-  // Patreon e do Ko-fi. Acao, sem valor. No fim: valor[]/CHAVE[] posicionais.
-  AJ_APOIAR,
   // #287: com o audio no idioma da legenda, ligar so a legenda FORCADA desse
   // idioma (ou nenhuma). LOCAL, padrao Ligado. No fim: valor[]/CHAVE[] posicionais.
   AJ_LEG_FORCADA,
@@ -1011,14 +1007,6 @@ static const Opcao OPCOES[AJ_N] = {
   // versao (a marca em atualizacao-vista.txt), e sem esta linha "Depois"
   // significava "nunca mais nesta versao".
   ACAO("Atualizar o aplicativo"),
-  // Manda o log DESTA sessao ao servico de recomendacoes (dono, 20/09/2026):
-  // ate aqui so o cartao do crash mandava, e so o da sessao anterior.
-  ACAO("Enviar registro"),
-  // ENVIO AUTOMATICO (dono, 20/09/2026: "temos que pegar todos os logs para
-  // resolver a Samsung"). Desligado de fabrica; o cartao de primeira vez no
-  // Tizen pergunta (telemetria.c) e grava aqui. Ligado, avisos.c manda o
-  // registro da sessao anterior no arranque e o desta a cada minuto.
-  ESC("Enviar registros sozinho",   V_LIGA, 2),
   LER("Memória usada por imagens"),
   ESC("Memória para imagens",       V_TEX_MB, 7),
 
@@ -1160,8 +1148,7 @@ static const Opcao OPCOES[AJ_N] = {
   ESC("Títulos da vitrine",              V_DESCANSO_FONTE, 2),   // local: descansoFonteLocal
   ESC("Formato do relógio",              V_RELOGIO_12H, 2),      // local: relogio12hLocal
   ESC("Tamanho máximo",                  V_TAMANHO_GB, 7),       // local: tamanhoMaxLocal
-  ESC("Tamanho mínimo",                  V_TAMANHO_GB, 7),       // local: tamanhoMinLocal
-  ACAO("Apoiar o projeto"),
+  ESC("Tamanho mínimo",                  V_TAMANHO_GB, 7),
   ESC("Legenda forçada automática quando o áudio for no seu idioma", V_LIGA, 2), // local: legendaForcadaLocal
   ESC("Classificação no player",         V_LIGA, 2),             // local: classifPlayerLocal
   ESC("Fontes do automático",            V_FONTE_ESCOPO, 3),  // por perfil: stream_auto_play_source
@@ -1269,7 +1256,7 @@ static const char *CHAVE[] = {
   // A grade e LOCAL e sem "-": o app oficial nao tem a escolha (#158).
   "-xtreamConta", "epgPaisLocal",
   "salvosDestino", "-trakt", "-simkl", "-sair",
-  "-versao", "-atualizar", "-registro", "envioAuto", "-espaco", "texturasMB",
+  "-versao", "-atualizar", "-espaco", "texturasMB",
   // Integracoes: os nomes sao exatamente os que profileSettingsSyncService.js
   // exporta dentro de tmdb_settings / mdblist_settings — a conta aplica e a
   // TV respeita a escolha feita no app web, e vice-versa.
@@ -1366,7 +1353,6 @@ static const char *CHAVE[] = {
   "descansoEstiloLocal", "descansoFonteLocal",
   "relogio12hLocal",
   "tamanhoMaxLocal", "tamanhoMinLocal",
-  "-apoiar",
   "legendaForcadaLocal",
   "classifPlayerLocal",
   // #202. O escopo usa o NOME do oficial (stream_auto_play_source no blob)
@@ -2016,7 +2002,6 @@ float ajustes_trailer_zoom(void)      { static const float z[] = { 1.34f, 1.15f,
 int   ajustes_trailer_qualidade(void) { static const int t[] = { 0, 1080, 720, 480 }; int v = valor[AJ_TRAILER_QUAL]; return (v >= 0 && v < 4) ? t[v] : 0; }
 // Fonte do trailer: o TRF_* de trailerfonte.h. Fora da lista le Automatico.
 int   ajustes_trailer_fonte(void)     { int v = valor[AJ_TRAILER_FONTE]; return (v >= 0 && v < nValores(AJ_TRAILER_FONTE)) ? v : 0; }
-int  ajustes_envio_auto(void)         { return lig(AJ_ENVIO_AUTO); }
 int  ajustes_menu_explorar(void)      { return lig(AJ_MENU_EXPLORAR); }
 int  ajustes_menu_guia(void)          { return lig(AJ_MENU_GUIA); }
 int  ajustes_menu_perfil(void)        { return lig(AJ_MENU_PERFIL); }
@@ -2032,7 +2017,6 @@ int  ajustes_trailer_cartaz(void) {
   // inativa() vem bem mais abaixo no arquivo.
   return lig(AJ_FOCO_TRAILER) && !SEGURO && (lig(AJ_EXPANDIR) || valor[AJ_LANDSCAPE] == 0);
 }
-void ajustes_definir_envio_auto(int ligado) { valor[AJ_ENVIO_AUTO] = ligado ? 0 : 1; gravar(); }
 // ARTE DO DESTAQUE ESCOLHIDA PELO DIAGNOSTICO, e so depois de a pessoa ver a
 // proposta na tela e apertar OK no botao (diagnostico.c): nunca sozinho. Os
 // dois ajustes sao locais (ver somenteDesteAparelho), entao nao ha blob de conta para
@@ -2740,31 +2724,6 @@ void ajustes_dir(const char *dir) {
       dados_gravar(RES_ARQ_MIGRADA, "1\n");
       gravar();
     } }
-  // MIGRACAO UNICA (1.5.1, #149): religa o envio automatico. Ate a 1.5.0 a
-  // abertura da tela de Ajustes desligava o envio e a gravacao seguinte
-  // levava o "desligado" ao disco — quem o tem no arquivo, na maioria, nao
-  // escolheu isso. O dono decidiu religar uma vez. A unica recusa que se sabe
-  // distinguir e o "nao" do cartao de consentimento do Tizen
-  // (telemetria-perguntado.txt = 0): essa fica. A marca mora ao lado do
-  // ajustes.txt, e o gravar() abaixo e quem avisa o IDBFS no Tizen.
-  { char marca[640];
-    FILE *m;
-    snprintf(marca, sizeof marca, "%s/envio-151.txt", dirAjustes);
-    m = fopen(marca, "r");
-    if (m) fclose(m);
-    else {
-      char *resp = dados_ler("telemetria-perguntado.txt");
-      int disseNao = resp && resp[0] == '0';
-      free(resp);
-      if (!disseNao && valor[AJ_ENVIO_AUTO] != 0) {
-        valor[AJ_ENVIO_AUTO] = 0;
-        printf("[ajustes] envio automatico religado (migracao unica do #149)\n");
-        fflush(stdout);
-      }
-      m = fopen(marca, "w");
-      if (m) { fputs("1\n", m); fclose(m); }
-      gravar();
-    } }
   // MIGRACAO UNICA (2.0): o fundo da escolha de perfil volta a Filmes (0, a
   // parede de cartazes de cada perfil, PS_FUNDO_FILMES em psestilos.h) para
   // todo mundo, uma vez. O dono decidiu: quem tinha Listras ou Arte do perfil
@@ -3451,7 +3410,6 @@ static int somenteDesteAparelho(int op) {
     case AJ_RESOLUCAO:      /* pedir superficie 4K: depende do painel */
     case AJ_TEX_MB:         /* teto de memoria de imagem: depende da RAM */
     case AJ_QUALIDADE_IMG:  /* resolucao da arte decodificada: idem */
-    case AJ_ENVIO_AUTO:     /* consentimento de envio de registro deste aparelho */
     case AJ_ANIM:           /* animacoes reduzidas: acessibilidade nesta TV */
     case AJ_IDIOMA:         /* idioma da interface deste aparelho */
     case AJ_FIL_LIMITE:     /* fileiras da home: por aparelho (fileirasui-p<N>.txt) */
@@ -3872,13 +3830,6 @@ int ajustes_iniciar(void) {
   rotulosDeIdioma();
   conferirPadroes();
   txt_definir_fonte_interface((TxtFamilia)valor[AJ_FONTE_UI]);
-  // #149: aqui havia `valor[AJ_ENVIO_AUTO] = 1` (desligado), o padrao do envio
-  // automatico escrito fora do vetor porque o vetor estava sete casas curto. Mesmo
-  // defeito do bloco abaixo: esta funcao roda a cada abertura da tela, depois
-  // do arquivo lido, e o "arquivo, lido depois, sobrescreve" do comentario nao
-  // acontecia — ligar o envio durava ate a proxima visita aos Ajustes. O
-  // padrao mora no vetor agora, conferido pelo _Static_assert dele.
-  //
   // BUG (#82/#86, 1.3.9 e 1.3.10): havia aqui um bloco Samsung escrevendo
   // AJ_DET_TRAILER_AUTO = AJ_HERO_TRAILER = 1 (desligado) como "padrao de
   // fabrica". So que ajustes_iniciar() roda TODA VEZ que a tela de Ajustes
@@ -4006,19 +3957,7 @@ static const char *textoLeitura(int op) {
   if (op >= AJ_POSTER_INST && op <= AJ_POSTER_TESTAR) return pstTexto(op);
   if (debIdx(op) >= 0) return debValor(op);
   if (op == AJ_DEBRID_AD_TESTAR) return adTesteTexto();
-  if (op == AJ_ENVIAR_LOG) {
-    static char b[48];
-    AvisosEnvio env;
-    switch (avisos_envio_info(&env)) {
-      case 1:  return i18n("enviando…");
-      case 2:
-        // O codigo fica na linha ate a sessao acabar (mockup quadro 9).
-        if (env.codigo[0]) { snprintf(b, sizeof b, i18n("enviado · %s"), env.codigo); return b; }
-        return i18n("enviado. Obrigado.");
-      case 3:  return i18n("não foi possível enviar");
-      default: return i18n("OK envia");
-    }
-  }
+
   if (op == AJ_VER_REGISTRO)
     return i18n("ou botão vermelho");
   if (op == AJ_ATUALIZAR && !atualizacao_nova()[0]) {
@@ -4237,8 +4176,6 @@ static int soLeitura(int op) { return OPCOES[op].tipo == OP_LEITURA; }
 // Item desenhado agora? Opcao de grupo fechado nao e — nem desenhada, nem
 // alcancada pelo cima/baixo.
 static int visivel(int i) {
-  if (i >= 0 && i < AJ_N_TELA && TELA[i].tipo == IT_OPC &&
-      TELA[i].op == AJ_ICONE_APP && !apoiador_ativo()) return 0;
   if (i < 0 || i >= AJ_N_TELA) return 0;
   if (TELA[i].tipo == IT_ROT) {
     int j;
@@ -4309,7 +4246,7 @@ static void focarOpcao(int op) {
 // separado de proposito: as duas perguntas sao diferentes e juntas viram um
 // paragrafo que ninguem le do sofa.
 static const char *ajudaOpcao(int op) {
-  if (op == AJ_ICONE_APP) return "Escolha uma marca alternativa para o Nuvio nesta TV. Um agradecimento a quem apoia o projeto.";
+  if (op == AJ_ICONE_APP) return "Escolha uma marca alternativa para usar dentro do app. O ícone instalado na TV permanece o mesmo.";
   if (inativa(op)) {
     if (op == AJ_VIDRO_CONTORNO) return "Ative a interface de vidro para ajustar o contorno.";
     if (op == AJ_VIDRO_OPAC || op == AJ_VIDRO_FOSCO) return "Ative a interface de vidro para ajustar o vidro.";
@@ -4575,9 +4512,6 @@ static const char *ajudaOpcao(int op) {
     case AJ_VER_REGISTRO: return "Abre o registro do app por cima desta tela, ao vivo: o mesmo painel do botão vermelho do controle, para quem não tem esse botão.";
     case AJ_MEDIDOR: return "Mostra quadros por segundo, o pior quadro e a memória dentro da ilha do relógio, atualizados a cada 3 s. Mínimo fica na linha da hora, Menor ganha uma segunda linha e Grande abre o painel completo. Quando a ilha mostra um aviso, o medidor se recolhe e volta depois.";
     case AJ_GUIA: return "O que o Nuvio faz, em 12 capítulos. Cada recurso diz onde fica e tem um atalho para ele.";
-    case AJ_APOIAR: return "Se o Nuvio te ajuda e você quiser apoiar quem faz o app, aponte a câmera do celular para um dos códigos. É opcional: nada muda no app.";
-    case AJ_ENVIAR_LOG: return "Manda os últimos 200 KB do registro desta sessão (sem senhas nem chaves) para quem faz o app. Use quando algo estiver errado agora.";
-    case AJ_ENVIO_AUTO: return "Ligado, o app manda o registro sozinho: o da sessão anterior ao abrir e o desta a cada minuto. Sem senhas nem chaves; serve para achar o que trava a Samsung. Desligue quando quiser.";
     case AJ_DIAGNOSTICO: return "Testa manifestos, fontes e artes dos addons, mede os tempos e aplica um perfil seguro de Qualidade ou Desempenho. O teste não marca títulos como assistidos.";
     case AJ_MENU_EXPLORAR: case AJ_MENU_GUIA: case AJ_MENU_PERFIL:
       return "Desligado, o item some da barra lateral. Nada é apagado: ligue de novo para ele voltar.";
@@ -5541,12 +5475,8 @@ static void eventoTela(const SDL_Event *e) {
       else if (atualizacao_busca() != ATUALIZACAO_BUSCA_PROCURANDO) atualizacao_procurar_agora();
       return;
     }
-    // O painel de envio (registro.h) dispara o envio e mostra o codigo ou o
-    // motivo da falha; antes so o texto da linha mudava.
-    if (focoOp == AJ_ENVIAR_LOG) { registro_envio_abrir(); return; }
     if (focoOp == AJ_VER_REGISTRO) { registro_abrir(); return; }
     if (focoOp == AJ_GUIA) { guiaAbrir(); return; }
-    if (focoOp == AJ_APOIAR) { uxNotificar("Aponte a câmera do celular para um dos códigos."); return; }
     if (focoOp == AJ_ADDONS) { pediuAddons = 1; return; }
     if (focoOp == AJ_PLUGINS) { pediuPlugins = 1; return; }
     if (focoOp == AJ_FONTE_ORDEM) { frAbrir(3); return; }
@@ -6103,8 +6033,7 @@ static AjPreview familiaPreviaOpcao(int op) {
       return AJPV_CONTA;
     case AJ_SALVOS_DEST: case AJ_TRAKT: case AJ_SIMKL:  case AJ_HIST_CONTA:
       return AJPV_RASTREIO;
-    case AJ_VERSAO_I: case AJ_ATUALIZAR: case AJ_ENVIAR_LOG: case AJ_GUIA:  case AJ_APOIAR:
-    case AJ_ENVIO_AUTO: case AJ_VER_REGISTRO:
+    case AJ_VERSAO_I: case AJ_ATUALIZAR: case AJ_GUIA: case AJ_VER_REGISTRO:
       return AJPV_ABOUT;
     case AJ_TMDB_LIGADO: case AJ_TMDB_IDIOMA: case AJ_TMDB_ARTE:
     case AJ_TMDB_BASICO: case AJ_TMDB_FICHA: case AJ_TMDB_DATAS:

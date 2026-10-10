@@ -471,19 +471,17 @@ int main(int argc, char **argv) {
   // (FPS, texturas, teclas) estava sendo descartada em silencio. Log em arquivo
   // e a unica forma de ler qualquer coisa de um app nativo em execucao normal.
   //
-  // O CAMINHO SAI DE registro.c e nao esta escrito aqui. E o mesmo arquivo que
+  // O CAMINHO SAI DE log.c e nao esta escrito aqui. E o mesmo arquivo que
   // o painel de log na tela le quando abre; com o nome repetido nos dois lados,
   // trocar um e esquecer o outro daria um painel vazio sem nenhuma pista do
-  // motivo. NULL = esta compilacao nao redireciona nada (o Mac, onde o log vai
-  // para o terminal, e o alvo Tizen, onde nao ha arquivo util) — que e
-  // exatamente o que o antigo #ifndef NV_SEM_WEBOS ja fazia.
+  // motivo. NULL = Linux sem NUVIO_LOG, onde o log vai para o terminal.
 #ifndef NV_SEM_WEBOS
   signal(SIGTERM, aoSinalTerminar);
 #endif
   { const char *log = registro_arquivo();
     // O LOG DA SESSAO ANTERIOR SOBREVIVE UMA VOLTA: renomeado antes de o novo
-    // truncar o arquivo. E ele que "Enviar registro" manda quando a sessao
-    // anterior morreu sem se despedir (avisos.h). Custa um rename; o arquivo
+    // truncar o arquivo. Permanece local para investigar uma sessao que
+    // terminou sem se despedir (avisos.h). Custa um rename; o arquivo
     // e do proprio app, entao o sticky bit do /tmp nao atrapalha.
     //
     // stderr e o MESMO descritor do stdout (dup2), nao um segundo freopen. Com
@@ -906,15 +904,12 @@ int main(int argc, char **argv) {
   plugins_ligar_aos_addons();
   // Ajustes tambem sao do USUARIO, nao do pacote.
   ajustes_dir(dirDados);
-  // Icone do app (apoiadores): a arte vem do pacote; o alias do launcher do
-  // Android e a abertura do .wgt seguem o que ficou gravado (idempotente).
+  // In-app icons use packaged artwork and the saved local selection.
   iconeapp_iniciar(dirArte);
   ajustes_idioma_auto_iniciar(aoMudarIdiomaAuto);
   // A estrutura persistida só pode ser comparada após carregar a configuração.
   homeestado_iniciar();
   { // Nativo conserva arte comprimida na pasta gravavel, sujeita a poda LRU.
-    // Tizen inicializa aqui o IndexedDB separado de imagens, lido sob demanda;
-    // a pasta IDBFS continua disponivel para o caminho legado de GIFs.
     char c[600];
     snprintf(c, sizeof c, "%s/cache", dirDados);
     tex_cache_dir(c); }

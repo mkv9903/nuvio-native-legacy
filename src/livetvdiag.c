@@ -26,7 +26,6 @@
 #include "ts_sonda.h"
 #include "ajustes.h"
 #include "addons.h"
-#include "avisos.h"
 #include "fontecache.h"  /* addons_consultar */
 #include "gfx.h"
 #include "guia.h"
@@ -106,7 +105,7 @@ static struct {
   Uint32 pfDesde, pfTocouEm, pausaAte;
   LtdRecomendacao rec;
   int recModo, tocouModo[5];   // modo do load que mais tocou; -1 = nenhum
-  int aplicado, enviou;
+  int aplicado;
   _Atomic int fioOcupado;
   volatile int cancelado;
   pthread_t fio;
@@ -601,7 +600,7 @@ static void comecar(void) {
   juntarFio();
   memset(L.it, 0, sizeof L.it);
   L.kbps = L.kbpsPior = 0; L.latenciaMs = -1; L.redeMedida = 0; L.kbpsDoSegmento = 0;
-  L.aplicado = 0; L.enviou = 0; L.contaLida = 0;
+  L.aplicado = 0; L.contaLida = 0;
   memset(&L.conta, 0, sizeof L.conta);
   memset(&L.rec, 0, sizeof L.rec);
   L.xtConfig = xtream_configurado();
@@ -670,12 +669,11 @@ void livetvdiag_atualizar(float dt, Uint32 agora) {
 }
 
 // --- teclas --------------------------------------------------------------------
-enum { B_APLICAR, B_ENVIAR, B_DENOVO, B_N };
+enum { B_APLICAR, B_DENOVO, B_N };
 static int botoes(int *lista) {
   int n = 0;
   if (L.estado != E_PRONTO) return 0;
   if (L.rec.confianca > 0 || L.redeMedida || L.recModo >= 0 || L.tocouModo[M_P]) lista[n++] = B_APLICAR;
-  lista[n++] = B_ENVIAR;
   lista[n++] = B_DENOVO;
   return n;
 }
@@ -706,9 +704,6 @@ void livetvdiag_evento(const SDL_Event *e) {
       printf("[livetv-diag] aplicado: resolucao=%d formato=%d espera=%d\n", L.rec.resolucao,
              L.rec.formato, L.rec.espera);
       fflush(stdout);
-    } else if (b == B_ENVIAR) {
-      avisos_enviar_registro_atual();
-      L.enviou = 1;
     } else comecar();
   }
 }
@@ -1006,12 +1001,7 @@ static void desenharRecomendacoes(GfxRect r, float ar, float ag, float ab) {
     if (L.it[i].xt && L.it[i].f[F_HLS].servido) hlsServido++;
   }
   if (L.aplicado) linhaRec(r, &y, i18n("Aplicado. Os próximos canais já usam estes ajustes."), 150, 222, 170);
-  if (L.enviou) {
-    int st = avisos_envio_estado();
-    linhaRec(r, &y, i18n(st == 2 ? "Resultado enviado no registro." : st == 3 ? "O envio do registro falhou."
-                                                                             : "Enviando o registro…"),
-             st == 3 ? 244 : 150, st == 3 ? 170 : 222, st == 3 ? 140 : 170);
-  }
+
   if (L.rec.semDecoder) {
     snprintf(a, sizeof a, i18n("%d canal(is): o vídeo chega, mas a TV não começa a decodificar. Esperar mais não resolve; tente o outro formato ou outra resolução do canal."), L.rec.semDecoder);
     linhaRec(r, &y, a, 244, 196, 150);
@@ -1048,10 +1038,10 @@ static void desenharRecomendacoes(GfxRect r, float ar, float ag, float ab) {
     snprintf(a, sizeof a, i18n("%d de %d canais não abriram: são esses canais, não a TV. Use a versão em outra resolução deles."), semVideo, L.n);
     linhaRec(r, &y, a, 214, 220, 230);
   } else if (L.n && semVideo == L.n)
-    linhaRec(r, &y, i18n("Nenhum canal abriu: confira a conta, a rede e envie o resultado no registro."), 244, 196, 150);
+    linhaRec(r, &y, i18n("Nenhum canal abriu: confira a conta e a rede. Os resultados permanecem no registro local."), 244, 196, 150);
   // BOTOES no rodape do painel.
   n = botoes(lista);
-  { static const char *const ROT[B_N] = { "Aplicar recomendadas", "Enviar no registro", "Testar de novo" };
+  { static const char *const ROT[B_N] = { "Aplicar recomendadas", "Testar de novo" };
     float x = r.x + 32.0f, by = r.y + r.h - 28.0f - 60.0f;
     if (L.botao >= n) L.botao = n ? n - 1 : 0;
     for (i = 0; i < n; i++) x += ajustes_ui_botao(i18n(ROT[lista[i]]), NULL, x, by, i == L.botao) + 12.0f; }

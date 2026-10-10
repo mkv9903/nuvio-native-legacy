@@ -1,4 +1,4 @@
-// CAPTURA DO ICONE DO APP (apoiadores) fora dos Ajustes: a marca no canto da
+// CAPTURA DO ICONE DO APP fora dos Ajustes: a marca no canto da
 // tela de login e no alto da barra lateral aberta, com dois icones diferentes.
 // Sem rede: a build de teste nao tem servidor, entao o login desenha a frase
 // de "pacote sem servidor" — o que importa aqui e o canto.
@@ -70,12 +70,9 @@ int main(int argc, char **argv) {
   ajustes_iniciar();
   iconeapp_iniciar("deploy/app/art");
 
-  // Sem o portao, o icone gravado nao vale: Original, e nada no canto.
+  // A saved alternative icon works without any account or local override.
   ajustes_teste_op_icone(1);
-  assert(iconeapp_atual() == 0);
-  setenv("NUVIO_APOIADOR", "1", 1);
-  apoiador_reler();
-  assert(apoiador_ativo() && iconeapp_atual() == 1);
+  assert(iconeapp_atual() == 1);
 
   login_iniciar();
   for (int k = 0; k < 3; k++) {

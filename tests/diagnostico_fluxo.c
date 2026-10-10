@@ -256,6 +256,19 @@ int main(void) {
          strstr(strstr(d.relatorio, "arte_fonte=fanart"), "download_medio_ms=-1|download_pior_ms=0\n"));
   puts("ok  relatorio: media e pior pedido por fonte, alem da soma");
 
+  // Completing a speed test updates the report on disk without an upload.
+  atomic_store(&d.estado, 2);
+  atomic_store(&vz.estado, 2);
+  vz.resultado = VR_CURTO;
+  assert(!strcmp(vazaoNome(VR_CURTO), "curto"));
+  assert(!strcmp(vazaoNome(VR_CANCELADO), "cancelado"));
+  concluirVazao();
+  cfg = dados_ler("diagnostico-otimizacao.txt");
+  assert(cfg && !strcmp(cfg, d.relatorio));
+  assert(strstr(cfg, "vazao_resultado=curto\n"));
+  free(cfg);
+  puts("ok  speed-test result remains in the local diagnostic report");
+
   tex_encerrar();
   { char cmd[128]; snprintf(cmd, sizeof cmd, "rm -rf '%s'", dir); if (system(cmd)) {} }
   return 0;

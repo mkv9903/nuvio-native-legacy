@@ -99,7 +99,7 @@ static const char MD[] =
   "\n"
   "## Added\n"
   "- Where to watch in the source picker: see regional streaming services such as Netflix and open their installed apps. Store availability depends on the TV.\n"
-  "- Optional app icons using the existing provisional supporter setting.\n"
+  "- Alternative app icons available locally in Settings.\n"
   "\n"
   "## Fixed\n"
   "- Android queries installed streaming apps in the background, preserving the last complete list while refreshing.\n"

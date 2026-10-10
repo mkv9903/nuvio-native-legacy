@@ -54,7 +54,7 @@ static const char *const AJ_IDS[] = {
   "AJ_STALKER_MAC", "AJ_STALKER_LIMPAR", "AJ_XTREAM_SERVIDOR", "AJ_XTREAM_USUARIO",
   "AJ_XTREAM_SENHA", "AJ_XTREAM_LIMPAR", "AJ_SALVOS_DEST", "AJ_TRAKT",
   "AJ_SIMKL", "AJ_SAIR", "AJ_VERSAO_I", "AJ_ATUALIZAR",
-  "AJ_ENVIAR_LOG", "AJ_ENVIO_AUTO", "AJ_ESPACO", "AJ_TEX_MB",
+  "AJ_ESPACO", "AJ_TEX_MB",
   "AJ_TMDB_LIGADO", "AJ_TMDB_IDIOMA", "AJ_TMDB_ARTE", "AJ_TMDB_BASICO",
   "AJ_TMDB_FICHA", "AJ_TMDB_DATAS", "AJ_TMDB_ELENCO", "AJ_TMDB_PROD",
   "AJ_TMDB_REDES", "AJ_TMDB_EPS", "AJ_TMDB_TRAILERS", "AJ_TMDB_MAIS",
@@ -333,12 +333,10 @@ int main(int argc, char **argv) {
     goto fim_capturas;
   }
 
-  // A GALERIA DO "Ícone do app" (apoiadores), forcada pelo portao do dono:
+  // A GALERIA DO "Ícone do app", disponivel sem conta ou permissao especial:
   // NUVIO_AJUSTES_ICONE=1 grava -icone-<id>.png com tres escolhas diferentes.
   if (getenv("NUVIO_AJUSTES_ICONE")) {
     static const int esc[] = { 0, 1, 7 };
-    setenv("NUVIO_APOIADOR", "1", 1);
-    apoiador_reler();
     iconeapp_iniciar("deploy/app/art");
     logoapp_iniciar("deploy/app/art");
     for (i = 0; i < 3; i++) {

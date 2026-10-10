@@ -27,7 +27,6 @@ static int ajDicasDe(int op, AjDica *d) {
   }
   { int n = 0;
     if (op >= 0 && inativa(op) && uxRequisito(op) >= 0) d[n++] = (AjDica){ "OK", "Mostrar" };
-    else if (op == AJ_ENVIAR_LOG && !inativa(op)) d[n++] = (AjDica){ "OK", "Enviar" };
     else if (op >= 0 && !inativa(op)) switch (ajTipo(op)) {
       case AJL_TOG: d[n++] = (AjDica){ "OK", "Mudar" }; break;
       case AJL_ESC: d[n++] = (AjDica){ "OK", op == AJ_TEMA ? "Mudar" : "Escolher" }; break;
@@ -141,38 +140,6 @@ static void ajDesenharInspetor(void) {
       y += 18.0f;
       y += aj2Meta(i18n("Vale para"), i18n(uxEscopo(op)), x, y, w, 1);
       y += aj2Meta(i18n("Padrão"), padrao, x, y, w, 1);
-    }
-    // ENVIAR REGISTRO: o ultimo envio, o ultimo codigo e o destino.
-    if (op == AJ_ENVIAR_LOG) {
-      AvisosEnvio env;
-      char v[96], ha[48];
-      time_t ult;
-      int autom;
-      avisos_envio_info(&env);
-      autom = env.autoQuando > env.quando;
-      ult = autom ? env.autoQuando : env.quando;
-      y += 18.0f;
-      if (ult) {
-        long s = (long)(time(NULL) - ult);
-        if (s < 60) snprintf(ha, sizeof ha, i18n("há %ld s"), s);
-        else if (s < 3600) snprintf(ha, sizeof ha, i18n("há %ld min"), s / 60);
-        else snprintf(ha, sizeof ha, i18n("há %ld h"), s / 3600);
-        snprintf(v, sizeof v, "%s · %s", ha, autom ? i18n("automático") : i18n("manual"));
-      } else snprintf(v, sizeof v, "%s", i18n("nenhum nesta sessão"));
-      y += aj2Meta(i18n("Último envio"), v, x, y, w, 1);
-      if (env.ultimoCodigo[0]) {
-        struct tm a, b;
-        time_t agora = time(NULL);
-        localtime_r(&env.ultimoCodigoQuando, &a);
-        localtime_r(&agora, &b);
-        if (a.tm_yday == b.tm_yday && a.tm_year == b.tm_year)
-          snprintf(v, sizeof v, i18n("%s · hoje %02d:%02d"), env.ultimoCodigo, a.tm_hour, a.tm_min);
-        else if (b.tm_yday - a.tm_yday == 1 && a.tm_year == b.tm_year)
-          snprintf(v, sizeof v, i18n("%s · ontem %02d:%02d"), env.ultimoCodigo, a.tm_hour, a.tm_min);
-        else snprintf(v, sizeof v, i18n("%s · %02d/%02d %02d:%02d"), env.ultimoCodigo, a.tm_mday, a.tm_mon + 1, a.tm_hour, a.tm_min);
-        y += aj2Meta(i18n("Último código"), v, x, y, w, 1);
-      }
-      y += aj2Meta(i18n("Destino"), env.disponivel ? i18n("servidor de registros do app") : i18n("indisponível nesta versão"), x, y, w, 1);
     }
   } }
 }
@@ -784,7 +751,7 @@ static void aj2InspetorDiferencas(void) {
 // --- A TELA ---------------------------------------------------------------------
 static int ajModalAberto(void) {
   return (uxEditor && (uxRestaurar || uxAvisoRisco || uxEditor == 2)) || riscoFolha || frAberta || ajVinculoAtivo() ||
-         teclado_aberto() || registro_envio_aberto();
+         teclado_aberto();
 }
 static void ajDesenharTela(void) {
   int modal = ajModalAberto();
@@ -835,7 +802,6 @@ static void ajDesenharTela(void) {
     txt_desenhar_alpha(t, fr.x + 50, fr.y + fr.h - 30, 0.7f);
   }
   ajDesenharModais();
-  if (registro_envio_aberto()) registro_envio_desenhar();
 }
 
 // --- ADDONS (addonsui.c) COMO UMA CATEGORIA DE AJUSTES ------------------------------

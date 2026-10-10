@@ -1,14 +1,6 @@
 #include "gles_test.h"
-// CAPTURAS DO REGISTRO DO APP NO GLASS UI (logs-mockup.html, 03/10), sem
-// rede e sem interacao: o painel do botao vermelho (ao vivo, pausado, filtros,
-// etapas, vazio), Ajustes > Sobre e ajuda com o painel de envio (enviando,
-// enviado, erro, sem internet), o aviso de primeira vez, o consentimento do
-// envio automatico, a queda da sessao anterior e o medidor de desempenho.
-//
-// As linhas sao as do mockup (registro_shot_sessao.h); os estados sao
-// montados a mao (registro.c e incluido). A arte de tras: NUVIO_SHOT_ARTE_LOG,
-// _AJ, _TEL (os fundos do mockup) ou a embarcada. NUVIO_SHOT_VIDRO=0 = solido.
-// Uso: bash tests/registro_shot.sh <pasta> [ids...]
+// Local log panel, first-use hint, crash notice and performance HUD captures.
+// No upload or Samsung telemetry scenes are included.
 #define REGISTRO_TESTE 1
 #include "../src/log.c"
 #include "registro_shot_sessao.h"
@@ -18,12 +10,11 @@
 #include "badges.h"
 #include "desempenho.h"
 #include "plrilha.h"
-#include "telemetria.h"
+#include "avisos.h"
 #include <SDL2/SDL_image.h>
 #include <assert.h>
 
 extern int  ajustes_teste_quadro(const char *id);
-extern void telemetria_teste_abrir(void);
 
 static GLuint fbo, fboTex;
 static const char *saida;
@@ -59,7 +50,7 @@ static GLuint carregaArte(const char *c) {
   return tex;
 }
 static void arte(int qual, float veu) {
-  static const char *ENV[4] = { "NUVIO_SHOT_ARTE_LOG", "NUVIO_SHOT_ARTE_AJ", "NUVIO_SHOT_ARTE_TEL", NULL };
+  static const char *ENV[4] = { "NUVIO_SHOT_ARTE_LOG", "NUVIO_SHOT_ARTE_AJ", "NUVIO_SHOT_ARTE_PLAYER", NULL };
   if (!artes[qual] && ENV[qual]) artes[qual] = carregaArte(getenv(ENV[qual]));
   if (artes[qual]) {
     gfx_tex_aspect_atual = 16.0f / 9.0f;
@@ -69,7 +60,7 @@ static void arte(int qual, float veu) {
   if (veu > 0) gfx_cor((GfxRect){ 0, 0, 1920, 1080 }, 0, 0, 0, 0, veu);
 }
 
-enum { CENA_PAINEL_AJ, CENA_PAINEL, CENA_AVISO, CENA_AJ, CENA_TEL, CENA_QUEDA, CENA_HUD, CENA_HUD_ATV, CENA_HUD_PLAYER };
+enum { CENA_PAINEL_AJ, CENA_PAINEL, CENA_AVISO, CENA_AJ, CENA_QUEDA, CENA_HUD, CENA_HUD_ATV, CENA_HUD_PLAYER };
 // O medidor e conteudo da ilha do relogio (desempenho.h): a ilha no canto de
 // sempre, sem ancora, como app.c a desenha na home.
 static void relogioPadrao(void) { ilha_relogio_visivel(1); ilha_desenhar(SDL_GetTicks()); }
@@ -106,9 +97,8 @@ static void captura(const char *id, int cena) {
       case CENA_AJ:
         ajustes_atualizar(1.0f / 60.0f, SDL_GetTicks());
         ajustes_desenhar(SDL_GetTicks());
-        if (!registro_envio_aberto()) relogio(ajustes_ilha_x());
+        relogio(ajustes_ilha_x());
         break;
-      case CENA_TEL: arte(2, 0.30f); telemetria_atualizar(1.0f / 60.0f, SDL_GetTicks()); telemetria_desenhar(SDL_GetTicks()); break;
       case CENA_QUEDA: arte(1, 0.30f); avisos_atualizar(1.0f / 60.0f, SDL_GetTicks()); ilha_relogio_visivel(1); ilha_posicionar(1); ilha_desenhar(SDL_GetTicks()); break;
       case CENA_HUD: arte(1, 0.30f); relogioPadrao(); break;
       case CENA_HUD_ATV: arte(1, 0.30f); ilha_atividade("Carregando fileiras…", -1.0f); relogioPadrao(); break;
@@ -209,10 +199,9 @@ int main(int argc, char **argv) {
   registro_teste_texto(REG_SHOT_SESSAO);
   registro_abrir();
   hostsDeMentira();
-  avisos_teste_envio_auto(40, 200);
   registro_teste_estado(RG_TUDO, 0, 0, 0, 0, 0);
   if (quer("painel-sobre-ajustes")) {
-    ajustes_teste_quadro("op:-registro");
+    assert(ajustes_teste_quadro("op:verRegistro"));
     captura("painel-sobre-ajustes", CENA_PAINEL_AJ);
   }
   captura("painel", CENA_PAINEL);
@@ -240,32 +229,11 @@ int main(int argc, char **argv) {
   registro_teste_texto(REG_SHOT_SESSAO);
   carregar();
 
-  // --- Ajustes > Sobre e ajuda e o painel de envio ---------------------------
-  { char l[64];
-    time_t ontem = time(NULL) - 86400;
-    struct tm t;
-    localtime_r(&ontem, &t);
-    t.tm_hour = 22; t.tm_min = 47; t.tm_sec = 0;
-    snprintf(l, sizeof l, "K7QM2X %ld\n", (long)mktime(&t));
-    dados_gravar("registro-codigo.txt", l); }
-  if (quer("sobre") || quer("enviando") || quer("enviado") || quer("enviar-erro") || quer("enviar-offline")) {
-    ajustes_teste_quadro("op:-registro");
-    jaAberto = 0;   // o "NOVO" da linha: ninguem abriu o registro por Ajustes
+  // Settings keeps the local log action and preview.
+  if (quer("sobre")) {
+    assert(ajustes_teste_quadro("op:verRegistro"));
+    jaAberto = 0;
     captura("sobre", CENA_AJ);
-    registro_teste_envio(1);
-    avisos_teste_envio(1, 0, 0, "", 186L * 1024, 2214);
-    captura("enviando", CENA_AJ);
-    avisos_teste_envio(2, AVISOS_ENVIO_OK, 200, "K7QM2X", 186L * 1024, 2214);
-    captura("enviado", CENA_AJ);
-    avisos_teste_envio(3, AVISOS_ENVIO_SERVIDOR, 500, "", 186L * 1024, 2214);
-    registro_teste_envio_foco(0);
-    captura("enviar-erro", CENA_AJ);
-    { int k;   // a TV sem internet: seis falhas de transporte em tres hosts
-      for (k = 0; k < 6; k++) rede_saude_nota(6, k % 3 == 0 ? "https://addon-b.exemplo/x" : k % 3 == 1 ? "https://imagens.exemplo/x" : "https://sync.exemplo/x"); }
-    avisos_teste_envio(3, AVISOS_ENVIO_OFFLINE, 0, "", 186L * 1024, 2214);
-    captura("enviar-offline", CENA_AJ);
-    registro_teste_envio(0);
-    avisos_teste_envio(0, 0, 0, "", 0, 0);
   }
 
   // --- aviso de primeira vez --------------------------------------------------
@@ -276,8 +244,7 @@ int main(int argc, char **argv) {
   // --- a queda da sessao anterior, na ilha do relogio ---------------------------
   if (quer("queda")) {
     int k;
-    ajustes_definir_envio_auto(0);
-    avisos_teste_queda("Em 2026-10-02 22:41 o Nuvio parou sem avisar. Se quiser, envie o registro daquela sessão para ajudar a encontrar a causa.");
+    avisos_teste_queda("Em 2026-10-02 22:41 o Nuvio parou sem avisar. O registro daquela sessão permanece neste aparelho.");
     for (k = 0; k < 30; k++) { ilha_desenhar(SDL_GetTicks()); SDL_Delay(10); }
     { SDL_Event e = { 0 };   // AZUL/CH+: a pilula cresce no modal do aviso
       e.type = SDL_KEYDOWN; e.key.keysym.sym = SDLK_PAGEUP; e.key.keysym.scancode = SDL_SCANCODE_PAGEUP;
@@ -286,13 +253,7 @@ int main(int argc, char **argv) {
     for (k = 0; k < 90; k++) { txt_novo_quadro(); ilha_desenhar(SDL_GetTicks()); SDL_Delay(10); }   // a mola assenta
     captura("queda", CENA_QUEDA);
     ilha_modal_fechar(1);
-    ajustes_definir_envio_auto(1);
   }
-
-  // --- consentimento do envio automatico (Samsung) ------------------------------
-  telemetria_teste_abrir();
-  captura("consentimento", CENA_TEL);
-  telemetria_desenhar(0);
 
   // --- medidor de desempenho ----------------------------------------------------
   { static const float PIOR[36] = { 21,19,22,24,20,18,22,26,21,19,20,23,31,38,61,44,33,24,20,19,21,22,20,25,19,18,20,21,22,19,18,20,23,19,18,18 };

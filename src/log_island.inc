@@ -41,8 +41,19 @@ static void rgIcone(const char *n, float x, float y, float l, float al) {
 static void rgIconeCor(const char *n, float x, float y, float l, float r, float g, float b, float al) {
   gfx_icone((GfxRect){ x, y, l, l }, n, r, g, b, al);
 }
-static void rgMilhar(char *d, size_t tam, long n);
 static char rgSep(void) { return idioma_ponto_decimal(ajustes_idioma()) ? '.' : ','; }
+static void rgMilhar(char *d, size_t tam, long n) {
+  char b[32];
+  int len, i, j = 0;
+  char sep = rgSep() == ',' ? '.' : ',';
+  snprintf(b, sizeof b, "%ld", n);
+  len = (int)strlen(b);
+  for (i = 0; i < len && j < (int)tam - 2; i++) {
+    d[j++] = b[i];
+    if ((len - i - 1) % 3 == 0 && i < len - 1) d[j++] = sep;
+  }
+  d[j] = 0;
+}
 // "%.*f" with language decimal point.
 static void rgNum(char *d, size_t tam, double v, int casas) {
   char *p;
@@ -95,10 +106,6 @@ static void rgPilulaAcento(GfxRect r, float raioPx, float a) {
   gfx_cor(r, raioPx / r.h, ar, ag, ab, a);
 }
 static TxtLinha rgTT(TxtEstilo e, const char *s) { int t = ajustes_tinta_foco(); return txt_linha(e, s, t, t, t, 255); }
-static void rgIconeT(const char *n, float x, float y, float l, float a) {
-  float t = ajustes_tinta_foco() / 255.0f;
-  gfx_icone((GfxRect){ x, y, l, l }, n, t, t, t, a);
-}
 // Breathing dot of island (accent with 6px halo at 22%).
 static void rgRespira(float x, float yc, float r, float g, float b) {
   float p = ajustes_animacoes_reduzidas() ? 1.0f
@@ -688,7 +695,6 @@ static void inspSessao(void) {
   GfxRect ir = rgInspR();
   float x = RI_CX, w = RI_CW, y = ir.y + 34;
   char v[160], a[64];
-  AvisosEnvio env;
   rgIlha(ir, 36, 0.80f, 0.055f, 0.059f, 0.071f);
   rgKicker("Esta sessão", x, y);
   y += 18 + 18;
@@ -753,54 +759,6 @@ static void inspSessao(void) {
         if (fr > 1) fr = 1;
         gfx_cor((GfxRect){ x, y, w, 8 }, 0.5f, 1, 1, 1, 0.07f);
         if (fr > 0.005f) gfx_cor((GfxRect){ x, y, w * fr, 8 }, 0.5f, RG_VERDE, 0.75f); }
-    } }
-  // Automatic send at bottom.
-  avisos_envio_info(&env);
-  { const char *txt;
-    char t[300];
-    float th, ch, cy;
-    int lig = ajustes_envio_auto();
-    if (!env.disponivel) txt = i18n("Esta versão não tem servidor de registros.");
-    else {
-      char ha[48];
-      if (lig && env.autoQuando) {
-        rgHa(ha, sizeof ha, (long)(time(NULL) - env.autoQuando));
-        snprintf(t, sizeof t, i18n("Último envio sozinho %s. Endereços aparecem só até o host: o caminho pode levar chave."), ha);
-      } else if (lig) snprintf(t, sizeof t, "%s", i18n("Nenhum envio sozinho nesta sessão ainda. Endereços aparecem só até o host: o caminho pode levar chave."));
-      else snprintf(t, sizeof t, "%s", i18n("Desligado: o registro só sai quando você mandar. Endereços aparecem só até o host: o caminho pode levar chave."));
-      txt = t;
-    }
-    th = rgBlocoAltura(TXT_ILHA_GENERO, txt, w - 44, 23.2f, 4);
-    ch = 20 + 26 + 10 + th + (env.disponivel ? 16 + 50 : 0) + 20;
-    cy = RI_BASE - ch;
-    rgCart((GfxRect){ x, cy, w, ch });
-    rgIcone("aj_cloud", x + 22, cy + 22, 22, 0.7f);
-    { TxtLinha l = rgT(TXT_AJ_SEG, "Envio automático"); txt_desenhar(l, x + 22 + 34, cy + 33 - l.h * 0.5f); }
-    { float ar, ag, ab, xd = x + w - 22;
-      TxtLinha l;
-      ajustes_acento(&ar, &ag, &ab);
-      if (lig) {
-        float cw;
-        l = txt_linha(TXT_G16B, "Ligado", (int)(ar * 255), (int)(ag * 255), (int)(ab * 255), 255);
-        cw = 14 + 8 + 8 + l.w + 14;
-        gfx_cor((GfxRect){ xd - cw, cy + 33 - 17, cw, 34 }, 0.5f, ar, ag, ab, 0.22f);
-        gfx_cor((GfxRect){ xd - cw + 14, cy + 33 - 4, 8, 8 }, 0.5f, ar, ag, ab, 1);
-        txt_desenhar(l, xd - cw + 30, cy + 33 - l.h * 0.5f);
-      } else {
-        float cw;
-        l = rgT(TXT_G16B, "Desligado");
-        cw = 14 + l.w + 14;
-        rgNeutro((GfxRect){ xd - cw, cy + 33 - 17, cw, 34 }, 17, 0.07f, RG_CHIP_SOL, 1);
-        txt_desenhar_alpha(l, xd - cw + 14, cy + 33 - l.h * 0.5f, 0.5f);
-      } }
-    rgBloco(TXT_ILHA_GENERO, txt, x + 22, cy + 20 + 26 + 10, w - 44, 23.2f, 0.52f, 4);
-    if (env.disponivel) {
-      float by = cy + 20 + 26 + 10 + th + 16;
-      TxtLinha l = focoEnviar ? rgTT(TXT_LOG_19B, "Enviar agora") : rgT(TXT_LOG_19B, "Enviar agora");
-      float bw = 22 + 20 + 10 + l.w + 22;
-      if (focoEnviar) { rgPilulaAcento((GfxRect){ x + 22, by, bw, 50 }, 25, 1); rgIconeT("aj_send", x + 44, by + 15, 20, 1); }
-      else { rgNeutro((GfxRect){ x + 22, by, bw, 50 }, 25, 0.08f, RG_CHIP_SOL, 1); rgIcone("aj_send", x + 44, by + 15, 20, 0.85f); }
-      txt_desenhar_alpha(l, x + 22 + 52, by + (50 - l.h) * 0.5f, focoEnviar ? 1.0f : 0.85f);
     } }
 }
 
@@ -1052,29 +1010,23 @@ static void inspAparelho(void) {
     y += 16 + 8;
     rgBloco(TXT_MONO15, tv, x, y, w, 23.25f, 0.62f, 4);
   }
-  rgCartNota(NULL, "No webOS e no .tpk 6+ esta aba mostra o arranque do próprio app ([arranque], [tv], [host]); as etapas só existem no 4/5.", x, RI_BASE, w);
+  rgCartNota(NULL, "Esta aba mostra o arranque do próprio app ([arranque], [tv], [host]).", x, RI_BASE, w);
 }
 
 static void inspVazio(void) {
   GfxRect ir = rgInspR();
   float x = RI_CX, w = RI_CW, y = ir.y + 34;
-  AvisosEnvio env;
   const char *arq = log_file_path();
   rgIlha(ir, 36, 0.80f, 0.055f, 0.059f, 0.071f);
-  avisos_envio_info(&env);
   rgKicker("Esta sessão", x, y);
   y += 18 + 18;
   y += rgDevCard(x, y) + 22;
   y += rgStat(i18n("Arquivo de log"), arq ? arq : i18n("nenhum"), x, y, w);
-  // Without file (Mac without NUVIO_LOG) sending produces empty text: unavailable.
-  y += rgStat(i18n("Envio de registro"), env.disponivel && arq ? i18n("disponível") : i18n("indisponível"), x, y, w);
   y += 30;
   rgK2("De onde o painel lê", x, y);
   y += 16 + 10;
   y += rgStat("webOS", "/tmp/nuvio.log", x, y, w);
-  y += rgStat("Samsung .wgt", i18n("linhas do shell"), x, y, w);
-  y += rgStat(".tpk e Android", i18n("nuvio.log da pasta de dados"), x, y, w);
-  rgStat("Mac", i18n("só com NUVIO_LOG"), x, y, w);
+  rgStat("Linux", i18n("só com NUVIO_LOG"), x, y, w);
   rgCartNota(NULL, "“Não há de onde ler” e “ainda não há linha” são problemas diferentes; cada um tem a sua frase.", x, RI_BASE, w);
 }
 
@@ -1241,11 +1193,7 @@ static void desenhaPainel(void) {
       rgSeguindo(t);
     } else rgSeguindo(i18n("seguindo o fim · lê o arquivo a cada segundo"));
   }
-  if (focoEnviar) {
-    RgDica d[3] = { { "OK", "Enviar" }, { "←", "Área" }, { "Voltar", "Fechar" } };
-    snprintf(t, sizeof t, i18n("%d linhas do fim do registro"), nLin);
-    rgRodape(d, 3, t);
-  } else if (etap) {
+  if (etap) {
     RgDica d[4] = { { "↑ ↓", "Etapa" }, { "← →", "Área" }, { "OK", "Linha crua" }, { "Voltar", "Fechar" } };
     snprintf(t, sizeof t, i18n("[etapa] e [etapa-anterior] · %d linhas"), nEtapasLinhas);
     rgRodape(d, 4, t);
@@ -1270,8 +1218,8 @@ static void desenhaPainel(void) {
   if (RG_SEM_INSP) { /* narrow virtual screen: no inspector */ }
   else if (pausado && foco >= 0 && detalhe) inspLinha();
   else if (etap) inspAparelho();
-  else if (area == RG_PROB && !focoEnviar) inspProblemas();
-  else if (area == RG_REDE && !focoEnviar) inspRede();
+  else if (area == RG_PROB) inspProblemas();
+  else if (area == RG_REDE) inspRede();
   else inspSessao();
 }
 

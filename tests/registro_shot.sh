@@ -5,7 +5,7 @@
 #   NUVIO_SHOT_VIDRO=0 bash tests/registro_shot.sh <pasta>     (material solido)
 #
 # Fundos: NUVIO_SHOT_ARTE_LOG (painel), NUVIO_SHOT_ARTE_AJ (Ajustes, aviso,
-# queda, medidor), NUVIO_SHOT_ARTE_TEL (consentimento, pilula); sem eles, a
+# queda, medidor), NUVIO_SHOT_ARTE_PLAYER (player); sem eles, a
 # arte embarcada. Nao entra na suite (tools/test-all.sh pula *_shot.sh):
 # precisa de janela GL e de olho humano. NUVIO_DADOS e temporario.
 set -eu
@@ -24,7 +24,7 @@ for source in src/*.c src/dts/*.c; do
   sources+=("$source")
 done
 cc "${sources[@]}" tests/registro_shot.c -Isrc -Itests -o "$B" \
-  -DREGISTRO_TESTE -DAVISOS_TESTE_ENVIO -DNV_VERSAO='"1.7.2"' -DNV_REC_URL='"https://registro.exemplo"' -DDESEMPENHO_TESTE -DTELEMETRIA_TESTE -DAJUSTES_TESTE \
+  -DREGISTRO_TESTE -DAVISOS_TESTE -DNV_VERSAO='"1.7.2"' -DDESEMPENHO_TESTE -DAJUSTES_TESTE \
   -O1 -g -DNV_LINUX_DESKTOP $(pkg-config --cflags sdl2 SDL2_image SDL2_ttf)  \
    -lSDL2 -lSDL2_image -lSDL2_ttf -lz $(pkg-config --libs glesv2 egl) -ldl -pthread -lm \
   -Wno-deprecated-declarations -Wno-macro-redefined

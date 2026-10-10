@@ -7,7 +7,6 @@
 #include "idiomacod.h"
 #include "layout.h"
 #include "ajustes.h"
-#include "avisos.h"
 #include "redesaude.h"
 #include "tex_cache.h"
 #define NV_ESCALA_TELA   // whole file measures by virtual screen (escala.h)
@@ -35,10 +34,7 @@
 // Settings > About and help > "View log on screen" exists (log_open).
 #define LOG_SCANCODE_RED 486
 
-// SAME key must exist without TV remote: on Mac there is no red key, and
-// on Tizen red is translated by shell (keyCode 403 -> F9). F9 and not a
-// letter: panel is routed BEFORE all screens, and a letter would open
-// panel while typing in search.
+// F9 opens the panel on Linux without conflicting with search input.
 #define LOG_KEY_KEYBOARD SDLK_F9
 
 // How many bytes from END of file are read, and how many lines are kept.
@@ -92,7 +88,7 @@ static int nLidas;          // lines in read window (>= nLin)
 static int cont[RG_N];      // per area, over read window
 static int nErros, nAvisos;
 static int semFonte;        // 1 = nowhere to read from in this build
-static long marcaLida;      // file size (or line count in wasm) on last read
+static long marcaLida;      // file size on last read
 static Uint32 ultLeitura;
 
 static char cru[LOG_WINDOW + 1];
@@ -105,8 +101,8 @@ const char *log_file_path(void) {
     resolvido = 1;
     if (env && env[0]) snprintf(caminho, sizeof caminho, "%s", env);
 #if defined(NV_LINUX_DESKTOP)
-    // On Mac log goes to TERMINAL and stays that way. To exercise panel:
-    // NUVIO_LOG=/tmp/nuvio.log bash tools/mac.sh
+    // Linux logs to the terminal unless a local log file is requested:
+    // NUVIO_LOG=/tmp/nuvio.log bash tools/linux.sh
     else caminho[0] = 0;
 #else
 #ifdef NV_DTS_DEBUG
@@ -264,7 +260,7 @@ static void fatiar(char *texto, int parcial) {
 }
 
 
-// Current source mark (file bytes, or lines in wasm); -1 without source.
+// Current source mark (file bytes); -1 without source.
 static long marcaAtual(void) {
   struct stat st;
   const char *c = log_file_path();
@@ -315,7 +311,6 @@ static int segEd;           // picking area (segmented in accent)
 static int pausado;         // ↑ paused: list does not move
 static int foco = -1;       // line in focus (index in vis), paused
 static int detalhe;         // focused line open in full
-static int focoEnviar;      // focus on "Send now" in inspector
 static int novas;           // new lines arrived since pause
 static long marcaPausa;
 static int focoEtapa;       // System with stage trail: stage in focus
@@ -394,7 +389,7 @@ int log_is_open(void) { return is_open; }
 
 static void abrir(void) {
   is_open = 1;
-  area = RG_TUDO; segEd = 0; pausado = 0; foco = -1; detalhe = 0; focoEnviar = 0;
+  area = RG_TUDO; segEd = 0; pausado = 0; foco = -1; detalhe = 0;
   novas = 0; focoEtapa = 0;
   fflush(stdout);
   recarregar();
@@ -451,9 +446,6 @@ static void trocarArea(int d) {
   filtrar();
 }
 
-int log_send_is_open(void);
-int log_send_event(const SDL_Event *e);
-
 int log_event(const SDL_Event *e) {
   int ehTecla = (e->type == SDL_KEYDOWN || e->type == SDL_KEYUP || e->type == SDL_TEXTINPUT);
 
@@ -488,21 +480,9 @@ int log_event(const SDL_Event *e) {
       if (ehOk(k)) { recarregar(); engolirSoltura(e); }
       return 1;
     }
-    if (focoEnviar) {
-      if (k == SDLK_LEFT || k == SDLK_UP) { focoEnviar = 0; segEd = 1; }
-      else if (ehOk(k)) {
-        is_open = 0;
-        log_send_open();
-        engolirSoltura(e);
-      }
-      return 1;
-    }
     if (segEd) {
       if (k == SDLK_LEFT) trocarArea(-1);
-      else if (k == SDLK_RIGHT) {
-        if (area == RG_N - 1) { segEd = 0; focoEnviar = 1; }
-        else trocarArea(1);
-      }
+      else if (k == SDLK_RIGHT) trocarArea(1);
       else if (ehOk(k) || k == SDLK_DOWN) { segEd = 0; engolirSoltura(e); }
       return 1;
     }
@@ -511,16 +491,13 @@ int log_event(const SDL_Event *e) {
       if (k == SDLK_UP) { if (focoEtapa > 0) focoEtapa--; else segEd = 1; }
       else if (k == SDLK_DOWN) { if (focoEtapa < n - 1) focoEtapa++; }
       else if (k == SDLK_LEFT) { segEd = 1; trocarArea(-1); }
-      else if (k == SDLK_RIGHT) focoEnviar = 1;
+      else if (k == SDLK_RIGHT) { segEd = 1; trocarArea(1); }
       return 1;
     }
     if (!pausado) {
       if (k == SDLK_UP || ehOk(k)) { if (nVis) pausar(nVis - 1); if (ehOk(k)) engolirSoltura(e); }
       else if (k == SDLK_LEFT) { segEd = 1; trocarArea(-1); }
-      else if (k == SDLK_RIGHT) {
-        if (area == RG_N - 1) focoEnviar = 1;
-        else { segEd = 1; trocarArea(1); }
-      }
+      else if (k == SDLK_RIGHT) { segEd = 1; trocarArea(1); }
       return 1;
     }
     // Paused: ↑ ↓ move lines, ← → move pages, OK opens/closes detail,
@@ -536,7 +513,6 @@ int log_event(const SDL_Event *e) {
 }
 
 #include "log_island.inc"
-#include "log_send.inc"
 
 static void log_draw_internal(void);
 void log_draw(void) {
@@ -555,7 +531,7 @@ static void log_draw_internal(void) {
 void log_test_text(const char *t) { regTesteTexto = t; regTesteSemFonte = 0; }
 void log_test_no_source(int s) { regTesteSemFonte = s; }
 void log_test_state(int a, int ed, int pausa, int focoLinha, int det, int nov) {
-  area = a; segEd = ed; focoEnviar = 0; focoEtapa = 0; filtrar();
+  area = a; segEd = ed; focoEtapa = 0; filtrar();
   if (pausa) { pausado = 1; foco = focoLinha < 0 ? nVis + focoLinha : focoLinha; detalhe = det; novas = nov; }
   else { pausado = 0; foco = -1; detalhe = 0; novas = 0; }
 }

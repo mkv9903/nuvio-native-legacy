@@ -61,12 +61,18 @@ int main(void) {
   snprintf(caminho, sizeof caminho, "%s/ajustes.txt", dir);
   f = fopen(caminho, "w");
   assert(f);
-  fprintf(f, "legendaIdioma %d\naudioIdioma %d\n", en, es);
+  // An older file may still contain the retired upload preference. Adjacent
+  // retained choices must load by key rather than shift with enum positions.
+  fprintf(f, "legendaIdioma %d\naudioIdioma %d\nenvioAuto 0\n"
+             "texturasMB 2\ntamanhoMaxLocal 3\ntamanhoMinLocal 1\n"
+             "iconeAppLocal 7\n", en, es);
   fclose(f);
 
   ajustes_dir(dir);
   assert(valor[AJ_LEG_LINGUA] == en);
   assert(valor[AJ_AUD_LINGUA] == es);
+  assert(valor[AJ_TEX_MB] == 2 && valor[AJ_TAM_MAX] == 3 && valor[AJ_TAM_MIN] == 1);
+  assert(ajustes_icone_app() == 7 && iconeapp_atual() == 7);
   assert(!strcmp(ling_legenda(), "en"));
   assert(!strcmp(ling_audio(), "es"));
 
@@ -86,6 +92,7 @@ int main(void) {
   ajustes_iniciar();
   assert(valor[AJ_LEG_LINGUA] == en);
   assert(valor[AJ_AUD_LINGUA] == es);
+  assert(iconeapp_atual() == 7);
   ajustes_iniciar();
   assert(valor[AJ_LEG_LINGUA] == en);
 

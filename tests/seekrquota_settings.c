@@ -20,7 +20,6 @@ void seekr_definir_chave(const char *c) { snprintf(efetiva, sizeof efetiva, "%s"
 int seekr_validar(const char *c) { return !strcmp(c, efetiva); }
 const char *i18n(const char *s) { return s; }
 int recomenda_ativo(void) { return 0; }
-int apoiador_ativo(void) { return 0; }
 static SeekrUso uso = {.usadas=12, .restantes=38, .limite=50, .persistente=1, .reinicioUtc=2000073600};
 static int estadoSeekr = SEEKR_PRONTO;
 void seekr_uso(SeekrUso *u) { *u = uso; }

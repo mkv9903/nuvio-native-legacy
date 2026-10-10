@@ -167,7 +167,6 @@ static const char *uxSinonimos(int op) {
     case AJ_CW_RETIDO_TAMBEM: return "continuar assistindo tambem ilha retomar agora fileira duplicar repetir aparecer dois lugares titulo continue watching also island resume";
     case AJ_HIST_CONTA: return "historico historico vistos progresso conta nuvio enviar scrobble simkl trakt perfil sincronizar sync history watched";
     case AJ_PLR_CLASSIF: return "classificacao indicativa idade faixa etaria 16 12 18 livre guia parental avisos violencia nudez player content rating age parental guide";
-    case AJ_APOIAR: return "apoiar apoio doar doacao patreon kofi ko-fi cafe contribuir ajudar projeto qr support donate";
     case AJ_BUSCA_CINEMETA: return "busca pesquisa cinemeta catalogo nuvio addon excluir desligar resultados procurar search";
     case AJ_LEG_LINGUA2: return "idioma legenda secundaria segunda dupla dual second subtitle subtitles";
     case AJ_FONTE_ORDEM: case AJ_FONTE_ORDEM_USO:
@@ -297,7 +296,6 @@ int ajustes_buscar(const char *consulta, AjusteBuscaResultado *resultados, int c
     op = item->op;
     if (op < 0 || op >= AJ_N || visto[op]) continue;
     visto[op] = 1;
-    if (op == AJ_ICONE_APP && !apoiador_ativo()) continue;
     uxNormalizar(i18n(rotuloOpcao(op)), titulo, sizeof titulo);
     uxNormalizar(rotuloOpcao(op), tituloPt, sizeof tituloPt);
     uxNormalizar(uxSinonimos(op), aliases, sizeof aliases);
