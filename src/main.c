@@ -491,11 +491,7 @@ int main(int argc, char **argv) {
     // libass, "[legenda] libass: ...", nunca aparecia) e sobravam ~1600 linhas
     // vazias — os restos dos textos sobrescritos.
     if (log) { rename(log,
-#ifdef NV_DTS_DEBUG
         "/tmp/" NV_APP_ID "-anterior.log"
-#else
-        "/tmp/nuvio-anterior.log"
-#endif
       );
                if (freopen(log, "w", stdout)) { fflush(stderr); dup2(fileno(stdout), fileno(stderr)); } } }
   setvbuf(stdout, NULL, _IOLBF, 0);
@@ -615,7 +611,7 @@ int main(int argc, char **argv) {
   // A chamada de sempre, la embaixo, FICA: ela roda depois de addons_carregar
   // e e a que estabelece o idioma e o espelho do limite de fileiras. Reler o
   // mesmo arquivo duas vezes e barato e deixa aquele bloco intacto.
-  ajustes_dir(dados_dir()[0] ? dados_dir() : dirArte);
+  ajustes_dir(dados_dir());
   // MODO SEGURO, LOGO DEPOIS DE LER OS AJUSTES e antes de qualquer coisa que os
   // use para decidir peso: a superficie 4K (logo abaixo) e o teto de fileiras
   // sao lidos daqui. Se a sessao anterior caiu logo depois de uma mudanca
@@ -679,9 +675,9 @@ int main(int argc, char **argv) {
     if (quer4k) { printf("[4k] pedindo %dx%d — a linha `janela=` abaixo diz o "
                          "que a TV concedeu\n", pedeW, pedeH); fflush(stdout); } }
   SDL_Window *win;
-  const char *windowTitle = "Nuvio";
+  const char *windowTitle = "Nuvio Native";
 #ifdef NV_LINUX_DESKTOP
-  windowTitle = "Nuvio - Linux UI preview";
+  windowTitle = "Nuvio Native - Linux UI preview";
 #endif
   NV_ETAPA("SDL_CreateWindow");
   win = SDL_CreateWindow(windowTitle, SDL_WINDOWPOS_CENTERED,
@@ -879,20 +875,10 @@ int main(int argc, char **argv) {
   // todo mundo que usar o aparelho, e passa para a pasta da instalacao.
   if (dados_dir()[0]) cat_dir_gravacao(dados_dir());
 
-  // DUAS PASTAS, e nao uma.
-  //
-  // `dirArte` e o PACOTE: so-leitura por definicao. No webOS isso era teorico
-  // (o .ipk instalado e gravavel em modo desenvolvedor) e por isso tudo cabia
-  // numa variavel so. No alvo Tizen deixou de ser: o .wgt e so-leitura de
-  // verdade, e no build de hoje /app/art vem de --preload-file, ou seja MEMFS,
-  // que e APAGADO a cada recarga. Gravar la nao falha — e o pior dos dois
-  // mundos, porque some sem erro.
-  //
-  // `dirDados` e a pasta descoberta por dados_iniciar: /nuvio (IDBFS) no Tizen,
-  // ~/.nuvio ou /media/developer/temp/nuvio nos outros. Quando nenhuma serve, a
-  // propria dados_iniciar ja escolheu dirArte como ultimo recurso e as duas
-  // voltam a coincidir — que e exatamente o comportamento de hoje.
-  const char *dirDados = dados_dir()[0] ? dados_dir() : dirArte;
+  // Packaged artwork and local user data have separate roots. data_init scopes
+  // its default candidates to NV_APP_ID; if none is writable, settings and
+  // image caching stay disabled rather than using files in the artwork root.
+  const char *dirDados = dados_dir();
 
   // A configuracao de addons mora junto da arte. Ausente, o app segue com a
   // lista de exemplo — nunca fica sem nada para mostrar. addons.c olha a pasta
@@ -909,7 +895,7 @@ int main(int argc, char **argv) {
   ajustes_idioma_auto_iniciar(aoMudarIdiomaAuto);
   // A estrutura persistida só pode ser comparada após carregar a configuração.
   homeestado_iniciar();
-  { // Nativo conserva arte comprimida na pasta gravavel, sujeita a poda LRU.
+  if (dirDados[0]) { // Nativo conserva arte comprimida na pasta gravavel, sujeita a poda LRU.
     char c[600];
     snprintf(c, sizeof c, "%s/cache", dirDados);
     tex_cache_dir(c); }

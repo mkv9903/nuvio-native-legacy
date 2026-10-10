@@ -340,8 +340,8 @@ void net_prepare(void);
 // WHY THIS EXISTS: Debrid key travels in PATH of addon URLs ("https://host/manifest/<id>/<jwt>",
 // "https://host/d/<key>/file.mkv"), and app PRINTS these URLs at various points.
 // Destination is no longer just development file:
-//   - on webOS goes to /tmp/nuvio.log, readable by any process;
-//   - on Tizen goes to browser console and, with NUVIO_LOG_URL, exits device via network;
+//   - on webOS goes to /tmp/<app-id>.log, readable by any process;
+//   - on Linux goes to the terminal or the file selected by NUVIO_LOG;
 //   - and appears ON TV SCREEN via red key log panel.
 // Stripping at display time protects room, not log file. Stripping at SOURCE protects both,
 // and host — useful for diagnosing which addon responded — remains in log.

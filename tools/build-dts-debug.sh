@@ -57,14 +57,14 @@ def ignore(directory,names):
 shutil.copytree(source/'deploy'/'app',target/'deploy'/'app',ignore=ignore)
 metadata=target/'deploy'/'app'/'appinfo.json'
 app=json.loads(metadata.read_text())
-app['id']='space.nuvio.native.legacy.dtsdebug';app['title']='Nuvio Legacy DTS Debug'
+app['id']='space.mkv.nuvio.native.dtsdebug';app['title']='Nuvio Native DTS Debug'
 metadata.write_text(json.dumps(app,ensure_ascii=False,indent=2)+'\n')
 PY
 # The normal SDK includes DTS; the debug helper only changes package identity.
 export NUVIO_CONTAINER_RUNTIME="$runtime" NUVIO_SDK_IMAGE="$image" NUVIO_ARES_PACKAGE="$packager"
 export NUVIO_BUILD_PLATFORM="${NUVIO_BUILD_PLATFORM:-linux/amd64}"
 export NUVIO_DTS_FFMPEG=1
-export NUVIO_EXTRA_CFLAGS="${NUVIO_EXTRA_CFLAGS:-} -DNV_DTS_DEBUG -DNV_APP_ID=\"space.nuvio.native.legacy.dtsdebug\""
+export NUVIO_EXTRA_CFLAGS="${NUVIO_EXTRA_CFLAGS:-} -DNV_DTS_DEBUG -DNV_APP_ID=\"space.mkv.nuvio.native.dtsdebug\""
 # Read the original configuration by absolute path; never copy it into the package.
 if [ -n "${NUVIO_PROPERTIES:-}" ]; then
   export NUVIO_PROPERTIES=$(python3 -c 'import os,sys;print(os.path.abspath(sys.argv[1]))' "$NUVIO_PROPERTIES")
@@ -87,7 +87,7 @@ with tarfile.open(fileobj=io.BytesIO(data),mode='r:gz') as archive:
     apps=[m for m in members if m.name.endswith('/appinfo.json')]
     if len(apps)!=1: raise SystemExit('Package has no unique appinfo.json')
     app=json.load(archive.extractfile(apps[0]))
-    if app['id']!='space.nuvio.native.legacy.dtsdebug' or app['title']!='Nuvio Legacy DTS Debug':
+    if app['id']!='space.mkv.nuvio.native.dtsdebug' or app['title']!='Nuvio Native DTS Debug':
         raise SystemExit('Wrong DTS Debug package identity')
     names={m.name for m in members}
     for suffix in ('/nuvio-proto','/lib/dts-starfish-webos3.so','/lib/dts-starfish-webos4.so',
@@ -96,7 +96,7 @@ with tarfile.open(fileobj=io.BytesIO(data),mode='r:gz') as archive:
     binary=next(m for m in members if m.name.endswith('/nuvio-proto'))
     if binary.mode&0o777 != 0o755: raise SystemExit('Debug executable is not mode 755')
     binary_bytes=archive.extractfile(binary).read()
-    if b'space.nuvio.native.legacy.dtsdebug' not in binary_bytes:
+    if b'space.mkv.nuvio.native.dtsdebug' not in binary_bytes:
         raise SystemExit('Native binary does not contain the debug app identity')
 destination=output/package.name
 if destination.exists() and destination.read_bytes()!=package.read_bytes():

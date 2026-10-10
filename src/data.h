@@ -1,10 +1,8 @@
 // Where the app saves USER data — session, active profile, sync cache.
 //
-// Previously settings and catalog wrote inside artDir, the PACKAGE folder.
-// In developer mode this works, which is why it went unnoticed; in a truly
-// installed app the package folder is the wrong place, shared across anyone
-// using the device. With login, saving there would mean one person's session
-// living inside another's app.
+// Default folders are scoped to NV_APP_ID. This fork never migrates or reads
+// the old app's data folders. NUVIO_DATA (or NUVIO_DADOS) explicitly selects
+// a production data directory; debug builds use an ID subdirectory inside it.
 //
 // The directory is PROBED, not guessed: there is no reliable public documentation
 // of where a native webOS app can write, and a wrong hardcoded path turns
@@ -14,8 +12,8 @@
 #ifndef NV_DATA_H
 #define NV_DATA_H
 
-// Chooses the directory. `artDir` enters as a LAST resort (legacy behavior,
-// better than not saving anything). Call once at startup.
+// Chooses an explicit override, ~/.<app-id>, /media/developer/temp/<app-id>,
+// or, as a last resort, artDir/.<app-id>. Call once at startup.
 void data_init(const char *artDir);
 
 // Chosen directory without trailing slash. Never NULL after data_init; may be

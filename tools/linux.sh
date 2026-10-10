@@ -34,17 +34,17 @@ done < "$ENVF"
 read -r -a DEP_CFLAGS <<< "$(pkg-config --cflags "${DEPS[@]}")"
 read -r -a DEP_LIBS <<< "$(pkg-config --libs "${DEPS[@]}")"
 mkdir -p build/linux
-"$CC" src/*.c src/dts/*.c -Isrc -o build/linux/nuvio-native-legacy -O1 -g \
+"$CC" src/*.c src/dts/*.c -Isrc -o build/linux/nuvio-native -O1 -g \
   "${DEFINES[@]}" "${DEP_CFLAGS[@]}" "${DEP_LIBS[@]}" -ldl -pthread -lm
-echo "Linux UI build: $PWD/build/linux/nuvio-native-legacy"
+echo "Linux UI build: $PWD/build/linux/nuvio-native"
 if [ "$BUILD_ONLY" = 1 ]; then exit 0; fi
 
-DEFAULT_DATA="${XDG_DATA_HOME:-$HOME/.local/share}/nuvio-native-legacy-linux"
+DEFAULT_DATA="${XDG_DATA_HOME:-$HOME/.local/share}/space.mkv.nuvio.native"
 if [ "${NUVIO_UI_PREVIEW:-0}" = 1 ]; then
   DEFAULT_DATA="${DEFAULT_DATA}-preview"
 fi
-export NUVIO_DADOS="${NUVIO_DADOS:-$DEFAULT_DATA}"
+export NUVIO_DADOS="${NUVIO_DATA:-${NUVIO_DADOS:-$DEFAULT_DATA}}"
 mkdir -p "$NUVIO_DADOS"
 rm -f "$ENVF"
 trap - EXIT
-exec build/linux/nuvio-native-legacy "$PWD/deploy/app/art" "$@"
+exec build/linux/nuvio-native "$PWD/deploy/app/art" "$@"

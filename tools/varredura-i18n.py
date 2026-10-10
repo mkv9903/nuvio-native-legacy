@@ -326,7 +326,7 @@ IGNORAR = {
     "-perfil",                      # filename suffix (ajustes.c)
     "biblioteca.h", "catalogo.h", "fileiras.h", "perfil.h", "legenda.h",
     "perfil.txt",                   # #include and filename
-    "com.webos.media.client.nuvio", # LS2 client ID
+    "com.webos.media.client.",     # LS2 client ID prefix
     "abrir", "buscar", "erro",      # internal operation names
     "fontes", "legenda", "mais", "nao", "poster",  # internal keys, not labels
     "fileiras", "ordem-da-conta",  # context parts in homeestado.c log

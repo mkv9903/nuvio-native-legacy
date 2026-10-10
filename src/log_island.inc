@@ -1025,7 +1025,7 @@ static void inspVazio(void) {
   y += 30;
   rgK2("De onde o painel lê", x, y);
   y += 16 + 10;
-  y += rgStat("webOS", "/tmp/nuvio.log", x, y, w);
+  y += rgStat("webOS", "/tmp/" NV_APP_ID ".log", x, y, w);
   rgStat("Linux", i18n("só com NUVIO_LOG"), x, y, w);
   rgCartNota(NULL, "“Não há de onde ler” e “ainda não há linha” são problemas diferentes; cada um tem a sua frase.", x, RI_BASE, w);
 }
@@ -1109,7 +1109,7 @@ static void desenhaVazio(void) {
       y += k * 31.5f; }
   }
   if (semFonte) {
-    TxtLinha c = txt_linha(TXT_MONO19, "NUVIO_LOG=/tmp/nuvio.log bash tools/mac.sh", RG_TX, 255);
+    TxtLinha c = txt_linha(TXT_MONO19, "NUVIO_LOG=/tmp/" NV_APP_ID ".log bash tools/linux.sh", RG_TX, 255);
     y += 26;
     rgNeutro((GfxRect){ cx - c.w * 0.5f - 26, y, c.w + 52, 56 }, 18, 0.07f, RG_CHIP_SOL, 1);
     txt_desenhar_alpha(c, cx - c.w * 0.5f, y + (56 - c.h) * 0.5f, 0.88f);

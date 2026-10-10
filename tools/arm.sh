@@ -32,7 +32,7 @@ cd "$(dirname "$0")/.."
 
 TV_IP="${NUVIO_TV_IP:-192.168.1.32}"
 TV_PASS="${NUVIO_TV_PASS:-alpine}"
-APP_ID="space.nuvio.native.legacy"
+APP_ID="space.mkv.nuvio.native"
 if [ -n "${NUVIO_ARES_PACKAGE:-}" ]; then
   ARES="$NUVIO_ARES_PACKAGE"
 elif [ -x "../NuvioWeb-0.3.38-beta/node_modules/.bin/ares-package" ]; then

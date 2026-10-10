@@ -23,10 +23,10 @@ env=pathlib.Path(args[args.index('--env-file')+1]).read_text()
 flags=next(x for x in args if x.startswith('NUVIO_EXTRA_CFLAGS='))
 assert 'NUVIO_DTS_FFMPEG=1' in args
 assert '-DNV_DTS_DEBUG' in flags
-assert '-DNV_APP_ID="space.nuvio.native.legacy.dtsdebug"' in flags
+assert '-DNV_APP_ID="space.mkv.nuvio.native.dtsdebug"' in flags
 assert not (work/'deploy/app/art/addons.txt').exists()
 assert not (work/'deploy/app/nuvio-proto').exists()
-(work/'nuvio-proto.arm').write_text(env+'\\nspace.nuvio.native.legacy.dtsdebug\\n')
+(work/'nuvio-proto.arm').write_text(env+'\\nspace.mkv.nuvio.native.dtsdebug\\n')
 lib=work/'deploy/app/lib';lib.mkdir()
 for version in (3,4): (lib/f'dts-starfish-webos{version}.so').write_bytes(b'fixture adapter')
 licenses=work/'deploy/app/licenses/dts';licenses.mkdir(parents=True)
@@ -48,8 +48,8 @@ with tempfile.TemporaryDirectory() as d:
     subprocess.run(['bash',str(tools/'build-dts-debug.sh')],cwd=repository,env=env,check=True,stdout=subprocess.DEVNULL)
     packages=list((repository/'build/dts-debug').glob('*.ipk'));assert len(packages)==1
     manifest=json.loads(packages[0].with_suffix('.ipk.json').read_text())
-    assert manifest['id']=='space.nuvio.native.legacy.dtsdebug'
-    assert manifest['title']=='Nuvio Legacy DTS Debug' and manifest['version']==metadata['version']
+    assert manifest['id']=='space.mkv.nuvio.native.dtsdebug'
+    assert manifest['title']=='Nuvio Native DTS Debug' and manifest['version']==metadata['version']
     assert manifest['sha256']==hashlib.sha256(packages[0].read_bytes()).hexdigest()
     for path,digest in before.items():assert hashlib.sha256(path.read_bytes()).hexdigest()==digest
 print('dts_debug_build: identity, sanitized staging, checksums and production isolation passed')

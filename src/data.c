@@ -42,16 +42,13 @@ void data_init(const char *artDir) {
     }
   }
   if (home && *home) {
-    int size = snprintf(homeDir, sizeof homeDir, isolated ? "%s/.%s" : "%s/.nuvio", home, NV_APP_ID);
+    int size = snprintf(homeDir, sizeof homeDir, "%s/.%s", home, NV_APP_ID);
     if (size > 0 && size < (int)sizeof homeDir) candidates[n++] = homeDir;
   }
-  candidates[n++] = isolated ? "/media/developer/temp/" NV_APP_ID : "/media/developer/temp/nuvio";
+  candidates[n++] = "/media/developer/temp/" NV_APP_ID;
   if (artDir && *artDir) {
-    if (!isolated) candidates[n++] = artDir;
-    else {
-      int size = snprintf(artHome, sizeof artHome, "%s/.%s", artDir, NV_APP_ID);
-      if (size > 0 && size < (int)sizeof artHome) candidates[n++] = artHome;
-    }
+    int size = snprintf(artHome, sizeof artHome, "%s/.%s", artDir, NV_APP_ID);
+    if (size > 0 && size < (int)sizeof artHome) candidates[n++] = artHome;
   }
 
   for (i = 0; i < n; i++) {

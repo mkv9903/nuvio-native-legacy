@@ -15,7 +15,6 @@
 // UMA VEZ POR VERSAO: o arquivo-marca guarda a tag mostrada. Nova release,
 // nova tag, novo cartao; a mesma nao volta.
 //
-// O irmao e novidades.c: mesmo cartao central, mesma regra de fechamento.
 #include "horafmt.h"
 #include "app_id.h"
 #include "atualizacao.h"
@@ -41,12 +40,11 @@
 #define NV_VERSAO "dev"
 #endif
 
-#define AT_URL   "https://api.github.com/repos/iqui27/nuvio-native-legacy/releases/latest"
+#define AT_URL   "https://api.github.com/repos/mkv9903/nuvio-native-legacy/releases/latest"
 #define AT_ARQ   "atualizacao-vista.txt"
-#define AT_PAGINA "https://github.com/iqui27/nuvio-native-legacy/releases"
-#define AT_APPID  NV_APP_ID
+#define AT_PAGINA "https://github.com/mkv9903/nuvio-native-legacy/releases"
 #define AT_LUNA_PUB "/usr/bin/luna-send-pub"
-#define AT_LOG_INST "/tmp/nuvio-instalar.log"
+#define AT_LOG_INST "/tmp/" NV_APP_ID "-instalar.log"
 #define AT_HB_DIR   "/media/developer/apps/usr/palm/applications/org.webosbrew.hbchannel"
 
 // AGENDA DA RECONSULTA (ver atualizacao_agenda_vence).

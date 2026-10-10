@@ -7,13 +7,23 @@
 // Inclui o .c de proposito: as funcoes de parse sao estaticas, e expo-las so
 // para o teste seria API a mais. O .sh compila tudo MENOS src/atualizacao.c.
 #define NV_VERSAO "1.0.53"
+#define rede_baixar testDownloadRelease
 #include "../src/atualizacao.c"
+#undef rede_baixar
 #include "tex_cache.h"
 #include <SDL2/SDL_image.h>
 #include <assert.h>
 
 static int falhas = 0;
 #define CONFERE(c, ...) do { if (!(c)) { falhas++; printf("FALHA: " __VA_ARGS__); printf("\n"); } } while (0)
+
+static const char *releaseResponse;
+char *testDownloadRelease(const char *url, int seconds) {
+  CONFERE(!strcmp(url, "https://api.github.com/repos/mkv9903/nuvio-native-legacy/releases/latest"),
+          "release request uses the personal fork");
+  CONFERE(seconds > 0, "release request has a timeout");
+  return releaseResponse ? strdup(releaseResponse) : NULL;
+}
 
 static char *lerArquivo(const char *nome) {
   FILE *f = fopen(nome, "rb"); long n; char *s;
@@ -24,6 +34,26 @@ static char *lerArquivo(const char *nome) {
 }
 
 int main(int argc, char **argv) {
+  // An empty fork has no latest release. Its 404 response must not produce
+  // an update or reuse a package from another repository.
+  mtx = SDL_CreateMutex(); assert(mtx);
+  releaseResponse = "{\"message\":\"Not Found\",\"status\":\"404\"}";
+  manualPendente = 1; emCurso = 1;
+  fioConsulta(NULL);
+  CONFERE(pronto && !emCurso && !manualPendente, "empty release query completes");
+  CONFERE(!tagNova[0] && !ipkUrl[0] && !manualAchou && !geracao,
+          "empty repository offers no update or package");
+  CONFERE(busca == ATUALIZACAO_BUSCA_ERRO && ultFalhou, "missing release is reported as unavailable");
+  // The same worker must accept a later release from the fork.
+  releaseResponse = "{\"tag_name\":\"v1.0.54\",\"body\":\"Personal fork update\",\"assets\":[]}";
+  manualPendente = 1; emCurso = 1;
+  fioConsulta(NULL);
+  CONFERE(!strcmp(tagNova,"1.0.54") && geracao == 1 && manualAchou,
+          "a published newer fork release is offered");
+  CONFERE(busca == ATUALIZACAO_BUSCA_NOVA && !ultFalhou && !ipkUrl[0],
+          "release without an IPK cannot install a package");
+  SDL_DestroyMutex(mtx); mtx = NULL;
+
   CONFERE(maisNova("1.0.54", "1.0.53"), "1.0.54 > 1.0.53");
   CONFERE(!maisNova("1.0.53", "1.0.53"), "igual nao e mais nova");
   CONFERE(!maisNova("1.0.52", "1.0.53"), "1.0.52 nao e mais nova");

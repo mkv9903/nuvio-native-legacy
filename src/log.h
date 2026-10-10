@@ -1,5 +1,5 @@
 // On-screen local log panel, with a first-use explanation of the shortcut.
-// webOS reads the end of /tmp/nuvio.log. Linux logs to the terminal unless
+// webOS reads the end of /tmp/<app-id>.log. Linux logs to the terminal unless
 // NUVIO_LOG selects a file. The panel opens with the red TV key, F9, or Settings.
 // With the panel closed, no file is opened or line formatted.
 //
@@ -17,8 +17,7 @@
 
 // File path where app redirects stdout/stderr, or NULL when this build redirects nothing.
 // main.c uses THIS for startup freopen: a single place decides the path, and it is
-// the same one the panel reads. Without this both sides would match "/tmp/nuvio.log"
-// by coincidence.
+// the same one the panel reads.
 #define LOG_WINDOW 40960
 #define LOG_MAX    200
 #define LOG_COL    512

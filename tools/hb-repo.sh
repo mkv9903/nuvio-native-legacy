@@ -8,7 +8,7 @@
 # SERVERLESS: the two files are ATTACHED to the release, and the URL users
 # register in the channel is the GitHub "latest release" URL, which always redirects
 # to the newest one:
-#   https://github.com/iqui27/nuvio-native-legacy/releases/latest/download/repo.json
+#   https://github.com/mkv9903/nuvio-native-legacy/releases/latest/download/repo.json
 #
 # Usage: bash tools/hb-repo.sh <package.ipk> <output-folder>
 # Generates <output>/webosbrew.manifest.json and <output>/repo.json. Publishing them
@@ -18,7 +18,7 @@ cd "$(dirname "$0")/.."
 
 IPK="${1:?usage: hb-repo.sh <package.ipk> <output>}"
 SAIDA="${2:?usage: hb-repo.sh <package.ipk> <output>}"
-REPO="iqui27/nuvio-native-legacy"
+REPO="mkv9903/nuvio-native-legacy"
 mkdir -p "$SAIDA"
 
 python3 - "$IPK" "$SAIDA" "$REPO" <<'EOF'
@@ -38,7 +38,7 @@ manifesto = {
     "id": app["id"],
     "version": versao,
     "type": "native",
-    "title": "Nuvio (native legacy)",
+    "title": app["title"],
     "appDescription": "Unofficial native Nuvio client for LG webOS",
     "iconUri": icone,
     "sourceUrl": f"https://github.com/{repo}",

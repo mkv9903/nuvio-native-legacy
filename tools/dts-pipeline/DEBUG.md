@@ -1,7 +1,7 @@
 # DTS Debug package
 
-**Nuvio Legacy DTS Debug** uses the same native-first fallback as the normal app,
-with additional diagnostics. Its ID is `space.nuvio.native.legacy.dtsdebug`;
+**Nuvio Native DTS Debug** uses the same native-first fallback as the normal app,
+with additional diagnostics. Its ID is `space.mkv.nuvio.native.dtsdebug`;
 it has a separate app/service identity and data directory, and no self-updater.
 It can be installed alongside the normal app.
 

@@ -9,6 +9,11 @@ bash tools/arm.sh --ipk --build
 The package excludes saved account credentials. `tools/test-ipk.sh` checks the
 package, and `arm.sh` verifies its contents during packaging.
 
+This app is **Nuvio Native**, package ID `space.mkv.nuvio.native`. Install it as
+a separate app and sign in again. It starts with fresh local data and leaves
+the old app's settings, login files, cache and logs untouched. Updates come
+from `mkv9903/nuvio-native-legacy` releases.
+
 ---
 
 ## Do you need root? No. But read the LS2 caveat.
@@ -31,8 +36,8 @@ little free RAM, so pick H.264 sources when you can.
 
 ```bash
 ares-setup-device
-ares-install space.nuvio.native.legacy_<version>_arm.ipk -d <name>
-ares-launch space.nuvio.native.legacy -d <name>
+ares-install space.mkv.nuvio.native_<version>_arm.ipk -d <name>
+ares-launch space.mkv.nuvio.native -d <name>
 ```
 
 `tools/arm.sh` is **not** the tool for this: it uses root over port 22 with a

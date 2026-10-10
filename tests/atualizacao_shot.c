@@ -116,8 +116,8 @@ static void semear(int comoEstado, float pct, const char *passo, int comInstalad
   limparNotas(MD, notas, sizeof notas);
   if (comInstalador)
     snprintf(ipkUrl, sizeof ipkUrl, "%s",
-             "https://github.com/iqui27/nuvio-native-legacy/releases/download/"
-             "v1.7.3/space.nuvio.native.legacy_1.7.3_arm.ipk");
+             "https://github.com/mkv9903/nuvio-native-legacy/releases/download/"
+             "v1.7.3/space.mkv.nuvio.native_1.7.3_arm.ipk");
   else ipkUrl[0] = 0;
   estado = comoEstado;
   instPct = pct;

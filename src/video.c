@@ -359,7 +359,7 @@ static void logErroLs(const char *onde) {
 }
 
 // Contexto do processo, UMA vez, na primeira recusa. O papel LS2 do app casa
-// pelo exeName (/var/palm/ls2-dev/roles/*/space.nuvio.native.legacy.json), e
+// pelo exeName (/var/palm/ls2-dev/roles/*/<app-id>.json), e
 // nas sessoes recusadas dos registros 1720-1774 faltava a linha
 // "[HLunaServiceBridge::proc]" do inicio e o HOME era /tmp — sinal de que o app
 // nao foi aberto pelo caminho de sempre. Hipotese, nao prova: esta linha e o
@@ -403,7 +403,7 @@ static int  (*acbJanela)(long, long, long, long, long, int, long *);
 // permissao. Chamar luna://com.webos.service.tv.display/setCustomDisplayWindow
 // direto e RECUSADO pelo hub — "Not permitted to send to
 // com.webos.service.tv.display" —, porque o app se registra como
-// com.webos.media.client.nuvio e esse papel nao alcanca o servico de display.
+// NV_LS_MEDIA_CLIENT e esse papel nao alcanca o servico de display.
 // A libAcbAPI alcanca: ela expoe AcbAPI_setCustomDisplayWindow e fala com o
 // tv.display por dentro, que e como o proprio navegador da TV faz.
 static int  (*acbJanelaCustom)(long, long, long, long, long,
