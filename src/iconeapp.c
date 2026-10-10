@@ -6,17 +6,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#ifdef NV_ANDROID
-#include <SDL2/SDL.h>
-#include <jni.h>
-#endif
-#ifdef __EMSCRIPTEN__
-#include <emscripten.h>
-#endif
 
 // A ORDEM E A DA GALERIA e o INDICE gravado em ajustes.txt (iconeAppLocal):
 // so acrescentar no fim. Bate com V_ICONE_APP (ajustes.c), com LISTA em
-// tools/icones-app.sh e com os aliases do AndroidManifest.xml.
+// tools/icones-app.sh.
 static const char *ID[ICONEAPP_N] = {
   "original", "fenix", "nverde", "tvlaranja", "npixel",
   "tricolor", "arco", "tvviva", "cluberetro", "arcaden",
@@ -85,48 +78,4 @@ int iconeapp_marca(GfxRect r, float alpha) {
   int i = iconeapp_atual();
   if (i == 0) return 0;
   return iconeapp_desenhar(i, r, 0, alpha);
-}
-
-#ifdef NV_ANDROID
-// NuvioActivity.trocarIcone(id): agenda a troca do <activity-alias> do launcher
-// para quando o app sair da frente (ver a nota la: trocar na hora fecha a
-// tarefa, medido no emulador). 0 = ja estava, 2 = agendada, -1 = falhou.
-static void androidTrocar(const char *id) {
-  JNIEnv *env = (JNIEnv *)SDL_AndroidGetJNIEnv();
-  jobject act = (jobject)SDL_AndroidGetActivity();
-  jclass cls;
-  jmethodID m;
-  jstring js;
-  int r = -1;
-  if (!env || !act) return;
-  cls = (*env)->GetObjectClass(env, act);
-  m = cls ? (*env)->GetMethodID(env, cls, "trocarIcone", "(Ljava/lang/String;)I") : NULL;
-  js = (*env)->NewStringUTF(env, id);
-  if (m && js) r = (int)(*env)->CallIntMethod(env, act, m, js);
-  if ((*env)->ExceptionCheck(env)) { (*env)->ExceptionClear(env); r = -1; }
-  if (js) (*env)->DeleteLocalRef(env, js);
-  if (cls) (*env)->DeleteLocalRef(env, cls);
-  (*env)->DeleteLocalRef(env, act);
-  if (r != 0)
-    printf("[app-icon] launcher: %s -> %s\n", id, r == 2 ? "scheduled for app exit" : "failed");
-  fflush(stdout);
-}
-#endif
-
-void iconeapp_aplicar_plataforma(void) {
-  const char *id = iconeapp_id(iconeapp_atual());
-#ifdef NV_ANDROID
-  androidTrocar(id);
-#elif defined(__EMSCRIPTEN__)
-  // A abertura do .wgt e HTML e roda ANTES do wasm: so le o que ficou gravado.
-  MAIN_THREAD_ASYNC_EM_ASM({
-    try {
-      var v = UTF8ToString($0);
-      if (v === 'original') localStorage.removeItem('nuvio-icone');
-      else localStorage.setItem('nuvio-icone', v);
-    } catch (e) {}
-  }, id);
-#else
-  (void)id;
-#endif
 }

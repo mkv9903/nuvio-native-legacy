@@ -1,5 +1,5 @@
 #!/bin/bash
-# Native Linux UI preview. Video uses the same stubs as the macOS build.
+# Native Linux UI preview. Video playback is stubbed for desktop UI testing.
 #   bash tools/linux.sh           # build and run
 #   bash tools/linux.sh --build   # build only
 #   bash tools/linux.sh --preview # browse UI without an account

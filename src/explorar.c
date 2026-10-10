@@ -306,8 +306,7 @@ static void porque(const MapaVizGrupo *g, const MapaVizItem *it, char *dst, size
     case MAPA_GR_REC:
       snprintf(dst, n, "%s", i18n(viz.remoto ? "Recomendado pelo TMDB" : "Gênero e época parecidos"));
       break;
-    case MAPA_GR_AMIGOS: snprintf(dst, n, i18n("%s gostou"), it->motivo); break;
-  }
+    }
 }
 
 static void cabecalhoGrupo(const MapaVizGrupo *g, char *dst, size_t n) {
@@ -319,7 +318,6 @@ static void cabecalhoGrupo(const MapaVizGrupo *g, char *dst, size_t n) {
     case MAPA_GR_REC:
       snprintf(dst, n, "%s", i18n(viz.remoto ? "Quem viu este também viu" : "Parecidos no seu catálogo"));
       break;
-    case MAPA_GR_AMIGOS: snprintf(dst, n, "%s", i18n("Seus amigos gostaram")); break;
     default: dst[0] = 0;
   }
 }
@@ -341,7 +339,7 @@ static void descer(const MapaVizGrupo *g, const MapaVizItem *it) {
   else if (g->tipo == MAPA_GR_TEMA) snprintf(p->tema, sizeof p->tema, "%s", g->kw);
   else if (g->tipo == MAPA_GR_GENERO) snprintf(p->tema, sizeof p->tema, "%s", g->sub);
   switch (g->tipo) {
-    case MAPA_GR_PESSOA: case MAPA_GR_AMIGOS: snprintf(p->via, sizeof p->via, "%s", it->motivo); break;
+    case MAPA_GR_PESSOA: snprintf(p->via, sizeof p->via, "%s", it->motivo); break;
     case MAPA_GR_EPOCA:  snprintf(p->via, sizeof p->via, i18n("anos %s"), g->sub); break;
     case MAPA_GR_TEMA: case MAPA_GR_GENERO: snprintf(p->via, sizeof p->via, "%s", i18n(g->sub)); break;
     default:             snprintf(p->via, sizeof p->via, "%s", i18n("recomendado")); break;
@@ -733,10 +731,7 @@ static void desenharGrupos(float a) {
     cabecalhoGrupo(gr, cab, sizeof cab);
     { TxtLinha l = txt_linha_corta(TXT_HEADLINE, cab, 236, 238, 244, 255, EX_DIR - x0);
       txt_desenhar_alpha(l, x, y, ae);
-      if (gr->tipo == MAPA_GR_AMIGOS && gr->sub[0]) {
-        TxtLinha s = txt_linha_corta(TXT_CAPTION2, gr->sub, tr, tg, tb, 255, EX_DIR - x0 - l.w - 30.0f);
-        txt_desenhar_alpha(s, x + l.w + 18.0f, y + (l.h - s.h) * 0.6f, ae);
-      } }
+ }
     for (i = 0; i < gr->n; i++, x += EX_VZ_CARD + EX_VZ_GAP) {
       const MapaVizItem *it = &gr->itens[i];
       int sel = vzLinha == li && vzCol == i;

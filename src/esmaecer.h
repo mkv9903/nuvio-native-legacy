@@ -55,7 +55,6 @@ float esmaecer_alfa_do_estagio(int estagio, int estilo);
 void  esmaecer_reiniciar(void);
 void  esmaecer_escolha(int escolha);
 void  esmaecer_estilo(int estilo);
-int   esmaecer_estilo_atual(void);
 // 1 = a tela de descanso (vitrine ou relogio) esta no ar: estagio 2 com um
 // desses estilos e o veu ja no preto. descanso.c desenha por cima.
 int   esmaecer_descanso(void);

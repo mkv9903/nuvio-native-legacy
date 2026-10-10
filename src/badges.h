@@ -37,15 +37,11 @@ int marca_resolucao(const char *nome);
 // Rotulo cuja palavra de formato vira a marca: "Sem HDR" -> "Sem" [HDR].
 // `rotulo` e a chave em portugues (traduzida aqui); `y` e o TOPO da linha de
 // texto e a marca fica centrada nela. Devolve a largura desenhada.
-float marca_rotulo(TxtEstilo est, const char *rotulo, FormatoMarca f, float x, float y,
-                   float altura, int tinta, float a);
-float marca_rotulo_largura(TxtEstilo est, const char *rotulo, FormatoMarca f, float altura);
 // Marca do HDR que a FONTE anuncia (nao o que o painel ativou), ou -1.
 int badges_fonte_hdr_marca(uint64_t mask);
 float badges_desenhar(uint64_t mask,float x,float y,float maxW,float height,float alpha);
 // A MESMA fileira em tinta ESCURA, para desenhar SOBRE superficie clara
 // (linha selecionada). Ver a nota em badges.c.
-float badges_desenhar_escura(uint64_t mask,float x,float y,float maxW,float height,float alpha);
 // SELOS COLORIDOS (#198): a mesma fileira, cada marca numa peca com base
 // escura, tinta do grupo a 20 % e borda na cor do grupo (paleta do pacote
 // inicial da wiki do Nuvio; ver badges.c). `height` e a caixa da ARTE, como

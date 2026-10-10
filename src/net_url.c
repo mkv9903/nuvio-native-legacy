@@ -181,9 +181,6 @@ const char *net_url_log(const char *url, char *dst, unsigned size) {
 const char *rede_url_publica(const char *url, char *dst, unsigned tam) {
   return net_url_public(url, dst, tam);
 }
-int rede_segmento_suspeito(const char *s, unsigned n) {
-  return net_segment_is_suspicious(s, n);
-}
 const char *rede_url_log(const char *url, char *dst, unsigned tam) {
   return net_url_log(url, dst, tam);
 }

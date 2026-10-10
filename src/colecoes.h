@@ -40,12 +40,6 @@ typedef struct {
   char groupId[64];   /* id da colecao no web; a chave de ordem da conta e collection_<groupId> */
   char frameDir[600];
   char detailHero[512];
-  /* GIF de foco que a CONTA manda (focusGifUrl). O PACOTE nao guarda URL:
-     tools/import-collections.mjs ja converte o GIF em 001.jpg..090.jpg na
-     importacao, e o que sobra dele aqui e frames+frameDir. Vazio quando a
-     conta nao mandou o campo ou mandou focusGifEnabled:false. Ver src/gif.h
-     para onde isso anima (Tizen) e onde nao anima (webOS). */
-  char focusGif[512];
   int editorial; /* 1: legacy vector export; 2: approved cinematic image pair */
   int local;     /* 1: veio do collections.json do pacote (arte e ajustes curados aqui) */
   /* 1: pasta ACRESCENTADA PELO APP, nao vinda da conta nem do pacote. Ver
@@ -125,7 +119,6 @@ const ColFolder *col_folder(int i);
 void col_chave_pasta(const ColFolder *pasta, char *dst, unsigned n);
 int col_grupo_chave(const char *chave, int *indices, int max);
 int col_grupo_forma_chave(const char *chave);
-int col_grupo(const char *nome, int *indices, int max);
 // addonId dominante do grupo (1) ou "" quando as fontes sao de addons
 // diferentes / nao sao de addon (0). Ver a definicao.
 int col_grupo_addon(const char *nome, char *dst, unsigned n);
@@ -134,7 +127,6 @@ const ColFolder *col_por_catalogo(const char *base, const char *type, const char
 // significa que toda colecao ja pode engolir o catalogo dela.
 int col_fontes_sem_base(void);
 // Despeja ate `max` fontes com a base REDIGIDA, para comparar os dois lados.
-void col_despejar_fontes(int max);
 // Ate onde a fileira (base,type,id) chegou ao procurar colecao: 0 nenhuma base
 // igual, 1 so a base, 2 base+type, 3 os tres (e entao o grupo e que esta
 // oculto). Preenche `grupo` com o nome do grupo do melhor casamento.

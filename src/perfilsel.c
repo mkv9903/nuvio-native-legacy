@@ -6,7 +6,6 @@
 #include "gfx.h"
 #include "text.h"
 #include "tex_cache.h"
-#include "gif.h"
 #include "anim.h"
 #include "layout.h"
 #include "ajustes.h"
@@ -66,9 +65,6 @@
 #define PS_CONT_CAPA_W 108.0f
 #define PS_CONT_CAPA_H 156.0f
 #define PS_CONT_Y_MAX  800.0f   // topo, com o avatar no teto; abaixo disso sobe com o avatar
-#define PS_HALO_N            3   // poucos aneis suaves, sem efeito de alvo
-#define PS_HALO_ATE      0.66f   // quanto o ultimo anel passa do avatar
-#define PS_HALO_ALFA     0.040f
 
 // MURAL DE CAPAS. A tela de perfis abre antes de a primeira fileira terminar,
 // portanto isto e um efeito de passagem, nao uma nova colecao: os URLs sao
@@ -1117,49 +1113,21 @@ void perfilsel_continuar_ativo(void) {
 
 // --- DESENHO -----------------------------------------------------------------
 
-// GIF NO AVATAR (issue #45). A foto de perfil pode ser um .gif subido pela
-// conta, e ate aqui ele virava a primeira imagem parada — todo arquivo passa
-// pelo decodificador de UM quadro. So o perfil em foco anima (gif.c segura
-// UMA animacao por vez) e so no Tizen: no webOS gif_textura devolve 0 e fica
-// a foto parada, a mesma regra das capas de colecao (#29).
-static const ContaPerfil *gifDono;
-static int    gifAnima = -1;
-static GLuint gifTex;
-
 // O circulo do perfil: soquete escuro, cor da conta por cima e, quando ha,
 // a foto. Tres camadas e nao uma porque a cor precisa DIMINUIR fora do foco
 // sem virar um buraco preto sobre a arte de fundo — o soquete e o que garante
 // que o dimming seja igual com arte e sem arte.
-static void disco(GfxRect a, const ContaPerfil *p, float f, float alfa,
-                  int focado) {
+static void disco(GfxRect a, const ContaPerfil *p, float f, float alfa) {
   float cr = 0.12f, cg = 0.53f, cb = 0.90f;
   float vivo = 0.55f + 0.45f * f;
   GLuint foto;
-  int emGif = 0;
   corDe(p->corHex, &cr, &cg, &cb);
   corLegivel(&cr, &cg, &cb);
   gfx_rect(a, 0, GFX_DISCO, 0, 0, 0, 0, 0.09f, 0.09f, 0.10f, alfa);
   gfx_rect(a, 0, GFX_DISCO, 0, 0, 0, 0, cr, cg, cb, vivo * alfa);
   foto = p->avatarUrl[0] ? tex_obter_larg(p->avatarUrl, a.w) : 0;
-  if (focado && gif_pode_animar() && !ajustes_animacoes_reduzidas()
-      && p->avatarUrl[0] && strstr(p->avatarUrl, ".gif")) {
-    // O arquivo e pedido a cada quadro em que este perfil e o foco — fora
-    // dele nenhum download comeca (ver a nota de gif_pode_animar em gif.h).
-    const char *arq = tex_arquivo(p->avatarUrl);
-    if (gifDono != p) { gifDono = p; gifAnima = -1; gifTex = 0; gif_parar(); }
-    if (gifAnima < 0 && arq) gifAnima = gif_animado(arq);
-    if (arq && gifAnima > 0) {
-      // A cada desenho: o relogio e de gif.c, e sem quadro vencido a chamada
-      // nao sobe nada (1.4.7; o passo de 67 ms prendia o GIF a 15 fps).
-      GLuint m = gif_textura(arq, (int)a.w);
-      if (m) gifTex = m;
-      if (gifTex) { foto = gifTex; emGif = 1; }
-    }
-  }
   if (foto) {
-    // O GIF vem na proporcao dele: o aspecto registrado e da foto parada,
-    // que nao vale para o quadro animado. Zero deixa a moldura decidir.
-    gfx_tex_aspect_atual = emGif ? 0 : tex_aspecto(p->avatarUrl);
+    gfx_tex_aspect_atual = tex_aspecto(p->avatarUrl);
     gfx_rect(a, foto, GFX_AVATAR, 0, 0, 0, 0, 1, 1, 1, vivo * alfa);
     gfx_tex_aspect_atual = 0;
   } else {
@@ -1172,13 +1140,9 @@ static void disco(GfxRect a, const ContaPerfil *p, float f, float alfa,
   }
 }
 
-// Brilho da cor do perfil atras do circulo focado. Aneis concentricos de alpha
-// baixo em vez de um degrade: o shader nao tem um, e a alternativa (um disco
-// grande e translucido) mostra a propria borda. Com PS_HALO_ALFA por anel o
-// degrau entre um e o outro fica abaixo do que se ve numa TV.
+// Glow behind the focused profile avatar.
 static void halo(GfxRect a, const ContaPerfil *p, float f) {
   float cr = 0.12f, cg = 0.53f, cb = 0.90f;
-  int i;
   if (f <= 0.02f) return;
   corDe(p->corHex, &cr, &cg, &cb);
   corLegivel(&cr, &cg, &cb);
@@ -1189,12 +1153,6 @@ static void halo(GfxRect a, const ContaPerfil *p, float f) {
     GfxRect r = { a.x - cresce * 0.5f, a.y - cresce * 0.5f, a.w + cresce, a.h + cresce };
     gfx_rect(r, 0, GFX_SOMBRA, 1.0f, 0, 0, 0.5f, cr, cg, cb, 0.45f * f);
     return; }
-  for (i = PS_HALO_N; i >= 1; i--) {
-    float k = PS_HALO_ATE * (float)i / (float)PS_HALO_N * f;
-    float cresce = a.w * k;
-    GfxRect r = { a.x - cresce * 0.5f, a.y - cresce * 0.5f, a.w + cresce, a.h + cresce };
-    gfx_rect(r, 0, GFX_DISCO, 0, 0, 0, 0, cr, cg, cb, PS_HALO_ALFA * f);
-  }
 }
 
 // O INDICADOR DE CARREGAMENTO sobre o avatar escolhido: o mesmo anel de doze
@@ -1252,7 +1210,7 @@ static void desenhaPin(void) {
   // pode ser o de qualquer perfil, e num teclado numerico nao ha nada na tela
   // que diga de quem e a fechadura.
   { GfxRect av = { (NV_TELA_W - 132.0f) * 0.5f, 176.0f, 132.0f, 132.0f };
-    disco(av, p, 1.0f, a, 1); }
+    disco(av, p, 1.0f, a); }
 
   { char t[128];
     TxtLinha l;
@@ -1408,7 +1366,7 @@ void perfilsel_desenhar(Uint32 agora) {
     }
     // So anima o avatar em foco, e nao quando o teclado do PIN esta por cima:
     // gif.c segura uma animacao por vez e os dois discos disputariam a textura.
-    disco(av, p, f, a, i == foco && pinDe < 0);
+    disco(av, p, f, a);
     if (preparando && i == foco) giro(av, agora, a, reduzida);
 
     // 176 e nao 140 no estado sem foco: a nota de contraste vale a 3 m, e

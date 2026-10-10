@@ -85,7 +85,6 @@ const char *perfis_dono(void)    { return "dono-a"; }
 void perfis_esquecer(void)       { }
 const ContaPerfil *perfis_item(int i) { (void)i; return NULL; }
 const char *i18n(const char *s) { return s; }
-int ajustes_social(void) { return 1; }
 int ajustes_hist_conta(void) { return 1; }
 void ajustes_perfil_guardar(int perfil) { (void)perfil; }
 int  ajustes_perfil_restaurar(int perfil) { (void)perfil; return 0; }
@@ -206,7 +205,7 @@ void desc_tmdb_definir(const char *c) { (void)c; }
 void addons_marcar_da_conta(int perfil) { (void)perfil; }
 void addons_esquecer(void) {}
 int  addons_exportar(AddonRemoto *s, int m) { (void)s; (void)m; return 0; }
-void agenda_esquecer(void) {}
+void releaseinfo_forget(void) {}
 void lembrete_esquecer_todos(void) {}
 int  ajustes_aplicar_blob(const char *j) { (void)j; return 0; }
 void ajustes_definir_ocultar_nao_lancados(int l) { (void)l; }

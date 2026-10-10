@@ -20,7 +20,6 @@
 #include "regcodigo.h"
 #include "redesaude.h"
 #include <math.h>
-#include "agenda.h"
 #include "catalogo.h"
 #include "salvos.h"
 #include "sessao.h"
@@ -60,24 +59,19 @@
 #define AV_MAX        40
 #define AV_VISTOS_ARQ "avisos-vistos.txt"
 #define AV_MARCA_ARQ  "sessao-viva.txt"
-#if defined(NV_TPK) || defined(NV_ANDROID)
-// No .tpk (e no Android) o /tmp nao e do app: o anterior fica na pasta de dados (tpk.c).
-#define AV_LOG_ANTERIOR (getenv("NUVIO_LOG_ANTERIOR"))
-#else
 #define AV_LOG_ANTERIOR "/tmp/nuvio-anterior.log"
-#endif
 #define AV_REGISTRO_MAX (200 * 1024)
 // 20 s, nao 6 (dono, 20/09/2026: "teria que ficar mais tempo"). Quem esta
 // olhando um card do outro lado da tela leva um tempo para notar o canto.
 #define AV_TOAST_MS   20000.0f
 
-enum { AV_AGENDA, AV_UPDATE, AV_CANAL, AV_CRASH };
+enum { AV_UPDATE, AV_CANAL, AV_CRASH };
 typedef struct {
   char id[72];
   int  tipo;
   char titulo[160];
   char texto[420];
-  char alvo[24];        // imdb (agenda) ou versao (update)
+  char alvo[24];        // versao (update)
   int  visto;
   int  anunciar;        // novo: a ilha ainda nao disse o assunto (anunciarNaIlha)
 } Aviso;
@@ -101,43 +95,11 @@ static int   toastN;
 static int   vistosSujos;
 
 // Acoes entregues a app.c.
-static char pediuAbrir[24];
 static int  pediuCodigo;
 
 // Crash da sessao anterior e envio do registro.
 static int   crashDetectado;
 static char  crashQuando[40];
-#ifdef __EMSCRIPTEN__
-// O LOG DA SESSAO ANTERIOR NO TIZEN. Nao ha arquivo: tools/tizen-shell.html
-// guarda as linhas do Module.print em localStorage (nv-log) e, no arranque
-// seguinte, gira para nv-log-anterior. E lido AQUI, no fio principal (o
-// unico com localStorage), em avisos_iniciar; enviarRegistro roda num
-// pthread e so pode usar o que ja esta na memoria. Ate a 1.3.3 o crash da
-// Samsung chegava com 0 bytes de texto — os 5 de #72 nao disseram nada.
-static char *logAnterior;
-#include <emscripten.h>
-static void lerLogAnterior(void) {
-  char *js = (char *)EM_ASM_PTR({
-    try {
-      var t = localStorage.getItem('nv-log-anterior') || '';
-      if (t.length > $0) t = t.slice(t.length - $0);
-      // TextEncoder e nao stringToUTF8: os helpers do runtime nao estao
-      // exportados neste build (so PThread), e com ASSERTIONS chamar um
-      // deles aborta.
-      var b = new TextEncoder().encode(t);
-      var p = _malloc(b.length + 1);
-      if (!p) return 0;
-      HEAPU8.set(b, p);
-      HEAPU8[p + b.length] = 0;
-      return p;
-    } catch (e) { return 0; }
-  }, AV_REGISTRO_MAX);
-  logAnterior = js;
-  if (logAnterior && !logAnterior[0]) { free(logAnterior); logAnterior = NULL; }
-  printf("[avisos] log da sessao anterior: %u bytes\n",
-         logAnterior ? (unsigned)strlen(logAnterior) : 0u);
-}
-#endif
 static int   envioEstado;       // 0 nada, 1 enviando, 2 ok, 3 falhou
 // O RECIBO E O MOTIVO do ultimo envio MANUAL (o automatico so atualiza
 // envAuto*): o painel de envio do registro (registro.c) mostra o codigo, o
@@ -154,7 +116,7 @@ static pthread_t fioEnvio;
 
 // O CARTAO DO CRASH, na reabertura: uma pergunta, dois botoes. Abre uma vez
 // por crash (a marca e o id do item, gravada em vistos ao fechar) quando a
-// home esta de pe e nenhum outro cartao esta na frente, como agendaviso.c.
+// home esta de pe e nenhum outro cartao esta na frente, como os demais modais.
 static int   cartao;            // 1 = aberto
 static int   cartaoFoco;        // 0 = Enviar, 1 = Agora nao
 static float cartaoA;
@@ -390,16 +352,8 @@ int avisos_enviar_diagnostico(const char *execucao_id, const char *relatorio,
   snprintf(corpo, n * 2 + 640,
            "{\"versao\":\"%s\",\"plataforma\":\"%s\",\"execucao_id\":\"%s\",\"texto\":\"%s\"}",
            NV_VERSAO,
-#ifdef __EMSCRIPTEN__
-           "tizen",
-#elif defined(NV_TPK)
-           "tizen-tpk",
-#elif defined(NV_ANDROID)
-           "android",
-#elif defined(NV_LINUX_DESKTOP)
+#if defined(NV_LINUX_DESKTOP)
            "linux-desktop",
-#elif defined(__APPLE__)
-           "mac",
 #else
            "webos",
 #endif
@@ -441,18 +395,11 @@ static const char *agoraTextoAuto(const char *marca) {
   static char buf[48];
   time_t t = time(NULL);
   struct tm tmv;
-#ifdef _WIN32
-  localtime_s(&tmv, &t);
-#else
   localtime_r(&t, &tmv);
-#endif
   snprintf(buf, sizeof buf, "%04d-%02d-%02d %02d:%02d (%s)", tmv.tm_year + 1900,
            tmv.tm_mon + 1, tmv.tm_mday, tmv.tm_hour, tmv.tm_min, marca);
   return buf;
 }
-#ifdef __EMSCRIPTEN__
-static char *logAtual;
-#endif
 static void *enviarRegistro(void *u) {
   static char aut[2200], via[40], chave[160];
   const char *cab[5];
@@ -461,10 +408,6 @@ static void *enviarRegistro(void *u) {
   int status = 0;
   int manual = (u == &ATUAL || u == &AUTO_ATUAL);
   int automatico = (u == &AUTO_ATUAL || u == &AUTO_ANTERIOR);
-#ifdef __EMSCRIPTEN__
-  { const char *fonte = manual ? logAtual : logAnterior;
-    if (fonte) { texto = strdup(fonte); if (texto) nTexto = strlen(texto); } }
-#else
   { const char *arq = manual ? registro_arquivo() : AV_LOG_ANTERIOR;
     FILE *f = arq ? fopen(arq, "rb") : NULL;
     if (f) {
@@ -475,7 +418,6 @@ static void *enviarRegistro(void *u) {
       if (texto) { nTexto = fread(texto, 1, AV_REGISTRO_MAX, f); texto[nTexto] = 0; }
       fclose(f);
     } }
-#endif
   if (!idHead(cab, aut, sizeof aut, via, sizeof via, chave, sizeof chave)) {
     if (!automatico) { pthread_mutex_lock(&trava); envMotivo = AVISOS_ENVIO_CONTA; envHttp = 0; pthread_mutex_unlock(&trava); }
     free(texto); envioEstado = automatico ? 0 : 3; return NULL;
@@ -488,16 +430,8 @@ static void *enviarRegistro(void *u) {
     snprintf(corpo, nTexto * 2 + 512,
              "{\"versao\":\"%s\",\"plataforma\":\"%s\",\"quando\":\"%s\",\"texto\":\"%s\"}",
              NV_VERSAO,
-#ifdef __EMSCRIPTEN__
-             "tizen",
-#elif defined(NV_TPK)
-             "tizen-tpk",
-#elif defined(NV_ANDROID)
-             "android",
-#elif defined(NV_LINUX_DESKTOP)
+#if defined(NV_LINUX_DESKTOP)
            "linux-desktop",
-#elif defined(__APPLE__)
-             "mac",
 #else
              "webos",
 #endif
@@ -604,19 +538,7 @@ static void *fioCanalFn(void *u) {
       if (desde[0] && strcmp(hoje, desde) < 0) ok = 0;
       if (ate[0] && strcmp(hoje, ate) > 0) ok = 0;
       if (ateV[0] && versaoMaior(NV_VERSAO, ateV)) ok = 0;
-#ifdef __EMSCRIPTEN__
-      if (plat[0] && strcmp(plat, "todas") && strcmp(plat, "tizen")) ok = 0;
-#elif defined(NV_TPK)
-      // O .tpk tambem e Samsung: vale o "tizen" de sempre, mais o "tizen-tpk"
-      // so dele. O anuncio do proprio preview (id com "tpk-preview") nao faz
-      // sentido dentro dele.
-      if (plat[0] && strcmp(plat, "todas") && strcmp(plat, "tizen") && strcmp(plat, "tizen-tpk")) ok = 0;
-      if (strstr(id, "tpk-preview")) ok = 0;
-#elif defined(NV_ANDROID)
-      if (plat[0] && strcmp(plat, "todas") && strcmp(plat, "android")) ok = 0;
-#else
       if (plat[0] && strcmp(plat, "todas") && strcmp(plat, "lg")) ok = 0;
-#endif
       { char cid[72];
         snprintf(cid, sizeof cid, "canal:%s", id);
         if (ok) novos += por(cid, AV_CANAL, ingles && titEn[0] ? titEn : tit,
@@ -682,17 +604,6 @@ void avisos_iniciar(void) {
 #endif
   vistosLer();
   m = dados_ler(AV_MARCA_ARQ);
-  // MARCA PRESENTE NAO E CRASH quando a sessao anterior se despediu por fora
-  // do IDBFS (issue #120; ver dados_despedida_ler). No Tizen a remocao da marca
-  // pode nao chegar ao IndexedDB antes de o processo morrer; e a TV fechar o
-  // app escondido (Home, Exit, desligar) nao e o app cair.
-  { int desp = dados_despedida_ler();
-    if (m && desp) {
-      printf("[avisos] marca da sessao anterior presente, mas ela se despediu (%s): nao e crash\n",
-             desp == 1 ? "saida pelo app" : "pagina escondida, a TV fechou em segundo plano");
-      fflush(stdout);
-      free(m); m = NULL;
-    } }
   if (m) {
     char v[24] = "", sinal[96] = "";
     const char *nl;
@@ -706,9 +617,6 @@ void avisos_iniciar(void) {
     printf("[avisos] a sessao anterior (%s, %s) nao se despediu: marca presente; %s\n",
            v, crashQuando, sinal[0] ? sinal : "no last signal (old mark)");
     fflush(stdout);
-#ifdef __EMSCRIPTEN__
-    lerLogAnterior();
-#endif
     { char id[72], tit[160], txt[420];
       snprintf(id, sizeof id, "crash:%s", crashQuando);
       snprintf(tit, sizeof tit, "%s", i18n("O app fechou sozinho"));
@@ -724,7 +632,7 @@ void avisos_iniciar(void) {
   marcaGravar();
   canalProximo = SDL_GetTicks() + 8000;   // depois da home, nao junto com ela
   // DEMONSTRACAO: NUVIO_AVISOS_DEMO=1 poe um item de cada tipo na lista, para
-  // olhar o painel sem esperar amigo, estreia, versao nova ou crash de verdade.
+  // olhar o painel sem esperar versao nova, recado ou crash de verdade.
   // So na previa; a TV nao tem ambiente.
   { const char *demo = getenv("NUVIO_AVISOS_DEMO");
     if (demo && demo[0] == '1') {
@@ -733,8 +641,6 @@ void avisos_iniciar(void) {
       // DADO DE MENTIRA, nao rotulo: os textos abaixo imitam o que a rede
       // traria (nome de amigo, titulo, aviso do dono), por isso passam por
       // demoAviso e nao por i18n — a varredura de i18n sabe disso.
-      novos += demoAviso("demo:agenda", AV_AGENDA, i18n("Episódio novo"),
-                   "Outlander — T7E9 · Unfinished Business", "tt3006802");
       novos += demoAviso("demo:update", AV_UPDATE, i18n("Atualização disponível"),
                    "Versão 1.3.2 disponível. Você está na 1.3.1.", "1.3.2");
       novos += demoAviso("demo:canal", AV_CANAL, "Guia de TV demorando",
@@ -836,7 +742,6 @@ static void cartaoDesenhar(void) {
 }
 
 void avisos_encerrar(void) {
-  dados_despedida_fim();   // no Tizen: sincrono, vale mesmo se o apagar abaixo nao chegar ao disco
   dados_apagar(AV_MARCA_ARQ);
   vistosGravar();
   seguro_encerrar();   // confirma o que estava em prova e fecha a sessao no diario
@@ -853,19 +758,6 @@ static void colherLocais(void) {
       snprintf(id, sizeof id, "update:%s", v);
       snprintf(txt, sizeof txt, i18n("Versão %s disponível. Você está na %s."), v, NV_VERSAO);
       novos += por(id, AV_UPDATE, i18n("Atualização disponível"), txt, v);
-    } }
-  // Agenda: lembretes vencidos (agendaviso.c continua abrindo o cartao dele;
-  // aqui fica o rastro na lista para quem fechou o cartao sem ler).
-  { const AgItem *dev[8];
-    int q = agenda_devidos(dev, 8), i;
-    for (i = 0; i < q; i++) {
-      char id[72], txt[300];
-      snprintf(id, sizeof id, "agenda:%s:%s", dev[i]->imdb, dev[i]->dataProx);
-      if (dev[i]->temporada > 0 && dev[i]->episodio > 0)
-        snprintf(txt, sizeof txt, i18n("%s — T%dE%d%s%s"), dev[i]->titulo, dev[i]->temporada, dev[i]->episodio,
-                 dev[i]->nomeEp[0] ? " · " : "", dev[i]->nomeEp);
-      else snprintf(txt, sizeof txt, "%s", dev[i]->titulo);
-      novos += por(id, AV_AGENDA, i18n("Episódio novo"), txt, dev[i]->imdb);
     } }
   pthread_mutex_unlock(&trava);
   toast(novos);
@@ -897,13 +789,6 @@ int  avisos_aberto(void) { return aberto; }
 // A CENTRAL ABERTA LE TUDO: os avisos dela saem da ilha (os que diziam o
 // assunto e o "N avisos novos" que juntou o resto).
 void avisos_abrir(void)  { aberto = 1; foco = 0; rol = 0.0f; toastN = 0; ilha_retirar_grupo(); }
-const char *avisos_pediu_abrir(void) {
-  static char saida[24];
-  if (!pediuAbrir[0]) return NULL;
-  snprintf(saida, sizeof saida, "%s", pediuAbrir);
-  pediuAbrir[0] = 0;
-  return saida;
-}
 int avisos_pediu(void) { int c = pediuCodigo; pediuCodigo = 0; return c; }
 
 static void fechar(void) {
@@ -973,7 +858,6 @@ int avisos_evento(const SDL_Event *e) {
 
 static const char *icone(int tipo) {
   switch (tipo) {
-    case AV_AGENDA: return "lembrete";
     case AV_UPDATE: return "avancar";
     case AV_CRASH:  return "fluxo";
     default:        return "menu_settings";
@@ -994,10 +878,9 @@ static const char *icone(int tipo) {
 // queda (Enviar registro / Agora não / Dispensar) e o aviso do dono (o texto
 // inteiro; Fechar / Dispensar). Voltar recolhe sem mudar nada; "Dispensar"
 // tira o item da lista de vez (avisos_dispensar, avisodisp.h). O
-// episodio novo abre o modal do cartao de estreia (ilhacart.c), quando ele
-// esta na pilula. Quem executa o botao e avisos_ilha_acao.
+// botao e executado por avisos_ilha_acao.
 static void anunciarItem(const Aviso *it) {
-  char chave[96], txt[240], f1[200], f2[200];
+  char chave[96], txt[240];
   IlhaAvisoEx e;
   static IlhaModal m;
   memset(&e, 0, sizeof e);
@@ -1005,25 +888,6 @@ static void anunciarItem(const Aviso *it) {
   snprintf(chave, sizeof chave, "av:%s", it->id);
   e.chave = chave; e.grupo = 1; e.texto = txt;
   switch (it->tipo) {
-    case AV_AGENDA: {
-      const AgItem *ag = it->alvo[0] ? agenda_registro(it->alvo) : NULL;
-      const char *tit = ag && ag->titulo[0] ? ag->titulo : it->texto;
-      e.tipo = ILHA_ACENTO;
-      // ESTREIA HOJE (o episodio vai ao ar hoje) e SAIU (ja foi): o mesmo
-      // aviso de agenda, com a frase do dia. O de hoje e mais curto e nao
-      // leva a tecla: ainda nao ha o que assistir.
-      if (ag && agenda_dias(ag->dataProx) == 0) {
-        snprintf(txt, sizeof txt, i18n("%s estreia hoje"), ilha_forte(f1, sizeof f1, tit));
-        e.icone = "aj_calendar"; e.ms = 6000u;
-      } else {
-        if (ag && ag->temporada > 0 && ag->episodio > 0)
-          snprintf(txt, sizeof txt, i18n("Saiu T%dE%d de %s"), ag->temporada, ag->episodio, ilha_forte(f1, sizeof f1, tit));
-        else snprintf(txt, sizeof txt, i18n("Episódio novo de %s"), ilha_forte(f1, sizeof f1, tit));
-        e.icone = "aj_tv-minimal-play"; e.ms = 8000u;
-        e.cartao = ILHA_ESTREIA + 1;
-        e.tecla = 1;
-      }
-      break; }
     case AV_UPDATE:
       // GLASS UI v2 (mockup ajustes-v2 "v2-upd-aviso", 03/10): o aviso de duas
       // linhas, e a tecla nao abre mais um modal da ilha — o proprio CARTAO DA
@@ -1159,7 +1023,7 @@ static int ehCanalExpansivel(int i) { return i >= 0 && i < n && itens[i].tipo ==
 // primeiro, a da aba Avisos do painel Social.
 static float larguraTextoAviso = 610.0f;
 static int temAcaoAviso(const Aviso *av) {
-  return av->tipo == AV_AGENDA || av->tipo == AV_UPDATE || av->tipo == AV_CRASH;
+  return av->tipo == AV_UPDATE || av->tipo == AV_CRASH;
 }
 // A LINHA EM FOCO SEMPRE TEM A LINHA DE ACAO (06/10): e onde mora "Segure OK
 // para dispensar". Fora do foco so quem tem acao a desenha.
@@ -1189,15 +1053,6 @@ float avisos_lista_y(int linha, int focoLinha) {
   int i;
   for (i = 0; i < linha; i++) y += avisos_lista_altura_linha(i, focoLinha);
   return y;
-}
-float avisos_lista_altura(void) {
-  pthread_mutex_lock(&trava);
-  { float h = 0.0f;
-    int i;
-    for (i = 0; i < n; i++) h += alturaAviso(i);
-    if (n == 0) h = 60.0f;
-    else h += AVL_TODOS_H;
-    pthread_mutex_unlock(&trava); return h; }
 }
 int avisos_lista_n(void) { int k; pthread_mutex_lock(&trava); k = n; pthread_mutex_unlock(&trava); return k; }
 
@@ -1252,7 +1107,6 @@ void avisos_lista_desenhar(float x, float y0, float w, float a, int focoLinha) {
     }
     else txt_bloco(TXT_ILHA_SUB, av->texto, 243, 242, 239, tx, y + 51.0f, tw, 25.0f, a * 0.62f, 2);
     switch (av->tipo) {
-      case AV_AGENDA: acao = i18n("OK abre o título"); break;
       case AV_UPDATE: acao = i18n("OK abre a atualização"); break;
       case AV_CRASH:  acao = envioEstado == 1 ? i18n("Enviando…") : envioEstado == 2 ? i18n("Registro enviado. Obrigado.")
                            : envioEstado == 3 ? i18n("Não foi possível enviar. OK tenta de novo.") : i18n("OK envia o registro"); break;
@@ -1305,7 +1159,6 @@ int avisos_lista_ok(int linha) {
   }
   switch (a.tipo) {
     case AV_UPDATE: pediuCodigo = AVISOS_ABRIR_ATUALIZACAO; return 1;
-    case AV_AGENDA: snprintf(pediuAbrir, sizeof pediuAbrir, "%s", a.alvo); return 1;
     case AV_CRASH:
       if (envioEstado == 0 || envioEstado == 3) {
         if (!NV_REC_URL[0]) { envioEstado = 3; return 0; }
@@ -1320,20 +1173,6 @@ int avisos_lista_ok(int linha) {
 
 // A ESTREIA AINDA NAO LIDA mais recente (ilhacart.c poe na ilha). Os itens
 // entram no fim da lista, entao o mais novo e o de indice maior.
-int avisos_estreia_pendente(char *id, size_t tamId, char *imdb, size_t tamImdb) {
-  int i, achou = 0;
-  pthread_mutex_lock(&trava);
-  for (i = n - 1; i >= 0; i--)
-    if (itens[i].tipo == AV_AGENDA && !itens[i].visto && itens[i].alvo[0] &&
-        !avisodisp_sessao_tem(itens[i].id)) {   // "Depois" no modal: so na proxima sessao
-      snprintf(id, tamId, "%s", itens[i].id);
-      snprintf(imdb, tamImdb, "%s", itens[i].alvo);
-      achou = 1;
-      break;
-    }
-  pthread_mutex_unlock(&trava);
-  return achou;
-}
 
 void avisos_marcar_visto(const char *id) {
   int i;
@@ -1353,27 +1192,12 @@ void avisos_marcar_lidos(void) {
 }
 
 // --- dispensar (06/10) ---------------------------------------------------------------
-// Ver avisodisp.h. A recomendacao e a excecao: o item "rec" e a CONTAGEM das
-// novas, e gravar "rec" calaria toda recomendacao futura. Dispensar responde a
-// recomendacao (o mesmo que o "Dispensar" do modal sempre fez): a contagem zera
-// e o item sai sozinho na proxima colheita; uma recomendacao nova o traz de
-// volta. A estreia tambem marca o lembrete daquele episodio como avisado
-// (agenda.c), para o cartao "Estreou hoje" nao abrir por ela — o lembrete
-// continua ligado e o proximo episodio avisa.
+// Dismissed notice IDs persist per profile; later events have new IDs.
 void avisos_dispensar(const char *id) {
-  char ch[96], imdb[24] = "";
-  int i, tipo = -1;
+  char ch[96];
   if (!id || !id[0]) return;
-  snprintf(ch, sizeof ch, "%s", id);   // id pode apontar para dentro de itens[]
-  pthread_mutex_lock(&trava);
-  for (i = 0; i < n; i++) if (!strcmp(itens[i].id, ch)) {
-    tipo = itens[i].tipo;
-    snprintf(imdb, sizeof imdb, "%s", itens[i].alvo);
-    break;
-  }
-  pthread_mutex_unlock(&trava);
+  snprintf(ch, sizeof ch, "%s", id);
   avisodisp_por(ch);
-  if ((tipo == AV_AGENDA || (tipo < 0 && !strncmp(ch, "agenda:", 7))) && imdb[0]) agenda_marcar_avisado(imdb);
   pthread_mutex_lock(&trava);
   marcarVisto(ch);
   tirar(ch);
@@ -1404,22 +1228,16 @@ int avisos_lista_dispensar(int linha) {
   return 1;
 }
 
-int avisos_lista_item(int linha, char *id, size_t tamId, char *titulo, size_t tamTit,
-                      char *imdbLembrete, size_t tamImdb) {
+int avisos_lista_item(int linha, char *id, size_t tamId, char *titulo, size_t tamTit) {
   int ok = 0;
-  if (imdbLembrete && tamImdb) imdbLembrete[0] = 0;
   pthread_mutex_lock(&trava);
   if (linha >= 0 && linha < n) {
     const Aviso *a = &itens[linha];
     if (id && tamId) snprintf(id, tamId, "%s", a->id);
-    if (titulo && tamTit) snprintf(titulo, tamTit, "%s", a->tipo == AV_AGENDA && a->texto[0] ? a->texto : a->titulo);
-    if (imdbLembrete && tamImdb && a->tipo == AV_AGENDA && a->alvo[0])
-      snprintf(imdbLembrete, tamImdb, "%s", a->alvo);
+    if (titulo && tamTit) snprintf(titulo, tamTit, "%s", a->titulo);
     ok = 1;
   }
   pthread_mutex_unlock(&trava);
-  // So oferece "Remover lembrete" quando ele ainda esta ligado.
-  if (ok && imdbLembrete && imdbLembrete[0] && agenda_lembrete(imdbLembrete) != 1) imdbLembrete[0] = 0;
   return ok;
 }
 
@@ -1469,21 +1287,6 @@ static void avisos_desenharCorpo_(Uint32 agora) {
 int avisos_envio_estado(void) { return envioEstado; }
 // Le o nv-log do localStorage para logAtual (fio principal; so no Tizen).
 static void lerLogAtual(void) {
-#ifdef __EMSCRIPTEN__
-  free(logAtual);
-  logAtual = (char *)EM_ASM_PTR({
-    try {
-      var t = localStorage.getItem('nv-log') || '';
-      if (t.length > $0) t = t.slice(t.length - $0);
-      var b = new TextEncoder().encode(t);
-      var p = _malloc(b.length + 1);
-      if (!p) return 0;
-      HEAPU8.set(b, p);
-      HEAPU8[p + b.length] = 0;
-      return p;
-    } catch (e) { return 0; }
-  }, AV_REGISTRO_MAX);
-#endif
 }
 
 // PASSO DO ENVIO AUTOMATICO, do laco principal. Com o ajuste ligado: uma vez,
@@ -1506,12 +1309,7 @@ void avisos_envio_auto_passo(Uint32 agora) {
     anteriorFeito = 1;
     proximo = agora + 60000;
     { int tem;
-#ifdef __EMSCRIPTEN__
-      if (!logAnterior) lerLogAnterior();
-      tem = logAnterior && logAnterior[0];
-#else
       { FILE *f = fopen(AV_LOG_ANTERIOR, "rb"); tem = f != NULL; if (f) fclose(f); }
-#endif
     envAutoProximo = proximo;
     if (tem) {
       envioEstado = 1;
@@ -1524,14 +1322,7 @@ void avisos_envio_auto_passo(Uint32 agora) {
   // 1 min no Tizen (e la que falta dado); 5 min no LG — o registro do LG com
   // o player aberto enche os 200 KB em menos de um minuto (haylereader,
   // 20/09: 200 KB por minuto de eventos [video]).
-#ifdef __EMSCRIPTEN__
-  // Depois dos 5 primeiros minutos, 5 em 5 tambem no Tizen: a cada minuto o
-  // registro inteiro (ate 200 KB) subia de novo — 18 envios em 16 minutos de
-  // uma TV so nos logs de 24/09, quase todos repetindo o que ja tinha ido.
-  proximo = agora + (agora < 300000 ? 60000 : 300000);
-#else
   proximo = agora + 300000;
-#endif
   envAutoProximo = proximo;
   lerLogAtual();
   fflush(stdout);
@@ -1557,23 +1348,6 @@ void avisos_enviar_registro_atual(void) {
     return;
   }
   envMotivo = 0; envPendenteRede = 0;
-#ifdef __EMSCRIPTEN__
-  // Fio principal: e o unico com localStorage. O shell grava nv-log a cada
-  // 10 s, entao o que vai e o log ate a ultima gravacao.
-  free(logAtual);
-  logAtual = (char *)EM_ASM_PTR({
-    try {
-      var t = localStorage.getItem('nv-log') || '';
-      if (t.length > $0) t = t.slice(t.length - $0);
-      var b = new TextEncoder().encode(t);
-      var p = _malloc(b.length + 1);
-      if (!p) return 0;
-      HEAPU8.set(b, p);
-      HEAPU8[p + b.length] = 0;
-      return p;
-    } catch (e) { return 0; }
-  }, AV_REGISTRO_MAX);
-#endif
   fflush(stdout);   // o que este fio ja imprimiu entra no arquivo antes da leitura
   envioEstado = 1;
   if (pthread_create(&fioEnvio, NULL, enviarRegistro, (void *)&ATUAL) == 0) pthread_detach(fioEnvio);

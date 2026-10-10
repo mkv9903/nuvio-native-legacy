@@ -14,18 +14,6 @@ int proxyts_candidata(const char *url, int mp4) {
   return 1;
 }
 
-#if defined(__EMSCRIPTEN__) || defined(NV_TPK) || defined(NV_ANDROID)
-void proxyts_definir_cabecalhos(const char *c) { (void)c; }
-int  proxyts_redirecionou(void) { return 0; }
-int  proxyts_disponivel(void) { return 0; }
-int  proxyts_url(const char *f, char *s, size_t n) { (void)f; (void)s; (void)n; return 0; }
-void proxyts_parar(void) {}
-int  proxyts_e_url(const char *u) { (void)u; return 0; }
-const char *proxyts_resolver(const char *url, char *buf, size_t n) {
-  (void)buf; (void)n;
-  return url && !strncmp(url, PROXYTS_PREFIXO, 8) ? url + 8 : url;
-}
-#else
 
 #include "rede.h"
 #include <arpa/inet.h>
@@ -768,5 +756,3 @@ const char *proxyts_resolver(const char *url, char *buf, size_t n) {
   if (atomic_load(&sessaoAtual) && fonteAtual[0]) proxyts_parar();
   return url;
 }
-
-#endif

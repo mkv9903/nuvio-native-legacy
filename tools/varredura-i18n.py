@@ -327,19 +327,16 @@ IGNORAR = {
     # "top", "popular" and "trending" already don't match because ASCII.
     "em alta", "mais vist", "tendência",
     "-perfil",                      # filename suffix (ajustes.c)
-    "recomendacoes-perfil.txt",     # public profile filename (recomenda.c)
-    "amigos-vistos.txt",            # watched updates filename (socialvis.c)
-    "%s/poster/%02d.jpg",           # sample data artwork path (socialvis.c, test only)
     "biblioteca.h", "catalogo.h", "fileiras.h", "perfil.h", "legenda.h",
     "perfil.txt",                   # #include and filename
     "com.webos.media.client.nuvio", # LS2 client ID
-    "abrir", "buscar", "erro",      # JS bridge operation names (video_tizen.c)
+    "abrir", "buscar", "erro",      # internal operation names
     "fontes", "legenda", "mais", "nao", "poster",  # internal keys, not labels
     "fileiras", "ordem-da-conta",  # context parts in homeestado.c log
     # reason for GPU step down in log "[gpu-nivel] nivel 1 -> 2 (...)" (gpunivel.c aplicar)
     "GPU presa mesmo com efeitos leves: efeitos minimos",
     # Stop points in condemned loop (descoberta.c, CONDENADA): log only.
-    "antes de pedir os catalogos", "depois da atividade dos amigos",
+    "antes de pedir os catalogos",
     "depois do continuar assistindo", "depois dos catalogos",
     "depois dos manifestos", "esperando os catalogos", "lendo os manifestos",
     # Reasons and origins of GPU level (gpunivel.c): only go to nuvio.log.
@@ -347,8 +344,6 @@ IGNORAR = {
     "teto de tempo de medida",
     "lento pela CPU ou pelo resto, nao pela GPU: menos pixel nao ajuda",
     # .tpk: only go to nuvio.log / compile error / filename.
-    "NV_TPK40 e so da libnuvio.so do Tizen 4/5; nunca junto com Emscripten",
-    "libEGL nao encontrada na TV", "libnuvio.staged.ver",
     "sem recorte em 2 s, mostra assim", "sem tocando, mostra assim",
     "sem recorte",
     "eglMakeCurrent no fio do app falhou: 0x%x",
@@ -417,17 +412,6 @@ IGNORAR = {
     # #92, v1.4.7: if VIDEO was already open when mkvass Range failed
     # (momentoVideo, mkvass.c), and reason for orphan video in pre-search line (player.c).
     # Both only go to diagnostic printf.
-    # gifcol_motivo_texto() reasons (gifcolecao.c, #141): why focused collection
-    # poster does not animate. `return "..."` that only goes to
-    # printf "[gif] cartaz ... nao anima: motivo" — log for issue reports.
-    "sem focusGifUrl e a capa nao e GIF",
-    "sem focusGifUrl e a capa ainda nao chegou",
-    "arquivo do GIF ainda nao chegou",
-    "veio GIF mas o arquivo saiu do disco",
-    "o arquivo nao e GIF",
-    "GIF de 1 quadro",
-    "recusado pelo orcamento de animacao (ver a linha [gif] acima)",
-    "este aparelho nao anima GIF (webOS ou TV de 1 GB)",
     "antes do video",
     "com video aberto",
     "teto vencido, o resto segue em segundo plano",

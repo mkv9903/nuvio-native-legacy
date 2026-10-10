@@ -465,9 +465,6 @@ int prog_pendentes(ProgRegistro *saida, int max) {
 void prog_confirmar_empurrados(const ProgRegistro *enviados, int n) {
   progress_confirm_pushed(enviados, n);
 }
-void prog_marcar_empurrados(const char *const *chaves, int n) {
-  progress_mark_pushed(chaves, n);
-}
 void prog_remover(const char *chave) {
   progress_remove(chave);
 }

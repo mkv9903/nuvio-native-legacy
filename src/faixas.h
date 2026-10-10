@@ -16,7 +16,6 @@
 // valendo. Chamada pelo player quando uma reproducao nova comeca.
 void faixas_reiniciar(void);
 
-void faixas_abrir(void);
 // Abre com o foco JA na coluna pedida: 0 = audio, 1 = legenda. O player tem um
 // icone para cada, e abrir sempre no audio fazia os dois parecerem o mesmo
 // botao.

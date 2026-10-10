@@ -109,8 +109,6 @@ int   player_pausado(void);
 // Fator de cor do OSD do player (Ajustes > Brilho da interface no player + degrau
 // automatico com a barra parada). 1 = sem efeito. Ver esmaecer.h.
 float player_osd_brilho(void);
-float player_duracao_seg(void);
-int   player_eh_canal(void);
 // StreamFit (F03): 1 + real backend duration of the player's own source.
 int   player_duracao_midia(double *seg);
 
@@ -153,7 +151,6 @@ int  player_suspender(void);
 int  player_retido(void);
 // 1 = retida so ate o voo da saida pousar (Android, sem "Manter o video
 // pronto ao sair"); player_validar_retido solta em PLR_RETIDO_VOO_MS.
-int  player_retido_so_voo(void);
 int  player_retomar_retido(const char *imdb, int temporada, int episodio);
 void player_validar_retido(Uint32 agora);
 void player_descartar_retido(void);
@@ -229,7 +226,7 @@ typedef enum {
 // showAspectToast do web.
 #define PLR_TOAST_MS     1400u
 
-int         player_aspecto(void);              // modo atual (PlrAspecto)
+              // modo atual (PlrAspecto)
 const char *player_aspecto_rotulo(int modo);   // "Cinema Zoom", "Encaixar"...
 void        player_aspecto_definir(int modo);  // aplica e grava
 void        player_aspecto_ciclar(void);       // proximo modo + aviso na tela

@@ -161,11 +161,11 @@ int main(void) {
     f = fopen(caminho, "w"); assert(f);
     fprintf(f, "idioma 0\n"); fclose(f);
     ajustes_dir(dir); }
-  SDL_SetHint("SDL_MAC_BACKGROUND_APP", "1");
   assert(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) == 0);
   IMG_Init(IMG_INIT_PNG | IMG_INIT_JPG);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
   SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
-  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
   janela = SDL_CreateWindow("spainel fundo tempo", 0, 0, 1920, 1080,
                             SDL_WINDOW_OPENGL | SDL_WINDOW_HIDDEN);
   assert(janela);

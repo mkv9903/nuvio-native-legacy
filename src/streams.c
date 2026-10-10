@@ -225,11 +225,7 @@ StreamfitClasse stream_fit_folha_estado(int indice, StreamfitResultado *saida) {
 // Platforms whose network epoch can become known (redemarca fed by the
 // Android ConnectivityManager monitor). Tests may force it.
 #ifndef STREAMFIT_REDE_EXISTE
-#ifdef NV_ANDROID
-#define STREAMFIT_REDE_EXISTE 1
-#else
 #define STREAMFIT_REDE_EXISTE 0
-#endif
 #endif
 static int fitPesada(int i) { return i >= 0 && i < fitN && fitClasses && fitClasses[i] == SF_PESADA; }
 static void fitMbps(char *dst, size_t n, double kbps) {
@@ -692,9 +688,7 @@ static int nivelHdr(const Stream *s) {
   else if (flag >= 0) nivel = 1;
   if (s->dolbyVision) {
     int toca = ajustes_dolby_vision() && telaDv != 0;
-#ifndef NV_ANDROID
     toca = toca && (s->mp4 || strstr(s->url, ".mp4"));
-#endif
     if (perfil5(s)) { if (nivel < 1) nivel = 1; }
     else if (toca) nivel = 4;
     else if (nivel < 2) nivel = 2;        // perfil 8: a base HDR10 toca
@@ -721,27 +715,9 @@ static long qualidade(const Stream *s, int modo) {
   return q;
 }
 
-#ifdef NV_TPK
-// SAMSUNG NAO TOCA DTS NEM TRUEHD (#313; specs oficiais 2018+). Fonte cujo
-// unico audio anunciado e DTS/DTS-HD/TrueHD abre mudo no .tpk. O selo vem do
-// nome do arquivo: Atmos fica de fora (pode ser DD+ ou TrueHD) e qualquer selo
-// Dolby Digital junto do DTS (nome com os dois) tira a multa. Pesa mais que um
-// degrau de resolucao (10000) para o 1080p com AC3 passar na frente do 4K mudo,
-// e continua longe das multas de cache/origem (>= 140000): so desempata a fila.
-static long penalAudioTv(const Stream *s) {
-  uint64_t recusa = badges_bit("a-dts") | badges_bit("a-dtshd") | badges_bit("a-dtshdma") |
-                              badges_bit("a-dtsx") | badges_bit("a-truehd") | badges_bit("a-truehd-dv");
-  uint64_t toca = badges_bit("a-dd") | badges_bit("a-ddp") | badges_bit("a-dd-dv") |
-                            badges_bit("a-atmos") | badges_bit("a-atmos-dv");
-  return (s->badges & recusa) && !(s->badges & toca) ? 20000 : 0;
-}
-#endif
 
 static long pontos(const Stream *s) {
   long p = 0;
-#ifdef NV_TPK
-  p -= penalAudioTv(s);
-#endif
   // DOLBY VISION SO VALE PONTO EM MP4 — e isto e medida, nao teoria.
   //
   // Marcado no aparelho do dono (LG C9, webOS 4.10) tocando um MKV que o addon
@@ -852,7 +828,6 @@ static int grupoDe(int i) {
   pthread_mutex_unlock(&grupoTrava);
   return g;
 }
-int stream_grupo_regra(int i) { return grupoDe(i); }
 // A ultima escolha nao achou candidata SO por causa das regras (#202): ha
 // fonte nao excluida, mas nenhuma e permitida. app.c abre a folha de fontes,
 // como o oficial faz quando o auto-play nao acha nada.
@@ -985,33 +960,17 @@ static int resolverUrl(const char *url, const char *cabecalhos, int segundos,
   const char *vetor[8];
   char copia[512];
   int nc = 0, http = 0;
-#ifdef __EMSCRIPTEN__
-  int restrito = 0;
-#endif
   if (cabecalhos && *cabecalhos) {
     char *l, *ctx = NULL;
     snprintf(copia, sizeof copia, "%s", cabecalhos);
     for (l = strtok_r(copia, "\n", &ctx); l && nc < 7; l = strtok_r(NULL, "\n", &ctx)) {
       vetor[nc++] = l;
-#ifdef __EMSCRIPTEN__
-      if (!strncasecmp(l, "Referer:", 8) || !strncasecmp(l, "Origin:", 7) ||
-          !strncasecmp(l, "User-Agent:", 11)) restrito = 1;
-#endif
     }
   }
   vetor[nc] = NULL;
   // O tipo e o tamanho do corpo vem da MESMA sonda: nenhum pedido a mais.
   if (rede_url_final_tipo(url, segundos, nc ? vetor : NULL, fim, tam, &http,
                           mime, mimeTam, corpo)) return 1;
-#ifdef __EMSCRIPTEN__
-  // XHR nao manda estes cabecalhos; AVPlay manda. A recusa nao prova que a
-  // fonte morreu (mesmo contrato de playlistVazia). 5xx nao entram aqui.
-  if ((http == 401 || http == 403) && restrito && strlen(url) < tam) {
-    memcpy(fim, url, strlen(url) + 1);
-    printf("[fonte] sonda HTTP %d com cabecalho controlado pelo navegador: quem decide e o player\n", http);
-    return 1;
-  }
-#endif
   return 0;
 }
 
@@ -1145,13 +1104,6 @@ int stream_antecipada(int *estado) {
   return i;
 }
 
-int stream_qtd_torrents(void) {
-  int i, q = 0;
-  pthread_mutex_lock(&verTrava);
-  for (i = 0; i < n; i++) if (!lista[i].url[0] && lista[i].infoHash[0]) q++;
-  pthread_mutex_unlock(&verTrava);
-  return q;
-}
 
 unsigned stream_lista_geracao(void) {
   unsigned g;

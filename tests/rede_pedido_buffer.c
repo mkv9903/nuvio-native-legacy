@@ -4,9 +4,6 @@
 #include <string.h>
 static size_t maior, chamadas;
 static int falhar;
-#ifdef NV_TPK40
-void nv_tpk40_etapa(const char *s) { (void)s; }
-#endif
 static void *alocar(void *p, size_t n) {
   chamadas++;
   if (n > maior) maior = n;

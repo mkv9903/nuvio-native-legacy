@@ -15,9 +15,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#ifdef __APPLE__
-#include <OpenGL/gl.h>
-#endif
 
 static void grava(const char *nome, SDL_Window *w) {
   unsigned char *pix = malloc(1920 * 1080 * 4);
@@ -66,19 +63,20 @@ static Uint32 roda(Uint32 t0, Uint32 de, Uint32 ate, Uint32 soltaEm) {
 
 int main(int argc, char **argv) {
   const char *saida = argc > 1 ? argv[1] : "/tmp/nuvio-abertura";
-  char dir[] = "/Volumes/ExternalSSD/tmp/nuvio-ab-XXXXXX";
+  char dir[] = "/tmp/nuvio-ab-XXXXXX";
   char nome[700];
   SDL_Window *w;
   SDL_GLContext gl;
   int logo, estilo;
   Uint32 t0 = 100000;
 
-  if (access("/Volumes/ExternalSSD/tmp", W_OK) != 0) strcpy(dir, "/tmp/nuvio-ab-XXXXXX");
+  if (access("/tmp/", W_OK) != 0) strcpy(dir, "/tmp/nuvio-ab-XXXXXX");
   assert(mkdtemp(dir));
   assert(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) == 0);
   IMG_Init(IMG_INIT_PNG | IMG_INIT_JPG);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
   SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
-  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
   w = SDL_CreateWindow("abertura", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1920, 1080,
                        SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN);
   assert(w);

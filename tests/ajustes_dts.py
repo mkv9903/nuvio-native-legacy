@@ -32,13 +32,14 @@ def block(pattern):
 
 # Preprocess the real presentation catalog: hidden settings must also stay out
 # of search results and the differences list, which bypass visivel().
-for macro in [None, 'NV_WEBOS', 'NV_TPK', 'NV_ANDROID']:
+for macro in ['NV_WEBOS', 'NV_LINUX_DESKTOP']:
     command = [os.environ.get('CC', 'cc'), '-E', '-P', '-x', 'c']
     if macro:
         command.append('-D' + macro)
     command.append(str(ROOT / 'src/ajustes_ux_tela.inc'))
     catalog = subprocess.check_output(command, text=True)
-    assert 'DTS' not in catalog, macro
+    assert 'AJ_DTS,' not in catalog, macro
+    assert 'AJ_DTS_AC3' in catalog, macro
 
 harness = r'''
 #include <assert.h>
@@ -62,7 +63,8 @@ static Opcao OPCOES[AJ_N];
 static char dirAjustes[512];
 static int idiomaFonteGravada;
 static int ajustes_idioma(void) { return 1; }
-static void dados_marcar_sujo(int x) { (void)x; }
+static int fonteregra_do_blob(const char *j) { (void)j; return 0; }
+static int fonteregra_mesclar(const char *j, char **out) { (void)j; *out=NULL; return 0; }
 static void pstAplicar(void) {}
 static int nValores(int op) { (void)op; return 2; }
 static int temaLocal(void) { return 0; }
@@ -74,7 +76,7 @@ static const char *const *literaisDe(int op) { (void)op; return NULL; }
 '''
 for name in ['limita', 'gravar', 'camelParaSnake',
              'igualSemCaixa', 'somenteDesteAparelho', 'ajustes_aplicar_blob',
-             'dePerfil', 'acharValor', 'textoDoValor']:
+             'perfilLocal', 'dePerfil', 'acharValor', 'textoDoValor']:
     harness += '\n' + function(name) + '\n'
 harness += '\ntypedef struct { const char *vi, *vf; char texto[160]; } Troca;\n'
 harness += function('ajustes_mesclar_blob')

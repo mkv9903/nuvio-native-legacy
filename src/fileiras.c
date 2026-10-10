@@ -242,22 +242,6 @@ static int tipoValido(const char *chave, int t) {
 
 static int limita(int v, int lo, int hi) { return v < lo ? lo : (v > hi ? hi : v); }
 
-// GRAVA POR dados_gravar, E NAO COM fopen DIRETO. As duas coisas que o fopen
-// direto nao fazia sao invisiveis no Mac e no webOS e FATAIS no Tizen:
-//
-//   1. NAO MARCA A LOJA COMO SUJA. No alvo Tizen "gravar" escreve em MEMFS, que
-//      e RAM; o que leva o arquivo para o IndexedDB e dados_sincronizar(), e ela
-//      so descarrega quando dados_gravar avisou que houve escrita. Sem esse
-//      aviso a escolha de fileiras vivia ate a recarga e sumia — que e
-//      exatamente o relato "mexo nos catalogos e eles nao recarregam ou salvam".
-//   2. NAO PEGA A TRAVA DO SISTEMA DE ARQUIVOS. O FS do Emscripten e uma
-//      estrutura JavaScript compartilhada entre os workers e NAO e segura entre
-//      fios; esta funcao roda no fio do desenho (a tela de Ajustes) enquanto a
-//      descoberta le no fio dela. O sintoma documentado de ignorar isso, em
-//      dados.c, foi o app inteiro CONGELAR sem erro nenhum.
-//
-// dados_gravar ja e atomica (temporario + rename), ja pega a trava e ja marca a
-// sujeira. Montar o texto e entrega-lo pronto e menos codigo do que estava aqui.
 static void gravar(void) {
   // 64 linhas de ate ~310 bytes (chave 192 + titulo 96 + quatro numeros), mais
   // o cabecalho. Alocado e nao na pilha: sao ~20 KB e esta funcao roda no fio

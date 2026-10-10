@@ -8,8 +8,8 @@ sources=()
 for source in src/*.c src/dts/*.c; do [ "$source" != src/main.c ] && sources+=("$source"); done
 bin="${TMPDIR:-/tmp}/nuvio-fonte-addon-shot"
 cc -DNV_SHOT_HOOKS "${sources[@]}" tests/fonte_addon_texto_shot.c -Isrc -o "$bin" \
-  -O1 -g -I/opt/homebrew/include -I/opt/homebrew/include/SDL2 \
-  -L/opt/homebrew/lib -lSDL2 -lSDL2_image -lSDL2_ttf -lz -framework OpenGL \
+  -O1 -g -DNV_LINUX_DESKTOP $(pkg-config --cflags sdl2 SDL2_image SDL2_ttf)  \
+   -lSDL2 -lSDL2_image -lSDL2_ttf -lz $(pkg-config --libs glesv2 egl) -ldl -pthread -lm \
   -Wno-deprecated-declarations -Wno-macro-redefined
 D=$(mktemp -d); trap 'rm -rf "$D" "$bin"' EXIT
 mkdir -p "$1"

@@ -33,34 +33,15 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#ifdef NV_GLES_NO_MAC
-#include <EGL/egl.h>
-#endif
 
 static GLuint fbo, fboTex;
 static const int LW = 1920, LH = 1080;
 
 static void contexto(void) {
-#ifdef NV_GLES_NO_MAC
-  EGLDisplay d = eglGetDisplay(EGL_DEFAULT_DISPLAY);
-  EGLint maj, min, n;
-  EGLConfig c;
-  static const EGLint ca[] = { EGL_RED_SIZE, 8, EGL_GREEN_SIZE, 8, EGL_BLUE_SIZE, 8, EGL_ALPHA_SIZE, 8,
-                               EGL_SURFACE_TYPE, EGL_PBUFFER_BIT, EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
-                               EGL_NONE };
-  static const EGLint sa[] = { EGL_WIDTH, 64, EGL_HEIGHT, 64, EGL_NONE };
-  static const EGLint xa[] = { EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE };
-  EGLSurface s; EGLContext x;
-  assert(d != EGL_NO_DISPLAY && eglInitialize(d, &maj, &min));
-  assert(eglChooseConfig(d, ca, &c, 1, &n) && n == 1);
-  s = eglCreatePbufferSurface(d, c, sa); assert(s != EGL_NO_SURFACE);
-  x = eglCreateContext(d, c, EGL_NO_CONTEXT, xa); assert(x != EGL_NO_CONTEXT);
-  assert(eglMakeCurrent(d, s, s, x));
-#else
-  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2); SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2); SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
   SDL_Window *w = SDL_CreateWindow("fundo", 0, 0, 64, 64, SDL_WINDOW_OPENGL | SDL_WINDOW_HIDDEN); assert(w);
   assert(SDL_GL_CreateContext(w));
-#endif
   printf("GL: %s | %s\n", (const char *)glGetString(GL_VERSION), (const char *)glGetString(GL_RENDERER));
 }
 
@@ -198,7 +179,6 @@ static void pintarTeste(void *ctx) {
 int main(void) {
   double m[3], d;
   int falhas = 0;
-  SDL_SetHint("SDL_MAC_BACKGROUND_APP", "1");
   assert(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) == 0);
   contexto();
   glGenTextures(1, &fboTex); glBindTexture(GL_TEXTURE_2D, fboTex);

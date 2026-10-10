@@ -16,4 +16,4 @@ for _ in $(seq 50); do [ -s "$DTS_RANGE_DIR/ports" ] && break; sleep 0.1; done
 read -r DTS_RANGE_HTTP_PORT DTS_RANGE_PEER_PORT DTS_RANGE_TLS_PORT < "$DTS_RANGE_DIR/ports"
 ${CC:-gcc} -O1 -g -Wall -Wextra -Werror -Wno-misleading-indentation -Isrc tests/dts_range.c src/net.c src/net_url.c \
   -ldl -lpthread -o "$DTS_RANGE_DIR/test"
-"$DTS_RANGE_DIR/test" "$DTS_RANGE_HTTP_PORT" "$DTS_RANGE_PEER_PORT" "$DTS_RANGE_TLS_PORT" "$DTS_RANGE_DIR/cert.pem"
+"$DTS_RANGE_DIR/test" "$DTS_RANGE_HTTP_PORT" "$DTS_RANGE_PEER_PORT" "$DTS_RANGE_TLS_PORT"

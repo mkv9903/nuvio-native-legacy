@@ -31,7 +31,6 @@ static const char *ajVisualIcone(int op) {
     case AJ_RAIL: return "aj_panel-left";
     case AJ_MENU_EXPLORAR: return "aj_panel-left";
     case AJ_MENU_GUIA: return "aj_panel-left";
-    case AJ_MENU_AGENDA: return "aj_panel-left";
     case AJ_MENU_PERFIL: return "aj_panel-left";
     case AJ_RAIL_BLUR: return "aj_panel-left";
     case AJ_DESCOBRIR: return "aj_panel-left";
@@ -68,7 +67,6 @@ static const char *ajVisualIcone(int op) {
     case AJ_HERO_TRAILER: return "aj_clapperboard";
     case AJ_FOCO_TRAILER: return "aj_clapperboard";
     case AJ_DET_TRAILER_AUTO: return "aj_clapperboard";
-    case AJ_TRAILER_ZOOM_TPK: return "aj_clapperboard";
     case AJ_DET_TRAILER: return "aj_clapperboard";
     case AJ_HERO_TRAILER_SOM: return "aj_audio-lines";
     case AJ_DET_TRAILER_SOM: return "aj_audio-lines";
@@ -140,7 +138,6 @@ static const char *ajVisualIcone(int op) {
     case AJ_ATMOS: return "aj_monitor-play";
     case AJ_PAUSA_OVERLAY: return "aj_circle-play";
     case AJ_PLR_CLASSIF: return "aj_shield";
-    case AJ_REACAO_CREDITOS: return "aj_circle-play";
     case AJ_CW_CONCLUIDO: return "aj_circle-play";
     case AJ_SAIDA_PLAYER: return "aj_circle-play";
     case AJ_SEEKR_LIGADO: return "aj_film";
@@ -151,7 +148,6 @@ static const char *ajVisualIcone(int op) {
     case AJ_IDIOMA: return "aj_languages";
     case AJ_AUD_LINGUA: return "aj_audio-lines";
     case AJ_LEG_LINGUA: case AJ_LEG_LINGUA2: case AJ_LEG_FORCADA: return "aj_captions";
-    case AJ_CACHE_SEEK: return "aj_database";
     case AJ_TAM_MAX: case AJ_TAM_MIN: return "aj_database";
     case AJ_TMDB_IDIOMA: return "aj_file-text";
     case AJ_TEMA: return "aj_palette";
@@ -163,14 +159,11 @@ static const char *ajVisualIcone(int op) {
     case AJ_TAMANHO_AJUSTES: return "aj_sliders-horizontal";
     case AJ_AVANCADAS: return "aj_eye";
     case AJ_LOGO_TRAILER: return "aj_eye-off";
-    case AJ_LEG_SYNC_AUDIO: return "aj_audio-lines";
     case AJ_LEG2_POS: case AJ_LEG2_TAMANHO: case AJ_LEG2_COR: case AJ_LEG2_FUNDO: case AJ_LEG2_BORDA: return "aj_captions";
     case AJ_ICONE_APP: return "aj_image-plus";
     case AJ_LOGO_APP: return "aj_image";
     case AJ_ABERTURA: return "aj_clapperboard";
-    case AJ_DISCORD: return "aj_message-square";
     case AJ_ANIM: return "aj_activity";
-    case AJ_ENQUETES: return "aj_bell";
     case AJ_BUSCA_CINEMETA: return "aj_list-x";
     case AJ_ESMAECER: return "aj_moon";
     case AJ_DESCANSO_ESTILO: return "aj_image";
@@ -203,15 +196,12 @@ static const char *ajVisualIcone(int op) {
     case AJ_ADDONS: return "aj_user-round";
     case AJ_PLUGINS: return "aj_puzzle";
     case AJ_ADDONS_PRINCIPAL: return "aj_user-round";
-    case AJ_PERFIL_PESQ: return "aj_user-round";
-    case AJ_PERFIL_EDITAR: return "aj_user-round";
     case AJ_SAIR: return "aj_log-out";
     case AJ_TRAKT: return "aj_plug";
     case AJ_SIMKL: return "aj_plug";
     case AJ_SALVOS_DEST: return "aj_plug";
     case AJ_CW_FONTE: return "aj_plug";
     case AJ_HIST_CONTA: return "aj_cloud";
-    case AJ_SOCIAL: return "aj_user-round";
     case AJ_DEBRID_RD: return "aj_key-round";
     case AJ_DEBRID_TB: return "aj_key-round";
     case AJ_DEBRID_PM: return "aj_key-round";
@@ -219,16 +209,6 @@ static const char *ajVisualIcone(int op) {
     case AJ_DEBRID_AD_TESTAR: return "aj_key-round";
     case AJ_MDB_CHAVE: return "aj_key-round";
     case AJ_FANART_CHAVE: return "aj_key-round";
-    case AJ_P2P_LIGADO: return "aj_user-round";
-    case AJ_P2P_URL: return "aj_user-round";
-    case AJ_P2P_TESTAR: return "aj_user-round";
-    case AJ_JF_LIGADO: return "aj_server";
-    case AJ_JF_SERVIDOR: return "aj_server";
-    case AJ_JF_ENTRAR: return "aj_log-in";
-    case AJ_JF_SAIR: return "aj_log-out";
-    case AJ_EM_SERVIDOR: case AJ_PX_SERVIDOR: return "aj_server";
-    case AJ_EM_ENTRAR: case AJ_PX_ENTRAR: return "aj_log-in";
-    case AJ_EM_SAIR: case AJ_PX_SAIR: return "aj_log-out";
     case AJ_RESOLUCAO: return "aj_monitor-play";
     case AJ_QUALIDADE_IMG: return "aj_images";
     case AJ_NAV_RAPIDA: return "aj_zap";
@@ -238,16 +218,12 @@ static const char *ajVisualIcone(int op) {
     case AJ_ESPACO: return "aj_database";
     case AJ_TEX_MB: return "aj_memory-stick";
     case AJ_GUIA: return "aj_book-open";
-    case AJ_NOVIDADES20: return "aj_sparkles";
     case AJ_APOIAR: return "aj_heart";
     case AJ_VERSAO_I: return "aj_info";
     case AJ_ATUALIZAR: return "aj_download";
     case AJ_VER_REGISTRO: return "aj_scroll-text";
     case AJ_ENVIAR_LOG: return "aj_send";
     case AJ_ENVIO_AUTO: return "aj_scroll-text";
-#if defined(NV_TPK) || defined(NV_ANDROID)
-    case AJ_GPU_EFEITOS: return "aj_zap";
-#endif
     default: return "aj_settings-2";
   }
 }

@@ -16,7 +16,7 @@ static const Item TELA[] = {
       OPC(AJ_CW_FURTHEST), OPC(AJ_CW_RETIDO_TAMBEM),
     ROT("Barra lateral"),
       OPC(AJ_RAIL_MODERNA), OPC(AJ_RAIL), OPC(AJ_MENU_EXPLORAR),
-      OPC(AJ_MENU_GUIA), OPC(AJ_MENU_AGENDA), OPC(AJ_MENU_PERFIL),
+      OPC(AJ_MENU_GUIA), OPC(AJ_MENU_PERFIL),
       OPC(AJ_RAIL_BLUR), OPC(AJ_DESCOBRIR),
     ROT("Escolha de perfil"), OPC(AJ_PS_FUNDO), OPC(AJ_PS_CONTINUAR),
 
@@ -60,9 +60,6 @@ static const Item TELA[] = {
     ROT("Som e imagem"),
       OPC(AJ_HERO_TRAILER_SOM), OPC(AJ_DET_TRAILER_SOM), OPC(AJ_TRAILER_FONTE),
       OPC(AJ_HERO_TRAILER_ESPERA), OPC(AJ_TRAILER_QUAL), OPC(AJ_TRAILER_ASPECTO),
-#ifdef NV_TPK
-      OPC(AJ_TRAILER_ZOOM_TPK),
-#endif
       OPC(AJ_LOGO_TRAILER),
 
   SEC("Aparência", "Cor, transparência, fonte, animações e relógio", "aj_palette"),
@@ -80,12 +77,10 @@ static const Item TELA[] = {
 
   SEC("Reprodução", "Qualidade, som e o que o player faz", "aj_circle-play"),
     ROT("Imagem e som"), OPC(AJ_QUALIDADE), OPC(AJ_DV),
-#if !defined(NV_TPK) && !defined(NV_ANDROID)
       OPC(AJ_DV_MKV),
-#endif
-      OPC(AJ_ATMOS), OPC(AJ_DTS_AC3), OPC(AJ_CACHE_SEEK),
+      OPC(AJ_ATMOS), OPC(AJ_DTS_AC3),
     ROT("Durante e depois"),
-      OPC(AJ_PAUSA_OVERLAY), OPC(AJ_PLR_CLASSIF), OPC(AJ_REACAO_CREDITOS), OPC(AJ_CW_CONCLUIDO), OPC(AJ_SAIDA_PLAYER),
+      OPC(AJ_PAUSA_OVERLAY), OPC(AJ_PLR_CLASSIF),  OPC(AJ_CW_CONCLUIDO), OPC(AJ_SAIDA_PLAYER),
       OPC(AJ_PROPORCAO_PADRAO), OPC(AJ_MANTER_VIDEO), OPC(AJ_BRILHO_PLAYER),
     ROT("Seekr"),
       OPC(AJ_SEEKR_LIGADO), OPC(AJ_SEEKR_CHAVE), OPC(AJ_SEEKR_TESTAR),
@@ -94,7 +89,7 @@ static const Item TELA[] = {
   // Tudo o que decide DE ONDE vem o video: os addons, a escolha da fonte e os
   // servicos que entregam o arquivo. Antes ficava espalhado entre Reproducao
   // (escolha da fonte) e Contas e servicos (addons, debrid, P2P, servidores).
-  SEC("Fontes e addons", "Addons, escolha da fonte, debrid e servidores", "aj_puzzle"),
+  SEC("Fontes e addons", "Addons, escolha da fonte e debrid", "aj_puzzle"),
     ROT("Addons"),
       OPC(AJ_ADDONS), OPC(AJ_PLUGINS), OPC(AJ_ADDONS_PRINCIPAL), OPC(AJ_BUSCA_CINEMETA),
     ROT("Escolha da fonte"),
@@ -111,24 +106,10 @@ static const Item TELA[] = {
     ROT("Debrid"),
       OPC(AJ_DEBRID_RD), OPC(AJ_DEBRID_TB), OPC(AJ_DEBRID_PM), OPC(AJ_DEBRID_AD),
       OPC(AJ_DEBRID_AD_TESTAR),
-#ifndef __EMSCRIPTEN__
     // .wgt: sem socket TCP/UDP no navegador, sem motor; P2P escondido (a8e7685d).
-    ROT("P2P"), OPC(AJ_P2P_LIGADO), OPC(AJ_P2P_URL), OPC(AJ_P2P_TESTAR),
-#endif
-    ROT("Servidores pessoais"),
-      OPC(AJ_JF_LIGADO), OPC(AJ_JF_SERVIDOR), OPC(AJ_JF_ENTRAR), OPC(AJ_JF_SAIR),
-      OPC(AJ_EM_SERVIDOR), OPC(AJ_EM_ENTRAR), OPC(AJ_EM_SAIR),
-      OPC(AJ_PX_ENTRAR), OPC(AJ_PX_SERVIDOR), OPC(AJ_PX_SAIR),
-
   SEC("Idiomas e legendas", "Idioma da interface, áudio, legenda e metadados", "aj_languages"),
     ROT("Idiomas"),
       OPC(AJ_IDIOMA), OPC(AJ_AUD_LINGUA), OPC(AJ_LEG_LINGUA), OPC(AJ_LEG_FORCADA),
-#ifdef NV_ANDROID
-      // Sincronia pelo audio (F06): so o player do Android entrega o PCM. Na LG e
-      // na Samsung a linha so diria "indisponivel nesta plataforma" (decisao do
-      // dono, 04/10).
-      OPC(AJ_LEG_SYNC_AUDIO),
-#endif
       OPC(AJ_TMDB_IDIOMA),
     ROT("Segunda legenda"),
       OPC(AJ_LEG_LINGUA2),
@@ -146,22 +127,17 @@ static const Item TELA[] = {
   SEC("Conta e perfis", "Perfil, sincronização, Trakt, Simkl e avisos", "aj_user-round"),
     ROT("Perfil"),
       OPC(AJ_PERFIL_ATIVO), OPC(AJ_SYNC),
-      OPC(AJ_PERFIL_PESQ), OPC(AJ_PERFIL_EDITAR), OPC(AJ_SAIR),
+        OPC(AJ_SAIR),
     ROT("Trakt e Simkl"),
-      OPC(AJ_TRAKT), OPC(AJ_SIMKL), OPC(AJ_SALVOS_DEST), OPC(AJ_CW_FONTE), OPC(AJ_HIST_CONTA), OPC(AJ_SOCIAL), OPC(AJ_DISCORD),
-    ROT("Notificações"), OPC(AJ_ENQUETES),
-
+      OPC(AJ_TRAKT), OPC(AJ_SIMKL), OPC(AJ_SALVOS_DEST), OPC(AJ_CW_FONTE), OPC(AJ_HIST_CONTA),
   SEC("Desempenho desta TV", "Resolução, imagens, efeitos e diagnóstico", "aj_monitor-cog"),
     OPC(AJ_RESOLUCAO), OPC(AJ_QUALIDADE_IMG),
-#if defined(NV_TPK) || defined(NV_ANDROID)
-    OPC(AJ_GPU_EFEITOS),
-#endif
     OPC(AJ_NAV_RAPIDA), OPC(AJ_MEDIDOR), OPC(AJ_DIAGNOSTICO), OPC(AJ_VELOCIDADE), OPC(AJ_ESPACO),
     OPC(AJ_TEX_MB),
 
   SEC("Sobre e ajuda", "Guia de uso, versão, atualização e registros", "aj_info"),
     OPC(AJ_GUIA),
-    OPC(AJ_NOVIDADES20),
+
     OPC(AJ_APOIAR),
     ROTS("App", ""), OPC(AJ_VERSAO_I), OPC(AJ_ATUALIZAR), OPC(AJ_AVANCADAS),
     ROTS("Registro", "para quem faz o app"),
@@ -178,7 +154,7 @@ static const char *SECAO_AJUDA[] = {
   "Configuração dos trailers no destaque, no cartaz em foco e na página do título.",
   "Cor de destaque, transparência, tipografia, animações e relógio na tela.",
   "Qualidade máxima, Dolby Vision e Atmos, e o que acontece durante e depois do vídeo.",
-  "Addons e plugins, como a fonte é escolhida, debrid, P2P e servidores pessoais.",
+  "Addons e plugins, como a fonte é escolhida e debrid.",
   "Idioma da interface, preferências de áudio e legenda e idioma dos metadados.",
   "Conexão dos provedores e diagnóstico de reprodução de canais ao vivo.",
   "Perfil desta TV, sincronização, Trakt, Simkl e notificações.",
@@ -214,7 +190,7 @@ static int uxAvancada(int op) {
     case AJ_SELOS_PACOTE: case AJ_SELOS_PACOTE_ADD: case AJ_SELOS_PACOTE_REM:
     case AJ_VIDRO_OPAC: case AJ_VIDRO_FOSCO:
     case AJ_LIVETV_FORMATO: case AJ_LIVETV_MODO: case AJ_LIVETV_PROXY:
-    case AJ_P2P_LIGADO: case AJ_P2P_URL: case AJ_P2P_TESTAR:
+
     case AJ_TEX_MB:
     case AJ_SEEKR_AJUSTE:
     case AJ_MANTER_VIDEO:

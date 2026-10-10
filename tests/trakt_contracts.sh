@@ -6,9 +6,8 @@ trap 'rm -rf "$dir"' EXIT
 flags=()
 if [ "${SANITIZE:-0}" = 1 ]; then flags+=(-fsanitize=address,undefined -fno-omit-frame-pointer); fi
 stripflag=(-Wl,--gc-sections)
-if [ "$(uname -s)" = Darwin ]; then stripflag=(-Wl,-dead_strip); fi
 cc ${flags[@]+"${flags[@]}"} src/trakt.c tests/stub_fichameta.c tests/trakt_contracts.c \
-  -Isrc -I/opt/homebrew/include -I/opt/homebrew/include/SDL2 \
+  -Isrc -DNV_LINUX_DESKTOP $(pkg-config --cflags sdl2 SDL2_image SDL2_ttf)  \
   -o "$dir/teste" -O1 -g -Wall -Wextra -ffunction-sections -fdata-sections \
   "${stripflag[@]}" -lpthread
 "$dir/teste"

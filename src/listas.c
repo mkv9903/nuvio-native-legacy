@@ -58,7 +58,7 @@ const char *lst_arquivo(void) {
 
 // Campo de TSV: tabulacao e quebra viram espaco. Um titulo de lista com
 // tabulacao dentro parte a linha em duas e a leitura seguinte pega lixo — a
-// mesma guarda que agenda.c ja tem.
+// isto preserva os limites dos campos no arquivo.
 static void limpo(char *dst, size_t tam, const char *s) {
   size_t i = 0;
   if (!tam) return;

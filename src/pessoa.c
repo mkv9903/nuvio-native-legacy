@@ -168,7 +168,6 @@ void pessoa_pedir(long tmdbId, const char *nomeConhecido, const char *fotoConhec
   else pthread_detach(fio);
 }
 
-int  pessoa_pronta(void)     { return pronta; }
 const char *pessoa_nome(void){ return nome; }
 const char *pessoa_foto(void){ return foto; }
 const char *pessoa_bio(void) { return bio; }

@@ -15,7 +15,7 @@ ROOT=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
 cd "$ROOT"
 
 cc -fsyntax-only src/detail.c \
-  -Isrc -I/opt/homebrew/include -I/opt/homebrew/include/SDL2 \
+  -Isrc -DNV_LINUX_DESKTOP $(pkg-config --cflags sdl2 SDL2_image SDL2_ttf)  \
   -Wno-deprecated-declarations -Wno-macro-redefined
 
 # Ninguem le a fileira com a coluna crua. As duas formas abaixo sao exatamente
@@ -76,14 +76,14 @@ rg -q 'alvo = foco\.colunaLembrada\[r\];' src/detail.c
 # estado de uma serie que ninguem avaliou. Duas coisas diferentes com o mesmo
 # desenho, e o card convidava a abrir o que nao existe.
 #
-# A fonte tem de continuar sendo a agenda do TMDB, que ja vem no corpo que a
+# A fonte tem de continuar sendo a metadados do TMDB, que ja vem no corpo que a
 # pagina baixa. Qualquer tentativa de deduzir pela DATA do episodio volta a
 # esbarrar no CatEp.data, que chega formatado por extenso e passa por i18n.
 rg -q 'static int epNaoExibido\(const CatEp \*ep\)' src/detail.c
-rg -q 'extras_agenda_temporada\(\).*extras_agenda_episodio\(\)' src/detail.c
-# SEM AGENDA NAO SE AFIRMA NADA: 0 e "nao sabemos", e ai o episodio e comum.
+rg -q 'extras_next_episode_season\(\).*extras_next_episode_number\(\)' src/detail.c
+# SEM METADADOS NAO SE AFIRMA NADA: 0 e "nao sabemos", e ai o episodio e comum.
 if ! rg -q 'if \(!ep \|\| t <= 0 \|\| e <= 0\) return 0;' src/detail.c; then
-  echo 'detail: epNaoExibido afirma "nao exibido" sem a agenda do TMDB' >&2
+  echo 'detail: epNaoExibido afirma "nao exibido" sem a metadados do TMDB' >&2
   exit 1
 fi
 

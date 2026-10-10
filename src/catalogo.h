@@ -413,7 +413,6 @@ typedef struct {
   int estado;
   // Social-only account generation captured BEFORE fetching its source data.
   // Metadata/progress revisions never make an old account row current.
-  unsigned socialGeracao;
 } CatFileira;
 
 int cat_n_fileiras(void);
@@ -472,7 +471,6 @@ void cat_atualizar_item(int indice, const CatItem *novo);
 // o Xperience so oferece "More Like X" para os titulos recentes do dono, nao
 // para um qualquer. Cruzar genero dentro do catalogo que ja esta carregado
 // responde na hora, sem rede, e acerta o suficiente para a fileira valer.
-int           cat_similares(int indice, int *saida, int max);
 
 // Quantas vezes o catalogo INTEIRO foi trocado. Muda => todo indice guardado
 // fora daqui deixou de valer, e as faixas de episodio foram zeradas.

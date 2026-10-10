@@ -245,7 +245,7 @@ int net_request(const NetRequest *p, NetResponse *r) {
   const char *method;
   const void *body;
   size_t n_body;
-  char url[4096], origin[300], personal_origin[300];
+  char url[4096], origin[300];
   int tls, headers_allowed = 1, hop, ok = 0;
   if (!r) return 0;
   memset(r, 0, sizeof *r); memset(&c, 0, sizeof c);
@@ -264,8 +264,6 @@ int net_request(const NetRequest *p, NetResponse *r) {
       !req_headers_valid(p->headers, c.hdr_ceiling)) {
     r->error = NET_INPUT; return 0;
   }
-  /* `origin` follows redirects; the personal-server origin is the first one. */
-  memcpy(personal_origin, origin, sizeof personal_origin);
   net_job_retain(p->job);
   c.start = net_now_ms();
   c.deadline = c.start + (p->timeout_ms ? p->timeout_ms : 15000);
@@ -300,13 +298,8 @@ int net_request(const NetRequest *p, NetResponse *r) {
     REQ_OPT(OPT_TIMEOUT_MS, (long)(c.deadline - now));
     REQ_OPT(OPT_CONNECTTIMEOUT_MS, (long)(c.deadline - now));
     REQ_OPT(OPT_NOSIGNAL, 1L);
-    { /* #290: personal server only on the same origin (see tls_personal in net.h). */
-      char here[300];
-      int tls_here = 0, is_personal = p->tls_personal &&
-        req_origin(url, here, sizeof here, &tls_here) && tls_here && !strcmp(here, personal_origin);
-      REQ_OPT(OPT_SSL_VERIFYPEER, is_personal ? 0L : 1L);
-      REQ_OPT(OPT_SSL_VERIFYHOST, is_personal ? 0L : 2L);
-    }
+    REQ_OPT(OPT_SSL_VERIFYPEER, 1L);
+    REQ_OPT(OPT_SSL_VERIFYHOST, 2L);
     if (p->ca_file) REQ_OPT(OPT_CAINFO, p->ca_file);
     REQ_OPT(OPT_USERAGENT, "Nuvio/1.8");
     /* Media diagnostics measure the player's wire body, without transparent

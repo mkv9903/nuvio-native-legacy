@@ -72,7 +72,7 @@ int  vistoep_temporada(const char *imdb, int temporada, VistoPar *saida, int max
 // MAPA e do CATALOGO juntos, sem repetir. O mapa sozinho so enumera a serie
 // quando o Trakt respondeu; sem Trakt ele so tem o que ja foi visto, e a
 // temporada inteira era "0 episodios". `cat` sao os episodios que o catalogo
-// lista. (agT, agE) e o proximo episodio a ir ao ar (agenda do TMDB; 0 = nao
+// lista. (agT, agE) e o proximo episodio a ir ao ar (metadados do TMDB; 0 = nao
 // se sabe): dele em diante nada entra. Temporada 0 do catalogo fica fora do
 // "ate aqui" (especial so entra se o mapa trouxer). `saida` nula conta.
 // Teto de 256 por lote.

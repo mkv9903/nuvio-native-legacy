@@ -109,7 +109,6 @@ int  epg_janela(int epg, time_t *ini, time_t *fim);
 int  epg_janela_total(time_t *ini, time_t *fim);
 
 // Quantos programas a grade retem para o canal (para dimensionar buffers).
-int  epg_total(int epg);
 
 // Programas do canal que TOCAM o intervalo [de, ate) — fim > de e ini < ate —
 // em ordem de inicio. Escreve no maximo `cap` em `out` (out pode ser NULL com

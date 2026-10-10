@@ -23,7 +23,8 @@
 #include "buscanorm.h"
 
 typedef struct { const char *titulo, *icone, *sub; } GuiaCap;
-enum { GT_NADA = 0, GT_GUIA_TV, GT_BIBLIOTECA, GT_AGENDA, GT_EXPLORAR, GT_PERFIL };
+enum { GT_NADA = 0, GT_GUIA_TV = AJ_TELA_GUIA_TV, GT_BIBLIOTECA = AJ_TELA_BIBLIOTECA,
+       GT_EXPLORAR = AJ_TELA_EXPLORAR, GT_PERFIL = AJ_TELA_PERFIL };
 enum { GX_NADA = 0, GX_N180_FONTES, GX_N180_ILHA, GX_N170_ILHA, GX_N170_SPOT };
 enum { GV_NADA = 0, GV_GUIA, GV_LAYOUTS, GV_FILEIRAS, GV_FONTES, GV_ILHA, GV_ASS, GV_VIDRO,
        GV_N170_SPOT, GV_N170_ILHA };
@@ -47,7 +48,7 @@ static const char *const GUIA_CAP_TXT[GUIA_NCAPS] = {
   "Da folha de Fontes ao player: como o app escolhe o que tocar e o que dá para mudar.",
   "Legendas, áudio e o idioma do app e do conteúdo.",
   "A pílula do canto da tela, os avisos que saem dela e a central onde eles ficam.",
-  "O que você guarda, as listas da conta e dos serviços, a agenda das séries e o Explorar.",
+  "O que você guarda, as listas da conta e dos serviços e o Explorar.",
   "Amigos no Nuvio, quem pode te encontrar, Trakt e Simkl, perfis e addons.",
   "O Guia de TV, os canais dos addons e do seu provedor, e o que fazer quando um canal não abre.",
   "Vidro ou sólido, a cor de destaque, a fonte e os cartazes.",
@@ -59,18 +60,17 @@ static const char *const GUIA_CAP_TXT[GUIA_NCAPS] = {
 #define GI_BUSCA 0
 #define GI_NOVO  1
 #define GI_CAP0  2
-enum { GC_INDICE = 0, GC_LISTA, GC_BOTOES, GC_CHIP };
+enum { GC_INDICE = 0, GC_LISTA, GC_BOTOES };
 typedef struct {
   int idx;      // item do indice (GI_*), capitulo = idx - GI_CAP0
   int col;      // GC_*
   int ent;      // entrada em foco (indice em GUIA_ENT), -1 sem
   int botao;    // botao do inspetor em foco
-  int daNov;    // aberto pelo cartao da 1.8.0
   int rotulos;  // miniatura do proprio guia com os rotulos de anatomia
 } GuiaVista;
 static int guiaExemplo;
 static float guiaExT, guiaRol, guiaRolAlvo, guiaRolV;
-static GuiaVista gv = { GI_CAP0, GC_INDICE, -1, 0, 0, 0 };
+static GuiaVista gv = { GI_CAP0, GC_INDICE, -1, 0, 0 };
 static GfxMini guiaMiniVis, guiaMiniEx;
 static int guiaDesenhandoMini;   // dentro da miniatura do proprio guia: sem FBO aninhado
 static int pediuTela;
@@ -117,7 +117,6 @@ static const char *guiaRotTela(int t) {
   switch (t) {
     case GT_GUIA_TV: return "Abrir o Guia de TV";
     case GT_BIBLIOTECA: return "Abrir a Biblioteca";
-    case GT_AGENDA: return "Abrir a Agenda";
     case GT_EXPLORAR: return "Abrir o Explorar";
     case GT_PERFIL: return "Abrir Perfil e Stats";
     default: return "";
@@ -127,20 +126,17 @@ static const char *guiaIcTela(int t) {
   switch (t) {
     case GT_GUIA_TV: return "aj_tv-minimal-play";
     case GT_BIBLIOTECA: return "aj_library";
-    case GT_AGENDA: return "aj_calendar";
     case GT_EXPLORAR: return "aj_telescope";
     default: return "aj_chart-column";
   }
 }
 
-static void guiaAbrir(int daNov) {
+static void guiaAbrir(void) {
   guiaAberto = 1;
   guiaExemplo = 0;
   memset(&gv, 0, sizeof gv);
-  gv.daNov = daNov;
   gv.idx = GI_CAP0;
-  if (daNov) { gv.col = GC_LISTA; gv.ent = guiaPrimeira(GI_CAP0); }
-  else { gv.col = GC_INDICE; gv.ent = -1; }
+  gv.col = GC_INDICE; gv.ent = -1;
   guiaRol = guiaRolAlvo = guiaRolV = 0;
 }
 static void guiaFechar(void) {
@@ -425,9 +421,7 @@ static void guiaCenaIlha(void) {
   { float x = c.x + 40, y = c.y + c.h - 34 - 60;
     x += ajBotao("Reconectar", NULL, x, y, 1, 1) + 12;
     ajBotao("Depois", NULL, x, y, 0, 1); }
-  snprintf(b, sizeof b, "%s", i18n("%s quer ser seu amigo"));
-  p = strstr(b, "%s");
-  if (p) { *p = 0; guiaPilulaIlha(560, "aj_users", ar, ag, ab, b, "Marina", p + 2, 1); }
+
 }
 // Um quadro de video com uma legenda ASS: letreiro no topo, duas falas embaixo.
 static void guiaTextoContorno(TxtEstilo e, int enf, const char *s, int r, int g, int b, float cx, float y, int esp, float track) {
@@ -490,7 +484,7 @@ static void guiaDesenharTela(const GuiaVista *v, float a);
 // O proprio guia em miniatura (Home e fileiras, "Três layouts da Home" em
 // foco), com os rotulos de anatomia quando pedidos.
 static void guiaCenaGuia(int rotulos) {
-  GuiaVista m = { GI_CAP0 + 1, GC_LISTA, -1, 0, 0, 0 };
+  GuiaVista m = { GI_CAP0 + 1, GC_LISTA, -1, 0, 0 };
   int i;
   for (i = 0; i < GUIA_NENT; i++) if (!strcmp(GUIA_ENT[i].id, "h-layout")) m.ent = i;
   { int arte = ajArteFundoN; ajArteFundoN = 12;
@@ -522,7 +516,7 @@ static int guiaMiniCena(GfxMini *m, int tipo, int ent, GfxRect r, float x0, floa
   gfx_mini_comecar(m, x0, y0, esc);
   gfx_cor((GfxRect){ x0, y0, r.w / esc, r.h / esc }, 0, 0.047f, 0.051f, 0.063f, 1);
   switch (tipo) {
-    case GV_GUIA: guiaCenaGuia(gv.daNov || ent >= 0); break;
+    case GV_GUIA: guiaCenaGuia(ent >= 0); break;
     case GV_FONTES: guiaCenaFontes(); break;
     case GV_ILHA: guiaCenaIlha(); break;
     case GV_ASS: guiaCenaASS(); break;
@@ -657,16 +651,10 @@ static void guiaDesenharLista(const GuiaVista *v, float a) {
     snprintf(sub, sizeof sub, i18n("%d recursos novos ou que mudaram nesta versão"), guiaNovos());
   } else {
     int c = v->idx >= GI_CAP0 ? v->idx - GI_CAP0 : 0;
-    if (v->daNov) snprintf(kick, sizeof kick, "%s › %s", i18n("Novidades da 1.8.0"), i18n("Guia de uso"));
-    else snprintf(kick, sizeof kick, i18n("Guia de uso · Capítulo %d de %d"), c + 1, GUIA_NCAPS);
+
+    snprintf(kick, sizeof kick, i18n("Guia de uso · Capítulo %d de %d"), c + 1, GUIA_NCAPS);
     snprintf(tit, sizeof tit, "%s", GUIA_CAPS[c].titulo);
     snprintf(sub, sizeof sub, "%s", GUIA_CAPS[c].sub);
-  }
-  if (v->daNov) {
-    TxtLinha t = ajTxt(TXT_AJ_SEG, "Voltar às novidades");
-    float cw = 22 + 20 + 10 + t.w + 22;
-    ajChip("Voltar às novidades", "aj_corner-up-left", fr.x + fr.w - 30 - cw, fr.y + 34, v->col == GC_CHIP, a);
-    reserva = cw + 20;
   }
   topo = ajCabecalhoFolha(fr, kick, tit, sub, reserva, a) - 0.0f;
   topo = fr.y + 155.6f;
@@ -745,10 +733,6 @@ static void guiaDesenharInspetor(const GuiaVista *v, float a) {
     ajCaps(TXT_AJ_CAPS13, "Onde fica", 1.82f, x, y, 0.45f * a);
     y += 16 + 8;
     y += guiaTrilha(g->onde, x, y, w, a) - 8;
-    if (v->daNov && !strcmp(g->id, "c-guia")) {
-      y += 18;
-      y += ajEf("aj_corner-up-left", i18n("Voltar fecha o guia e devolve ao cartão das Novidades da 1.8.0. Depois, o guia fica em Ajustes › Sobre e ajuda › Guia de uso."), x, y, w, a);
-    }
     if (nb) {
       float bx = x;
       y += 20;
@@ -768,7 +752,7 @@ static void guiaDesenharInspetor(const GuiaVista *v, float a) {
       if (nb) d[nd++] = (AjDica){ "→", "Botões" };
       d[nd++] = (AjDica){ "←", "Capítulos" };
     }
-    d[nd++] = (AjDica){ "Voltar", v->daNov ? "Novidades da 1.8.0" : "Ajustes" };
+    d[nd++] = (AjDica){ "Voltar", "Ajustes" };
   } else if (v->idx >= GI_CAP0) {
     int c = v->idx - GI_CAP0;
     char k[64], q[16], q2[16];
@@ -795,7 +779,7 @@ static void guiaDesenharInspetor(const GuiaVista *v, float a) {
     y += ajMeta(i18n("Novo na 1.8.0"), q2, x, y, w, a);
     d[nd++] = (AjDica){ "→", "Recursos" };
     d[nd++] = (AjDica){ "↑ ↓", "Capítulos" };
-    d[nd++] = (AjDica){ "Voltar", v->daNov ? "Novidades da 1.8.0" : "Ajustes" };
+    d[nd++] = (AjDica){ "Voltar", "Ajustes" };
   } else {
     // "Buscar no guia" e "Novo na 1.8.0" com o foco no indice.
     int novo = v->idx == GI_NOVO;
@@ -811,14 +795,13 @@ static void guiaDesenharInspetor(const GuiaVista *v, float a) {
     y += ajBloco(TXT_AJ_SUB, t, x, y, w, 28.5f, 0.66f * a, 5);
     d[nd++] = (AjDica){ "OK", novo ? "Abrir" : "Buscar" };
     d[nd++] = (AjDica){ "↑ ↓", "Capítulos" };
-    d[nd++] = (AjDica){ "Voltar", v->daNov ? "Novidades da 1.8.0" : "Ajustes" };
+    d[nd++] = (AjDica){ "Voltar", "Ajustes" };
   }
   guiaDicas(d, nd, ir, a);
 }
 
 // "Ver exemplo": a cena das Novidades viva, numa ilha por cima do guia.
 static void guiaDesenharExemplo(void) {
-  int c = guiaExemplo;
   float esc, cw, ch;
   GfxRect m, pv;
   const char *tit = gv.ent >= 0 ? GUIA_ENT[gv.ent].titulo : "";
@@ -868,37 +851,6 @@ static void guiaAtualizar(float dt) {
 }
 
 // --- O MESMO GUIA NO INSPETOR DE AJUSTES (a linha "Guia de uso") -------------------------
-static void guiaInspetorAjustes(GfxRect ir) {
-  float x = ir.x + 32, w = ir.w - 64, y = ir.y + 32;
-  int c;
-  char q[64], q2[64];
-  AjDica d[3] = { { "OK", "Abrir" }, { "↑ ↓", "Navegar" }, { "←", "Categorias" } };
-  guiaMiniCena(&guiaMiniVis, GV_GUIA, -1, (GfxRect){ x, y, w, w * 9.0f / 16.0f }, 0, 0, w / 1920.0f, 22, 0);
-  y += w * 9.0f / 16.0f;
-  x += 6.0f; w -= 12.0f;
-  y += 26.0f;
-  ajIcone("aj_book-open-text", x, y - 1, 20, 0.45f);
-  ajCaps(TXT_MINI, "Abre uma tela", 2.1f, x + 30, y, 0.45f);
-  y += 28.0f;
-  y += ajBloco(TXT_AJ_INSP, "Guia de uso", x, y, w, 38.4f, 1, 2);
-  y += 12.0f;
-  y += ajBloco(TXT_AJ_SUB, ajudaOpcao(AJ_GUIA), x, y, w, 28.5f, 0.62f, 7);
-  y += 18.0f;
-  snprintf(q, sizeof q, i18n("%d em %d capítulos"), GUIA_NENT, GUIA_NCAPS);
-  snprintf(q2, sizeof q2, i18n("%d recursos"), guiaNovos());
-  y += ajMeta(i18n("Recursos"), q, x, y, w, 1);
-  y += ajMeta(i18n("Novo na 1.8.0"), q2, x, y, w, 1);
-  y += 22.0f;
-  ajKicker("Capítulos", x, y + 1, 1);
-  y += 29.0f;
-  for (c = 0; c < GUIA_NCAPS; c++) {
-    float cx = x + (c % 2) * (w * 0.5f + 9), cy = y + (c / 2) * 42.0f;
-    TxtLinha t = ajTxtC(TXT_ILHA_GENERO, GUIA_CAPS[c].titulo, w * 0.5f - 40);
-    ajIcone(GUIA_CAPS[c].icone, cx, cy + 8.5f, 19, 0.45f);
-    txt_desenhar_alpha(t, cx + 29, cy + (36 - t.h) * 0.5f, 0.7f);
-  }
-  ajDicas(d, 3, ir.x + 32, ir.y + ir.h - 32.0f, ir.w - 64, 1);
-}
 
 // --- TECLAS ---------------------------------------------------------------------------
 static void guiaAgir(int b) {
@@ -916,7 +868,6 @@ static void guiaMoverEnt(int d) {
   int l[GUIA_NENT + GUIA_NCAPS], n = guiaLista(gv.idx, l), i, at = -1;
   for (i = 0; i < n; i++) if (l[i] == gv.ent) at = i;
   for (i = at + d; i >= 0 && i < n; i += d) if (l[i] >= 0) { gv.ent = l[i]; return; }
-  if (d < 0 && gv.daNov) gv.col = GC_CHIP;   // acima da primeira: o chip "Voltar às novidades"
 }
 static void guiaEvento(const SDL_Event *e) {
   SDL_Keycode k;
@@ -934,11 +885,6 @@ static void guiaEvento(const SDL_Event *e) {
       else if ((k == SDLK_RIGHT || ok) && gv.idx != GI_BUSCA) {
         gv.col = GC_LISTA; gv.ent = guiaPrimeira(gv.idx); guiaRol = guiaRolV = 0;
       }
-      break;
-    case GC_CHIP:
-      if (ok) { guiaSair(); return; }
-      if (k == SDLK_DOWN) gv.col = GC_LISTA;
-      else if (k == SDLK_LEFT) gv.col = GC_INDICE;
       break;
     case GC_LISTA: {
       int bs[3], nb = guiaBotoes(gv.ent, bs);
@@ -997,7 +943,7 @@ void ajustes_guia_imagem(int e, float x, float y, float w, float h) {
 // Abre o guia ja na entrada `e` (o OK num resultado do Spotlight).
 void ajustes_guia_ir(int e) {
   if (e < 0 || e >= GUIA_NENT) return;
-  if (!guiaAberto) guiaAbrir(0);
+  if (!guiaAberto) guiaAbrir();
   gv.idx = GI_CAP0 + GUIA_ENT[e].cap;
   gv.col = GC_LISTA;
   gv.ent = e;

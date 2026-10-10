@@ -10,6 +10,6 @@ trap 'rm -f "$bin"' EXIT
 flags=()
 if [ "${SANITIZE:-0}" = 1 ]; then flags+=(-fsanitize=address,undefined -fno-omit-frame-pointer); fi
 cc tests/ponteiro.c src/pointer.c -Isrc -DNV_LINUX_DESKTOP -o "$bin" -Wall -Wextra \
-  -I/opt/homebrew/include -I/opt/homebrew/include/SDL2 \
+  -DNV_LINUX_DESKTOP $(pkg-config --cflags sdl2 SDL2_image SDL2_ttf)  \
   -Wno-deprecated-declarations -Wno-macro-redefined -lm ${flags[@]+"${flags[@]}"}
 "$bin"

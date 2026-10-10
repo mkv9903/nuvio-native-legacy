@@ -13,11 +13,6 @@ void streamfitpassiva_permitir(uint64_t geracao) {
   permitida = geracao;
   pthread_mutex_unlock(&trava);
 }
-uint64_t streamfitpassiva_permitida(void) {
-  uint64_t g;
-  pthread_mutex_lock(&trava); g = permitida; pthread_mutex_unlock(&trava);
-  return g;
-}
 
 int streamfitpassiva_receber(uint64_t rede, uint64_t geracao, const char *origem,
                              const int *kbps, int n, uint64_t fimMs) {
@@ -42,26 +37,3 @@ int streamfitpassiva_receber(uint64_t rede, uint64_t geracao, const char *origem
   fflush(stdout);
   return aceitos;
 }
-
-#ifdef NV_ANDROID
-#include <jni.h>
-JNIEXPORT void JNICALL
-Java_space_nuvio_nativelegacy_NvPlayer_nativeFitPassiva(JNIEnv *env, jclass cls,
-    jlong rede, jint geracao, jstring origem, jintArray kbps, jlong fimMs) {
-  char o[STREAMFIT_HOST_MAX + 16];
-  int v[STREAMFIT_AMOSTRAS_MAX];
-  jsize n;
-  const char *u;
-  (void)cls;
-  if (!origem || !kbps || rede <= 0 || geracao <= 0 || fimMs <= 0) return;
-  n = (*env)->GetArrayLength(env, kbps);
-  if (n < 5 || n > STREAMFIT_AMOSTRAS_MAX) return;
-  (*env)->GetIntArrayRegion(env, kbps, 0, n, (jint *)v);
-  if ((*env)->ExceptionCheck(env)) { (*env)->ExceptionClear(env); return; }
-  u = (*env)->GetStringUTFChars(env, origem, NULL);
-  if (!u) return;
-  snprintf(o, sizeof o, "%s", u);
-  (*env)->ReleaseStringUTFChars(env, origem, u);
-  streamfitpassiva_receber((uint64_t)rede, (uint64_t)(unsigned)geracao, o, v, (int)n, (uint64_t)fimMs);
-}
-#endif

@@ -111,7 +111,7 @@ static TgEp    epsBuf[1024];
 
 const TgDados *tgraf_dados(int idx) {
   const CatItem *ci = cat_item(idx);
-  int agT = extras_agenda_temporada(), agE = extras_agenda_episodio();
+  int agT = extras_next_episode_season(), agE = extras_next_episode_number();
   int n = cat_n_episodios(idx), i, k = 0, sabe;
   if (!ci || !ci->imdb[0] || n < 1) {
     memset(&dados, 0, sizeof dados);

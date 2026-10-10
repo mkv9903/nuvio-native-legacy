@@ -628,7 +628,7 @@ void ctx_abrir_salvo(const CatItem *titulo) {
   abrirComum(-1);
 }
 
-void ctx_abrir_social(const CatItem *titulo, const CtxExtra *ex, int n) {
+void ctx_abrir_extras(const CatItem *titulo, const CtxExtra *ex, int n) {
   int k;
   if (holdCancelado) { holdCancelado = 0; holdPronto = 0; return; }
   if (!titulo || (!titulo->imdb[0] && n < 1)) return;

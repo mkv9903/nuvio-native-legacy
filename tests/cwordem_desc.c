@@ -10,7 +10,6 @@
 // o caso de um primeiro arranque — a remocao e o que este teste cobra.
 #include "../src/homeestado.h"
 unsigned homeestado_geracao(void) { return 1; }
-unsigned recomenda_geracao(void) { return 1; }
 int homeestado_contexto_valido(void) { return 0; }
 int homeestado_tem_fileira(const char *chave) { (void)chave; return 0; }
 int homeestado_ordem_fileira(const char *chave) { (void)chave; return -1; }
@@ -19,7 +18,6 @@ int homeestado_identidade_geracao(unsigned g, char *dono, unsigned tamDono, int 
   (void)g; if (dono && tamDono) dono[0] = 0; if (perfil) *perfil = 0; return 0; }
 int arte_reserva_episodios(const char *imdb, const char *corpo) { (void)imdb; (void)corpo; return 0; }
 
-int ajustes_social(void) { return 1; }
 int ajustes_hist_conta(void) { return 1; }
 int ajustes_busca_cinemeta(void) { return 1; }
 int ajustes_itens_fileira(void) { return 18; }
@@ -97,7 +95,6 @@ int   ajustes_salvos_no_simkl(void)        { return 0; }
 // anota a estreia e descarta a serie que acabou (ver CONTA abaixo).
 int   trakt_enfeitar_lote(CatItem *s, int n);
 int   trakt_lista(const char *q, CatItem *s, int m) { (void)q; (void)s; (void)m; return 0; }
-// O servico social proprio (recomenda.c) fica fora deste teste: a uniao e so o que o Trakt trouxe.
 const char *nuvem_trakt_cliente(void)      { return ""; }
 int   addons_n(void)                       { return 0; }
 const char *addons_base(int i)             { (void)i; return ""; }

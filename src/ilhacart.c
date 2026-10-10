@@ -1,10 +1,7 @@
 // Cartoes da ilha — ver ilhacart.h.
 #include "ilhacart.h"
-#include "avisodisp.h"
 #include "ilha.h"
-#include "agenda.h"
 #include "ajustes.h"
-#include "avisos.h"
 #include "catalogo.h"
 #include "home.h"
 #include "idioma.h"
@@ -15,11 +12,10 @@
 #include <time.h>
 
 #define VIVO_OCIOSO_MS (30u * 60u * 1000u)
-#define ESTREIA_SONDA_MS 1000u
 
-static IlhaCartao vivo, estreia;
-static int temVivo, temEstreia;
-static Uint32 ultimaTecla, ultimaSonda;
+static IlhaCartao vivo;
+static int temVivo;
+static Uint32 ultimaTecla;
 static unsigned vivoSeq;
 static char vivoConta[96];
 static int vivoPerfil;
@@ -103,73 +99,18 @@ void ilhacart_player_saiu(int indice, double posSeg, double durSeg, int t, int e
 
 void ilhacart_tecla(Uint32 agora) { ultimaTecla = agora; }
 
-void ilhacart_dispensar(int qual) {
-  if (qual == ILHA_VIVO) { temVivo = 0; ilha_cartao(ILHA_VIVO, NULL); return; }
-  // "Dispensar" (06/10): o episodio sai da lista de Avisos e nao volta, nem
-  // depois de reiniciar (avisodisp.h). O lembrete da serie continua ligado.
-  if (temEstreia) avisos_dispensar(estreia.avisoId);
-  temEstreia = 0;
-  ilha_cartao(ILHA_ESTREIA, NULL);
-}
-
-void ilhacart_adiar(int qual) {
-  if (qual != ILHA_ESTREIA) { ilhacart_dispensar(qual); return; }
-  // "Depois": so nesta sessao. avisos_estreia_pendente pula o adiado, entao a
-  // proxima sonda nao o repoe; o item fica nao lido na lista.
-  if (temEstreia) avisodisp_sessao_por(estreia.avisoId);
-  temEstreia = 0;
-  ilha_cartao(ILHA_ESTREIA, NULL);
-}
-
-static void montarEstreia(const char *id, const char *imdb) {
-  const AgItem *ag = agenda_registro(imdb);
-  int idx = cat_indice_por_imdb(imdb);
-  const CatItem *ci = idx >= 0 ? cat_item(idx) : NULL;
-  memset(&estreia, 0, sizeof estreia);
-  snprintf(estreia.avisoId, sizeof estreia.avisoId, "%s", id);
-  snprintf(estreia.imdb, sizeof estreia.imdb, "%s", imdb);
-  estreia.progresso = -1.0f;
-  if (ci) doTitulo(ci, &estreia);
-  estreia.serie = 1;
-  // O registro da agenda vale ate a proxima escrita: copiado aqui, na hora.
-  if (ag) {
-    if (!estreia.titulo[0]) snprintf(estreia.titulo, sizeof estreia.titulo, "%s", ag->titulo);
-    if (!estreia.poster[0]) snprintf(estreia.poster, sizeof estreia.poster, "%s", ag->poster);
-    estreia.t = ag->temporada; estreia.e = ag->episodio;
-    snprintf(estreia.epNome, sizeof estreia.epNome, "%s", ag->nomeEp);
-    snprintf(estreia.sinopse, sizeof estreia.sinopse, "%s", ag->sinopse);
-    if (agenda_dias(ag->dataProx) == 0)
-      snprintf(estreia.quando, sizeof estreia.quando, "%s", i18n("hoje"));
-  }
-  if (idx >= 0 && estreia.t > 0 && estreia.e > 0) doEpisodio(idx, estreia.t, estreia.e, &estreia);
-  if (!estreia.arte[0] && ci) snprintf(estreia.arte, sizeof estreia.arte, "%s", ci->backdrop);
-  if (!estreia.sinopse[0] && ci) snprintf(estreia.sinopse, sizeof estreia.sinopse, "%s", ci->sinopse);
-  snprintf(estreia.chave, sizeof estreia.chave, "estreia:%s", id);
-}
-
-void ilhacart_atualizar(Uint32 agora, const char *imdbAberto) {
+void ilhacart_atualizar(Uint32 agora) {
   ilhacart_validar_identidade();
   if (temVivo && agora - ultimaTecla > VIVO_OCIOSO_MS) {
     printf("[ilha] atividade ao vivo saiu: 30 min sem tecla\n");
     temVivo = 0;
     ilha_cartao(ILHA_VIVO, NULL);
   }
-  if (ultimaSonda && agora - ultimaSonda < ESTREIA_SONDA_MS) return;
-  ultimaSonda = agora ? agora : 1;
-  { char id[72], imdb[64];
-    int ha = ajustes_relogio_ligado() && avisos_estreia_pendente(id, sizeof id, imdb, sizeof imdb);
-    // A PAGINA DO TITULO ABERTA E "VI": o aviso ja cumpriu o papel.
-    if (ha && imdbAberto && !strcmp(imdbAberto, imdb)) {
-      avisos_marcar_visto(id);
-      ha = 0;
-    }
-    if (!ha) {
-      if (temEstreia) { temEstreia = 0; ilha_cartao(ILHA_ESTREIA, NULL); }
-      return;
-    }
-    // Remonta a cada sonda: o catalogo ou a lista de episodios podem ter
-    // chegado depois (logo, still). A chave so muda se o aviso mudar.
-    montarEstreia(id, imdb);
-    temEstreia = 1;
-    ilha_cartao(ILHA_ESTREIA, &estreia); }
+
+}
+
+void ilhacart_dispensar(int qual) {
+  if (qual != ILHA_VIVO) return;
+  temVivo = 0;
+  ilha_cartao(ILHA_VIVO, NULL);
 }

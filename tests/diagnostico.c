@@ -35,33 +35,6 @@ static void tabela(void) {
   assert(p.texMb == 128 && p.fiosRede == 4 && p.heroiLarg == 1920);
   ptv_padrao(PTV_LG, 1024, &p);
   assert(p.texMb == 48 && p.fiosRede == 2 && p.heroiLarg == 1280);
-  // Tizen: deviceMemory; o teto e o proprio automatico.
-  assert(ptv_tex_auto_mb(PTV_TIZEN, 0) == 96);
-  assert(ptv_tex_auto_mb(PTV_TIZEN, 1024) == 64);
-  assert(ptv_tex_auto_mb(PTV_TIZEN, 2048) == 96);
-  assert(ptv_tex_auto_mb(PTV_TIZEN, 4096) == 128);
-  ptv_padrao(PTV_TIZEN, 2048, &p);
-  assert(p.texMb == 96 && p.fiosRede == 2 && p.heroiLarg == 1280);
-  ptv_padrao(PTV_TIZEN, 1024, &p);
-  assert(p.texMb == 64 && p.fiosRede == 2 && p.heroiLarg == 1280);
-  puts("ok  tabela por aparelho (LG MemTotal, Tizen deviceMemory)");
-  // .tpk nativo (PTV_TPK): tabela propria, e a LG/Tizen acima nao mudaram.
-  assert(ptv_tex_auto_mb(PTV_TPK, 0) == 96);
-  assert(ptv_tex_auto_mb(PTV_TPK, 1108) == 64);   // registro 8825, Tizen 5.0
-  assert(ptv_tex_auto_mb(PTV_TPK, 2048) == 96);
-  assert(ptv_tex_auto_mb(PTV_TPK, 3072) == 128);
-  assert(ptv_tex_teto_mb(PTV_TPK, 1108) == 96);
-  assert(ptv_tex_teto_mb(PTV_TPK, 3072) == 256);
-  assert(ptv_fios_rede_max(PTV_TPK) == 4);
-  ptv_definir_gpu_fraca(0);
-  ptv_padrao(PTV_TPK, 1108, &p);
-  assert(p.texMb == 64 && p.fiosRede == 2 && p.heroiLarg == 1280);
-  ptv_padrao(PTV_TPK, 2048, &p);
-  assert(p.texMb == 96 && p.fiosRede == 4 && p.heroiLarg == 1920);
-  ptv_definir_gpu_fraca(1);
-  ptv_padrao(PTV_TPK, 2048, &p);
-  assert(p.heroiLarg == 1280);
-  ptv_definir_gpu_fraca(0);
   assert(ptv_gpu_fraca("Mali-TDVX"));
   assert(ptv_gpu_fraca("Mali-T830"));
   assert(ptv_gpu_fraca("Mali-450 MP"));
@@ -69,13 +42,13 @@ static void tabela(void) {
   assert(!ptv_gpu_fraca("Mali-G71"));
   assert(!ptv_gpu_fraca("Apple M4 Pro"));
   assert(!ptv_gpu_fraca(NULL));
-  puts("ok  tabela do .tpk nativo (PTV_TPK) e GPU fraca pelo GL_RENDERER");
+  puts("ok  LG memory budgets and weak GPU detection");
 }
 
 // NENHUM candidato, em nenhuma RAM, em nenhum modo, passa do teto.
 static void limites(void) {
   int i, plat, modo;
-  for (plat = 0; plat <= PTV_ANDROID; plat++)
+  for (plat = 0; plat <= PTV_LG; plat++)
     for (modo = 0; modo < 2; modo++)
       for (i = 0; i < N_RAMS; i++) {
         PtvPerfil c;
@@ -84,14 +57,7 @@ static void limites(void) {
         assert(c.texMb >= 16 && c.texMb <= ptv_tex_teto_mb((PtvPlataforma)plat, m));
         assert(c.fiosRede >= 1 && c.fiosRede <= ptv_fios_rede_max((PtvPlataforma)plat));
         assert(c.heroiLarg >= 1280 && c.heroiLarg <= ptv_heroi_max((PtvPlataforma)plat, m));
-        if (plat == PTV_TIZEN) {
-          // A Samsung nunca ganha mais textura que o automatico medido nem os
-          // 300 MB do alto-cache, em modo nenhum.
-          assert(c.texMb <= ptv_tex_auto_mb(PTV_TIZEN, m));
-          assert(c.texMb <= 128);
-          if (m < 2000) assert(c.heroiLarg == 1280);
-        }
-        if ((plat == PTV_LG || plat == PTV_ANDROID) && m && m < 1200)
+        if (plat == PTV_LG && m && m < 1200)
           assert(c.texMb <= 64 && c.heroiLarg == 1280 && c.fiosRede <= 2);
       }
   { PtvPerfil c;
@@ -114,9 +80,7 @@ static void limites(void) {
     assert(ptv_limitar(PTV_LG, 658, &salvo) == 1 && salvo.fiosRede == 2 && salvo.texMb == 64);
     ptv_candidato(PTV_LG, 1500, PTV_QUALIDADE, 0, &c);
     assert(c.fiosRede == 4); }
-  { PtvPerfil lido = { 999, 9, 3840 };
-    assert(ptv_limitar(PTV_TIZEN, 2048, &lido) == 1);
-    assert(lido.texMb == 96 && lido.fiosRede == 2 && lido.heroiLarg == 1920); }
+
   puts("ok  limites por RAM e plataforma em todo candidato");
 }
 
@@ -161,11 +125,11 @@ static void margem(void) {
   PtvMedida a, b;
   const char *m = NULL;
 
-  // Android de 2 GB: 300 MB e candidato para imagens, nao compromisso de
+  // LG de 2 GB: 300 MB e candidato para imagens, nao compromisso de
   // aplicar. Sem ganho/arte descartada, 128 MB continuam; sob pressao, sobe.
   { PtvPerfil atual, cand;
-    ptv_padrao(PTV_ANDROID, 2245, &atual);
-    ptv_candidato(PTV_ANDROID, 2245, PTV_QUALIDADE, 0, &cand);
+    ptv_padrao(PTV_LG, 2245, &atual);
+    ptv_candidato(PTV_LG, 2245, PTV_QUALIDADE, 0, &cand);
     assert(atual.texMb == 128 && cand.texMb == 300);
     a = medida(1000, 0, 33, 0); b = medida(950, 0, 33, 0);
     assert(ptv_decidir(&atual, &cand, &a, &b, 0, &m) == PTV_DEC_RUIDO);
@@ -358,42 +322,8 @@ static void dimensoes(void) {
   puts("ok  dimensoes pelo cabecalho (PNG, JPEG, GIF, WebP)");
 }
 
-static void android_policy(void) {
-  const int locks[] = { 0, 16, 48, 96, 300, 999 };
-  for (int gpu = 0; gpu <= 1; gpu++) {
-    ptv_definir_gpu_fraca(gpu);
-    for (int i=0;i<N_RAMS;i++) {
-      long mem = RAMS[i];
-      PtvPerfil a, old;
-      assert(ptv_tex_auto_mb(PTV_ANDROID,mem) == ptv_tex_auto_mb(PTV_LG,mem));
-      assert(ptv_tex_teto_mb(PTV_ANDROID,mem) == ptv_tex_teto_mb(PTV_LG,mem));
-      ptv_padrao(PTV_ANDROID,mem,&a); ptv_padrao(PTV_LG,mem,&old);
-      assert(!memcmp(&a,&old,sizeof a));
-      for (int mode=0;mode<2;mode++) for (int j=0;j<6;j++) {
-        ptv_candidato(PTV_ANDROID,mem,(PtvModo)mode,locks[j],&a);
-        ptv_candidato(PTV_LG,mem,(PtvModo)mode,locks[j],&old);
-        assert(!memcmp(&a,&old,sizeof a));
-      }
-      a = (PtvPerfil){999,9,3840}; old = a;
-      assert(ptv_limitar(PTV_ANDROID,mem,&a) == ptv_limitar(PTV_LG,mem,&old));
-      assert(!memcmp(&a,&old,sizeof a));
-    }
-  }
-  ptv_definir_gpu_fraca(0);
-  assert(!strcmp(ptv_plataforma_nome(PTV_ANDROID),"android"));
-  PtvPerfil before, candidate;
-  ptv_padrao(PTV_ANDROID,2245,&before);
-  ptv_candidato(PTV_ANDROID,2245,PTV_DESEMPENHO,96,&candidate);
-  assert(candidate.texMb==96 && candidate.fiosRede==2 && candidate.heroiLarg==1280);
-  PtvMedida a={1000,10,0,20,0}, bad={1800,9,1,20,0}, noise=a, good={700,10,0,20,0};
-  assert(ptv_decidir(&before,&candidate,&a,&bad,0,NULL)==PTV_DEC_RESTAURAR);
-  assert(ptv_decidir(&before,&candidate,&a,&noise,0,NULL)==PTV_DEC_RUIDO);
-  assert(ptv_decidir(&before,&candidate,&a,&good,0,NULL)==PTV_DEC_APLICAR);
-  puts("ok  Android identity preserves native policy, overrides, and rollback");
-}
 
 int main(void) {
-  android_policy();
   tabela();
   limites();
   regra();

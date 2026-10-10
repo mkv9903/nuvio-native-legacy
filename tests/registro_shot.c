@@ -1,3 +1,4 @@
+#include "gles_test.h"
 // CAPTURAS DO REGISTRO DO APP NO GLASS UI (logs-mockup.html, 03/10), sem
 // rede e sem interacao: o painel do botao vermelho (ao vivo, pausado, filtros,
 // etapas, vazio), Ajustes > Sobre e ajuda com o painel de envio (enviando,
@@ -52,9 +53,7 @@ static GLuint carregaArte(const char *c) {
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-  glPixelStorei(GL_UNPACK_ROW_LENGTH, t->pitch / 4);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, t->w, t->h, 0, GL_RGBA, GL_UNSIGNED_BYTE, t->pixels);
-  glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+  gles_test_upload_surface(t);
   gfx_tex_aspect_atual = (float)t->w / (float)t->h;
   SDL_FreeSurface(t);
   return tex;
@@ -146,29 +145,16 @@ static void hostsDeMentira(void) {
   }
 }
 
-static const char ETAPAS_TPK40[] =
-  "[tv] modelo=UN55RU7100 host=tizen-5.0 dotnet=2.0 tela=1920x1080\n"
-  "[etapa-anterior] host begin nv_tpk_iniciar @0.51s\n"
-  "[etapa-anterior] host ok nv_tpk_iniciar @1.90s\n"
-  "[etapa-anterior] host begin first-frame @1.91s\n"
-  "[etapa-anterior] host ok first-frame @3.40s\n"
-  "[etapa-anterior] host note main-window visible=False @1843.20s\n"
-  "[etapa-anterior] host note app ended: main returned @1843.22s\n"
-  "[etapa] host note launch .NET Core 2.0.0 @0.00s\n"
-  "[etapa] host begin read-so @0.04s\n"
-  "[etapa] host ok read-so 4182016 bytes @0.29s\n"
-  "[etapa] host begin memfd @0.29s\n"
-  "[etapa] host ok memfd loader=memfd @0.35s\n"
-  "[etapa] host begin video-window @0.36s\n"
-  "[etapa] host ok video-window @0.52s\n"
-  "[etapa] host begin nv_tpk_iniciar @0.52s\n"
-  "[etapa] native note app-main started\n"
-  "[etapa] native ok libcurl-dlopen libcurl.so.5\n"
-  "[etapa] native note sign-in-thread started\n"
-  "[etapa] host ok nv_tpk_iniciar @1.94s\n"
-  "[etapa] host begin first-frame @1.95s\n"
-  "[etapa] host ok first-frame @3.12s\n"
-  "[etapa] host note main-window visible=True @3.13s\n";
+static const char ETAPAS_LG[] =
+  "[tv] modelo=OLED55C9 webOS=5 tela=1920x1080\n"
+  "[etapa] app start @0.00s\n"
+  "[etapa] SDL begin @0.04s\n"
+  "[etapa] SDL ready @0.35s\n"
+  "[etapa] graphics begin @0.36s\n"
+  "[etapa] graphics ready @0.52s\n"
+  "[etapa] libcurl ready @0.60s\n"
+  "[etapa] sign-in thread started @0.65s\n"
+  "[etapa] first-frame ready @1.90s\n";
 
 int main(int argc, char **argv) {
   const char *dir = getenv("NUVIO_DADOS");
@@ -177,7 +163,6 @@ int main(int argc, char **argv) {
   assert(argc > 1 && dir && *dir);
   saida = argv[1];
   nIds = argc - 2; ids = argv + 2;
-  SDL_SetHint("SDL_MAC_BACKGROUND_APP", "1");
   assert(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) == 0);
   IMG_Init(IMG_INIT_PNG | IMG_INIT_JPG);
   dados_iniciar(dir);
@@ -194,8 +179,9 @@ int main(int argc, char **argv) {
     shot_arte_material(f);
     fclose(f); }
   ajustes_dir(dir);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
   SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
-  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
   w = SDL_CreateWindow("Nuvio: captura do registro", 0, 0, 64, 64, SDL_WINDOW_OPENGL | SDL_WINDOW_HIDDEN);
   assert(w);
   gl = SDL_GL_CreateContext(w);
@@ -240,16 +226,16 @@ int main(int argc, char **argv) {
   captura("filtro-problemas", CENA_PAINEL);
   registro_teste_estado(RG_REDE, 0, 0, 0, 0, 0);
   captura("filtro-rede", CENA_PAINEL);
-  registro_teste_texto(ETAPAS_TPK40);
+  registro_teste_texto(ETAPAS_LG);
   registro_abrir();
-  aberto = 0; registro_abrir();
+  is_open = 0; registro_abrir();
   registro_teste_estado(RG_SISTEMA, 0, 0, 0, 0, 0);
   registro_teste_foco_etapa(4);
   captura("etapas", CENA_PAINEL);
   registro_teste_sem_fonte(1);
-  aberto = 0; registro_abrir();
+  is_open = 0; registro_abrir();
   captura("vazio", CENA_PAINEL);
-  aberto = 0;
+  is_open = 0;
   registro_teste_sem_fonte(0);
   registro_teste_texto(REG_SHOT_SESSAO);
   carregar();

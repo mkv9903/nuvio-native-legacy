@@ -1,10 +1,10 @@
 // A EXTENSAO DE INFORMACOES DO MENU DO CARTAZ NA HOME (dono, 06/10/2026), em
 // PNG, com a fonte da TV (NUVIO_SHOT_FONTE=3, Montserrat). Sem rede: o resumo
-// (notas, duracao, classificacao) e semeado no cache de extras.h, os amigos
-// pelo indice de amigostitulo.h e a agenda por agenda_registrar.
+// (notas, duracao, classificacao) e semeado no cache de extras.h, e os
+// metadados de lançamento por releaseinfo_record.
 //
 //   1. Continuar assistindo (serie em andamento): menu e extensao a DIREITA do
-//      cartaz, com "T2E5 · ... · 24 min restantes", amigos e agenda;
+//      cartaz, com "T2E5 · ... · 24 min restantes", metadados de lançamento;
 //   2. um cartaz na ponta direita de "Em alta": os dois a ESQUERDA;
 //   3. (sem GL) ctxinfo_geometria: direita, esquerda, encolhida, separada do
 //      outro lado do cartaz, centrada e ao lado do painel de Salvos.
@@ -14,7 +14,8 @@
 //
 //   bash tests/ctxinfo_shot.sh [pasta]
 #include "ajustes.h"
-#include "agenda.h"
+#include "releaseinfo.h"
+#include "idioma.h"
 #include "artehero.h"
 #include "catalogo.h"
 #include "corviva.h"
@@ -225,11 +226,11 @@ int main(int argc, char **argv) {
     fprintf(stderr, "recuse: NUVIO_DADOS tem de ser a pasta temporaria do teste\n");
     return 1;
   }
-  SDL_SetHint("SDL_MAC_BACKGROUND_APP", "1");
   assert(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) == 0);
   IMG_Init(IMG_INIT_PNG | IMG_INIT_JPG);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
   SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
-  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
   janela = SDL_CreateWindow("Nuvio: extensao do menu", SDL_WINDOWPOS_CENTERED,
                             SDL_WINDOWPOS_CENTERED, 1920, 1080,
                             SDL_WINDOW_OPENGL | SDL_WINDOW_HIDDEN);
@@ -291,9 +292,7 @@ int main(int argc, char **argv) {
   }
   cat_definir_tudo(itens, total, fils, 2);
 
-  agenda_definir_hoje("2026-10-06");
-  agenda_registrar(itens[0].imdb, itens[0].titulo, itens[0].poster, "Returning Series",
-                   2, 9, "Episódio 9", "2026-10-10", "2026-10-03");
+  releaseinfo_record(itens[0].imdb, "Returning Series", 2, 9, "2026-10-10", "2026-10-03");
   quadros(60, NULL);
 
   printf("\nContinuar assistindo:\n");
@@ -303,17 +302,18 @@ int main(int argc, char **argv) {
   quadros(40, NULL);
   snprintf(png, sizeof png, "%s/home-menu-extensao.png", saida);
   quadros(1, png);
-  conferir("continuar", 1, "T2E5");
+  { char episode[32];
+    snprintf(episode, sizeof episode, i18n("T%dE%d"), 2, 5);
+    conferir("continuar", 1, episode); }
   { char t[1400];
     ctxinfo_texto(ctx_titulo(), NULL, t, sizeof t);
     confere("continuar: notas IMDb, RT e Trakt do resumo",
             strstr(t, " 0=860") && strstr(t, " 1=87") && strstr(t, " 3=970"));
-    confere("continuar: agenda", !strstr(t, "schedule: \n")); }
+    confere("continuar: release information", strstr(t, "release: ") && !strstr(t, "release: \n")); }
   fechar();
 
   printf("\nEm alta, cartaz na ponta direita:\n");
-  // Abaixo de Continuar assistindo ha a fileira "Amigos assistindo".
-  tecla(SDLK_DOWN); quadros(40, NULL); tecla(SDLK_DOWN); quadros(60, NULL);
+  tecla(SDLK_DOWN); quadros(60, NULL);
   for (i = 0; i < 7; i++) { tecla(SDLK_RIGHT); quadros(20, NULL); }
   quadros(60, NULL);
   segurar();
@@ -323,8 +323,8 @@ int main(int argc, char **argv) {
   quadros(1, png);
   { HomeItem hi;
     int dir = home_item_focado(&hi) && hi.rect.x + hi.rect.w > 1920.0f - 900.0f;
-    if (dir) conferir("em alta", -1, "Filme");
-    else { printf("  (cartaz em foco em x=%.0f: nao ficou na direita)\n", hi.rect.x); conferir("em alta", 1, "Filme"); } }
+    if (dir) conferir("em alta", -1, i18n("Filme"));
+    else { printf("  (cartaz em foco em x=%.0f: nao ficou na direita)\n", hi.rect.x); conferir("em alta", 1, i18n("Filme")); } }
   fechar();
 
   printf("\nDestaque 4:3 (info sobre a arte):\n");

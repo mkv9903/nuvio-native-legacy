@@ -18,7 +18,6 @@
 #include "legendasui.h"
 #include "legsync.h"
 #include "legauto.h"
-#include "cacheboost.h"
 #include "velocidade.h"
 #include "faixasmkv.h"
 #define NV_ESCALA_TELA   // o arquivo inteiro mede pela tela virtual (escala.h)
@@ -136,11 +135,7 @@ static int ehAss(const VideoFaixa *f) {
 // (S90C, Tizen 9: "so a do OpenSubtitles funciona"). O overlay le a faixa do
 // MKV por Range, como a LG faz com ASS; o player so fica de reserva (no-go do
 // mkvass, fonte MP4, faixa sem par no cabecalho).
-#ifdef NV_TPK
-#define FX_TEXTO_OVERLAY 1
-#else
 #define FX_TEXTO_OVERLAY 0
-#endif
 static int vaiOverlay(const VideoFaixa *f) {
   return f && faixasmkv_overlay(f->codec, FX_TEXTO_OVERLAY);
 }
@@ -398,8 +393,6 @@ static int linhaDaLeg(int i);
 // it is `volFoco`; LEFT/RIGHT change it in 10% steps, live. Only focusable
 // where the backend has the gain (cacheboost_suportado: Android); elsewhere
 // it is drawn dimmed with "Não disponível nesta TV".
-static int volFoco;
-static int volFocavel(void) { return cacheboost_suportado(); }
 
 // #202: SPEED ROW right below the volume, same anatomy and gesture (LEFT/RIGHT
 // step through VEL_LISTA, live). Unlike the volume it is HIDDEN where the
@@ -412,7 +405,6 @@ static int velVisivel(void) { return video_velocidade_suportada() && !player_id_
 // (Android: ExoPlayer cannot change the tempo of a bitstream it does not decode).
 static int velFocavel(void) { return velVisivel() && !video_velocidade_bloqueada(); }
 
-void faixas_abrir(void) { faixas_abrir_em(0); }
 
 // Abre JA NA COLUNA que o botao pediu. O player tem um icone de audio e um de
 // legenda, e os dois abriam esta folha do mesmo jeito, com o foco no audio:
@@ -425,7 +417,7 @@ void faixas_abrir_em(int col) {
   aberta = 1;
   modo = (col == 1) ? 1 : 0;
   coluna = modo;                 // audio -> col 0; legenda -> col 1
-  volFoco = 0; velFoco = 0;
+  velFoco = 0;
   foco[0] = video_audio_atual();
   // A legenda pode estar desligada (-1); a primeira linha da coluna e sempre
   // "Desativada", entao o indice da lista e deslocado em um.
@@ -445,8 +437,7 @@ void faixas_abrir_em(int col) {
     } }
   // No track list yet (the audio list arrives after the first frames): the
   // volume row is the only thing to focus.
-  if (!modo && !nLinhas(0) && volFocavel()) volFoco = 1;
-  else if (!modo && !nLinhas(0) && velFocavel()) velFoco = 1;
+  if (!modo && !nLinhas(0) && velFocavel()) velFoco = 1;
 }
 
 int faixas_aberta(void) { return aberta; }
@@ -695,7 +686,6 @@ static void escolherLegenda(int i) {
 static void aplicar(void) {
   if (coluna == 0) {
     // F06: outra faixa de audio = outras falas; a escuta em curso nao vale mais.
-    if (video_audio_atual() != foco[0]) legsync_audio_trocou();
     video_escolher_audio(foco[0]);
   } else {
     // A pessoa escolheu: a automatica nao mexe mais nesta sessao, nem se a
@@ -824,21 +814,6 @@ void faixas_evento(const SDL_Event *e) {
   if (k == SDLK_AC_BACK || k == SDLK_ESCAPE || k == SDLK_BACKSPACE) { aberta = 0; return; }
   // F07: the volume row of the audio sheet. The change is live (no OK needed);
   // OK just closes, like Back.
-  if (!modo && volFoco) {
-    if (!volFocavel()) { volFoco = 0; return; }
-    if (k == SDLK_LEFT || k == SDLK_RIGHT) {
-      int antes = cacheboost_volume(), v = cacheboost_volume_passo(k == SDLK_RIGHT ? 1 : -1);
-      if (v != antes) cacheboost_backend_ganho(v);
-      return;
-    }
-    if (k == SDLK_DOWN) {
-      if (velFocavel()) { volFoco = 0; velFoco = 1; }
-      else if (nLinhas(0) > 0) volFoco = 0;
-      return;
-    }
-    if (k == SDLK_RETURN || k == SDLK_KP_ENTER) { aberta = 0; return; }
-    return;
-  }
   // #202: the speed row. The change is live, like the volume; OK closes.
   if (!modo && velFoco) {
     if (!velFocavel()) { velFoco = 0; return; }
@@ -847,13 +822,12 @@ void faixas_evento(const SDL_Event *e) {
       if (v != antes) { video_velocidade(v); velPedidaUi = v; }
       return;
     }
-    if (k == SDLK_UP) { if (volFocavel()) { velFoco = 0; volFoco = 1; } return; }
+    if (k == SDLK_UP) return;
     if (k == SDLK_DOWN) { if (nLinhas(0) > 0) velFoco = 0; return; }
     if (k == SDLK_RETURN || k == SDLK_KP_ENTER) { aberta = 0; return; }
     return;
   }
   if (!modo && k == SDLK_UP && foco[0] == 0 && velFocavel()) { velFoco = 1; return; }
-  if (!modo && k == SDLK_UP && foco[0] == 0 && volFocavel()) { volFoco = 1; return; }
   // Esquerda/direita andam entre a LISTA e o ESTILO, e so na folha de legenda.
   // Na de audio nao ha para onde ir — antes elas pulavam para a coluna de
   // legenda, que e justamente o que fazia os dois botoes do player parecerem o
@@ -1082,7 +1056,7 @@ static int ilVisN(int extra) {
 #define IL_VIS        ilVisN(0)
 // The audio sheet spends one line on the volume row (F07) and one more on the
 // speed row (#202) where the platform has speed.
-#define IL_VIS_COL(c) ilVisN((c) == 0 ? 1 + (velVisivel() ? 1 : 0) : 0)
+#define IL_VIS_COL(c) ilVisN((c) == 0 ? (velVisivel() ? 1 : 0) : 0)
 #define IL_EST_CEL_H 92.0f
 #define IL_EST_TOPO  56.0f
 
@@ -1121,7 +1095,7 @@ static void rostoIdioma(GfxRect r, const char *idioma, const char *icone, int se
 
 // Uma linha da lista (audio ou legenda) em (x, y), largura w.
 static void linhaLista(int col, int i, float x, float y, float w, float a) {
-  int sel = col == coluna && i == foco[col] && !(col == 0 && (volFoco || velFoco));
+  int sel = col == coluna && i == foco[col] && !(col == 0 && velFoco);
   const char *marca = NULL, *icone = NULL, *idioma = NULL;
   char nome[64], sub[96];
   int ativo;
@@ -1173,63 +1147,6 @@ static int visiveisLista(int col) { int n = nLinhas(col); return n < IL_VIS_COL(
 // The volume row: the same anatomy as a track row (face, name, line below)
 // and, on the right, the 0-200% bar with the 100% tick and the value. Above
 // 100 the value and the part of the bar past the tick turn red.
-static void linhaVolume(float x, float y, float w, float a) {
-  int disp = volFocavel(), pt = cacheboost_ganho_estado() == CB_GANHO_PASSTHROUGH;
-  int sel = disp && volFoco && !modo, v = cacheboost_volume(), acima = v > CB_VOL_NORMAL;
-  float da = disp ? a : a * 0.5f, dir = x + w - 22.0f, tx, tw;
-  GfxRect lr = { x, y, w, IL_LN_H };
-  const char *sub = !disp ? "Não disponível nesta TV"
-                  : pt    ? "Passthrough: o receptor controla o volume"
-                  : acima ? "Reforço ativo, só neste vídeo" : "Só neste vídeo";
-  if (sel) plrui_linha_foco(lr, 22.0f, a);
-  rostoIdioma((GfxRect){ x + 22.0f, y + (IL_LN_H - 52.0f) * 0.5f, 52.0f, 52.0f }, NULL, "pl_audio-lines", sel, da);
-  if (disp) {
-    char val[16];
-    float yc = y + IL_LN_H * 0.5f, bx, fr = (float)v / (float)CB_VOL_MAX, meio;
-    int c = sel ? 255 : 219;
-    TxtLinha lv;
-    snprintf(val, sizeof val, "%d%%", v);
-    lv = acima ? txt_linha(TXT_ILHA_FORTE, val, 255, 90, 82, 255) : txt_linha(TXT_ILHA_FORTE, val, c, c, c - 2, 255);
-    // The value has a fixed slot ("200%") so the bar does not walk while it changes.
-    { float slot = (float)txt_largura(TXT_ILHA_FORTE, "200%");
-      if (sel) {
-        GfxRect d = { dir - 34.0f, yc - 17.0f, 34.0f, 34.0f };
-        gfx_cor(d, 0.5f, 1, 1, 1, 0.10f * a);
-        gfx_icone((GfxRect){ d.x + 7.0f, d.y + 7.0f, 20.0f, 20.0f }, "pl_chevron-right", 1, 1, 1, a);
-        dir -= 34.0f + 10.0f;
-      }
-      txt_desenhar_alpha(lv, dir - (float)lv.w, yc - (float)lv.h * 0.5f, a);
-      dir -= slot + 16.0f;
-      if (sel) {
-        GfxRect d = { dir - 34.0f, yc - 17.0f, 34.0f, 34.0f };
-        gfx_cor(d, 0.5f, 1, 1, 1, 0.10f * a);
-        gfx_icone((GfxRect){ d.x + 7.0f, d.y + 7.0f, 20.0f, 20.0f }, "pl_chevron-left", 1, 1, 1, a);
-        dir -= 34.0f + 14.0f;
-      } }
-    // Passthrough: no bar (there is no boost to show); the reason gets the room.
-    if (pt) goto semBarra;
-    bx = dir - VOL_BARRA_W;
-    meio = bx + VOL_BARRA_W * 0.5f;
-    gfx_cor((GfxRect){ bx, yc - 3.0f, VOL_BARRA_W, 6.0f }, 0.5f, 1, 1, 1, 0.16f * a);
-    if (fr > 0.0f) {
-      float fim = bx + VOL_BARRA_W * (fr > 1.0f ? 1.0f : fr);
-      gfx_cor((GfxRect){ bx, yc - 3.0f, (fim < meio ? fim : meio) - bx, 6.0f }, 0.5f, 1, 1, 1, 0.85f * a);
-      if (fim > meio) gfx_cor((GfxRect){ meio, yc - 3.0f, fim - meio, 6.0f }, 0.5f, VOL_VERMELHO, a);
-    }
-    // Tick at 100%: the boundary between the normal volume and the boost.
-    gfx_cor((GfxRect){ meio - 1.0f, yc - 9.0f, 2.0f, 18.0f }, 0.0f, 1, 1, 1, (pt ? 0.25f : 0.45f) * a);
-    dir = bx - 18.0f;
-  semBarra:;
-  }
-  tx = x + 22.0f + 52.0f + 18.0f;
-  tw = dir - tx;
-  { int c = sel ? 255 : 219, cs = 122;
-    TxtLinha ln = txt_linha_corta(TXT_ILHA_FORTE, "Volume", c, c, c - 2, 255, tw);
-    TxtLinha ls = txt_linha_corta(TXT_ILHA_GENERO, sub, cs, cs, cs - 2, 255, tw);
-    float th = (float)ln.h + 5.0f + (float)ls.h, ty = y + (IL_LN_H - th) * 0.5f;
-    txt_desenhar_alpha(ln, tx, ty, da);
-    txt_desenhar_alpha(ls, tx, ty + (float)ln.h + 5.0f, da); }
-}
 
 // #202: the speed row, the volume row's anatomy (face, name, line below) with
 // the value between the < > discs when focused. Away from 1x the value takes
@@ -1312,11 +1229,7 @@ static void corpoLista(GfxRect c, float a) {
                 ty + (float)t.h - 54.0f, a);
     } }
   y += IL_TIT_H + 14.0f;
-  if (!modo) {
-    if (velVisivel()) { linhaVolume(x0, y, w, a); y += IL_LN_H + IL_LN_VAO;
-                        linhaVelocidade(x0, y, w, a); y += IL_LN_H + VOL_VAO; }
-    else { linhaVolume(x0, y, w, a); y += IL_LN_H + VOL_VAO; }
-  }
+  if (!modo && velVisivel()) { linhaVelocidade(x0, y, w, a); y += IL_LN_H + VOL_VAO; }
   visiveis = IL_VIS_COL(col);
   ajustarRolagem();
   r = rolagem[col]; fim = r + visiveis; if (fim > n) fim = n;
@@ -1327,16 +1240,11 @@ static void corpoLista(GfxRect c, float a) {
   gfx_cor((GfxRect){ x0, y, w, 1.0f }, 0.0f, 1, 1, 1, 0.07f * a);
   { char q[32];
     float yc = y + 16.0f + 15.0f;
-    if (!modo && volFoco) {
-      // The real gain in decibels: 200% is +6.0 dB, not "twice as loud".
-      int v = cacheboost_volume();
-      if (v > 0) { snprintf(q, sizeof q, "%+.1f dB", cacheboost_volume_db(v)); plrui_decimal(q); }
-      else snprintf(q, sizeof q, "-\xe2\x88\x9e dB");
-    } else if (!modo && velFoco) snprintf(q, sizeof q, i18n("%d de %d"), vel_indice(video_velocidade_atual()) + 1, VEL_N);
+ if (!modo && velFoco) snprintf(q, sizeof q, i18n("%d de %d"), vel_indice(video_velocidade_atual()) + 1, VEL_N);
     else snprintf(q, sizeof q, i18n("%d de %d"), n ? foco[col] + 1 : 0, n);
     { TxtLinha l = txt_linha(TXT_ILHA_APOIO, q, 243, 242, 239, 115);
       txt_desenhar_alpha(l, x0 + 10.0f, yc - (float)l.h * 0.5f, a); }
-    if (!modo && (volFoco || velFoco)) {
+    if (!modo && velFoco) {
       const char *k[2] = { "\xe2\x86\x90 \xe2\x86\x92", "Voltar" }, *rt[2] = { "Ajustar", "Fechar" };
       plrui_dicas(k, rt, 2, x0 + w - 10.0f, yc, 1, a);
     } else if (!modo) {

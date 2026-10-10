@@ -106,7 +106,6 @@ const ContaPerfil *perfis_item(int i) { (void)i; return NULL; }
 // Ajustes por perfil (ajustes.c) e a arte escolhida (arteescolha.c) nao entram
 // neste teste; o sync so os chama.
 const char *i18n(const char *s) { return s; }
-int ajustes_social(void) { return 1; }
 int ajustes_hist_conta(void) { return 1; }
 void ajustes_perfil_guardar(int perfil) { (void)perfil; }
 int  ajustes_perfil_restaurar(int perfil) { (void)perfil; return 0; }
@@ -274,7 +273,7 @@ int  addons_exportar(AddonRemoto *s, int m) {
   snprintf(s[0].nome, sizeof s[0].nome, "%s", addonNome);
   s[0].ativo = addonAtivo; return 1;
 }
-void agenda_esquecer(void) {}
+void releaseinfo_forget(void) {}
 void lembrete_esquecer_todos(void) {}
 int  ajustes_aplicar_blob(const char *j) { (void)j; return 0; }
 void ajustes_definir_ocultar_nao_lancados(int l) { (void)l; }

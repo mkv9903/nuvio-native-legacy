@@ -21,7 +21,7 @@ int ajustes_livetv_formato(void);  // ajustes.h puxa SDL; o teste do xtream nao
 #endif
 // Proxy do Xtream so no Tizen (ver chamar). NV_XTREAM_PROXY_TESTE liga o ramo
 // numa build nativa para tests/xtream.sh conferir a url montada sem emcc.
-#if defined(__EMSCRIPTEN__) || defined(NV_XTREAM_PROXY_TESTE)
+#if defined(NV_XTREAM_PROXY_TESTE)
 #define XT_PROXY 1
 #else
 #define XT_PROXY 0
@@ -89,11 +89,6 @@ static void carregarTravado(void) {
   free(b);
 }
 
-void xtream_carregar(void) {
-  pthread_mutex_lock(&trava);
-  carregarTravado();
-  pthread_mutex_unlock(&trava);
-}
 
 static void gravar(void) {
   char txt[640];
@@ -447,12 +442,6 @@ int xtream_url_xmltv(char *url, unsigned n) {
   pthread_mutex_lock(&trava);
   carregarTravado();
   if (!servidor[0] || !usuario[0] || !senha[0]) { pthread_mutex_unlock(&trava); return 0; }
-#ifdef __EMSCRIPTEN__
-  // O Chromium do Tizen barra http:// (ver chamar), e o proxy do servico de
-  // recomendacoes so repassa o player_api.php: a grade do provedor so vem
-  // quando o painel e https.
-  if (strncmp(servidor, "https://", 8)) { pthread_mutex_unlock(&trava); return 0; }
-#endif
   urlenc(usuario, u, sizeof u);
   urlenc(senha, s, sizeof s);
   snprintf(url, n, "%s/xmltv.php?username=%s&password=%s", servidor, u, s);

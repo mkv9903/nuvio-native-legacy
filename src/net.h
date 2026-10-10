@@ -14,12 +14,10 @@
  * The request BLOCKS; execute it outside drawing. Strings, body, and callback
  * remain valid until return. net_response_clear frees the two allocations.
  * Zero max_bytes/max_headers use safe limits, never "unlimited".
- * TLS is verified; ca_file overrides the trusted bundle registered at startup
- * (net_discord_ca), or uses system trust if there is no bundle.
+ * TLS is verified; ca_file overrides system trust for this request.
  * Redirects HTTP(S) only, without HTTPS downgrade. Owner headers and body do
  * not cross origins; cross-origin authenticated 307/308 are rejected.
- * WGT synchronous XHR does not provide this contract: returns UNAVAILABLE without
- * starting I/O. Legacy wrappers remain available with their limits.
+ * Legacy wrappers remain available with their limits.
  */
 typedef struct NetGroup NetGroup;
 typedef struct NetJob NetJob;
@@ -56,12 +54,6 @@ typedef struct NetRequest {
   union { size_t max_headers; size_t max_cabecalhos; };
   union { int follow; int seguir; };                 /* 0 = return 3xx; 1 = up to 5 redirects */
   union { const char *ca_file; const char *ca_arquivo; };
-  /* #290: 1 = PERSONAL server configured by user (Jellyfin/Emby/Plex),
-   * which often has a self-signed or local-network certificate. The certificate
-   * is only unverified while the request stays on the SAME origin
-   * (scheme+host+port) as `url`; a redirect to another origin verifies again.
-   * Everything else in the app continues verifying. */
-  union { int tls_personal; int tls_pessoal; };
   union { NetJob *job; };
   union { void (*interval)(const NetInterval *, void *); void (*intervalo)(const NetInterval *, void *); };
   union { void *interval_user; void *intervalo_usuario; };
@@ -153,13 +145,6 @@ char *net_download(const char *url, int seconds);
 // and is suitable for JSON; images contain zeroes in the middle and strlen would lie.
 char *net_download_bin(const char *url, int seconds, long *n);
 
-#ifdef __EMSCRIPTEN__
-// POST of text/plain body with BINARY response (size in *n; 4xx/5xx become NULL,
-// as in net_download_bin). Only exists on Tizen, for Xtream proxy (#112): icon URL
-// goes in BODY, which worker platform does not log, and returns image with zeroes
-// inside — net_post_st does not provide size. See tex_cache.c and servidor/recomendacoes/src/xtream.js.
-char *net_post_bin(const char *url, int seconds, const char *body, long *n);
-#endif
 
 // With headers. `headers` is a NULL-terminated array of preformatted lines
 // ("Authorization: Bearer x"). Exists because Trakt requires token and app key
@@ -211,10 +196,7 @@ int net_tail_refused(void);
 
 // Wire byte cap of current transfer (0 = uncapped). Internal to module;
 // exposed only because net_download_range uses it. Do not touch from outside.
-#if defined(NV_TPK40)
-long *net_cap_ptr(void);
-#define net_cap (*net_cap_ptr())
-#elif defined(__GNUC__)
+#if defined(__GNUC__)
 extern _Thread_local long net_cap;
 #else
 extern long net_cap;
@@ -376,7 +358,6 @@ const char *net_last_error(void);
 // with a HEAD on "/" (no redirect follow, no body, never a stream path) and keeps handle
 // pooled for next thread requesting these hosts. ms[i] receives time per origin (0 = failed).
 // Returns number opened. Call from disposable thread; no-op on .wgt (returns 0).
-int net_warmup_batch(const char *const *origins, int n, unsigned *ms);
 const char *net_url_public(const char *url, char *dst, unsigned size);
 
 // IMAGE/META URL FOR LOG: keeps scheme, host, and path segments that cannot be credentials
@@ -423,10 +404,7 @@ typedef NetMeasurement RedeMedida;
 typedef NetControl RedeControle;
 typedef NetThroughput RedeVazao;
 
-#if defined(NV_TPK40)
-#define rede_teto_ptr net_cap_ptr
-#define rede_teto net_cap
-#elif defined(__GNUC__)
+#if defined(__GNUC__)
 #define rede_teto net_cap
 #else
 #define rede_teto net_cap
@@ -456,9 +434,6 @@ char *rede_baixar_trecho64_cab(const char *url, const char *headers,
                                volatile int *cancelled);
 char *rede_baixar(const char *url, int s);
 char *rede_baixar_bin(const char *url, int s, long *n);
-#ifdef __EMSCRIPTEN__
-char *rede_postar_bin(const char *u, int s, const char *c, long *n);
-#endif
 char *rede_baixar_com(const char *u, int s, const char *const *h);
 char *rede_baixar_trecho(const char *u, int s, long ini, long fim, long *tam);
 char *rede_baixar_trecho_st(const char *u, int s, long long ini, long long fim,
@@ -474,12 +449,10 @@ char *rede_apagar(const char *u, int s, const char *const *h, int *st);
 char *rede_postar_st(const char *u, int s, const char *const *h, const char *c, int *st);
 char *rede_baixar_st(const char *u, int s, const char *const *h, int *st);
 char *rede_baixar_st_retry(const char *u, int s, const char *const *h, int *st, int *ra);
-char *rede_baixar_medido(const char *u, int s, const char *const *h, RedeMedida *m);
 char *rede_baixar_medido_controle(const char *u, int s, const char *const *h,
                                   const RedeControle *c, RedeMedida *m);
 char *rede_baixar_bin_medido_controle(const char *u, int s, const char *const *h,
                                       const RedeControle *c, long *t, RedeMedida *m);
-char *rede_baixar_etag(const char *u, int s, const char *const *h, int *st, char *e, unsigned te);
 int rede_medir_vazao(const char *u, const char *const *h, int s, long ini, long long mb,
                      volatile int *c, int *kps, int nm, RedeVazao *r, char *f, unsigned tf);
 void rede_vazao_espera(unsigned long ms);
@@ -491,7 +464,6 @@ const char *rede_ultimo_erro(void);
 int rede_aquecer_lote(const char *const *origens, int n, unsigned *ms);
 const char *rede_url_publica(const char *url, char *dst, unsigned tam);
 const char *rede_url_log(const char *url, char *dst, unsigned tam);
-int rede_segmento_suspeito(const char *s, unsigned n);
 
 
 #endif

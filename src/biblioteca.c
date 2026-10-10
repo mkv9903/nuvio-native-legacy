@@ -237,7 +237,7 @@ static int bibTinta2(void) { return 205; }
 //     faixa; o cartaz em foco sobe (escala 1,08 a partir do centro) com sombra
 //     longa, e o titulo dele clareia e abre em ate duas linhas.
 // Corpos calibrados pela LARGURA medida na captura do mockup (ver a mesma nota
-// em agendaui.c, escTitulo): a Inter variavel do navegador e ~9% mais larga
+// escTitulo): a Inter variavel do navegador e ~9% mais larga
 // abaixo de 24 px que a Inter estatica daqui.
 #define BIB_TOPO          64.0f
 #define BIB_FAIXA_Y      193.0f
@@ -338,7 +338,7 @@ static char comprado[CAT_MAX];
 
 // ---------------------------------------------------------------- preferencia
 
-// A ESCOLHA DE EXIBIÇÃO E POR PERFIL, como fileirasui-p<N>.txt e agenda-p<N>.txt.
+// A ESCOLHA DE EXIBIÇÃO E POR PERFIL, como fileirasui-p<N>.txt e release-info-p<N>.txt.
 // Quem troca de perfil na tela "Quem esta assistindo?" nao herda a exibicao do
 // outro, e o arquivo sem sufixo continua servindo a quem nunca escolheu perfil.
 static int prefPerfil = -1;
@@ -714,14 +714,6 @@ int biblioteca_iniciar(void) {
 
 void biblioteca_encerrar(void) { }
 
-int biblioteca_na_lista(int i) {
-  // A verdade e a marca DO ITEM, que a descoberta preenche com a watchlist do
-  // Trakt. O vetor por indice que respondia aqui apontava para outro titulo
-  // assim que o catalogo era reconstruido.
-  const CatItem *c = cat_item(i);
-  return c ? c->naLista : 0;
-}
-int biblioteca_comprado(int i) { return (i >= 0 && i < CAT_MAX) ? comprado[i] : 0; }
 void biblioteca_alternar_lista(int i) {
   // So remonta a lista. Quem vira a marca e cat_definir_na_lista, no mesmo
   // ponto que fala com o Trakt (app.c) — ter DOIS donos do mesmo estado era o

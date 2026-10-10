@@ -21,7 +21,7 @@ for source in src/*.c src/dts/*.c; do
 done
 cc "${sources[@]}" "$aqui/tests/salvospainel_perf.c" -Isrc -o "$tmp/perf" \
   ${flags[@]+"${flags[@]}"} -DNV_TRAKT_CLIENT_ID='"chave-de-teste"' \
-  -O2 -g -I/opt/homebrew/include -I/opt/homebrew/include/SDL2 \
-  -L/opt/homebrew/lib -lSDL2 -lSDL2_image -lSDL2_ttf -lz -framework OpenGL \
+  -O2 -g -DNV_LINUX_DESKTOP $(pkg-config --cflags sdl2 SDL2_image SDL2_ttf)  \
+   -lSDL2 -lSDL2_image -lSDL2_ttf -lz $(pkg-config --libs glesv2 egl) -ldl -pthread -lm \
   -Wno-deprecated-declarations -Wno-macro-redefined
 NUVIO_DADOS="$tmp/dados" "$tmp/perf" 2>&1 | grep -vE "^\[(tex|arte|cat|desc|home|salvos|txt)\]"

@@ -14,8 +14,8 @@ trap 'rm -rf "$tmp"' EXIT
 sources=()
 for s in src/*.c src/dts/*.c; do [ "$s" != src/main.c ] && sources+=("$s"); done
 cc -DNV_SHOT_HOOKS -DNV_FLUIDEZ_PERF "${sources[@]}" tests/fluidez_perf_player.c -Isrc -Itests \
-  -o "$tmp/perf" -O1 -I/opt/homebrew/include -I/opt/homebrew/include/SDL2 \
-  -L/opt/homebrew/lib -lSDL2 -lSDL2_image -lSDL2_ttf -lz -framework OpenGL \
+  -o "$tmp/perf" -O1 -DNV_LINUX_DESKTOP $(pkg-config --cflags sdl2 SDL2_image SDL2_ttf)  \
+   -lSDL2 -lSDL2_image -lSDL2_ttf -lz $(pkg-config --libs glesv2 egl) -ldl -pthread -lm \
   -Wno-deprecated-declarations -Wno-macro-redefined
 printf '%-12s %-6s %6s %6s %6s %6s %6s %6s\n' estado vidro fill vis rects progs binds cheios
 for e in "${estados[@]}"; do

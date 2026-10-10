@@ -1,22 +1,5 @@
-// CENTRAL DE AVISOS — o unico lugar onde o app "chama" a pessoa.
-//
-// Nem webOS nem Tizen entregam notificacao a um app fechado, e este app nao
-// tem servico de fundo (ver agendaviso.h). O que da para fazer e avisar com o
-// app ABERTO, e antes disto cada coisa avisava do seu jeito: o cartao de
-// atualizacao abria sozinho, o lembrete de serie abria outro cartao, e a
-// recomendacao de amigo so aparecia para quem abrisse o painel de Salvos.
-// Pedido do dono (19/09/2026): um toast quando chega algo, AZUL/CH+ abre, e
-// uma lista com tudo — mais um canal para ELE avisar de defeito conhecido
-// enquanto nao esta consertado, e um jeito de mandar o registro quando o app
-// cai.
-//
-// CINCO ORIGENS, um mesmo item:
-//   rec      recomendacao de amigo (recomenda.c)         -> abre Salvos
-//   agenda   episodio de serie com lembrete estreou      -> abre o titulo
-//   update   versao nova no GitHub (atualizacao.c)       -> abre o cartao
-//   canal    aviso do dono, de avisos.json no proprio    -> so le
-//            repositorio (raw.githubusercontent.com)
-//   crash    o app fechou sem despedida na ultima vez    -> "Enviar registro"
+// Notice center: updates, upstream announcements and session diagnostics.
+// Notices appear while the app is open and can be dismissed per profile.
 //
 // O CRASH e detectado por MARCA: sessao-viva.txt e gravado no arranque e
 // apagado na saida limpa. Marca presente no arranque seguinte = a sessao
@@ -43,11 +26,7 @@
 // Avisa (toast + item na lista) que o idioma da interface foi escolhido sozinho.
 // Um item por idioma, entao so uma vez por idioma. Chamado por ajustes.c.
 void avisos_idioma_definido(const char *codigo, const char *texto);
-// 1 se a sessao ANTERIOR nao se despediu (crash, kill por memoria, energia),
-// ja descontada a despedida do Tizen (pagina escondida = a TV fechou em segundo
-// plano, nao e queda). Valido depois de avisos_iniciar; o modo seguro (seguro.h)
-// decide o que desfazer a partir disto. Existe porque dados_despedida_ler apaga
-// o que le: so avisos_iniciar pode pergunta-lo, uma vez.
+// Previous session left its crash marker. Valid after avisos_iniciar.
 int  avisos_sessao_anterior_caiu(void);
 // Aviso do modo seguro (ajuste desfeito, perfil seguro): entra na lista com toast.
 // Um item por `id`; o id leva o numero da sessao, entao cada queda avisa uma vez.
@@ -66,14 +45,13 @@ int  avisos_aberto(void);
 void avisos_abrir(void);
 int  avisos_n_novos(void);
 // O CARTAO DO CRASH: abre uma vez por crash, quando a home esta de pe e nenhum
-// outro cartao esta na frente (app.c chama como agendaviso_mostrar_se_houver).
+// outro cartao esta na frente (app.c chama avisos_mostrar_se_houver).
 // Enquanto aberto, avisos_evento come todo o teclado.
 void avisos_mostrar_se_houver(void);
 int  avisos_cartao_aberto(void);
 
 // ACOES PEDIDAS PELO PAINEL, entregues a app.c uma vez cada (o mesmo contrato
 // de spainel_pediu_abrir): o IMDb de um titulo a abrir, ou um dos codigos.
-const char *avisos_pediu_abrir(void);
 enum { AVISOS_NADA = 0, AVISOS_ABRIR_SALVOS, AVISOS_ABRIR_ATUALIZACAO };
 int  avisos_pediu(void);
 
@@ -126,35 +104,23 @@ void avisos_teste_queda(const char *texto);
 #include <stddef.h>
 #define AVISOS_LINHA_H 164.0f
 int   avisos_lista_n(void);
-float avisos_lista_altura(void);
 float avisos_lista_altura_linha(int linha, int focoLinha);
 float avisos_lista_y(int linha, int focoLinha);
 void  avisos_lista_desenhar(float x, float y, float w, float a, int focoLinha);
-// 1 = fez algo e o hospedeiro fecha; 2 = so trocou de lugar (pedidos de
-// amizade: o painel vai para a aba Amigos e fica aberto).
+// 1 = performed an action and the host closes; 0 = keep the list open.
 int   avisos_lista_ok(int linha);
 void  avisos_marcar_lidos(void);
 
-// DISPENSAR (06/10, avisodisp.h). Tira o item da lista e grava a chave por
-// perfil: a mesma chave nao volta, nem depois de reiniciar; um evento novo
-// (outro episodio, outra versao) volta. "rec" e excecao: responde a
-// recomendacao em vez de gravar. A ULTIMA LINHA da lista, quando ha itens, e
-// "Dispensar todos": avisos_lista_linhas() = n + 1 (o hospedeiro navega por
-// ela; avisos_lista_n() continua sendo a contagem de avisos), e
-// avisos_lista_ok(n) dispensa todos e devolve 0 (a lista fica, vazia).
-// avisos_lista_item: o id, o titulo para o menu e, numa estreia com o lembrete
-// ainda ligado, o imdb para "Remover lembrete" ("" sem). 0 = linha invalida.
+// Dismissal persists the notice ID per profile. A new ID can appear again.
+// The last row is Dismiss all when the list is nonempty.
+// avisos_lista_item returns the ID and title, or 0 for an invalid row.
 void  avisos_dispensar(const char *id);
 void  avisos_dispensar_todos(void);
 int   avisos_lista_dispensar(int linha);
 int   avisos_lista_linhas(void);
-int   avisos_lista_item(int linha, char *id, size_t tamId, char *titulo, size_t tamTit,
-                        char *imdbLembrete, size_t tamImdb);
+int   avisos_lista_item(int linha, char *id, size_t tamId, char *titulo, size_t tamTit);
 
-// A ilha (ilhacart.c): o episodio novo (AV_AGENDA) ainda nao lido mais
-// recente — o id do item e o imdb da serie — e marcar UM item como lido. Uma
-// estreia ADIADA nesta sessao ("Depois", avisodisp_sessao_*) nao conta.
-int  avisos_estreia_pendente(char *id, size_t tamId, char *imdb, size_t tamImdb);
+// Mark one notice as read.
 void avisos_marcar_visto(const char *id);
 
 // Botao do MODAL DA ILHA de um aviso da central (chave "av:<id>", ver

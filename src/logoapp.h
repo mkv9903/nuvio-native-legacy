@@ -26,7 +26,6 @@ void logoapp_iniciar(const char *dirArte);
 // O logo EM VIGOR (ajustes_logo_app()).
 int  logoapp_atual(void);
 // Nome na lista de valores ("Novo", "Clássico"); "" fora da faixa.
-const char *logoapp_nome(int logo);
 // Caminho absoluto da arte (buffer proprio por logo/forma).
 const char *logoapp_caminho(int logo, int forma);
 // Miniatura quadrada do logo em `r` (o seletor de 64 px). `ladrilho` = 1 pinta o

@@ -1,7 +1,7 @@
 // CAPTURA DA ILHA COM CARTOES (ilha.h): atividade ao vivo na pilula, o modal
 // nascendo dela (CH+/AZUL), o painel de Salvos nascendo do modal (seta para a
-// direita) e recolhendo para a pilula, a estreia alternando com a atividade, o
-// modal da estreia, vidro desligado, ancorada a direita e animacoes reduzidas.
+// direita) e recolhendo para a pilula, vidro desligado, ancorada a direita e
+// animacoes reduzidas.
 //
 // NAO ENTRA NA SUITE (*_shot.sh): precisa de janela GL e de olho humano.
 #include "ilha.h"
@@ -99,7 +99,7 @@ int main(int argc, char **argv) {
   char ajustes[700];
   SDL_GLContext gl;
   FILE *f;
-  IlhaCartao vivo, est;
+  IlhaCartao vivo;
   base = argc > 1 ? argv[1] : "/tmp/nuvio-ilha2";
   assert(dir && *dir);
   snprintf(ajustes, sizeof ajustes, "%s/ajustes.txt", dir);
@@ -110,8 +110,9 @@ int main(int argc, char **argv) {
 
   assert(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) == 0);
   IMG_Init(IMG_INIT_PNG | IMG_INIT_JPG);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
   SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
-  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
   win = SDL_CreateWindow("Nuvio: ilha2", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
                          1920, 1080, SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN);
   assert(win);
@@ -156,19 +157,6 @@ int main(int argc, char **argv) {
   snprintf(vivo.arte, sizeof vivo.arte, "deploy/app/art/ep/00_1_03.jpg");
   vivo.progresso = 0.42f; vivo.restanteMin = 32;
 
-  memset(&est, 0, sizeof est);
-  snprintf(est.chave, sizeof est.chave, "estreia:agenda:tt1:2026-10-01");
-  snprintf(est.avisoId, sizeof est.avisoId, "agenda:tt1:2026-10-01");
-  snprintf(est.imdb, sizeof est.imdb, "tt1");
-  est.serie = 1; est.t = 2; est.e = 5; est.progresso = -1.0f;
-  snprintf(est.titulo, sizeof est.titulo, "Widow's Bay");
-  snprintf(est.epNome, sizeof est.epNome, "The Lighthouse");
-  snprintf(est.sinopse, sizeof est.sinopse, "A skeptical mayor leads the superstitious residents of a cursed New England island.");
-  snprintf(est.poster, sizeof est.poster, "deploy/app/art/poster/01.jpg");
-  snprintf(est.logo, sizeof est.logo, "deploy/app/art/logo/01.png");
-  snprintf(est.arte, sizeof est.arte, "deploy/app/art/01.jpg");
-  snprintf(est.quando, sizeof est.quando, "hoje");
-
   quadros(40, "0-relogio");
   ilha_cartao(ILHA_VIVO, &vivo);
   quadros(80, "1-vivo");
@@ -191,17 +179,7 @@ int main(int argc, char **argv) {
   spainel_fechar();
   quadros(40, NULL);
   ilha_cartao(ILHA_VIVO, &vivo);
-  ilha_cartao(ILHA_ESTREIA, &est);
-  // Espera a vez da estreia (alterna a cada ILHA_ALTERNA_MS).
-  { int k = 0;
-    while (((SDL_GetTicks() / ILHA_ALTERNA_MS) % 2) != 1 && k++ < 600) quadros(1, NULL); }
-  quadros(70, "9-estreia");
-  tecla(SDLK_s);
-  quadros(60, "10-modal-estreia");
-  tecla(SDLK_ESCAPE);
-  quadros(40, NULL);
   ajustes_definir_vidro(0);
-  ilha_cartao(ILHA_ESTREIA, NULL);
   quadros(60, "11-solido-vivo");
   tecla(SDLK_s);
   quadros(60, "12-solido-modal");

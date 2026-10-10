@@ -1,7 +1,6 @@
 // Ver legsync.h. Nucleo sem SDL/GL: o desenho e os textos ficam em legsyncui.c.
 #include "legsync.h"
 #include "autosync.h"
-#include "audsync.h"
 #include "legenda.h"
 #include "legenda2.h"
 #include <pthread.h>
@@ -49,10 +48,6 @@ static struct {
   unsigned calmoDesde;
   // F06: referencia de AUDIO (audsync.c). audUltimo = a ultima analise pedida
   // foi por audio (desfazer/aceite/recusa falam dela; "Outra referencia" nao).
-  int audLigado, audUltimo;
-  uint64_t audPedido;
-  AudSyncMotivo audFalha;
-  LegendaDocumento *audRef, *audRec;
   // R4: plano automatico. autoEtapa: 0 a iniciar, 1 contra a faixa embutida,
   // 2 contra o audio, 9 encerrado. autoFase: 0 sem plano, 1 trabalhando,
   // 2 sincronizou, 3 nao deu.
@@ -94,12 +89,6 @@ static void zerarAnalise(void) {
 
 // F06: para a escuta e solta a referencia de audio. Com M. audsync tem lock
 // proprio e nunca chama de volta para ca.
-static void pararAudio(void) {
-  if (L.audPedido) audsync_cancelar();
-  L.audPedido = 0; L.audUltimo = 0; L.audFalha = AUDSYNC_M_OK;
-  legenda_documento_liberar(L.audRef); legenda_documento_liberar(L.audRec);
-  L.audRef = L.audRec = NULL;
-}
 
 // Geracao nova para a MESMA escolha de legenda (troca de fonte no meio da
 // sessao) ou para um titulo novo (manterPrimaria = 0).
@@ -118,7 +107,6 @@ static void novaSessao(const char *url, int manterPrimaria) {
   L.nExcl = 0; L.bytesSessao = 0; L.refMotivo = LEGREF_OK; L.ultimaFaixa = 0;
   L.idiomaRef[0] = 0;
   zerarAnalise();
-  pararAudio();
   // R4: outra midia recomeca o plano; a mesma escolha de legenda tenta de novo.
   L.autoEtapa = 0; L.autoRefTent = 0; L.autoPend = 0; L.autoTroca = L.autoVolta = 0;
   L.autoFase = autoLigado && manterPrimaria && L.primTipo == 1 ? 1 : 0;
@@ -169,8 +157,6 @@ void legsync_destruir(void) {
   autosync_destruir(s);
   legref_destruir(r);
   legenda_documento_liberar(a); legenda_documento_liberar(b);
-  pthread_mutex_lock(&M); pararAudio(); pthread_mutex_unlock(&M);
-  audsync_destruir();
 }
 
 // --- PRINCIPAL ------------------------------------------------------------------
@@ -217,7 +203,7 @@ void legsync_primaria_externa(const char *url, const char *idioma, const char *o
     autosync_selecionar(L.sync, 0, NULL);
     // A referencia embutida continua valendo para outra externa da mesma
     // midia; as exclusoes eram do par anterior.
-    L.nExcl = 0; zerarAnalise(); pararAudio();
+    L.nExcl = 0; zerarAnalise();
     // R4: a pessoa (ou a automatica de idioma) escolheu: plano novo. Vinda do
     // trocador, o plano continua e so anota a legenda tentada.
     L.autoEtapa = 0; L.autoRefTent = 0; L.autoPend = 0;
@@ -248,7 +234,7 @@ void legsync_primaria_outra(int embutida) {
     autosync_selecionar(L.sync, 0, NULL);
     legref_cancelar(L.ref); L.refPedido = 0;
   }
-  zerarAnalise(); pararAudio();
+  zerarAnalise();
   L.autoFase = 0; L.autoEtapa = 9; L.autoTrocou = 0; L.autoNome[0] = 0; L.nAutoTent = 0;
   L.autoPend = 0; L.autoTroca = L.autoVolta = 0;
   pthread_mutex_unlock(&M);
@@ -345,65 +331,12 @@ static int solicitar(int modo) {
 
 // F06: o par da MESMA janela ouvida (fala detectada x externa recortada) vai a
 // engine sem relaxar nenhum limiar. So um resultado ACEITO muda o offset.
-static int solicitarAudio(void) {
-  AutoSyncConfig c = autosync_config(AUTOSYNC_QUICK);
-  c.raioBuscaMs = AUDSYNC_RAIO_MS;
-  if (!L.audRef || !L.audRec) return 0;
-  if (!autosync_selecionar(L.sync, 0, L.audRec)) return 0;
-  if (!autosync_solicitar(L.sync, 0, L.audRef, &c)) return 0;
-  L.solicitou = 1; L.querModo = -1; L.reenviar = 0; L.desfeita = 0;
-  return 1;
-}
 
-static LegSyncMotivo motivoAudio(void) {
-  switch (audsync_capacidade()) {
-    case AUDSYNC_CAP_OK: return LEGSYNC_M_NENHUM;
-    case AUDSYNC_CAP_PASSTHROUGH: return LEGSYNC_M_AUD_PASSTHROUGH;
-    case AUDSYNC_CAP_SEM_AUDIO: return LEGSYNC_M_AUD_SEM_AUDIO;
-    default: return LEGSYNC_M_AUD_PLATAFORMA;
-  }
-}
 
-void legsync_audio_habilitar(int ligado) {
-  pthread_mutex_lock(&M);
-  if (L.audLigado && !ligado && (L.audPedido || L.audUltimo)) {
-    // Desligado no meio: para a escuta; um offset ja aceito fica (desfazer e
-    // explicito), mas nada novo e pedido.
-    if (L.audPedido) { audsync_cancelar(); L.audPedido = 0; }
-    L.audFalha = AUDSYNC_M_OK;
-  }
-  L.audLigado = ligado != 0;
-  pthread_mutex_unlock(&M);
-}
 
-void legsync_audio_trocou(void) {
-  pthread_mutex_lock(&M);
-  if (L.audPedido) { audsync_cancelar(); L.audPedido = 0; L.audUltimo = 0; }
-  if (L.audUltimo && autosync_estado(L.sync, 0).estado == AUTOSYNC_ANALYSING) {
-    autosync_cancelar(L.sync, 0); L.audUltimo = 0; L.reenviar = 0;
-  }
-  pthread_mutex_unlock(&M);
-}
 
 // Com M. A embutida em curso para: uma referencia por vez.
-static int iniciarAudio(void) {
-  uint64_t pedido; int ok = 0;
-  if (L.refPedido) { legref_cancelar(L.ref); L.refPedido = 0; }
-  pararAudio();
-  zerarAnalise();
-  L.audUltimo = 1;
-  pedido = audsync_pedir(L.sessao, L.primDoc, AUDSYNC_ALVO_SEG, AUDSYNC_RAIO_MS);
-  {
-    AudSyncStatus st = audsync_status();
-    if (st.pedido == pedido && st.fase == AUDSYNC_FALHOU) L.audFalha = st.motivo;
-    else { L.audPedido = pedido; ok = 1; }
-  }
-  return ok;
-}
 
-static int audioPossivel(void) {
-  return L.audLigado && motivoAudio() == LEGSYNC_M_NENHUM && primariaAtual();
-}
 
 // R4: a legenda atual nao sincroniza. Pede outra do mesmo idioma ao trocador
 // (executado fora do lock, no fim de legsync_passo); acabadas as trocas, volta
@@ -430,10 +363,9 @@ static void autoPasso(void) {
       if (L.refDoc) { if (!solicitar(AUTOSYNC_QUICK)) autoFalhou(0); }
       else {
         L.querModo = AUTOSYNC_QUICK; iniciarColeta();
-        if (!L.refPedido) { L.querModo = -1; if (audioPossivel()) { L.autoEtapa = 2; iniciarAudio(); } else autoFalhou(1); }
+        if (!L.refPedido) { L.querModo = -1; autoFalhou(1); }
       }
-    } else if (audioPossivel()) { L.autoEtapa = 2; iniciarAudio(); }
-    else { L.autoFase = 3; L.autoEtapa = 9; }
+    } else { L.autoFase = 3; L.autoEtapa = 9; }
     return;
   }
   e = autosync_estado(L.sync, 0);
@@ -452,17 +384,9 @@ static void autoPasso(void) {
         return;
       }
       // Arquivo sem faixa de texto, sem Range ou fora do ar: sem referencia. Resta o audio.
-      if (audioPossivel()) { L.autoEtapa = 2; iniciarAudio(); }
-      else autoFalhou(1);
+      autoFalhou(1);
     }
-  } else if (L.autoEtapa == 2) {
-    if (L.audPedido) return;
-    if (L.solicitou && e.estado == AUTOSYNC_ACCEPTED) { L.autoFase = 2; L.autoEtapa = 9; return; }
-    if ((L.solicitou && e.estado == AUTOSYNC_REJECTED) || L.audFalha != AUDSYNC_M_OK) {
-      L.autoFase = 3; L.autoEtapa = 9;
-    }
-  }
-}
+  } }
 
 int legsync_acao(int acao) {
   int ok = 0;
@@ -472,7 +396,6 @@ int legsync_acao(int acao) {
     case LEGSYNC_ACAO_RAPIDA: case LEGSYNC_ACAO_COMPLETA: {
       int modo = acao == LEGSYNC_ACAO_COMPLETA ? AUTOSYNC_THOROUGH : AUTOSYNC_QUICK;
       if (!dona() || !L.ref) break;
-      pararAudio();
       L.ultimoModo = modo; L.desfeita = 0;
       if (L.refDoc) ok = solicitar(modo);
       else {
@@ -481,17 +404,13 @@ int legsync_acao(int acao) {
         if (!L.refPedido) ok = 0;
       }
       break; }
-    case LEGSYNC_ACAO_AUDIO:
-      if (!dona() || !L.audLigado || motivoAudio() != LEGSYNC_M_NENHUM || !primariaAtual()) break;
-      ok = iniciarAudio();
-      break;
     case LEGSYNC_ACAO_DESFAZER:
       autosync_desfazer(L.sync, 0);       // mantem o manual
       L.desfeita = 1; L.querModo = -1; L.reenviar = 0; ok = 1;
       break;
     case LEGSYNC_ACAO_OUTRA: {
       int f = L.refFaixa ? L.refFaixa : L.ultimaFaixa, k, ja = 0;
-      if (!dona() || !L.ref || L.semOutra || L.audUltimo) break;
+      if (!dona() || !L.ref || L.semOutra) break;
       if (L.refDoc && L.solicitou) autosync_tentar_outra(L.sync, 0);
       for (k = 0; k < L.nExcl; k++) if (L.excl[k] == f) ja = 1;
       if (f > 0 && !ja && L.nExcl < 16) L.excl[L.nExcl++] = f;
@@ -501,7 +420,6 @@ int legsync_acao(int acao) {
       ok = L.refPedido != 0;
       break; }
     case LEGSYNC_ACAO_PARAR:
-      if (L.audPedido) { audsync_cancelar(); L.audPedido = 0; }
       legref_cancelar(L.ref); L.refPedido = 0;
       autosync_cancelar(L.sync, 0);
       L.querModo = -1; L.reenviar = 0; ok = 1;
@@ -571,24 +489,6 @@ void legsync_passo(const char *url, double pos, double folga, int sensivel, unsi
   }
   // F06: escuta do audio. Seek/buffer pausa (a janela recomeca depois); a
   // janela pronta vira o par de documentos que vai a engine.
-  audsync_passo();
-  if (L.audPedido) {
-    AudSyncStatus st = audsync_status();
-    if (st.pedido != L.audPedido) L.audPedido = 0;
-    else if (st.fase == AUDSYNC_PRONTO) {
-      LegendaDocumento *r = NULL, *c = NULL;
-      if (audsync_tomar(L.audPedido, &r, &c)) {
-        legenda_documento_liberar(L.audRef); legenda_documento_liberar(L.audRec);
-        L.audRef = r; L.audRec = c;
-        L.audPedido = 0;
-        if (!sensivel && dona()) solicitarAudio(); else L.reenviar = 1;
-      }
-    } else if (st.fase == AUDSYNC_FALHOU) {
-      L.audFalha = st.motivo; L.audPedido = 0;
-      fprintf(stderr, "[legsync] audio_sync rejected reason=%s restarts=%d dropped=%ld\n",
-              audsync_motivo(st.motivo), st.reinicios, st.descartados);
-    } else audsync_pausar(sensivel);
-  }
   // TETO DO PLANO AUTOMATICO, SEM PROGRESSO. Na TV do dono a linha
   // "Sincronizacao automatica" ficava em "Sincronizando…" para sempre quando a
   // referencia nunca chegava (leitura parcial pendurada, audio sem fala): o
@@ -605,7 +505,6 @@ void legsync_passo(const char *url, double pos, double folga, int sensivel, unsi
     long long marca = (long long)L.autoEtapa * 1000003LL + L.primFase * 7919LL + (L.refDoc != NULL) * 104729LL +
                       (long long)L.refPedido * 15485863LL + L.solicitou * 31LL + L.nAutoTent * 524287LL;
     if (L.refPedido) { LegRefStatus st = legref_status(L.ref); marca += st.pedidos * 3LL + st.feitos * 131071LL; }
-    if (L.audPedido) { AudSyncStatus st = audsync_status(); marca += (long long)st.progresso * 8191LL + st.fase; }
     if (!L.autoDesde || marca != L.autoMarca) { L.autoDesde = agora | 1u; L.autoMarca = marca; }
     else if (agora - L.autoDesde > LS_AUTO_TETO_MS) {
       printf("[legsync] automatico: %u s sem progresso (etapa %d, fase %d, ref=%d, pedido=%d); a legenda fica como esta\n",
@@ -613,7 +512,6 @@ void legsync_passo(const char *url, double pos, double folga, int sensivel, unsi
       fflush(stdout);
       L.autoFase = 3; L.autoEtapa = 9; L.autoPend = 0; L.autoDesde = 0;
       if (L.refPedido) { legref_cancelar(L.ref); L.refPedido = 0; }
-      if (L.audPedido) pararAudio();
       autosync_cancelar(L.sync, 0);
     }
   } else L.autoDesde = 0;
@@ -635,9 +533,7 @@ void legsync_passo(const char *url, double pos, double folga, int sensivel, unsi
     if (e.estado == AUTOSYNC_ANALYSING) { autosync_cancelar(L.sync, 0); L.reenviar = 1; }
   } else {
     if (!L.calmoDesde) L.calmoDesde = agora | 1u;
-    if (L.audUltimo) {
-      if (L.reenviar && L.audRef && agora - L.calmoDesde >= LS_CALMO_MS && dona()) solicitarAudio();
-    } else if ((L.reenviar || L.querModo >= 0) && L.refDoc && agora - L.calmoDesde >= LS_CALMO_MS && dona())
+    if ((L.reenviar || L.querModo >= 0) && L.refDoc && agora - L.calmoDesde >= LS_CALMO_MS && dona())
       solicitar(L.querModo >= 0 ? L.querModo : L.ultimoModo);
   }
   {
@@ -676,18 +572,10 @@ static LegSyncMotivo motivoRef(LegRefMotivo m) {
   }
 }
 
-static LegSyncMotivo motivoFalhaAudio(AudSyncMotivo m) {
-  switch (m) {
-    case AUDSYNC_M_PLATAFORMA: return LEGSYNC_M_AUD_PLATAFORMA;
-    case AUDSYNC_M_PASSTHROUGH: return LEGSYNC_M_AUD_PASSTHROUGH;
-    case AUDSYNC_M_SEM_FALA: case AUDSYNC_M_CONTINUA: return LEGSYNC_M_AUD_SEM_FALA;
-    default: return LEGSYNC_M_CONFIANCA;
-  }
-}
 
 LegSyncVisao legsync_visao(int slot) {
   LegSyncVisao v; AutoSyncResultado e;
-  int audOk, base;
+  int base;
   memset(&v, 0, sizeof v);
   if (slot == 1) {   // segunda legenda: so o estado da engine, sem acoes
     pthread_mutex_lock(&M);
@@ -712,26 +600,15 @@ LegSyncVisao legsync_visao(int slot) {
   v.autoFase = L.autoFase; v.autoTrocou = L.autoTrocou;
   snprintf(v.autoNome, sizeof v.autoNome, "%s", L.autoNome);
   // F06: so com o ajuste ligado o audio aparece (oferecido ou com o motivo).
-  v.motivoAudio = L.audLigado ? motivoAudio() : LEGSYNC_M_NENHUM;
-  audOk = L.audLigado && v.motivoAudio == LEGSYNC_M_NENHUM;
-  base = (L.ref ? LEGSYNC_ACAO_RAPIDA | LEGSYNC_ACAO_COMPLETA : 0) | (audOk ? LEGSYNC_ACAO_AUDIO : 0);
-  v.audio = L.audUltimo;
+  base = L.ref ? LEGSYNC_ACAO_RAPIDA | LEGSYNC_ACAO_COMPLETA : 0;
   if (L.primTipo == 2) { v.motivo = LEGSYNC_M_EMBUTIDA; goto fim; }
   if (L.primTipo != 1) { v.motivo = LEGSYNC_M_SEM_EXTERNA; goto fim; }
-  if (!L.ref && !audOk && !L.audUltimo) { v.motivo = LEGSYNC_M_PLATAFORMA; goto fim; }
+  if (!L.ref) { v.motivo = LEGSYNC_M_PLATAFORMA; goto fim; }
   if (L.primFase == 0) { v.fase = LEGSYNC_AGUARDANDO; goto fim; }
   if (L.primFase == 2) { v.motivo = LEGSYNC_M_EXTERNA_INCOMPLETA; goto fim; }
   if (!dona()) { v.motivo = LEGSYNC_M_SEM_EXTERNA; goto fim; }
   e = autosync_estado(L.sync, 0);
   v.offsetTotalMs = autosync_offset_ms(L.sync, 0);
-  if (L.audPedido) {
-    AudSyncStatus st = audsync_status();
-    v.acoes = LEGSYNC_ACAO_PARAR;
-    if (st.fase == AUDSYNC_OUVINDO) {
-      v.fase = st.pausado ? LEGSYNC_PAUSADA : LEGSYNC_OUVINDO; v.progresso = st.progresso;
-    } else v.fase = LEGSYNC_ANALISANDO;   // alinhando / entregando a engine
-    goto fim;
-  }
   if (L.reenviar) { v.fase = LEGSYNC_PAUSADA; v.acoes = LEGSYNC_ACAO_PARAR; goto fim; }
   if (L.refPedido) {
     LegRefStatus st = legref_status(L.ref);
@@ -744,23 +621,17 @@ LegSyncVisao legsync_visao(int slot) {
   }
   if (e.estado == AUTOSYNC_ACCEPTED && !L.desfeita) {
     v.fase = LEGSYNC_ACEITA; v.offsetAutoMs = e.offsetMs;
-    v.acoes = LEGSYNC_ACAO_DESFAZER | (L.semOutra || L.audUltimo || !L.ref ? 0 : LEGSYNC_ACAO_OUTRA);
+    v.acoes = LEGSYNC_ACAO_DESFAZER | (L.semOutra || !L.ref ? 0 : LEGSYNC_ACAO_OUTRA);
     goto fim;
   }
   v.acoes = base;
   if (L.desfeita) {
-    v.fase = LEGSYNC_DESFEITA; v.acoes |= L.semOutra || L.audUltimo || !L.ref ? 0 : LEGSYNC_ACAO_OUTRA; goto fim;
+    v.fase = LEGSYNC_DESFEITA; v.acoes |= L.semOutra || !L.ref ? 0 : LEGSYNC_ACAO_OUTRA; goto fim;
   }
-  if (L.audUltimo && L.audFalha != AUDSYNC_M_OK) {
-    v.motivo = motivoFalhaAudio(L.audFalha);
-    v.fase = v.motivo == LEGSYNC_M_AUD_PASSTHROUGH || v.motivo == LEGSYNC_M_AUD_PLATAFORMA
-           ? LEGSYNC_INDISPONIVEL : LEGSYNC_RECUSADA;
-    goto fim;
-  }
-  if (L.semOutra) { v.fase = LEGSYNC_INDISPONIVEL; v.motivo = LEGSYNC_M_SEM_OUTRA; v.acoes = audOk ? LEGSYNC_ACAO_AUDIO : 0; goto fim; }
+  if (L.semOutra) { v.fase = LEGSYNC_INDISPONIVEL; v.motivo = LEGSYNC_M_SEM_OUTRA; v.acoes = 0; goto fim; }
   if (L.solicitou && e.estado == AUTOSYNC_REJECTED) {
     v.fase = LEGSYNC_RECUSADA; v.motivo = LEGSYNC_M_CONFIANCA;
-    if (!L.audUltimo && L.ref) v.acoes |= LEGSYNC_ACAO_OUTRA;
+    if (L.ref) v.acoes |= LEGSYNC_ACAO_OUTRA;
     goto fim;
   }
   if (!L.refDoc && L.refMotivo != LEGREF_OK && L.refMotivo != LEGREF_PARADO) {
@@ -769,7 +640,6 @@ LegSyncVisao legsync_visao(int slot) {
     // do ARQUIVO/servidor: so tentar de novo (rede) ou nada.
     v.acoes = (L.refMotivo == LEGREF_SEM_DURACAO || L.refMotivo == LEGREF_INCOMPLETO) ? LEGSYNC_ACAO_OUTRA
             : L.refMotivo == LEGREF_REDE ? LEGSYNC_ACAO_RAPIDA : 0;
-    if (audOk) v.acoes |= LEGSYNC_ACAO_AUDIO;
     goto fim;
   }
   v.fase = LEGSYNC_PRONTA;

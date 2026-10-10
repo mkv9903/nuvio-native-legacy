@@ -80,9 +80,6 @@ static int carregar(void) {
 }
 char *dados_ler(const char *n)        { (void)n; return 0; }
 int   dados_gravar_leve(const char *n, const char *c) { (void)n;(void)c; return 1; }
-void  dados_marcar_sujo(int l)        { (void)l; }
-void  dados_fs_travar(void)           {}
-void  dados_fs_liberar(void)          {}
 char *dados_caminho(char *d, unsigned t, const char *n) { (void)d;(void)t;(void)n; return 0; }
 int   dados_apagar(const char *n)     { (void)n; return 0; }
 const char *dados_dir(void)           { return "/tmp"; }

@@ -30,7 +30,6 @@ int  ajustes_pediu_velocidade(void);
 // Itens da barra lateral que a pessoa pode esconder (#162). 1 = aparece.
 int  ajustes_menu_explorar(void);
 int  ajustes_menu_guia(void);
-int  ajustes_menu_agenda(void);
 int  ajustes_menu_perfil(void);
 // "Trailer do cartaz em foco" (#124, focusedPosterBackdropTrailerEnabled),
 // ja considerando a dependencia: 1 so com expandir ou cartaz deitado ligados.
@@ -47,8 +46,6 @@ void ajustes_abrir_na_cor(void);
 void ajustes_abrir_na_fonte(void);
 // Atalhos do cartao da 1.6.0: Ajustes › Layout na linha "Layout da home", e
 // Ajustes › Aparência na linha "Interface de vidro". Mesma regra da cor.
-void ajustes_abrir_no_layout(void);
-void ajustes_abrir_no_vidro(void);
 // O "Reconectar" do modal do Trakt na ilha (02/10): pousa na linha do Trakt,
 // onde o OK comeca o pareamento.
 void ajustes_abrir_no_trakt(void);
@@ -59,12 +56,12 @@ void ajustes_abrir_na_espera_fonte(void);
 // guia. `daNovidades` = 1 quando quem abriu foi o cartao da 1.8.0: o guia
 // ganha "Voltar às novidades" e o Voltar dele devolve ao cartao
 // (ajustes_pediu_novidades, lido e zerado pelo app.c).
-void ajustes_abrir_no_guia(int daNovidades);
+void ajustes_abrir_no_guia(void);
 // O guia esta na tela (por cima das ilhas de Ajustes).
 int  ajustes_guia_aberto(void);
-// Os atalhos "Abrir o Guia de TV / a Biblioteca / a Agenda / o Explorar /
+// Os atalhos "Abrir o Guia de TV / a Biblioteca / o Explorar /
 // Perfil e Stats" do guia: 1..5 na ordem, lido e zerado pelo app.c.
-enum { AJ_TELA_GUIA_TV = 1, AJ_TELA_BIBLIOTECA, AJ_TELA_AGENDA, AJ_TELA_EXPLORAR, AJ_TELA_PERFIL };
+enum { AJ_TELA_GUIA_TV = 1, AJ_TELA_BIBLIOTECA, AJ_TELA_EXPLORAR = 4, AJ_TELA_PERFIL };
 int  ajustes_pediu_tela(void);
 // O guia para o Spotlight no modo guia (spot_abrir_guia): as entradas que
 // casam com `consulta` (titulo antes de texto), os textos de cada uma e a
@@ -106,7 +103,6 @@ int ajustes_dolby_atmos(void);
 int ajustes_pausa_overlay(void);
 int ajustes_classif_player(void);   // 1 = mostra a classificacao/guia parental no player (padrao)
 // "O que achou?" nos creditos (reacao.h). Ligado de fabrica.
-int ajustes_reacao_creditos(void);
 // Medidor de desempenho na ilha do relogio (desempenho.h): Desempenho desta TV,
 // local. 0 = desligado, 1 = Minimo, 2 = Menor, 3 = Grande (DS_* de desempenho.h).
 int ajustes_medidor_desempenho(void);
@@ -197,15 +193,6 @@ int  ajustes_vidro_contorno(void);
 int  ajustes_addons_do_principal(void);
 // So para as capturas de teste e o atalho de quem ja sabe: grava como a tela.
 void ajustes_definir_vidro(int ligado);
-// P2P EXPERIMENTAL (p2p.h). Desligado de fabrica. O endereco (o servidor de
-// streaming do Stremio na rede local) e por aparelho, em p2p.txt.
-int  ajustes_p2p_ligado(void);
-void ajustes_definir_p2p_ligado(int ligado);
-// Endereco ja normalizado ("http://192.168.1.5:11470"); "" quando nao ha.
-const char *ajustes_p2p_url(void);
-// Normaliza e grava; texto vazio esquece. 0 se o texto nao e um endereco (nada
-// muda), 1 se gravou.
-int  ajustes_definir_p2p_url(const char *texto);
 // A MESMA cor mais a TINTA que contrasta com ela (acentos-mockup.html, 03/10):
 // 0.071 (#121316) sobre os CLAROS e 1.0 (branco) sobre os PROFUNDOS — a que
 // le a 4,5:1 ou mais (tests/acentos.sh). Com Textura e um titulo em cena, a
@@ -269,11 +256,11 @@ int   ajustes_hero_fonte(void);         // origem local da arte do hero (ARTEHER
 // 1 = destaque/detalhe com foto diferente da do card (regra em artehero.h).
 int   ajustes_hero_arte_diferente(void);
 int   ajustes_ps_fundo(void);            // 0 filmes, 1 listras, 2 arte do perfil, 3 luz, 4 projetor
-int   ajustes_ps_fundo_automatico(void); // #90: fundo da escolha de perfil (psfundo.c)
+ // #90: fundo da escolha de perfil (psfundo.c)
 // Teto de memoria para imagens escolhido em Ajustes, em MB; 0 = automatico.
 int   ajustes_tex_mb(void);
 int   ajustes_posteres_deitados(void);  // modernLandscapePostersEnabled
-int   ajustes_gradiente_foco_classico(void); // classicFocusGradientEnabled
+ // classicFocusGradientEnabled
 // #95: 1 = ao reabrir, fileiras comecam no primeiro tile (ignora home-pos.txt).
 // x onde o conteudo comeca. Nao e constante: o recuo e sempre 104 e a rail
 // soma os 144 dela quando esta fixa.
@@ -323,7 +310,7 @@ void  ajustes_area_conteudo(float padEsq, float padDir, float *x, float *w);
 
 // --- LAYOUT: rotulos e metadados --------------------------------------------
 int   ajustes_rotulos_poster(void);     // posterLabelsEnabled
-int   ajustes_nome_addon(void);         // catalogAddonNameEnabled
+         // catalogAddonNameEnabled
 int   ajustes_sufixo_tipo(void);        // catalogTypeSuffixEnabled
 int   ajustes_ocultar_nao_lancados(void);   // hideUnreleasedContent
 void  ajustes_definir_ocultar_nao_lancados(int ligado);
@@ -379,7 +366,7 @@ void  ajustes_definir_destaque(int fonte, int diferente);
 int   ajustes_notas_home(void);
 // discoverLocation: 0 in_search, 1 in_sidebar, 2 off
 int   ajustes_local_descobrir(void);
-int   ajustes_descobrir_na_busca(void); // searchDiscoverEnabled (derivado)
+ // searchDiscoverEnabled (derivado)
 
 // --- LAYOUT: continuar assistindo -------------------------------------------
 // "Resolucao da interface" (RES_* em resolucao.h; padrao Automatica = 1080p).
@@ -412,9 +399,9 @@ int   ajustes_leg2_cor(void);
 int   ajustes_leg2_fundo(void);
 int   ajustes_leg2_borda(void);
 int   ajustes_legenda_forcada_auto(void);    // #287: 1 = audio in the subtitle language -> only the forced track (local, default on)
-int   ajustes_legenda_sync_audio(void);      // 1 = offer "Por audio" in subtitle AutoSync (F06; local, default off)
-int   ajustes_trailer_zoom_tpk(void);        // #241: 1 = experimental trailer zoom on the native .tpk (local, default off)
-int   ajustes_cache_seek_mb(void);           // F07: seek cache limit in MB for the next video (0 = off / not on this TV)
+      // 1 = offer "Por audio" in subtitle AutoSync (F06; local, default off)
+        // #241: 1 = experimental trailer zoom on the native .tpk (local, default off)
+           // F07: seek cache limit in MB for the next video (0 = off / not on this TV)
 #ifdef AJUSTES_TESTE
 void  ajustes_teste_escala(int percentual); // fixture only; does not persist
 #endif
@@ -458,7 +445,7 @@ int   ajustes_cw_ordem(void);
 int   ajustes_dts_ac3(void);             // 1 = DTS convertido em AC3 5.1 (LG); 0 = AAC estereo
 int   ajustes_ps_continuar(void);        // #303: 0 = sem o cartao "continuar" na escolha de perfil
 int   ajustes_hist_conta(void);          // 1 = this profile's history goes to the Nuvio account (per profile, default on)
-int   ajustes_social(void);              // 1 = friends/social features on (per profile, default on)
+              // 1 = friends/social features on (per profile, default on)
 int   ajustes_dv_mkv(void);              // 1 = Dolby Vision MKV through our demux (webOS, local, default off)
 int   ajustes_cw_retido_tambem(void);   // 1 = o titulo da ilha/Retomar tambem fica em Continuar assistindo
 // Percentual (70-98, padrao 90) a partir do qual o episodio conta como

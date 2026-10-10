@@ -802,14 +802,6 @@ int legenda_cues(double posSeg, int atrasoMs, LegendaCue *dst, int max) {
   return achados;
 }
 
-int legenda_texto(double posSeg,int atrasoMs,char *dst,size_t tam) {
-  LegendaCue c;
-  if(!dst||!tam)return 0;
-  dst[0]=0;
-  if(legenda_cues(posSeg,atrasoMs,&c,1)!=1)return 0;
-  snprintf(dst,tam,"%s",c.texto);
-  return 1;
-}
 
 struct LegendaDocumento {
   pthread_mutex_t trava;

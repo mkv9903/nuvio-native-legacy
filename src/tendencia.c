@@ -152,14 +152,3 @@ int tend_delta(const char *chave, const char *imdb, int *delta, int *novo) {
   pthread_mutex_unlock(&trava);
   return ok;
 }
-
-const char *tend_desde(const char *chave) {
-  static char d[12];
-  const Fila *f;
-  d[0] = 0;
-  pthread_mutex_lock(&trava);
-  f = achar(chave);
-  if (f && f->temAnterior) snprintf(d, sizeof d, "%s", f->desde);
-  pthread_mutex_unlock(&trava);
-  return d;
-}

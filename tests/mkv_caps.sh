@@ -5,6 +5,6 @@
 set -eu
 cd "$(dirname "$0")/.."
 cc -Isrc tests/mkv_caps.c src/net.c src/net_url.c -o /tmp/nuvio-mkv-caps-tests \
-  -I/opt/homebrew/include -Wno-deprecated-declarations 2>/dev/null || \
-cc -Isrc tests/mkv_caps.c src/net.c src/net_url.c -o /tmp/nuvio-mkv-caps-tests -I/opt/homebrew/include
+  -DNV_LINUX_DESKTOP $(pkg-config --cflags sdl2 SDL2_image SDL2_ttf) -Wno-deprecated-declarations 2>/dev/null || \
+cc -Isrc tests/mkv_caps.c src/net.c src/net_url.c -o /tmp/nuvio-mkv-caps-tests -DNV_LINUX_DESKTOP $(pkg-config --cflags sdl2 SDL2_image SDL2_ttf)
 /tmp/nuvio-mkv-caps-tests

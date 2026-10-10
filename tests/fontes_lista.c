@@ -152,28 +152,5 @@ int main(void) {
   tecla(SDLK_ESCAPE);
   puts("fontes_lista: sem debrid so saem os torrents sem url");
 
-  // P2P EXPERIMENTAL (p2p.h): ligado E com endereco, o torrent sem url deixa de
-  // ser descartado — mesmo sem debrid — e a folha o lista. Ligado SEM endereco,
-  // ou com endereco e DESLIGADO, nada muda (a fabrica e desligado).
-  assert(!ajustes_p2p_ligado());
-  ajustes_definir_p2p_ligado(1);
-  stream_definir_lista(l, n);
-  assert(stream_n() == N_A + N_C);                 // ligado, mas sem endereco
-  assert(!ajustes_definir_p2p_url("ftp://x"));     // endereco torto e recusado
-  assert(ajustes_definir_p2p_url("192.168.1.5"));
-  assert(!strcmp(ajustes_p2p_url(), "http://192.168.1.5:11470"));
-  stream_definir_lista(l, n);
-  assert(stream_n() == N_TOTAL);
-  stream_folha_abrir();
-  assert(stream_folha_n() == N_TOTAL);
-  tecla(SDLK_ESCAPE);
-  assert(stream_qtd_torrents() == N_B);
-  ajustes_definir_p2p_ligado(0);                   // desligado: volta ao de hoje
-  stream_definir_lista(l, n);
-  assert(stream_n() == N_A + N_C);
-  assert(stream_qtd_torrents() == 0);
-  ajustes_definir_p2p_url("");                     // vazio esquece o endereco
-  assert(!ajustes_p2p_url()[0]);
-  puts("fontes_lista: P2P so mantem os torrents ligado e com endereco");
   return 0;
 }

@@ -4,10 +4,6 @@
 #include <string.h>
 #include <stdint.h>
 
-#if defined(__EMSCRIPTEN__) || defined(_WIN32)
-void crash_arm(const char *file) { (void)file; }
-int  crash_report(const char *file) { (void)file; return 0; }
-#else
 #include <signal.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -62,7 +58,7 @@ static void crash_handler(int sig, siginfo_t *si, void *ctx) {
     lr = u->uc_mcontext.arm_lr;
     sp = u->uc_mcontext.arm_sp;
   }
-#elif defined(__linux__) && defined(__aarch64__)
+#elif (defined(__linux__) && defined(__aarch64__))
   {
     ucontext_t *u = ctx;
     pc = u->uc_mcontext.pc;
@@ -240,7 +236,6 @@ int crash_report(const char *file) {
   free(m);
   return 1;
 }
-#endif
 
 // Backward compatibility wrappers
 void queda_armar(const char *arquivo) { crash_arm(arquivo); }

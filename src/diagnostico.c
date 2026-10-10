@@ -366,10 +366,6 @@ static RedeControle controleDiagnostico(long maxBytes) {
   return c;
 }
 
-// SEM dados_fs_travar EM VOLTA de dados_gravar/ler/apagar: cada um ja trava
-// por dentro, e a trava do Tizen nao e recursiva. As duas juntas no fio de
-// desenho congelavam a Samsung no OK da apresentacao (issue #113, 1.4.2); na
-// LG a trava e vazia e nada aparecia. tests/diagnostico.sh liga a trava real.
 static void marcarApresentacaoVista(void) {
   dados_gravar("diagnostico-otimizacao-intro.cfg", "versao=1\n");
 }
@@ -1571,11 +1567,7 @@ static MnRes medirNucleo(const VazCand *c, int janelaS, char hosts[][96], int nH
   if (!cab && !vz.rede) {
     if (rede_url_final(c->url, DIAG_TIMEOUT_S, fim, sizeof fim)) alvo = fim;
     else {
-#ifdef __EMSCRIPTEN__
-      *cat = VR_NAVEGADOR;
-#else
       *cat = VR_SEM_RESPOSTA;
-#endif
       *motivo = MOT_RESOLVEU;
       return MN_FALHA;
     }
@@ -2329,11 +2321,6 @@ void diagnostico_intro_primeira_vez(void) {
 
 int diagnostico_intro_aberto(void) { return introGlobal; }
 
-void diagnostico_intro_dispensar(int marcarVista) {
-  introDecidido = 1;
-  introGlobal = 0;
-  if (marcarVista) marcarApresentacaoVista();
-}
 
 void diagnostico_intro_evento(const SDL_Event *e) {
   SDL_Keycode k;

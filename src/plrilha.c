@@ -116,14 +116,12 @@ void plrilha_relogio(float a, double f) {
 
 void plrilha_velocidade(int cent) { velCent = cent > 0 ? cent : VEL_NORMAL; }
 
-void plrilha_esconder(void) { escondida = 1; }
 
 int plrilha_direita(void) {
   return 1;   // sempre a direita (dono, 03/10)
 }
 
 int plrilha_rect(GfxRect *r) { if (ultOk && r) *r = ultRect; return ultOk; }
-float plrilha_corpo_alfa(void) { return temUlt ? corpoA : 0.0f; }
 
 // --- a linha da pilula ------------------------------------------------------------
 typedef struct {

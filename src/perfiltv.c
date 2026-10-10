@@ -1,7 +1,7 @@
 // Tabela de padroes por aparelho e regra de comparacao do otimizador. Ver
 // perfiltv.h para o porque de morar tudo aqui.
 //
-// A TABELA (RAM = MemTotal na LG, navigator.deviceMemory no Tizen):
+// A TABELA (RAM = MemTotal na LG):
 //
 //   aparelho            textura  teto   fios rede  heroi
 //   LG sem MemTotal       96     160       4       1920
@@ -10,11 +10,6 @@
 //   LG  < 2 GB           128     160       4       1920   webOS 4/5 menores
 //   LG  < 3 GB (C9)      128     300       4       1920   medido na C9
 //   LG >= 3 GB           192     512       4       1920   C1/C2/C3
-//   Samsung sem devMem    96      96       2       1280
-//   Samsung <= 1 GB       64      64       2       1280
-//   Samsung 2 GB          96      96       2       1280*
-//   Samsung >= 4 GB      128     128       2       1280*
-//   (* 1920 so com Qualidade da imagem = Alta, regra de tetoDoHeroi)
 //
 // DE ONDE SAIU CADA COLUNA:
 // - textura/teto: a escada que ja existia em tex_cache.c (orcamentoMB e
@@ -38,46 +33,15 @@
 //   diagnostico=v2): nesta faixa o pico chegou a 160 de 160 MB e houve arte
 //   VISIVEL despejada em 12 de 27 relatorios. 128 e o degrau seguinte da
 //   escada, abaixo do teto de 160 que ja valia; fios e heroi nao mudam.
-// - fios de rede: o build cria 4 na LG e 2 no Tizen (NV_TEX_FIOS_REDE). Na LG
-//   de 1 GB ficam 2 ativos: cada fio segura um corpo baixado ate o decode
-//   (ate 12 MB de fundo), e 4 corpos em voo numa TV com ~300 MB livres e o
-//   caminho do OOM que no webOS fecha o app sem aviso. No Tizen os 2 seguem:
-//   cada fetch passa pelo fio principal (nota de ADD_FIOS em addons.c), e
-//   ninguem mediu 1 melhor que 2 na Samsung.
-// - heroi: 1920 e a largura do painel (8,3 MB por arte). 1280 custa 3,7 MB e
-//   e o teto de fabrica do Tizen (heap fixo de 256 MiB; registro 1450: fundos
-//   grandes levaram o heap a 5,7 MiB livres e a Aborted(OOM)). Na LG abaixo de
-//   1,2 GB o heroi desce ao mesmo 1280 pelo mesmo motivo de RAM.
+// - fios de rede: ate 4; abaixo de 1,2 GB ficam 2 ativos para limitar a RAM
+//   dos corpos de imagem em voo.
+// - heroi: 1920 px, ou 1280 px abaixo de 1,2 GB.
 #include "perfiltv.h"
 #include "layout.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-// A TABELA DO .tpk NATIVO (PTV_TPK, 29/09/2026). Ate aqui o .tpk caia no ramo
-// da LG (ptv_plataforma so conhecia __EMSCRIPTEN__), entao uma Samsung 2019 de
-// 1108 MB recebia a faixa "LG < 1,2 GB": 48 MB de textura, 2 fios, heroi 1280.
-// Aquela faixa desceu por OOM do webOS (registros 1720-1774), que NINGUEM
-// mediu na Samsung nativa. O que foi medido nela (registro D1 8825, Tizen 5.0,
-// Mali-TDVX, 1108 MB): textura em 47,6 de 48 MB com ate ~150 despejos por
-// janela de 3 s — o cache gira o tempo todo.
-//
-//   aparelho (MemTotal)   textura  teto   fios rede  heroi
-//   tpk sem MemTotal        96      96       4       1280
-//   tpk  < 1,2 GB           64      96       2       1280
-//   tpk  < 2,5 GB           96     160       4       1280 (1920 com >= 2 GB e GPU nao fraca)
-//   tpk >= 2,5 GB          128     256       4       1920 (1280 com GPU fraca)
-//
-// - textura < 1,2 GB: 64, um degrau acima dos 48 que despejavam ~150 por
-//   janela, e o mesmo numero que o .wgt ja usa na Samsung de 1 GB. NAO e
-//   medido que 64 cabe sem o sistema matar o app: e o palpite conservador, e
-//   o `rss=` do relatorio de FPS e quem confirma na TV.
-// - fios: o .tpk cria 4 (NV_TEX_FIOS_REDE nativo, curl proprio como na LG);
-//   abaixo de 1,2 GB ficam 2 pelo mesmo motivo de memoria da LG (cada fio
-//   segura um corpo baixado ate o decode).
-// - heroi: GPU fraca fica em 1280 em qualquer RAM. A arte de tela cheia e o
-//   maior desenho da home; 1280 e 3,7 MB contra 8,3 MB de 1920, e numa GPU
-//   presa em preenchimento cada byte lido por quadro conta.
 static int gpuFraca = 0;
 void ptv_definir_gpu_fraca(int f) { gpuFraca = f ? 1 : 0; }
 int  ptv_gpu_fraca_atual(void) { return gpuFraca; }
@@ -90,48 +54,24 @@ int ptv_gpu_fraca(const char *r) {
   m += 5;
   // Utgard (Mali-400/450/470): so GLES2, o mais fraco de todos.
   if (m[0] == '4' && m[1] >= '0' && m[1] <= '9') return 1;
-  // Midgard (Mali-T6xx/T7xx/T8xx) e o "Mali-TDVX" que a Samsung rebatiza.
+  // Midgard (Mali-T6xx/T7xx/T8xx), including the Mali-TDVX renderer name.
   if (m[0] == 'T') return 1;
   return 0;
 }
 
 PtvPlataforma ptv_plataforma(void) {
-#if defined(__EMSCRIPTEN__)
-  return PTV_TIZEN;
-#elif defined(NV_TPK)
-  return PTV_TPK;
-#elif defined(NV_ANDROID)
-  return PTV_ANDROID;
-#else
   return PTV_LG;
-#endif
 }
 
-// Android previously used PTV_LG. Preserve its budgets and mode behavior
-// until physical-device measurements justify a separate resource policy.
 const char *ptv_plataforma_nome(PtvPlataforma p) {
   switch (p) {
     case PTV_LG: return "lg";
-    case PTV_TIZEN: return "tizen_wgt";
-    case PTV_TPK: return "tizen_tpk";
-    case PTV_ANDROID: return "android";
     default: return "unknown";
   }
 }
 
 int ptv_tex_auto_mb(PtvPlataforma p, long mem) {
-  if (p == PTV_TPK) {
-    if (!mem) return NV_TEX_ORCAMENTO_MB;
-    if (mem < 1200) return 64;
-    if (mem < 2500) return 96;
-    return 128;
-  }
-  if (p == PTV_TIZEN) {
-    if (!mem) return NV_TEX_ORCAMENTO_MB;
-    if (mem <= 1024) return 64;
-    if (mem < 4096) return 96;
-    return 128;
-  }
+  (void)p;
   if (!mem) return NV_TEX_ORCAMENTO_MB;
   if (mem < 1200) return 48;
   if (mem < 3000) return 128;   // 1,2-2 GB e a C9: ver a tabela no topo
@@ -139,12 +79,7 @@ int ptv_tex_auto_mb(PtvPlataforma p, long mem) {
 }
 
 int ptv_tex_teto_mb(PtvPlataforma p, long mem) {
-  if (p == PTV_TIZEN) return ptv_tex_auto_mb(p, mem);
-  if (p == PTV_TPK) {
-    if (!mem || mem < 1200) return 96;
-    if (mem < 2500) return 160;
-    return 256;
-  }
+  (void)p;
   if (!mem) return 160;
   if (mem < 1200) return 64;
   if (mem < 2000) return 160;
@@ -152,7 +87,7 @@ int ptv_tex_teto_mb(PtvPlataforma p, long mem) {
   return 512;
 }
 
-int ptv_fios_rede_max(PtvPlataforma p) { return p == PTV_TIZEN ? 2 : 4; }
+int ptv_fios_rede_max(PtvPlataforma p) { (void)p; return 4; }
 
 // Fios que a RAM aceita: a LG abaixo de 1,2 GB fica nos 2 da tabela em
 // QUALQUER perfil — padrao, candidato de Qualidade ou perfil salvo. Antes so
@@ -160,15 +95,13 @@ int ptv_fios_rede_max(PtvPlataforma p) { return p == PTV_TIZEN ? 2 : 4; }
 // (4), e LGs de 658 MB aprovaram 64 MB com 4 fios (diagnostico de campo,
 // pessoas 80cd1a98 e f9f204be) — os 4 corpos em voo que a tabela evita.
 static int fiosTeto(PtvPlataforma p, long mem) {
-  if ((p == PTV_LG || p == PTV_ANDROID || p == PTV_TPK) && mem && mem < 1200) return 2;
+  if (mem && mem < 1200) return 2;
   return ptv_fios_rede_max(p);
 }
 
-// Teto de heroi que a RAM aceita. No Tizen 1920 so passa com 2 GB ou mais
-// (a mesma linha de tetoDoHeroi); abaixo disso, 1280 sempre.
+// Hero width allowed by the available RAM.
 int ptv_heroi_max(PtvPlataforma p, long mem) {
-  if (p == PTV_TIZEN) return mem >= 2000 ? 1920 : 1280;
-  if (p == PTV_TPK && !mem) return 1280;
+  (void)p;
   if (mem && mem < 1200) return 1280;
   return 1920;
 }
@@ -177,30 +110,22 @@ void ptv_padrao(PtvPlataforma p, long mem, PtvPerfil *out) {
   if (!out) return;
   out->texMb = ptv_tex_auto_mb(p, mem);
   out->fiosRede = fiosTeto(p, mem);
-  // Padrao do Tizen e 1280 mesmo com 2 GB: 1920 la e escolha de quem pos a
-  // qualidade em Alta, nunca o padrao (ver a tabela no topo).
-  out->heroiLarg = p == PTV_TIZEN ? 1280 : ptv_heroi_max(p, mem);
-  // .tpk: 1920 so com 2 GB ou mais E GPU que nao e das fracas (tabela acima).
-  if (p == PTV_TPK && (gpuFraca || mem < 2000)) out->heroiLarg = 1280;
+  out->heroiLarg = ptv_heroi_max(p, mem);
 }
 
 // QUALIDADE = o teto que a RAM permite em tudo. DESEMPENHO = menos pressao:
-// o orcamento automatico, metade dos fios (nunca menos que 2 na LG; o Tizen
-// ja esta no minimo medido) e heroi em 1280.
+// o orcamento automatico, ate 2 fios e heroi em 1280.
 void ptv_candidato(PtvPlataforma p, long mem, PtvModo modo, int travado,
                    PtvPerfil *out) {
   if (!out) return;
   if (modo == PTV_DESEMPENHO) {
     ptv_padrao(p, mem, out);
-    if ((p == PTV_LG || p == PTV_ANDROID) && out->fiosRede > 2) out->fiosRede = 2;
+    if (out->fiosRede > 2) out->fiosRede = 2;
     out->heroiLarg = 1280;
   } else {
     out->texMb = ptv_tex_teto_mb(p, mem);
     out->fiosRede = ptv_fios_rede_max(p);
     out->heroiLarg = ptv_heroi_max(p, mem);
-    // Tizen: o candidato de Qualidade nao sobe o heroi por conta propria. O
-    // 1920 continua dependendo da escolha Alta (tetoDoHeroi), e o teto aqui so
-    // deixa de ser o gargalo quando ela existe.
   }
   if (travado > 0) out->texMb = travado;
   ptv_limitar(p, mem, out);

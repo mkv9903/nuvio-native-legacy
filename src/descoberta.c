@@ -660,23 +660,6 @@ static void urlEscapar(const char *s, char *dst, size_t tam) {
   dst[o] = 0;
 }
 
-static int lerBusca(const char *tipo, const char *termo, CatItem *saida,
-                    int max) {
-  char *corpo;
-  const char *p;
-  int n = 0;
-  corpo = metaprov_busca_com(tipo, termo, METAPROV_NUVIO_S, 20, metaprov_get_rede,
-                             NULL, NULL);
-  if (!corpo) return 0;
-  p = js_array(corpo, NULL, "metas");
-  while (p && n < max) {
-    const char *f = js_fim(p);
-    if (deMeta(p, f, tipo, &saida[n])) n++;
-    p = js_prox(f);
-  }
-  free(corpo);
-  return n;
-}
 
 // --- ALVOS DE BUSCA ---------------------------------------------------------
 //
@@ -5101,15 +5084,6 @@ static void locGuardar(const char *chave, const char *tit, const char *sin,
 // configuracao, e arquivo de outra conta e descartado. Sem pasta gravavel
 // (dados_dir vazio, os testes) nao ha arquivo e tudo segue so na memoria.
 #include "dados.h"
-#ifdef __EMSCRIPTEN__
-#define LOC_FS_TRAVAR()   dados_fs_travar()
-#define LOC_FS_LIBERAR()  dados_fs_liberar()
-#define LOC_MARCAR_SUJO() dados_marcar_sujo(1)
-#else
-#define LOC_FS_TRAVAR()   ((void)0)
-#define LOC_FS_LIBERAR()  ((void)0)
-#define LOC_MARCAR_SUJO() ((void)0)
-#endif
 static int locDiscoLido;
 
 static int locCaminho(char *dst, size_t n) {
@@ -5153,9 +5127,9 @@ static void locSalvarDisco(void) {
   if (!locCaminho(caminho, sizeof caminho)) return;
   snprintf(tmp, sizeof tmp, "%s.tmp", caminho);
   locIdentidade(ident, sizeof ident);
-  LOC_FS_TRAVAR();
+
   f = fopen(tmp, "w");
-  if (!f) { LOC_FS_LIBERAR(); return; }
+  if (!f) { return; }
   fprintf(f, "%s\n", ident);
   pthread_mutex_lock(&locTrava);
   for (i = 0; i < LOC_N; i++) {
@@ -5169,8 +5143,8 @@ static void locSalvarDisco(void) {
   }
   pthread_mutex_unlock(&locTrava);
   if (fclose(f) != 0 || rename(tmp, caminho) != 0) remove(tmp);
-  LOC_FS_LIBERAR();
-  LOC_MARCAR_SUJO();
+
+
   printf("[desc] texto localizado gravado: %d titulo(s)\n", n);
   fflush(stdout);
 }
@@ -5182,15 +5156,15 @@ static void locLerDisco(void) {
   int n = 0;
   if (__atomic_exchange_n(&locDiscoLido, 1, __ATOMIC_ACQ_REL)) return;
   if (!locCaminho(caminho, sizeof caminho)) return;
-  LOC_FS_TRAVAR();
+
   f = fopen(caminho, "r");
-  if (!f) { LOC_FS_LIBERAR(); return; }
+  if (!f) { return; }
   locIdentidade(ident, sizeof ident);
   if (!fgets(linha, sizeof linha, f) || strncmp(linha, ident, strlen(ident)) ||
       (linha[strlen(ident)] != '\n' && linha[strlen(ident)] != 0)) {
     fclose(f);
     remove(caminho);
-    LOC_FS_LIBERAR();
+
     printf("[desc] texto localizado do disco descartado (outra conta/perfil)\n");
     fflush(stdout);
     return;
@@ -5217,7 +5191,7 @@ static void locLerDisco(void) {
   }
   pthread_mutex_unlock(&locTrava);
   fclose(f);
-  LOC_FS_LIBERAR();
+
   printf("[desc] texto localizado do disco: %d titulo(s)\n", n);
   fflush(stdout);
 }
@@ -5229,9 +5203,9 @@ void desc_loc_apagar(void) {
   locProx = 0;
   pthread_mutex_unlock(&locTrava);
   if (!locCaminho(caminho, sizeof caminho)) return;
-  LOC_FS_TRAVAR();
-  if (remove(caminho) == 0) LOC_MARCAR_SUJO();
-  LOC_FS_LIBERAR();
+
+  remove(caminho);
+
 }
 
 // Id do titulo ("tt123" de "tt123:1:2") e tipo do meta ("movie"/"series") de um
@@ -7006,7 +6980,6 @@ int  desc_vertudo_n(void) { pthread_mutex_lock(&vtTrava);int n=vtN;pthread_mutex
 int  desc_vertudo_carregando(void) { pthread_mutex_lock(&vtTrava);int n=vtFioVivo;pthread_mutex_unlock(&vtTrava);return n; }
 int  desc_vertudo_fim(void) { pthread_mutex_lock(&vtTrava);int n=vtFim;pthread_mutex_unlock(&vtTrava);return n; }
 int  desc_vertudo_erro(void) { pthread_mutex_lock(&vtTrava);int n=vtErro;pthread_mutex_unlock(&vtTrava);return n; }
-void desc_vertudo_fechar(void) { /* guarda o que leu; ver desc_vertudo_abrir */ }
 
 int desc_vertudo_item(int i, CatItem *dst) {
   int ok = 0;

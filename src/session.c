@@ -306,9 +306,6 @@ static void *thread_request(void *u) {
   char *resp;
   int st = 0;
   (void)u;
-#ifdef NV_TPK40
-  nv_tpk40_etapa("note sign-in-thread started");
-#endif
   error_msg[0] = 0;
   code[0] = 0;
   login_url[0] = 0;
@@ -641,15 +638,9 @@ void sessao_passo(unsigned agoraMs) { session_step(agoraMs); }
 void sessao_cancelar(void) { session_cancel(); }
 void sessao_login_email(const char *email, const char *senha) { session_login_email(email, senha); }
 const char *sessao_erro_email(void) { return session_error_email(); }
-void sessao_email_erro_de(int status, const char *corpo, char *dst, unsigned tam) {
-  session_email_error_from(status, corpo, dst, tam);
-}
 void sessao_sair(void) { session_logout(); }
 char *sessao_rpc(const char *funcao, const char *corpoJson, int *status) {
   return session_rpc(funcao, corpoJson, status);
-}
-char *sessao_funcao(const char *nome, const char *corpoJson, int *status) {
-  return session_function(nome, corpoJson, status);
 }
 char *sessao_tabela(const char *tabela, const char *consulta, int *status) {
   return session_table(tabela, consulta, status);

@@ -13,7 +13,7 @@
 // entrega as colecoes e chama desc_remontar_fileiras(), que republica
 // filsMontadas (janelas do lote descartado) por cima do bloco que esta na tela
 // (o do pacote). Resultado: "continue_watching" ini=0 n=2 aponta para os dois
-// primeiros titulos do pacote, "social_activity" para o terceiro.
+// primeiros titulos do pacote, Continue Watching para os episodios.
 //
 // O catalogo aqui e um FALSO fiel: guarda o bloco publicado e corta as janelas
 // como catalogo.c (cat_definir_tudo / cat_republicar_fileiras), e
@@ -29,11 +29,9 @@ int  prog_removido_vence(const char *imdb, long long instanteMs) { (void)imdb; (
 int  cat_tirar_continuar(const char *imdb) { (void)imdb; return 0; }
 int arte_reserva_episodios(const char *imdb, const char *corpo) { (void)imdb; (void)corpo; return 0; }
 
-int ajustes_social(void) { return 1; }
 int ajustes_hist_conta(void) { return 1; }
 int ajustes_busca_cinemeta(void) { return 1; }
 #include "../src/descoberta.c"
-unsigned recomenda_geracao(void) { return 1; }
 Uint32 SDL_GetTicks(void) { return 0; }
 
 #define BASE "https://addon.example/abc"
@@ -199,9 +197,17 @@ char *rede_baixar(const char *url, int t) {
 }
 char *rede_baixar_com(const char *u, int t, const char *const *c) { (void)c; return rede_baixar(u, t); }
 
+// Check publication integrity during the second account refresh.
+static volatile int chamadasTrakt, errosNoRemontar = -1;
+static int conferir(const char *rotulo);
 // ------------------------------------------------------------- o Trakt
 int trakt_continuar(CatItem *s, int m) {
   int i;
+  if (++chamadasTrakt == 2) {
+    desc_remontar_fileiras();
+    errosNoRemontar = conferir("logo depois de desc_remontar_fileiras");
+    geracaoEstado++;
+  }
   for (i = 0; i < 2 && i < m; i++) {
     memset(&s[i], 0, sizeof s[i]);
     snprintf(s[i].imdb, sizeof s[i].imdb, "tt900%d", i + 1);
@@ -212,32 +218,10 @@ int trakt_continuar(CatItem *s, int m) {
   return i;
 }
 int   trakt_continuar_falhou(void)        { return 0; }
-// O servico social proprio (recomenda.c) fica fora deste teste: sem amigos Nuvio, a uniao e o que o Trakt trouxe.
-// Segunda chamada = segunda montagem. E ali, no log, entre "trakt continuar
-// assistindo" e "trakt atividade dos amigos", que o sync entrega as colecoes:
-// "[desc] fileiras remontadas sem rede: 12 de 12". A config muda junto.
-static volatile int chamadasSocial, errosNoRemontar = -1;
-static int conferir(const char *rotulo);
-  if (++chamadasSocial == 2) {
-    // O QUE A HOME MOSTRA NESTE INSTANTE, e nao so no fim: uma volta posterior
-    // que publique certo esconderia a janela torta que ficou na tela ate ela.
-    desc_remontar_fileiras();
-    errosNoRemontar = conferir("logo depois de desc_remontar_fileiras");
-    geracaoEstado++;
-  }
-  if (m < 1) return 0;
-  memset(&s[0], 0, sizeof s[0]);
-  snprintf(s[0].imdb, sizeof s[0].imdb, "tt9101");
-  snprintf(s[0].tipo, sizeof s[0].tipo, "series");
-  snprintf(s[0].titulo, sizeof s[0].titulo, "Social 1");
-  snprintf(s[0].socialNome, sizeof s[0].socialNome, "Kevin");
-  snprintf(s[0].pais, sizeof s[0].pais, "Kevin");
-  snprintf(s[0].socialAcao, sizeof s[0].socialAcao, "checkin");
-  return 1;
-}
-
 // ------------------------------------------------------------------ o resto
 void  SDL_Delay(Uint32 ms)                 { usleep(ms * 1000); }
+int ajustes_cw_do_episodio_mais_alto(void) { return 1; }
+int contalib_sementes_a_seguir(ContaSemente *s, int m, int a) { (void)s; (void)m; (void)a; return 0; }
 int   ajustes_cw_fonte(void)               { return AJ_CWF_TRAKT; }
 int   ajustes_itens_fileira(void)          { return 12; }   // padrao (#163)
 int   ajustes_cw_ordem(void)               { return 0; }   // Padrao (issue #127)
@@ -357,8 +341,6 @@ static int conferir(const char *rotulo) {
       printf(" [%s]", it->titulo);
       if (!strcmp(f->chave, "continue_watching"))
         ok = !strncmp(it->titulo, "CW ", 3);
-      else if (!strcmp(f->chave, "social_activity"))
-        ok = it->socialNome[0] && !strncmp(it->titulo, "Social ", 7);
       else if (!strncmp(f->chave, "pkg_", 4))
         ok = !strncmp(it->titulo, "pacote ", 7);
       else
@@ -426,11 +408,10 @@ int main(void) {
   esperarQuieto();
   desc_repetir();          // o "[sync] addons: perfil 1 -> 12 linha(s)" do log
   esperarQuieto();
-  assert(chamadasSocial >= 2);
+  assert(chamadasTrakt >= 2);
   assert(errosNoRemontar == 0);
   assert(conferir("caso 1") == 0);
   assert(conta_linha("continue_watching") >= 0);
-  assert(conta_linha("social_activity") >= 0);
   assert(conta_linha("pkg_0") < 0);   // a home da conta substituiu o pacote
   puts("ok  janelas publicadas apontam para os itens da propria fileira");
 
@@ -438,13 +419,13 @@ int main(void) {
   // Snapshot valido (o caso 1 salvou) + cat_b sem resposta: a janela de cat_b
   // sai do bloco publicado por cat_copiar_fileira (linhaAnterior) e entra no
   // lote novo sem deslocar as vizinhas.
-  assert(snapshotValido && homeestado_tem_fileira("social_activity"));
+  assert(snapshotValido && homeestado_tem_fileira("continue_watching"));
   catBMudo = 1;
   bumpNoPrimeiroCatalogo = 0;
   desc_repetir();
   esperarQuieto();
   assert(conferir("caso 2") == 0);
-  assert(conta_linha("continue_watching") >= 0 && conta_linha("social_activity") >= 0);
+  assert(conta_linha("continue_watching") >= 0);
   { int k, achou = 0;
     for (k = 0; k < nPubFils; k++)
       if (!strcmp(pubFils[k].catId, "cat_b") && pubFils[k].n == 3) achou = 1;
@@ -453,13 +434,13 @@ int main(void) {
 
   // ------------------------------------------------------------- caso 3
   // Snapshot valido + publicacao PROGRESSIVA (tela vazia): o bloco antecipado
-  // de continue_watching/social_activity e as publicacoes por fileira.
+  // de continue_watching e as publicacoes por fileira.
   catBMudo = 0;
   pthread_mutex_lock(&pubTravaT); nPub = 0; nPubFils = 0; pthread_mutex_unlock(&pubTravaT);
   desc_repetir();
   esperarQuieto();
   assert(conferir("caso 3") == 0);
-  assert(conta_linha("continue_watching") >= 0 && conta_linha("social_activity") >= 0);
+  assert(conta_linha("continue_watching") >= 0);
   puts("ok  snapshot + progressivo: janelas do lote que foi publicado");
 
   puts("homejanelas: tudo ok");

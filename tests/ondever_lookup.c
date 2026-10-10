@@ -6,26 +6,6 @@
 static pthread_mutex_t gate=PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t wake=PTHREAD_COND_INITIALIZER;
 static int firstWaiting, releaseFirst;
-#if defined(NV_TPK)
-static int launches, stores;
-static char launched[96];
-static void mockList(void) {}
-static void mockLaunch(const char *id) { launches++;snprintf(launched,sizeof launched,"%s",id); }
-static void mockStore(const char *id) { (void)id;stores++; }
-static void actions(void) {
-  nv_tpk_apps_registrar(mockList,mockLaunch,mockStore);
-  ondever_apps_limpar();
-  assert(ondever_estado("Netflix")==ONDE_LOJA);
-  assert(ondever_abrir("Netflix")==ONDE_LOJA && stores==1);
-  ondever_app_visto("installed.netflix","Netflix");
-  assert(ondever_abrir("Netflix")==ONDE_ABRIR && launches==1);
-  assert(!strcmp(launched,"installed.netflix"));
-  assert(ondever_abrir("HBO Max Amazon Channel")==ONDE_INFO);
-  assert(ondever_abrir("Paramount Plus Apple TV Channel")==ONDE_INFO);
-  assert(launches==1 && stores==1);
-  assert(ondever_abrir("Unknown Service")==ONDE_PROCURAR && stores==2);
-}
-#endif
 const char *desc_chave_tmdb_reserva(void) { return "test-only"; }
 const char *ajustes_tmdb_idioma(void) { return "pt-BR"; }
 char *dados_ler(const char *name) { (void)name; return NULL; }
@@ -87,7 +67,4 @@ static void generation(void) {
   assert(ondever_status("tt4")==ONDE_PRONTO && ondever_n("tt4")==0);
 }
 int main(void) { parser();generation();
-#if defined(NV_TPK)
-  actions();
-#endif
   puts("ondever lookup: parser, entitlement and stale-response tests passed");return 0; }

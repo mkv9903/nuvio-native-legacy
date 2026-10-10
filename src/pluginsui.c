@@ -105,5 +105,4 @@ void pluginsui_desenhar(Uint32 agora) {
 }
 
 #ifdef AJUSTES_TESTE
-void pluginsui_teste(int n, int f, int r) { nivel = n; foco = f; repo = r; }
 #endif

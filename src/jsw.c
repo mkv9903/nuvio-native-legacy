@@ -109,14 +109,6 @@ void jsw_chave(Jsw *w, const char *nome) {
   if (w->prof > 0 && w->prof <= JSW_PROF) w->primeiro[w->prof - 1] = 1;
 }
 
-void jsw_num(Jsw *w, double v) {
-  char b[40];
-  separar(w);
-  // %.17g reproduz o double exatamente; %g simples arredonda e um progresso de
-  // reproducao volta diferente do que foi enviado.
-  snprintf(b, sizeof b, "%.17g", v);
-  por(w, b, strlen(b));
-}
 
 void jsw_int(Jsw *w, long long v) {
   char b[32];

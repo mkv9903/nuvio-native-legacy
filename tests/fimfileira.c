@@ -99,7 +99,7 @@ static void invariantes(const char *onde) {
     abort();
   }
   if (max > MAX_CARDS) { fprintf(stderr, "%s: %d colunas > MAX_CARDS\n", onde, max); abort(); }
-  if (s->tipo != FILEIRA_CATALOGOS && s->tipo != FILEIRA_SOCIAL && foco.coluna < s->n) {
+  if (s->tipo != FILEIRA_CATALOGOS && foco.coluna < s->n) {
     int idx = s->ini + foco.coluna;
     // A fileira pode ser mais velha que o catalogo (cenario d): o indice pode
     // estar fora, e o que se cobra e que o app NAO o use as cegas.

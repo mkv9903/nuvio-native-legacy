@@ -24,17 +24,8 @@ static float entry_anim;
 int telemetry_is_open(void) { return is_open; }
 
 void telemetry_first_time(void) {
-#ifndef __EMSCRIPTEN__
   is_decided = 1;   // only on Tizen
   return;
-#else
-  char *s;
-  if (is_decided) return;
-  is_decided = 1;
-  s = data_read(TL_FILE);
-  if (s) { free(s); return; }
-  is_open = 1; entry_anim = 0.0f;
-#endif
 }
 
 static void close_dialog(int yes) {

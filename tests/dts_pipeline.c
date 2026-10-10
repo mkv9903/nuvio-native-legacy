@@ -46,8 +46,10 @@ int main(int argc,char **argv) {
  DtsPipeline *p=dts_pipeline_create("app","\"window",0,event,&loads); assert(p);
  assert(!strcmp(dts_pipeline_media_id(p),getenv("DTS_MEDIA_ID_PHASE") ? "" : "fake-media"));
  DtsMediaInfo m={0}; strcpy(m.video_codec,"hevc"); strcpy(m.audio_codec,"aac"); m.channels=2;m.sample_rate=48000;m.width=1920;m.height=1080;
- strcpy(m.audio_codec,"ac3");m.channels=4;assert(!dts_pipeline_load(p,&m,2.5));m.channels=2;
- strcpy(m.audio_codec,"eac3");assert(!dts_pipeline_load(p,&m,2.5));strcpy(m.audio_codec,"aac");
+ /* AC-3/E-AC-3 passthrough is supported; reject malformed media metadata. */
+ strcpy(m.audio_codec,"ac3");m.channels=9;assert(!dts_pipeline_load(p,&m,2.5));m.channels=2;
+ strcpy(m.audio_codec,"eac3");m.sample_rate=0;assert(!dts_pipeline_load(p,&m,2.5));m.sample_rate=48000;
+ strcpy(m.audio_codec,"unsupported");assert(!dts_pipeline_load(p,&m,2.5));strcpy(m.audio_codec,"aac");
  m.channels=6;assert(!dts_pipeline_load(p,&m,2.5));m.channels=2;
  m.sample_rate=44100;assert(!dts_pipeline_load(p,&m,2.5));m.sample_rate=48000;
  m.dovi_profile=5; assert(!dts_pipeline_load(p,&m,2.5));m.dovi_profile=0;

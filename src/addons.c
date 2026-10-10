@@ -701,44 +701,8 @@ static const char *pulaEspaco(const char *p) {
 
 // Copia o valor textual de "chave" dentro do objeto que comeca em `obj`,
 // respeitando escapes. Devolve 1 se achou.
-static int campoTexto(const char *obj, const char *fimObj, const char *chave,
-                      char *dst, size_t tam) {
-  char busca[48];
-  const char *p;
-  size_t k = 0;
-  snprintf(busca, sizeof busca, "\"%s\"", chave);
-  p = strstr(obj, busca);
-  if (!p || p >= fimObj) return 0;
-  p = pulaEspaco(p + strlen(busca));
-  if (*p != ':') return 0;
-  p = pulaEspaco(p + 1);
-  if (*p != '"') return 0;
-  p++;
-  while (*p && *p != '"' && k + 1 < tam) {
-    if (*p == '\\' && p[1]) {
-      p++;
-      // \u..... vira "?" de proposito: os nomes vem cheios de emoji e o texto
-      // e so para exibicao. Decodificar UTF-16 aqui seria trabalho sem retorno.
-      if (*p == 'u') { p += 5; dst[k++] = ' '; continue; }
-      if (*p == 'n' || *p == 't' || *p == 'r') { p++; dst[k++] = ' '; continue; }
-    }
-    dst[k++] = *p++;
-  }
-  dst[k] = 0;
-  return k > 0;
-}
 
 // Acha o fim do objeto JSON que comeca em `p` (que aponta para '{').
-static const char *fimObjeto(const char *p) {
-  int prof = 0, texto = 0;
-  for (; *p; p++) {
-    if (texto) { if (*p == '\\') p++; else if (*p == '"') texto = 0; continue; }
-    if (*p == '"') texto = 1;
-    else if (*p == '{') prof++;
-    else if (*p == '}' && --prof == 0) return p + 1;
-  }
-  return p;
-}
 
 // --- legendas ---------------------------------------------------------------
 
@@ -1728,12 +1692,6 @@ static void dispararLegendas(int juntar) {
 // it's back to freezing") volta a 2 no Tizen para isolar se foi isto.
 #ifdef NV_ADD_FIOS
 #define ADD_FIOS NV_ADD_FIOS
-#elif defined(__EMSCRIPTEN__)
-// 2 NO TIZEN (1.3.5): a rc1 (2 fios) foi "lisa" no AU7000 e a 1.3.4 (4 fios,
-// junto com o GIF a 3 quadros) voltou a travar (#80). Nao esta provado qual
-// dos dois foi; os dois voltam ao valor da rc1 e o longtask do [navegador]
-// e quem separa.
-#define ADD_FIOS 2
 #else
 // UM FIO POR ADDON (#221), ate 12. Com 4, a quinta consulta so saia quando um
 // dos quatro primeiros soltasse — e um addon mudo segura o fio dele os 12 s

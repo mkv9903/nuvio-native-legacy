@@ -24,7 +24,6 @@ char *dados_caminho(char *dst, unsigned tam, const char *nome) {
   (void)dst; (void)tam; (void)nome; return NULL;
 }
 int   dados_apagar(const char *nome) { (void)nome; return 1; }
-void  dados_marcar_sujo(int leve) { (void)leve; }
 const char *ling_legenda(void) { return ""; }
 const char *ling_audio(void) { return ""; }
 void ling_conta_legenda(const char *v) { (void)v; }

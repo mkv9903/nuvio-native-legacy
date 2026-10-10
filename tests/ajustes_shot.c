@@ -151,8 +151,9 @@ int main(int argc, char **argv) {
 
   assert(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) == 0);
   IMG_Init(IMG_INIT_PNG | IMG_INIT_JPG);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
   SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
-  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
   w = SDL_CreateWindow("Nuvio: revisao dos Ajustes", SDL_WINDOWPOS_CENTERED,
                        SDL_WINDOWPOS_CENTERED, 1920, 1080,
                        SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN);
@@ -176,7 +177,6 @@ int main(int argc, char **argv) {
   // scratch folder, never the app's own) instead of the fake ones below.
   if (getenv("NUVIO_SHOT_DADOS")) { setenv("NUVIO_DADOS", getenv("NUVIO_SHOT_DADOS"), 1); dados_iniciar("deploy/app/art"); goto fileiras_prontas; }
   fil_registrar("continue_watching", "Continuar assistindo", "", "", 12);
-  fil_registrar("social_activity", "Entre amigos", "", "", 6);
   // NUVIO_SHOT_CANAIS=iguais|mistos|distintos (mistos: os 8 primeiros repetem o logo): no lugar de "Popular", a fileira de
   // canais de TV do FrostView (itens so com logo) e o catalogo que a alimenta.
   if (getenv("NUVIO_SHOT_CANAIS")) {

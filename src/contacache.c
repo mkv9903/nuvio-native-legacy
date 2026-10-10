@@ -130,11 +130,7 @@ void contacache_data(long quando, char *dst, unsigned tam) {
   struct tm tmv;
   if (!dst || !tam) return;
   if (quando <= 0) { snprintf(dst, tam, "?"); return; }
-#if defined(_WIN32)
-  tmv = *localtime(&t);
-#else
   localtime_r(&t, &tmv);
-#endif
   snprintf(dst, tam, "%02d/%02d %02d:%02d", tmv.tm_mday, tmv.tm_mon + 1,
            tmv.tm_hour, tmv.tm_min);
 }

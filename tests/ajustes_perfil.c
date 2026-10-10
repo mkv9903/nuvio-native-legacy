@@ -26,7 +26,6 @@ int main(void) {
   valor[AJ_CW_FONTE] = AJ_CWF_SIMKL;
   valor[AJ_SALVOS_DEST] = AJ_SALVOS_SIMKL;
   valor[AJ_HIST_CONTA] = 1;     // Desligado
-  valor[AJ_SOCIAL] = 1;         // Desligado
   valor[AJ_HERO] = 1;
   valor[AJ_RESOLUCAO] = RES_4K;
   valor[AJ_ADDONS_PRINCIPAL] = 0;
@@ -36,7 +35,6 @@ int main(void) {
   valor[AJ_CW_FONTE] = AJ_CWF_CONTA;
   valor[AJ_SALVOS_DEST] = AJ_SALVOS_LOCAL;
   valor[AJ_HIST_CONTA] = 0;
-  valor[AJ_SOCIAL] = 0;
   valor[AJ_HERO] = 0;
   valor[AJ_RESOLUCAO] = 0;
   valor[AJ_ADDONS_PRINCIPAL] = 1;
@@ -48,13 +46,13 @@ int main(void) {
   assert(valor[AJ_RESOLUCAO] == 0);
   assert(valor[AJ_ADDONS_PRINCIPAL] == 1);   // ajuste desta TV, nao do perfil
   assert(valor[AJ_CW_FONTE] == AJ_CWF_SIMKL && valor[AJ_SALVOS_DEST] == AJ_SALVOS_SIMKL);
-  assert(!ajustes_hist_conta() && !ajustes_social());
+  assert(!ajustes_hist_conta());
 
   // E o 2 de novo.
   assert(ajustes_perfil_restaurar(2) == 1);
   assert(valor[AJ_HERO] == 0);
   assert(valor[AJ_CW_FONTE] == AJ_CWF_CONTA && valor[AJ_SALVOS_DEST] == AJ_SALVOS_LOCAL);
-  assert(ajustes_hist_conta() && ajustes_social());
+  assert(ajustes_hist_conta());
 
   // Perfil nunca usado aqui: nada muda.
   valor[AJ_HERO] = 1;

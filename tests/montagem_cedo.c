@@ -34,7 +34,6 @@
 #include <unistd.h>
 int arte_reserva_episodios(const char *imdb, const char *corpo) { (void)imdb; (void)corpo; return 0; }
 
-int ajustes_social(void) { return 1; }
 int ajustes_hist_conta(void) { return 1; }
 int ajustes_busca_cinemeta(void) { return 1; }
 #include "../src/descoberta.c"
@@ -119,7 +118,7 @@ static pthread_mutex_t pedTrava = PTHREAD_MUTEX_INITIALIZER;
  * the original six scenarios unchanged. */
 static void (*fixtureCatalogo)(const char *id);
 static void (*fixtureMarco)(const char *name);
-static int fixtureCW, fixtureSocial;
+static int fixtureCW;
 
 static int imdbNaTela(const char *imdb, int (*campo)(const CatItem *)) {
   int i, k = 0;
@@ -194,27 +193,13 @@ int trakt_lista(const char *q, CatItem *s, int m) {
   }
   return i;
 }
-// O "sync" que chega entre o Trakt e a leitura da lista de addons.
+// A sync response changes addons or credentials before catalog discovery.
 enum { S_NADA, S_ADDONS, S_CREDENCIAL };
-static volatile int armadoSocial = S_NADA;
-// O servico social proprio (recomenda.c) fica fora deste teste: a uniao e so o que o Trakt trouxe.
-unsigned recomenda_geracao(void) { return 1; }
-  int a = armadoSocial;
-  (void)s; (void)m;
-  armadoSocial = S_NADA;
-  // (fioDaMontagem e marcado em trakt_continuar: o social corre em fio proprio.)
-  // Lista nova = versao nova: o manifesto largado no comeco nao serve mais.
+static volatile int armadoSync = S_NADA;
+static void fixtureSync(void) {
+  int a = __atomic_exchange_n(&armadoSync, S_NADA, __ATOMIC_SEQ_CST);
   if (a == S_ADDONS) { versaoAddons++; desc_repetir_addons(); }
   else if (a == S_CREDENCIAL) desc_repetir();
-  if (fixtureSocial && m > 0) {
-    memset(s, 0, sizeof *s);
-    snprintf(s->imdb, sizeof s->imdb, "ttSocial");
-    snprintf(s->tipo, sizeof s->tipo, "movie");
-    snprintf(s->titulo, sizeof s->titulo, "Social");
-    snprintf(s->poster, sizeof s->poster, "social.jpg");
-    return 1;
-  }
-  return 0;
 }
 
 // ------------------------------------------------------------- fileiras.c
@@ -255,7 +240,11 @@ int   fil_unir(const char *const *c, int n, int *s, int m) {
 // ------------------------------------------------------------------ o resto
 static volatile int montagens;
 void  marco(const char *n) {
-  if (!strcmp(n, "montar: inicio")) montagens++;
+  if (!strcmp(n, "montar: inicio")) {
+    montagens++;
+    fioDaMontagem = pthread_self(); temFioDaMontagem = 1;
+  }
+  if (!strcmp(n, "trakt continuar assistindo")) fixtureSync();
   if (fixtureMarco) fixtureMarco(n);
 }
 void  SDL_Delay(Uint32 ms)                 { usleep(ms * 1000); }
@@ -390,7 +379,7 @@ int main(void) {
 
   // ---------------------------------------------------------------- caso 1
   printf("\n==> addons novos antes de a volta ler a lista\n");
-  armadoSocial = S_ADDONS;
+  armadoSync = S_ADDONS;
   manifestosEmSerie = 0;
   zerar();
   desc_repetir();
@@ -403,7 +392,7 @@ int main(void) {
 
   // ---------------------------------------------------------------- caso 2
   printf("\n==> credencial nova no meio: para e recomeca, sem pedir catalogo\n");
-  armadoSocial = S_CREDENCIAL;
+  armadoSync = S_CREDENCIAL;
   zerar();
   desc_repetir();
   esperarQuieto();

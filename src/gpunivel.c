@@ -1,7 +1,5 @@
-// Nivel de GPU do .tpk. O porque, os niveis e a regra estao em gpunivel.h.
-//
-// SEM _Thread_local (a .so do Tizen 4/5 recusa TLS, tests/tpk40_tls.sh): tudo
-// aqui roda no fio de desenho, e os estaticos sao so dele.
+// Adaptive GPU rendering policy; see gpunivel.h.
+// State belongs to the rendering thread.
 #include "gpunivel.h"
 #include "gfx.h"
 #include "dados.h"
@@ -45,9 +43,6 @@ static int intW, intH, intFalhou, intLigado;
 // Descarte (glInvalidateFramebuffer ou glDiscardFramebufferEXT).
 typedef void (*PfnDescarte)(GLenum, GLsizei, const GLenum *);
 static PfnDescarte descarte;
-#ifdef NV_TPK
-static const char *descarteNome = "nenhum";
-#endif
 static int profStencil;   // a janela tem profundidade/stencil para descartar
 // Medida.
 static double aquece = GPUN_AQUECE_MS, janMs, janEsp, janCpu, totalMs;
@@ -70,81 +65,7 @@ static const char *glTxt(GLenum e) {
   return s ? s : "?";
 }
 
-#ifdef NV_TPK
-// Modelo e versao da Tizen pela API nativa (a mesma que o host .NET le em
-// Tizen.System.Information), por dlopen: o link da .so nao ganha dependencia
-// nova, e sem a biblioteca fica "?".
-static void infoPlataforma(void) {
-  static const char *const libs[] = { "libcapi-system-info.so.0", "libcapi-system-info.so", NULL };
-  int (*get)(const char *, char **) = NULL;
-  void *h = NULL;
-  int i;
-  for (i = 0; libs[i] && !h; i++) h = dlopen(libs[i], RTLD_NOW);
-  if (h) *(void **)&get = dlsym(h, "system_info_get_platform_string");
-  if (!get) return;
-  { char *v = NULL;
-    if (get("http://tizen.org/feature/platform.version", &v) == 0 && v) {
-      snprintf(tizen, sizeof tizen, "%s", v); free(v); } }
-  { char *v = NULL;
-    if (get("http://tizen.org/system/model_name", &v) == 0 && v) {
-      snprintf(modelo, sizeof modelo, "%s", v); free(v); } }
-}
 
-// "OpenGL ES 3.2 ..." -> 3. So um contexto que SE DIZ 3.x ganha as funcoes de 3.x.
-static int versaoEs(const char *v) {
-  int ma = 0, mi = 0;
-  if (v && sscanf(v, "OpenGL ES %d.%d", &ma, &mi) >= 1) return ma;
-  return 0;
-}
-
-// Extensao inteira na lista (sem casar prefixo de outra).
-static int temExt(const char *lista, const char *nome) {
-  size_t n = strlen(nome);
-  const char *p = lista;
-  while (p && (p = strstr(p, nome)) != NULL) {
-    if ((p == lista || p[-1] == ' ') && (p[n] == ' ' || p[n] == 0)) return 1;
-    p += n;
-  }
-  return 0;
-}
-
-// A lista em linhas de ~480 caracteres, sem o prefixo "GL_" (compacta).
-static void logExtensoes(const char *ext) {
-  char linha[560];
-  int n = 0, total = 0;
-  const char *p = ext;
-  linha[0] = 0;
-  while (p && *p) {
-    const char *f;
-    size_t t;
-    while (*p == ' ') p++;
-    if (!*p) break;
-    f = strchr(p, ' ');
-    t = f ? (size_t)(f - p) : strlen(p);
-    if (t > 3 && !strncmp(p, "GL_", 3)) { p += 3; t -= 3; }
-    if (n + (int)t + 1 > 480) { printf("[gl] ext: %s\n", linha); n = 0; linha[0] = 0; }
-    if (t < sizeof linha - 2) { memcpy(linha + n, p, t); n += (int)t; linha[n++] = ' '; linha[n] = 0; }
-    total++;
-    p += t;
-  }
-  if (n) printf("[gl] ext: %s\n", linha);
-  printf("[gl] %d extensoes\n", total);
-}
-#endif
-
-#if defined(NV_ANDROID)
-#include <SDL.h>
-// Extensao inteira na lista (sem casar prefixo de outra).
-static int temExt(const char *lista, const char *nome) {
-  size_t n = strlen(nome);
-  const char *p = lista;
-  while (p && (p = strstr(p, nome)) != NULL) {
-    if ((p == lista || p[-1] == ' ') && (p[n] == ' ' || p[n] == 0)) return 1;
-    p += n;
-  }
-  return 0;
-}
-#endif
 
 static void gravar(void) {
   char buf[400];
@@ -154,7 +75,7 @@ static void gravar(void) {
   if (!dados_gravar(GPUN_ARQ, buf)) printf("[gpu-nivel] nao gravou %s\n", GPUN_ARQ);
 }
 
-#if (defined(NV_TPK) || defined(NV_ANDROID) || defined(NV_WEBOS)) && !defined(NV_TPK_NIVEL_FORCADO)
+#if defined(NV_WEBOS)
 static void ler(void) {
   char *t = dados_ler(GPUN_ARQ);
   unsigned long c = 0;
@@ -199,45 +120,9 @@ void gpun_iniciar(int w, int h) {
   ext = glTxt(GL_EXTENSIONS);
   glGetIntegerv(GL_DEPTH_BITS, &db);
   glGetIntegerv(GL_STENCIL_BITS, &sb);
-#ifdef NV_TPK
-  infoPlataforma();
-  printf("[gl] GL_VERSION=%s\n", versaoGl);
-  printf("[gl] GL_RENDERER=%s | GL_VENDOR=%s\n", renderer, glTxt(GL_VENDOR));
-  printf("[gl] GL_SHADING_LANGUAGE_VERSION=%s\n", glTxt(GL_SHADING_LANGUAGE_VERSION));
-  printf("[gl] janela: profundidade=%d stencil=%d | TV %s / Tizen %s\n", (int)db, (int)sb, modelo, tizen);
-  logExtensoes(ext);
-  // ES3 so se o contexto SE DIZ 3.x e o ponteiro existe; senao a extensao.
-  if (tpkEgl.GetProcAddress) {
-    if (versaoEs(versaoGl) >= 3) {
-      *(void **)&descarte = tpkEgl.GetProcAddress("glInvalidateFramebuffer");
-      if (descarte) descarteNome = "glInvalidateFramebuffer (ES3)";
-    }
-    if (!descarte && temExt(ext, "GL_EXT_discard_framebuffer")) {
-      *(void **)&descarte = tpkEgl.GetProcAddress("glDiscardFramebufferEXT");
-      if (descarte) descarteNome = "glDiscardFramebufferEXT";
-    }
-  }
-  profStencil = db > 0 || sb > 0;
-  printf("[gl] descarte de alvo: %s%s\n", descarteNome,
-         descarte && profStencil ? " (+ profundidade/stencil da janela no fim do quadro)" : "");
-#elif defined(NV_ANDROID)
-  // Same facts as the .tpk log, for the Android field logs: which GPU, which
-  // buffers the window got (a depth/stencil the app never asked for is
-  // bandwidth written back every frame unless discarded below).
-  printf("[gl] GL_RENDERER=%s | %s\n", renderer, versaoGl);
-  printf("[gl] janela: profundidade=%d stencil=%d\n", (int)db, (int)sb);
-  if (temExt(ext, "GL_EXT_discard_framebuffer"))
-    *(void **)&descarte = SDL_GL_GetProcAddress("glDiscardFramebufferEXT");
-  profStencil = db > 0 || sb > 0;
-  printf("[gl] descarte de alvo: %s%s\n", descarte ? "glDiscardFramebufferEXT" : "nenhum",
-         descarte && profStencil ? " (+ profundidade/stencil da janela no fim do quadro)" : "");
-#else
   (void)ext; (void)db; (void)sb;
-#ifdef __APPLE__
-  snprintf(modelo, sizeof modelo, "mac");
-#elif defined(NV_LINUX_DESKTOP)
+#if defined(NV_LINUX_DESKTOP)
   snprintf(modelo, sizeof modelo, "linux-desktop");
-#endif
 #endif
   ptv_definir_gpu_fraca(ptv_gpu_fraca(renderer));
   chave = djb2(tizen, djb2(modelo, djb2(versaoGl, djb2(renderer, 5381))));
@@ -246,10 +131,7 @@ void gpun_iniciar(int w, int h) {
   // to the 1080p one. 1080p keeps the old key (no re-measure after updating).
   if (telaW > (int)NV_TELA_W) chave = djb2("4k", chave);
 
-#if defined(NV_TPK_NIVEL_FORCADO)
-  nivel = NV_TPK_NIVEL_FORCADO;
-  origem = "forcado na build (NV_TPK_NIVEL_FORCADO)";
-#elif defined(NV_TPK) || defined(NV_ANDROID) || defined(NV_WEBOS)
+#if defined(NV_WEBOS)
   // ANDROID tambem mede: TV box e Google TV vao de Mali-G52 a GPUs bem mais
   // fortes. Na TCL Smart TV Pro o vidro + cor viva dava 29 fps sustentado.
   // LG TAMBEM (2.0.1): log de uma LG webOS 5+ com Mali-G52 r23 na 2.0.0, 668
@@ -269,7 +151,7 @@ void gpun_iniciar(int w, int h) {
   }
 #else
   { const char *e = getenv("NUVIO_GPU_NIVEL");
-#if defined(__APPLE__) || defined(NV_LINUX_DESKTOP)
+#if defined(NV_LINUX_DESKTOP)
     if (e && *e) { nivel = atoi(e); origem = "NUVIO_GPU_NIVEL"; }
 #else
     (void)e;
@@ -279,10 +161,8 @@ void gpun_iniciar(int w, int h) {
   aplicar(nivel, "");
 }
 
-// Ajuste "Efeitos visuais" (so .tpk): 0 automatico, 1 completos, 2 leves.
-// Completos/Leves fixam o nivel e desligam a medida; Automatico volta a medir
-// a partir do que esta gravado (ou do 0). Build com NV_TPK_NIVEL_FORCADO
-// ignora: o canario de teste manda.
+// Visual-effects setting: 0 automatic, 1 full, 2 light.
+// Explicit preferences disable measurement; automatic uses the saved level.
 static int forca720;
 void gpun_forcar_720(void) {
   forca720 = 1; adaptativo = 0; decidido = 1;
@@ -291,7 +171,7 @@ void gpun_forcar_720(void) {
 
 void gpun_preferencia(int p) {
   if (forca720) return;
-#if (defined(NV_TPK) || defined(NV_ANDROID) || defined(NV_WEBOS)) && !defined(NV_TPK_NIVEL_FORCADO)
+#if defined(NV_WEBOS)
   prefFixa = p == 1 || p == 2;
   if (p == 1) { adaptativo = 0; aplicar(0, "ajuste: efeitos completos"); return; }
   if (p == 2) {
@@ -321,7 +201,7 @@ void gpun_alvo_1080(void) {
   // 1080p, from what this GPU saved for 1080p (the old key), unless the person
   // fixed "Efeitos visuais".
   chave = djb2(tizen, djb2(modelo, djb2(versaoGl, djb2(renderer, 5381))));
-#if (defined(NV_TPK) || defined(NV_ANDROID) || defined(NV_WEBOS)) && !defined(NV_TPK_NIVEL_FORCADO)
+#if defined(NV_WEBOS)
   if (!prefFixa) {
     adaptativo = 1; decidido = 0; origem = "adaptativo"; nivel = 0;
     aquece = GPUN_ASSENTA_MS; janMs = janEsp = janCpu = totalMs = 0; janN = 0;
@@ -338,18 +218,6 @@ int gpun_alvo_1080_ativo(void) { return alvo1080; }
 int gpun_nivel(void) { return nivel; }
 void gpun_definir_nivel(int n) { aplicar(n, "definido por gpun_definir_nivel"); }
 
-void gpun_log_perfil(long memMB, int texMb, int fios, int heroi) {
-#ifdef NV_TPK
-  printf("[perfil] tpk mem=%ldMB gpu=\"%s\"%s tizen=%s modelo=%s -> tex=%dMB fios=%d heroi=%d"
-         " escala=%s efeitos=%s nivel=%d (%s)\n",
-         memMB, renderer, ptv_gpu_fraca_atual() ? " (fraca)" : "", tizen, modelo, texMb, fios, heroi,
-         nivel >= 3 ? "1280x720->1920x1080" : alvo1080 ? "1920x1080->4K" : "1920x1080",
-         nivel >= 2 ? "minimos" : nivel >= 1 ? "leves" : "cheios", nivel, origem);
-  fflush(stdout);
-#else
-  (void)memMB; (void)texMb; (void)fios; (void)heroi;
-#endif
-}
 
 void gpun_descartar_cor(int padrao) {
   GLenum a = padrao ? NV_GL_COLOR : GL_COLOR_ATTACHMENT0;

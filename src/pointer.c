@@ -5,8 +5,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
-#if (!defined(__APPLE__) && !defined(NV_LINUX_DESKTOP) && !defined(__EMSCRIPTEN__) && !defined(NV_TPK) && !defined(NV_ANDROID)) || \
-    defined(NV_PONT_WEBOS_TESTE)
+#if (!(defined(NV_LINUX_DESKTOP)) || defined(NV_PONT_WEBOS_TESTE))
 #include <dlfcn.h>
 #define NV_PONT_WEBOS 1
 #endif
@@ -66,11 +65,7 @@ static int arrow_anchored = 0;
 // We asked compositor to hide its arrow (webOS).
 static int system_hidden = 0;
 
-#ifdef NV_ANDROID
-static int touch_available = 1;
-#else
 static int touch_available;
-#endif
 typedef struct { SDL_TouchID touch_id; SDL_FingerID finger_id; } Finger;
 static Finger fingers[PTR_FINGERS_MAX];
 static int finger_count, excess_fingers, touch_cancelled;
@@ -181,9 +176,7 @@ void pointer_init(void) {
   hidden_by_arrow = 0; system_hidden = 0;
   memset(&hover, 0, sizeof hover);
   cancel_touch();
-#ifndef NV_ANDROID
   touch_available = SDL_GetNumTouchDevices() > 0;
-#endif
   {
     SDL_Window *w = SDL_GL_GetCurrentWindow();
     int ww = 0, wh = 0, dw = 0, dh = 0;

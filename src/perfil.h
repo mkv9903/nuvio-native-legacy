@@ -108,7 +108,6 @@ void perfil_definir_dados(const PerfilDados *dados);
 // pede nova tentativa. O chamador faz a rede e consome a flag abaixo.
 void perfil_definir_erro(const char *mensagem);
 void perfil_definir_estado(PerfilEstado estado, const char *mensagem);
-PerfilEstado perfil_estado(void);
 int  perfil_pediu_atualizar(void);
 
 void perfil_evento(const SDL_Event *e);
@@ -121,8 +120,6 @@ int perfil_item_selecionado(PerfilDestaque *saida);
 
 // Retorna 1 uma vez apos OK no seletor do duelo ("Voce e Fulano"): `id`
 // recebe o pessoaId de socialvis para o app abrir o perfil do amigo.
-int perfil_pediu_amigo(char *id, size_t tam);
 // Depois de perfil_abrir, na volta do perfil do amigo: reabre o duelo.
-void perfil_voltar_ao_duelo(void);
 
 #endif

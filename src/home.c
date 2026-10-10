@@ -40,8 +40,6 @@
 #include "colecoes.h"
 #include "colfileiras.h"
 #include "addons.h"   /* addons_nome_por_id: o addon de um grupo de colecoes */
-#include "gif.h"
-#include "gifcolecao.h"
 #include "badges.h"
 #include "selospacote.h"
 #include "extras.h"
@@ -183,8 +181,6 @@ static int nFileiras = 3;
 static int retomarIndice = -1;
 static char retomarId[64];
 static unsigned retomarRev, retomarAplicada;
-int home_pediu_pessoa_social(CatItem *saida) { (void)saida; return 0; }
-int home_pediu_social(void) { return 0; }
 
 // Pedido de abrir o GUIA DE CANAIS: o "Ver tudo" de uma fileira de canal nao
 // leva a grade de cartazes — leva ao guia, e o OK num cartao de canal abre o
@@ -230,8 +226,7 @@ static TipoFileira perfilCatalogo(const char *nome) {
 }
 static int editorial(TipoFileira t) {
   return t == FILEIRA_DESTAQUE || t == FILEIRA_DESTAQUE_QUADRADO
-      || t == FILEIRA_COLECAO || t == FILEIRA_SERVICO
-      || t == FILEIRA_SOCIAL;
+      || t == FILEIRA_COLECAO || t == FILEIRA_SERVICO;
 }
 
 
@@ -455,7 +450,6 @@ static void heroTrailerMarcarTocou(const char *imdb) {
 //      home (heroAutoDesligado, zerado quando as fileiras voltam a aparecer
 //      depois de uma ausencia). Avancar continua so reiniciando os relogios 3 e 4.
 static int heroAutoDesligado;
-static char   heroTrailerYoutubeId[16];
 static int heroTrailerSegurando(Uint32 agora);
 // A espera e ajuste; a janela da Apple (NV_TRAILER_HERO_JANELA_MS) conta a
 // partir dela, senao uma espera longa venceria a janela antes de abrir.
@@ -624,7 +618,6 @@ static float larguraDe(TipoFileira t) {
     case FILEIRA_DESTAQUE_QUADRADO: return NV_DESTAQUE_QUADRADO_W;
     case FILEIRA_COLECAO: return 480.0f;
     case FILEIRA_SERVICO: return 360.0f;
-    case FILEIRA_SOCIAL: return 540.0f;
     case FILEIRA_TOP10: return 212.0f;
     case FILEIRA_RETORNO: return 680.0f;
     case FILEIRA_CATALOGOS: return 360.0f;
@@ -1062,7 +1055,6 @@ static int foco_pode_pressao_longa(void) {
   if (foco.fileira < 0 || foco.fileira >= nFileiras) return 0;
   const Fileira *s = &fileiras[foco.fileira];
   // Pasta de colecao: o menu e so o do estilo da fileira (ctx_abrir_fileira).
-  if (s->tipo == FILEIRA_SOCIAL) return 0;
   // Pilha fechada: so o estilo da fileira, entao so quando ela aceita forma.
   if (s->tipo == FILEIRA_TOP10 && s->stackN)
     return fil_estilos(s->chave, NULL, NULL, FIL_TIPO_N) > 0;
@@ -1081,7 +1073,6 @@ static float alturaDe(TipoFileira t) {
     case FILEIRA_DESTAQUE_QUADRADO: return NV_DESTAQUE_QUADRADO_H;
     case FILEIRA_COLECAO: return 270.0f;
     case FILEIRA_SERVICO: return 203.0f;
-    case FILEIRA_SOCIAL: return 240.0f;
     case FILEIRA_RETORNO: return 178.0f;
     case FILEIRA_TOP10: return 320.0f;
     case FILEIRA_CATALOGOS: return 203.0f;
@@ -1810,7 +1801,7 @@ void home_evento(const SDL_Event *e) {
 
   if (e->type != SDL_KEYDOWN) return;
   SDL_Keycode k = e->key.keysym.sym;
-#if defined(__APPLE__) || defined(NV_LINUX_DESKTOP)
+#if defined(NV_LINUX_DESKTOP)
   // Rodando no Mac, o Back na home NAO fecha: fechar a janela no meio de um
   // teste custa recompilar e reabrir. No aparelho ele sai do app, como deve.
   if (k == SDLK_ESCAPE || k == SDLK_AC_BACK || k == SDLK_BACKSPACE) return;
@@ -2865,7 +2856,7 @@ static const char *dinArteDaCor(void) {
   if (ajustes_hero_ligado()) return arte_por_identidade(heroAtual, 2);
   if (foco.fileira < 0 || foco.fileira >= nFileiras) return NULL;
   f = &fileiras[foco.fileira];
-  if (f->tipo == FILEIRA_SOCIAL || f->tipo == FILEIRA_CATALOGOS) return NULL;
+  if (f->tipo == FILEIRA_CATALOGOS) return NULL;
   idx = fileiraItemIndice(f, 0);
   if (idx < 0) return NULL;
   deitado = editorial(f->tipo) || f->tipo == FILEIRA_LARGA ||
@@ -3860,11 +3851,6 @@ static void alvoCard(float x, float y, float w, float h, int r, int c) {
 static void desenhaAtalhos(int r, float y) {
   float w = larguraFil(r), h = alturaFil(r);
   static int ultimo=-1;static Uint32 desde;
-  // Estado do ramo de GIF (#29), SEPARADO do da sequencia de JPEG desde o #141:
-  // o GIF passou a poder sair da CAPA, e a troca de fonte no mesmo cartaz
-  // tambem zera a pergunta ao arquivo. Ver gifcolecao.h.
-  static GcFoco gcFoco; static int gcIniciado;
-  if (!gcIniciado) { gifcol_foco_iniciar(&gcFoco); gcIniciado = 1; }
   // Quadro da sequencia de JPEG que ja esta resolvido, para nao reconsultar
   // o cache nos ~4 quadros de tela que cabem entre dois passos de 67 ms.
   static int seqIndice=-1;static GLuint seqTex;
@@ -3888,86 +3874,7 @@ static void desenhaAtalhos(int r, float y) {
     gfx_cor(card, raio, NV_COR_ESQUELETO_R, NV_COR_ESQUELETO_G, NV_COR_ESQUELETO_B, 1);
     const ColFolder *folder=col_folder(fileiras[r].folders[c]);if(!folder)continue;
     const char *arte = col_capa(folder);
-    // POR CARTAZ, e nao estatico: diz se ESTE quadro esta desenhando o GIF, e a
-    // resposta muda de cartaz para cartaz dentro do mesmo laco.
-    int gifDesenhando = 0;
     GLuint tex = arte && arte[0] ? tex_obter_larg(arte, w) : 0;
-    // GIF DA CONTA, quando nao ha sequencia de JPEG (#29).
-    //
-    // O importador converte `focusGifUrl` em 001.jpg…090.jpg com ffmpeg, e o
-    // ramo de baixo toca isso. Mas 117 das 169 pastas do pacote saem com
-    // frames==0 — o importador so gera a sequencia quando o perfil trazia a URL
-    // NA HORA da importacao —, e pasta que vem da conta nunca tem sequencia
-    // nenhuma. Para todas essas, a unica animacao possivel e o proprio GIF.
-    //
-    // A FONTE (#141): focusGifUrl, ou a propria CAPA quando os bytes que
-    // chegaram dela sao GIF e a conta nao mandou focusGifUrl. E, quando nao
-    // anima, UMA linha por cartaz dizendo por que (gifcol_registrar).
-    //
-    // So o Tizen anima: la gif.c decodifica o GIF num fio proprio e conta o
-    // tempo. No webOS gif_pode_animar e 0 e o cartaz fica na capa parada,
-    // como hoje — e o arquivo nem e pedido; so o motivo vai ao log. Ver gif.h.
-    if(foco.fileira==r&&foco.coluna==c&&folder->frames<1) {
-      int id=fileiras[r].folders[c];Uint32 now=SDL_GetTicks();
-      unsigned char magCapa[4], mag[4];
-      int temMagCapa=0, daCapa=0, temMag=0;
-      GcMotivo motivo=GC_ANIMA;
-      const char *fonte;
-      char chave[200];
-      // A magica da capa so interessa sem focusGif: e uma busca no cache.
-      if(!folder->focusGif[0]&&arte&&arte[0]) temMagCapa=tex_magica(arte,magCapa);
-      fonte=gifcol_fonte(folder->focusGif,arte,temMagCapa?magCapa:NULL,&daCapa);
-      if(gifcol_focar(&gcFoco,id,fonte,now)) {
-        // gif_parar SOLTA O FIO DE DECODE do cartaz anterior; e gif_textura
-        // devolve 0 ate o primeiro quadro DESTE chegar (a textura e uma so, e
-        // ainda tem o ultimo quadro do outro).
-        gif_parar();
-      }
-      if(!fonte) motivo=gifcol_sem_fonte(arte,temMagCapa?magCapa:NULL);
-      else if(NV_SEM_GIF||ajustes_animacoes_reduzidas()) motivo=GC_REDUZIDAS;
-      else if(!gif_pode_animar()) motivo=GC_APARELHO;
-      else {
-        // O ARQUIVO E PEDIDO FORA DO ATRASO de 350 ms. Dentro dele, o download so
-        // comecaria depois do atraso e o primeiro quadro chegaria tarde; pedir
-        // cedo custa uma consulta ao cache, que devolve NULL enquanto nao chegou.
-        const char *arq = tex_arquivo(fonte);
-        if(!arq) {
-          // Sem arquivo: ou ainda nao chegou, ou chegou e nao e GIF (no Tizen
-          // so GIF vira arquivo), ou era GIF e a poda levou (tex_arquivo ja
-          // pediu de novo, uma vez).
-          temMag=tex_magica(fonte,mag);
-          motivo=!temMag?GC_ARQ_AINDA:(gifcol_eh_gif(mag)?GC_SUMIU:GC_FORMATO);
-        } else {
-          // gif_animado LE O ARQUIVO INTEIRO. Uma vez por cartaz, e nao por quadro.
-          if(gcFoco.anima<0) {
-            gcFoco.anima=gif_animado(arq);
-            gcFoco.motivoArq=gifcol_motivo_arquivo(arq,gcFoco.anima,gcFoco.magicaArq);
-          }
-          if(gcFoco.anima<=0) { motivo=gcFoco.motivoArq; memcpy(mag,gcFoco.magicaArq,4); temMag=1; }
-          else if(now-gcFoco.desde>350) {
-            // A CADA DESENHO, sem passo de 67 ms (1.4.7): o relogio e de gif.c,
-            // que so sobe as linhas que mudaram quando o quadro do GIF vence. O
-            // passo de 67 ms prendia o GIF a 15 fps, abaixo do ritmo do arquivo.
-            GLuint motion=gif_textura(arq,480);
-            if(motion){
-              tex=motion;
-              // A PROPORCAO DA CAPA NAO VALE AQUI. Abaixo o desenho usa
-              // tex_aspecto(arte), que e a da capa; o GIF do CDN pode vir em
-              // qualquer proporcao. Zero deixa o desenho usar a moldura.
-              gifDesenhando=1;
-            } else if(gif_recusou(arq)) motivo=GC_ORCAMENTO;
-          }
-        }
-      }
-      // OS PROVISORIOS ESPERAM O PRAZO: "ainda nao chegou" aos 200 ms e so um
-      // download em andamento. Os definitivos saem na hora.
-      if(motivo!=GC_ANIMA&&
-         ((motivo!=GC_ARQ_AINDA&&motivo!=GC_CAPA_AINDA)||now-gcFoco.desde>GIFCOL_PRAZO_MS)) {
-        snprintf(chave,sizeof chave,"%s|%s",folder->groupId,folder->id);
-        gifcol_registrar(chave,folder->title,motivo,fonte?fonte:arte,fonte?daCapa:1,
-                         temMag?mag:NULL);
-      }
-    }
     if(foco.fileira==r&&foco.coluna==c&&folder->frames>0 && !NV_SEM_GIF &&
        !ajustes_animacoes_reduzidas()) {
       int id=fileiras[r].folders[c];Uint32 now=SDL_GetTicks();
@@ -4005,7 +3912,7 @@ static void desenhaAtalhos(int r, float y) {
       }
     }
     if (tex) {
-      gfx_tex_aspect_atual = gifDesenhando ? 0.0f : tex_aspecto(arte);
+      gfx_tex_aspect_atual = tex_aspecto(arte);
       // PASSA O FOCO, como a fileira de cartazes faz. Antes ia 0 fixo: o card
       // de COLECAO era o unico formato que nao clareava, nao ganhava o
       // especular e nao respondia ao foco de jeito nenhum — a queixa do dono
@@ -4024,24 +3931,6 @@ static void desenhaAtalhos(int r, float y) {
   }
 }
 
-static const char *heroTrailerYoutube(const char *imdb) {
-#ifdef __EMSCRIPTEN__
-  size_t j, tam;
-  if (!extras_hero_trailer_obter(imdb, heroTrailerYoutubeId,
-                                 sizeof heroTrailerYoutubeId)) return NULL;
-  tam = strlen(heroTrailerYoutubeId);
-  if (tam < 6 || tam > 15) return NULL;
-  for (j = 0; j < tam; j++)
-    if (!((heroTrailerYoutubeId[j] >= 'A' && heroTrailerYoutubeId[j] <= 'Z') ||
-          (heroTrailerYoutubeId[j] >= 'a' && heroTrailerYoutubeId[j] <= 'z') ||
-          (heroTrailerYoutubeId[j] >= '0' && heroTrailerYoutubeId[j] <= '9') ||
-          heroTrailerYoutubeId[j] == '_' || heroTrailerYoutubeId[j] == '-')) return NULL;
-  return heroTrailerYoutubeId;
-#else
-  (void)imdb;
-#endif
-  return NULL;
-}
 
 // O carrossel compartilha o mesmo contrato do pedido de trailer: espera
 // enquanto a fonte ainda pode chegar, segura enquanto o elemento prepara e
@@ -4088,11 +3977,10 @@ static void heroTrailerGateLog(int motivo, int enabled) {
 }
 
 static void heroTrailerFonteFalhou(void) {
-  if(heroTrailerQual>0&&heroTrailerQual<=TRF_YOUTUBE)
+  if(heroTrailerQual>0&&heroTrailerQual<=TRF_IMDB)
     heroTrailerFalhas|=1u<<heroTrailerQual;
   if(heroTrailerQual==TRF_APPLE)heroTrailerAppleFalhou=1;
-  heroTrailerTentado=trailerfonte_depois_destaque(trailerfonte_ajuste(),
-                    trailerfonte_tizen(),heroTrailerQual)==0;
+  heroTrailerTentado=trailerfonte_depois(trailerfonte_ajuste(), heroTrailerQual)==0;
   heroTrailerFonte=heroTrailerTentado?3:0;
   heroTrailerPreparandoAte=0;heroTrailerFade=0.0f;
 }
@@ -4181,28 +4069,11 @@ void home_trailer_passo(int topo, float dt, Uint32 agora) {
     heroTrailerTentado = heroTrailerMemoriaFalhou || heroTrailerJaTocou(ci->imdb);
     if (heroTrailerTentado) goto trailer_hero_fim;
     trailerapple_pedir(ci->imdb, ci->titulo, ci->meta, ci->tipo[0] ? !strcmp(ci->tipo, "series") : 0);
-#ifdef __EMSCRIPTEN__
-    // A consulta do hero e so /videos; extras_pedir (ficha, creditos,
-    // relacionados e imagens) continua reservado para a pagina de detalhe.
-    extras_hero_trailer_pedir(ci->imdb,
-                              ci->tipo[0] ? !strcmp(ci->tipo, "series") : 0,
-                              ci->tmdb);
-#endif
     // O IMDb exige Referer, que navegador nenhum deixa por (e o CORS dele so
     // aceita imdb.com): na Samsung so pelo servico de recomendacoes (#136).
-    if (!trailerfonte_tizen() || trailerfonte_imdb_tizen()) trailerimdb_pedir(ci->imdb);
+    trailerimdb_pedir(ci->imdb);
   } else {
     decorrido = agora - heroTrailerDesde;
-#ifdef __EMSCRIPTEN__
-    // O worker tem uma janela de retry própria. Chamar aqui é barato e
-    // idempotente enquanto a mesma fonte ainda pode chegar; depois de uma
-    // falha transitória, o cooldown deixa a mesma obra tentar de novo sem
-    // depender de uma troca de destaque.
-    if (!heroTrailerTentado)
-      extras_hero_trailer_pedir(ci->imdb,
-                                ci->tipo[0] ? !strcmp(ci->tipo, "series") : 0,
-                                ci->tmdb);
-#endif
     // Um elemento que ficou em buffering nao pode congelar a home. Fechar
     // aqui tambem invalida a fonte antiga antes de a proxima arte entrar.
     if (trailer_aberto() && !trailer_tocando() && heroTrailerPreparandoAte &&
@@ -4210,7 +4081,7 @@ void home_trailer_passo(int topo, float dt, Uint32 agora) {
       printf("[trailer] hero: sem playing em %d ms (%s, estado %d), %s\n",
              NV_TRAILER_HERO_PREPARA_MS, trailerfonte_nome(heroTrailerQual),
              trailer_estado(),
-             trailerfonte_depois_destaque(trailerfonte_ajuste(), trailerfonte_tizen(), heroTrailerQual)
+             trailerfonte_depois(trailerfonte_ajuste(), heroTrailerQual)
                ? "tenta a proxima fonte" : "desiste");
       fflush(stdout);
       trailer_fechar();
@@ -4223,7 +4094,7 @@ void home_trailer_passo(int topo, float dt, Uint32 agora) {
   if (heroTrailerQual>0 && heroTrailerFonte>0 && heroTrailerFonte<3 &&
       !trailer_aberto() && trailer_falhou() && !(heroTrailerFalhas&(1u<<heroTrailerQual))) {
     printf("[home-trailer] source failed source=%s action=%s\n",trailerfonte_nome(heroTrailerQual),
-           trailerfonte_depois_destaque(trailerfonte_ajuste(), trailerfonte_tizen(), heroTrailerQual)
+           trailerfonte_depois(trailerfonte_ajuste(), heroTrailerQual)
              ? "try_next_source" : "keep_art");
     fflush(stdout);
     heroTrailerFonteFalhou();
@@ -4255,30 +4126,11 @@ void home_trailer_passo(int topo, float dt, Uint32 agora) {
     c.apple = trailerapple_url(ci->imdb);
     c.appleRespondeu = trailerapple_respondeu(ci->imdb) || venceu;
     c.appleFalhou = heroTrailerAppleFalhou;
-    if (!trailerfonte_tizen() || trailerfonte_imdb_tizen()) {
-      c.imdb = trailerimdb_url(ci->imdb, NULL);
-      c.imdbRespondeu = trailerimdb_respondeu(ci->imdb) || venceu;
-    } else c.imdbRespondeu = 1;
+    c.imdb = trailerimdb_url(ci->imdb, NULL);
+    c.imdbRespondeu = trailerimdb_respondeu(ci->imdb) || venceu;
     if(heroTrailerFalhas&(1u<<TRF_APPLE)){c.apple=NULL;c.appleRespondeu=1;c.appleFalhou=1;}
     if(heroTrailerFalhas&(1u<<TRF_IMDB)){c.imdb=NULL;c.imdbRespondeu=1;}
-#ifdef __EMSCRIPTEN__
-    // SEM YOUTUBE NO DESTAQUE DA SAMSUNG (#136). O iframe do embed custa
-    // segundos de fio principal nesta TV — registro da AU7000: raf-max=1034
-    // ms, longtask-max=934 ms atribuido ao iframe, FPS=6.7 — e depois cai no
-    // erro 153 ("Video player configuration error") e o hero fecha sem
-    // `playing` aos 6,5 s. O destaque troca a cada seta: e o pior lugar para
-    // ele. Aqui so <video> (Apple, IMDb); o YouTube fica na pagina do titulo.
-    // A lista do TMDB ainda e pedida (heroTrailerYoutube), mas nao abre.
-    (void)heroTrailerYoutube;
-    c.youtube = NULL;
-    c.youtubeRespondeu = 1;
-#else
-    c.youtubeRespondeu = venceu;
-#endif
-    // _destaque: igual a trailerfonte_escolher, salvo no .tpk com
-    // NV_TRAILER_CONTINUA_DETALHE (IMDb antes da Apple, para o trailer poder
-    // continuar COM SOM na pagina do titulo; ver trailerfonte.h).
-    d = trailerfonte_escolher_destaque(trailerfonte_ajuste(), trailerfonte_tizen(), &c, &u, &qual);
+    d = trailerfonte_escolher(trailerfonte_ajuste(), &c, &u, &qual);
     if (d == TRF_ESPERA && !venceu) goto trailer_hero_fim;
     if (d == TRF_ABRE && u) {
       // The source kind is diagnostic state, not proof it is the last source:
@@ -4876,10 +4728,9 @@ static void pintarCartao(const CartaoFoco *k, float raio) {
           // no Trakt (ou marcado pelo menu, que zera o progresso) nunca
           // ganhava o selo. Leitura O(1) por cartaz (hash em catalogo.c),
           // sem pedido de rede: o mapa ja veio no ciclo da descoberta.
-          float limiteSelo = px + w;
           if (cItem && tipo != FILEIRA_CONTINUE && tipo != FILEIRA_RETORNO &&
               ajustes_selo_visto() && cat_visto(cItem)) {
-            limiteSelo = desenhaSeloVisto(px, py, w);
+            desenhaSeloVisto(px, py, w);
           }
 
           // `cardDepthEnabled` mais o interruptor por secao: `cardDepthPosters`
@@ -5495,14 +5346,8 @@ int home_item_focado(HomeItem *out) {
   return 1;
 }
 
-int home_n_artes(void) { return nBd; }
 // Quando ha catalogo, a arte vem dele (na ordem certa, casada com o titulo);
 // sem catalogo, cai na varredura da pasta.
-const char *home_backdrop(int i) {
-  const CatItem *c = cat_item_exato(i);
-  return c && c->backdrop[0] ? c->backdrop : NULL;
-}
-const char *home_arte(int i) { return (nBd && i >= 0 && i < nBd) ? bd[i] : NULL; }
 
 // Consome o pedido de abrir: quem le, zera. Assim o OK vale uma vez so, mesmo
 // que o quadro demore.

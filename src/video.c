@@ -14,7 +14,6 @@
 #include "lsregistro.h"
 #include "rede.h"
 #include "velocidade.h"
-#include "cacheboost.h"
 #include "dts/dts_playback.h"
 #include "dts/dts_engine.h"
 #include "ajustes.h"
@@ -52,7 +51,6 @@ static int dvMemOrd = -1;
 // Island notice for app.c: 1 = the source could not keep up, 2 = the path did
 // not start. Consumed once.
 int video_dv_recuo_consumir(void) { int v = dvRecuoAviso; dvRecuoAviso = 0; return v; }
-int video_dv_ativo(void) { return dtsSessao && dtsModoDv; }
 // This source already played (webOS): a later reload of the SAME source
 // (Dolby Vision/DTS path handing back to the TV player, audio switch) is not
 // a source that failed to open. Other targets keep 0.
@@ -60,7 +58,6 @@ static int fonteTocou;
 int video_fonte_tocou(void) { return fonteTocou; }
 static int dvLiberadoNestaTv(void);
 static int dvPronto(void);
-const char *video_dts_saida(void) { return dtsSaida; }
 
 int video_faixa_dts(const VideoFaixa *f) {
   char s[96];
@@ -149,7 +146,6 @@ void video_normalizar_url_legenda(const char *url, char *dst, unsigned tam) {
 // a guarda para o topo obrigaria a duplica-los no video_tizen.c, e duas copias
 // de uma tabela e uma copia para divergir da outra.
 // ============================================================================
-#ifndef __EMSCRIPTEN__
 
 // Declarada aqui porque o loadCompleted a chama muito antes de ela ser
 // definida. O clang do Mac aceita a implicita; o gcc do ARM recusa — e o ARM
@@ -167,9 +163,7 @@ static void aplicarEstilo(void);
 // Mesmo limite de Stream.url: o pipeline recebe a URL original, e cortar a
 // copia faria somente a sonda MKV/ASS falhar (inclusive apos tentar de novo).
 static char  urlAtual[4096];
-#if !defined(NV_TPK) && !defined(NV_ANDROID)   // .tpk e Android: video_url_atual vem do video_*.c do alvo
 const char *video_url_atual(void) { return urlAtual; }
-#endif
 // Recuperacao de pipeline destruido: pedida pelo fio de resposta do luna e
 // executada no fio principal (video_bombear), porque recarregar de dentro do
 // tratador de evento reentra no mesmo caminho que acabou de falhar.
@@ -218,7 +212,7 @@ static int       fioMkvVivo;
 // abertura e fazer o load correto ser ignorado.
 static unsigned  sessao;
 
-#if defined(__APPLE__) || defined(NV_LINUX_DESKTOP)
+#if defined(NV_LINUX_DESKTOP)
 // No Mac nao existe barramento nem plano de video. Os cotos deixam o resto do
 // app compilar e rodar igual, so sem imagem em movimento. As capturas podem
 // simular um video (video_simular, video.h); zerado e o coto mudo.
@@ -316,9 +310,9 @@ void video_velocidade(int c) { velMac = c > 0 ? c : VEL_NORMAL; }
 int  video_velocidade_atual(void) { return velMac; }
 void video_velocidade_recusada(void) { velMac = VEL_NORMAL; }
 // Capturas: o passthrough simulado (cacheboost_ganho_relato) esmaece a linha.
-int  video_velocidade_bloqueada(void) { return cacheboost_ganho_estado() == CB_GANHO_PASSTHROUGH; }
+int  video_velocidade_bloqueada(void) { return 0; }
 // .tpk da Samsung: o player e o do host .NET, em video_tpk.c.
-#elif !defined(NV_TPK) && !defined(NV_ANDROID)   // ramo luna (webOS): Android usa video_android.c
+#else
 #include <dlfcn.h>
 
 typedef struct LSHandle LSHandle;
@@ -1415,24 +1409,6 @@ static void chamarCtx(const char *metodo, const char *carga, Filtro cb,
   char uri[128];
   snprintf(uri, sizeof uri, "luna://com.webos.media/%s", metodo);
   lsChamar(uri, carga, cb, ctx, metodo);
-}
-
-// Chamada a OUTRO servico. O recorte de fonte NAO mora no com.webos.media: ele
-// respondeu `Unknown method "setDisplayWindow" for category "/"`, e a lista do
-// `ls-monitor -i com.webos.media` confirma que nao existe ali. Quem tem os
-// metodos de janela e o com.webos.service.tv.display:
-//
-//   "setDisplayWindow":       {"provides":["tv.management","private","tv.settings","all","public"]}
-//   "setCustomDisplayWindow": idem
-//
-// setCustomDisplayWindow e o que aceita a fonte junto do destino, que e o
-// recorte de que o zoom precisa.
-static void chamarEm(const char *servico, const char *metodo,
-                     const char *carga, Filtro cb) {
-  char uri[160], rot[160];
-  snprintf(uri, sizeof uri, "luna://%s/%s", servico, metodo);
-  snprintf(rot, sizeof rot, "%s/%s", servico, metodo);
-  lsChamar(uri, carga, cb, NULL, rot);
 }
 
 static void protegerScreensaver(void);
@@ -3339,5 +3315,3 @@ int video_legenda_nativa(char *d, int t) {
 }
 
 #endif
-
-#endif  /* !__EMSCRIPTEN__ */

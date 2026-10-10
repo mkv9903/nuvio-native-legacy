@@ -41,7 +41,6 @@ typedef struct {
 // A secao (Glass UI 1.8): cartao de nota a esquerda (media, critica x publico,
 // menor/maior) e uma grade de DUAS colunas com um bloco por fonte. Cada bloco
 // e uma coluna do foco (detail.c anda na grade com as setas).
-int   notasui_fontes_tem(const NotasSecao *s);
 int   notasui_fontes_n(const NotasSecao *s);      // blocos = colunas do foco
 // Altura do CONTEUDO (sem o cabecalho que detail.c desenha). Barata: nao
 // rasteriza nada.

@@ -56,12 +56,8 @@ int  spainel_n_continuar(void);
 // o id no catalogo e abre o detalhe e o roteador (app.c) — o painel nao conhece
 // nem detail.c nem a descoberta, exatamente como perfil.c nao conhecia.
 const char *spainel_pediu_abrir(void);
-// 1 uma vez quando a pessoa pediu a tela Agenda completa pela aba Agenda.
-int spainel_pediu_agenda(void);
-// Para os testes: abre direto numa aba (0 Salvos, 1 Avisos), com o foco na primeira linha da lista.
+// Para os testes: abre direto numa aba (0 Salvos, 3 Avisos), com o foco na primeira linha da lista.
 void spainel_ir_aba(int aba);
 // Testes: a aba aberta e o indice do foco (< 0: abas ou barra).
-int spainel_aba_atual(void);
-int spainel_foco_indice(void);
 
 #endif

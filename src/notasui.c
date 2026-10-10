@@ -331,7 +331,6 @@ static void medir(const NotasSecao *s, Medidas *m) {
   }
 }
 
-int notasui_fontes_tem(const NotasSecao *s) { Medidas m; medir(s, &m); return m.nFontes > 0; }
 int notasui_fontes_n(const NotasSecao *s)   { Medidas m; medir(s, &m); return m.nFontes; }
 float notasui_fontes_altura(const NotasSecao *s) { Medidas m; medir(s, &m); return m.h; }
 

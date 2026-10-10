@@ -17,7 +17,7 @@
 //
 // QUATRO CONTEUDOS, por prioridade: aviso (fila curta, um de cada vez) >
 // atividade (algo em andamento, renovado a cada quadro por quem a tem) >
-// cartao (atividade ao vivo / estreia, ao lado do relogio, so com ele) >
+// cartao (atividade ao vivo, ao lado do relogio, so com ele) >
 // relogio (so onde app.c disse que cabe: ilha_relogio_visivel).
 //
 // FIO PRINCIPAL em tudo.
@@ -117,7 +117,6 @@ typedef struct {
   const char *capa;         // mini capa 30x44; com rosto vira o "duo"
   const char *meta;         // sufixo apagado depois da frase ("T2E4")
   int vivo;                 // ponto vermelho de "agora"
-  int cartao;               // AZUL abre o modal deste cartao (ILHA_VIVO + 1 ...); 0 = nao
   const IlhaModal *modal;   // AZUL abre este modal; NULL = nao
   // AVISO DE DUAS LINHAS (Glass UI v2, 03/10 — o da atualizacao, mockup
   // ajustes-v2 "v2-upd-aviso"/"v2-upd-em-dia"). Com `titulo` a pilula fica com
@@ -201,19 +200,9 @@ void ilha_posicionar(int guia);
 
 void ilha_desenhar(Uint32 agora);
 // 1 quando ha aviso ou atividade aberta (o relogio sozinho nao conta).
-int  ilha_ocupada(void);
 
-// --- CARTOES PERSISTENTES: atividade ao vivo e estreia (pedido do dono, 01/10) ---
-//
-// SO COM O RELOGIO NA TELA (Ajustes > Relogio na tela e onde app.c diz que ele
-// cabe). Um cartao fica AO LADO do relogio, na mesma pilula, ate quem o poe
-// tira-lo (ilhacart.c): a sessao interrompida do player (ILHA_VIVO) e o
-// episodio novo de uma serie com lembrete ainda nao lido (ILHA_ESTREIA). Os
-// avisos e a atividade continuam passando na frente; dois cartoes alternam a
-// cada ILHA_ALTERNA_MS. AZUL/CH+ com um cartao na pilula abre o MODAL — a
-// pilula cresce ate um cartao maior com a arte e os botoes (ilha_evento).
-enum { ILHA_VIVO = 0, ILHA_ESTREIA, ILHA_N_CARTOES };
-#define ILHA_ALTERNA_MS 6000u
+// Persistent card for an interrupted playback session, beside the clock.
+enum { ILHA_VIVO = 0, ILHA_N_CARTOES };
 typedef struct {
   char chave[80];        // muda = outro conteudo (a pilula remorfa)
   char imdb[64];
@@ -222,8 +211,6 @@ typedef struct {
   char poster[1024], logo[512], arte[512];   // arte: still do episodio ou fundo
   float progresso;       // 0..1 na ILHA_VIVO; < 0 sem barra
   int  restanteMin;      // ILHA_VIVO
-  char quando[24];       // ILHA_ESTREIA: "hoje" (ja traduzido) ou ""
-  char avisoId[72];      // ILHA_ESTREIA: id do aviso em avisos.c
 } IlhaCartao;
 // NULL tira o cartao. A copia e da ilha; quem chama pode descartar o seu.
 void ilha_cartao(int qual, const IlhaCartao *c);
@@ -247,14 +234,9 @@ int  ilha_evento(const SDL_Event *e);
 // todo modal de cartao e de aviso:
 //   - VOLTAR recolhe o modal para a pilula e NAO muda nada: o cartao fica, o
 //     aviso continua na lista como estava;
-//   - "Depois" / "Agora nao" ADIA: o cartao da estreia sai da pilula ate o app
-//     fechar (ILHA_PEDIU_DEPOIS; avisodisp_sessao_*), o item fica na lista;
-//   - "Dispensar" (ou "Fechar" no cartao ao vivo e no do amigo, que nao
-//     guardam nada) DISPENSA: some da pilula e da lista e a mesma chave nao
-//     volta, nem depois de reiniciar (ILHA_PEDIU_DISPENSAR; avisodisp.h).
-// Estreia: Assistir · Depois · Dispensar.
+// Dismiss removes the current playback card; Back only closes its modal.
 enum { ILHA_PEDIU_NADA = 0, ILHA_PEDIU_TOCAR, ILHA_PEDIU_DETALHES,
-       ILHA_PEDIU_DISPENSAR, ILHA_PEDIU_SALVOS, ILHA_PEDIU_DEPOIS };
+       ILHA_PEDIU_DISPENSAR, ILHA_PEDIU_SALVOS };
 int  ilha_pediu(IlhaCartao *c, int *qual);
 
 // MINIMIZAR NA ILHA: o player saiu no meio e a sessao virou o cartao

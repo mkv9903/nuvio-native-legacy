@@ -4,6 +4,6 @@ cd "$(dirname "$0")/.."
 binary=$(mktemp /tmp/nuvio-icon-policy.XXXXXX)
 trap 'rm -f "$binary"' EXIT
 cc src/iconeapp.c tests/iconeapp_policy.c -Isrc \
-  -I/opt/homebrew/include -I/opt/homebrew/include/SDL2 \
+  -DNV_LINUX_DESKTOP $(pkg-config --cflags sdl2 SDL2_image SDL2_ttf)  \
   -Wno-deprecated-declarations -o "$binary"
 "$binary"

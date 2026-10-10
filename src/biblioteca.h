@@ -24,8 +24,6 @@ int  biblioteca_pediu_abrir(int *indiceCatalogo);
 // detalhe (o botao "+"), nao a biblioteca: sem isto a aba "Minha Lista" so
 // poderia ser alimentada por dentro deste modulo, e o "+" do detalhe nao teria
 // onde escrever.
-int  biblioteca_na_lista(int indiceCatalogo);
 void biblioteca_alternar_lista(int indiceCatalogo);
-int  biblioteca_comprado(int indiceCatalogo);
 
 #endif

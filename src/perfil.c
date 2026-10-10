@@ -123,7 +123,7 @@ static float pfDy(void);
 // estilo novo em text.c seria conflito com quem mexe nele em paralelo. Os
 // numeros sao os que dao, na Inter estatica daqui, a MESMA largura medida na
 // captura do mockup (a Inter variavel do navegador e ~9% mais larga abaixo de
-// 24 px; ver escTitulo em agendaui.c).
+// 24 px; ver escTitulo).
 #define PF_ESC_NOME   (53.0f / NV_FT_TITULO2)    // 52/800
 #define PF_ESC_BIG    (45.0f / NV_FT_TITULO3)    // 44/800
 #define PF_ESC_CARD   (23.0f / NV_FT_ROW_TITULO) // 22/700
@@ -188,7 +188,7 @@ static float rotuloCaixa(const char *s, int c, float x, float y, float a) {
 }
 static void acento(float *r, float *g, float *b) { ajustes_acento(r, g, b); }
 // A altura da linha de apoio (15 no mockup) ja reduzida. "Hg" pela caixa com
-// ascendente e descendente, como em agendaui.c.
+// ascendente e descendente, como no restante da interface.
 static float altLinhaApoio(void) {
   return (float)txt_linha(TXT_CAPTION2, "Hg", PF_APOIO, PF_APOIO, PF_APOIO, 255).h * PF_ESC_APOIO;
 }
@@ -270,7 +270,6 @@ void perfil_definir_estado(PerfilEstado novo, const char *m) {
   if ((novo == PERFIL_ESTADO_PRIVADO || novo == PERFIL_ESTADO_DESCONECTADO || novo == PERFIL_ESTADO_INDISPONIVEL) && temDados)
     estado = PERFIL_ESTADO_STALE;
 }
-PerfilEstado perfil_estado(void) { return estado; }
 int perfil_pediu_atualizar(void) { int p=pedirAtualizar; pedirAtualizar=0; return p; }
 
 void perfil_definir_dados(const PerfilDados *d) {
@@ -323,8 +322,6 @@ int perfil_item_selecionado(PerfilDestaque *saida) {
   return 1;
 }
 
-void perfil_voltar_ao_duelo(void) {}
-int perfil_pediu_amigo(char *id, size_t tam) { (void)id; (void)tam; return 0; }
 
 void perfil_evento(const SDL_Event *e) {
   if (!aberto || !e || e->type != SDL_KEYDOWN) return;

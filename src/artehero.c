@@ -75,11 +75,7 @@ void artehero_qualidade(int nivel) {
 // depois — o unico abort fatal da 1.4.0. No Tizen a ALTA fica em w1280 para
 // fundo e still; o logo (PNG pequeno) continua subindo.
 static int fundoOriginal(void) {
-#ifdef __EMSCRIPTEN__
-  return 0;
-#else
   return qualidadeImg == 2;
-#endif
 }
 
 // fixar() mora mais abaixo (anel de buffers); declarado aqui para o card.
@@ -310,11 +306,7 @@ static const char *urlDaFonte(const CatItem *item, int fonte, int grande,
       // na Samsung e na Baixa.
       char enc[200];
       int ano = anoDoItem(item);
-#ifdef __EMSCRIPTEN__
-      const char *t = "1280";
-#else
       const char *t = qualidadeImg == 0 ? "1280" : "1920";
-#endif
       if (!temTt || !ano || !item->titulo[0]) return NULL;
       codificar(item->titulo, enc, sizeof enc);
       snprintf(saida, tam, "%s" "apple/%s/%s/%c/%d/%s", ARTE_VIRTUAL_PREFIXO,

@@ -66,7 +66,6 @@ unsigned legenda_geracao(void);
 int      legenda_ligada_em(unsigned geracao);
 unsigned legenda_definir_corpo_se(const char *corpo, unsigned geracao);
 int      legenda_atualizar_corpo_se(const char *corpo, unsigned geracao);
-int  legenda_texto(double posSeg, int atrasoMs, char *dst, size_t tam);
 
 // Todos os blocos vivos em `posSeg`, ate `max`. Devolve quantos preencheu.
 // Ordem: a do arquivo (ver `ordem`), que e a ordem de empilhamento na tela.

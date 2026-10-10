@@ -7,7 +7,7 @@ for source in src/*.c src/dts/*.c; do
   sources+=("$source")
 done
 cc "${sources[@]}" tests/atualizacao_agenda.c -Isrc -o /tmp/nuvio-atualizacao-agenda \
-  -O1 -g -I/opt/homebrew/include -I/opt/homebrew/include/SDL2 \
-  -L/opt/homebrew/lib -lSDL2 -lSDL2_image -lSDL2_ttf -lz -framework OpenGL \
+  -O1 -g -DNV_LINUX_DESKTOP $(pkg-config --cflags sdl2 SDL2_image SDL2_ttf)  \
+   -lSDL2 -lSDL2_image -lSDL2_ttf -lz $(pkg-config --libs glesv2 egl) -ldl -pthread -lm \
   -Wno-deprecated-declarations -Wno-macro-redefined
 /tmp/nuvio-atualizacao-agenda "$@"

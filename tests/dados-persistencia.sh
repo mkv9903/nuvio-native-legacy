@@ -4,7 +4,7 @@ cd "$(dirname "$0")/.."
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
-# Do not touch a host's pre-existing Tizen developer directory if one is present.
+# Do not touch a host's pre-existing webOS developer directory if one is present.
 if [ -w /media/developer/temp/nuvio ]; then
   echo "SKIP: /media/developer/temp/nuvio is writable on this host"
   exit 0

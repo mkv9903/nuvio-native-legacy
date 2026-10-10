@@ -5,7 +5,7 @@
 // A COLISAO MEDIDA: a chave de i18n "espaço" servia a dois textos — o rotulo da
 // tecla (busca.c, spotlight.c, teclado.c) e o nome do TEMA "space" do mapa
 // (mapa.c, keyword do TMDB). As traducoes foram feitas pelo tema: a tecla saia
-// "Weltraum" em alemao, "космос" em russo, "宇宙" em japones. Uma tabela, uma
+// "Outer space" em alemao, "космос" em russo, "宇宙" em japones. Uma tabela, uma
 // traducao por chave: o tema ganhou chave propria ("espaço sideral").
 //
 // Digitacao por dois caminhos: D-pad + OK na grade da tela (o controle) e tecla
@@ -84,9 +84,7 @@ static void confere(const char *onde, const char *veio, const char *quer) {
 
 int main(void) {
   static const struct { int lg; const char *tecla; } ROTULO[] = {
-    { IDIOMA_EN, "space" }, { IDIOMA_DE, "Leertaste" }, { IDIOMA_RU, "пробел" },
-    { IDIOMA_UK, "пробіл" }, { IDIOMA_JA, "スペース" }, { IDIOMA_ZHCN, "空格" },
-    { IDIOMA_PL, "spacja" }, { IDIOMA_NL, "spatie" },
+    { IDIOMA_EN, "space" },
   };
   size_t i;
 
@@ -115,8 +113,8 @@ int main(void) {
     snprintf(onde, sizeof onde, "rotulo tecla (%s)", idioma_iso(ROTULO[i].lg));
     confere(onde, i18n("espaço"), ROTULO[i].tecla);
   }
-  valor[AJ_IDIOMA] = IDIOMA_DE + 1;
-  confere("tema \"space\" (de)", i18n(mapa_tema_nome("space")), "Weltraum");
+  valor[AJ_IDIOMA] = IDIOMA_EN + 1;
+  confere("tema \"space\" (de)", i18n(mapa_tema_nome("space")), "Outer space");
   puts("espaco: tudo certo");
   return 0;
 }

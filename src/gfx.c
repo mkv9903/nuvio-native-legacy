@@ -61,7 +61,6 @@ void gfx_textura_definir(GLuint tex, const float janela[4], float aspecto,
   memcpy(txJan, janela, sizeof txJan);
   txAsp = aspecto; txForca = forca; txVeu = veu; txVeuBranco = veuBranco ? 1.0f : 0.0f;
 }
-int gfx_textura_ativa(void) { return txTex != 0; }
 float gfx_card_forcar_cover_atual = 0.0f;
 float gfx_card_veu_tela_atual = 0.0f;
 // O pedaco do rect que o proximo gfx_rect desenha (uSub). So gfx_sombra_vazada
@@ -370,16 +369,7 @@ static const char *FS_CABECA =
   "#else\n"
   "#define NV_HP mediump\n"
   "#endif\n"
-  // O fundo social (GFX_SOCIAL), como funcao da posicao na tela (y para
-  // baixo), para o modo SOCIAL e para servir de fundo em gfx_hero_camadas.
-  "vec3 nv_social(vec2 p){\n"
-  "  float glow = 1.0-smoothstep(0.0,0.95,length((p-vec2(0.88,0.18))*vec2(1.0,1.25)));\n"
-  "  float ribbon = 1.0-smoothstep(0.04,0.40,abs(p.y-0.12-p.x*0.44));\n"
-  "  vec3 c = mix(vec3(0.105,0.065,0.095),vec3(0.40,0.14,0.18),glow);\n"
-  "  c += vec3(0.065,0.028,0.020)*ribbon*glow;\n"
-  "  c = mix(c,vec3(0.047,0.045,0.055),smoothstep(0.44,1.0,p.y));\n"
-  "  return c;\n"
-  "}\n";
+  ;
 
 // SDF de retangulo arredondado, corrigido pela proporcao — sem a correcao o
 // canto de um card landscape sai oval.
@@ -755,7 +745,7 @@ static const char *FS_CORPO[GFX_NMODOS] = {
   // nos cantos ela aparecia. Medido: na pilula "Depois" (56 px, traco de
   // 1,5 px) uma linha de pixel no reto e duas na diagonal da curva; no anel
   // de 3 px do Reproduzir, 2,3 px no reto e 4,4 px a 45 graus. E o mesmo
-  // "squircle" que agendaui.c e salvospainel.c descrevem num circulo: reto
+  // "squircle" que salvospainel.c descrevem num circulo: reto
   // nos quatro lados (o corte do quad) e cheio nas diagonais. E a rampa era
   // 45% da espessura: abaixo de ~2 px ela tinha menos de 1 px e serrilhava.
   // Agora a espessura e a mesma em todo o contorno e igual a pedida, e a borda
@@ -853,11 +843,6 @@ static const char *FS_CORPO[GFX_NMODOS] = {
   "  g = g * g;\n"
   "  gl_FragColor = nv_dither(uCor.rgb, g * uCor.a);\n"
   "}\n",
-  // GFX_SOCIAL: broad off-centre light, quiet left side for copy.
-  "void main(){\n"
-  "  gl_FragColor = nv_dither(nv_social(vUv),uCor.a);\n"
-  "}\n",
-
   // GFX_AVATAR: mascara radial exata. O GFX_CARD usa o SDF de retangulo
   // arredondado e over-scan de parallax; num circulo pequeno isso deixava a
   // aresta irregular e deslocava a fotografia dentro do disco.
@@ -1392,7 +1377,6 @@ static const struct { int sdf, cover; } PRECISA[GFX_NMODOS] = {
   {0,0},   /* GFX_FONTES  — idem */
   {0,0},   /* GFX_MARCA   — so o alpha da textura: sem SDF, sem cover */
   {0,0},   /* GFX_VEU_BAIXO — degrade vertical puro */
-  {0,0},   /* GFX_SOCIAL */
   {0,1},   /* GFX_AVATAR */
   {0,0},   /* GFX_RETRATO */
   {0,0},   /* GFX_DISCO */
@@ -1924,7 +1908,7 @@ void gfx_rect(GfxRect r, GLuint tex, GfxModo modo, float foco,
   // Modos cujo alfa de saida e o proprio uCor.a (ou 1): com alfa 1 a mistura
   // tambem era um no-op com leitura da tela. Fundo social, ceu da Explorar,
   // snapshot/luz assada e a arte desfocada do fundo.
-  else if ((modo == GFX_SOCIAL || modo == GFX_CEU || modo == GFX_SNAP || modo == GFX_FUNDO ||
+  else if ((modo == GFX_CEU || modo == GFX_SNAP || modo == GFX_FUNDO ||
             (modo == GFX_FOSCO && raio <= 0.0f) ||
             (modo == GFX_JANELA && raio <= 0.0f && cr > 0.5f &&
              nv_ambiente_forca <= 0.001f && parx <= 0.0f)) &&
@@ -2470,11 +2454,7 @@ void gfx_fundo_din_desenhar(const float topo[3], float queda) {
     // Adiado ate o fim do quadro (ver dinAdiado): so com a tela ainda vazia e
     // um buffer de profundidade na janela.
     if (dinAdiadoOk < 0) {
-#ifdef NV_ANDROID
-      dinAdiadoOk = 1;
-#else
       dinAdiadoOk = 0;
-#endif
       printf("[fundo-din] adiado para o fim do quadro: %s\n", dinAdiadoOk ? "sim" : "nao");
     }
     dinAdiado = dinAdiadoOk && gfx_n_rect == 0 && !gfx_modos_desligados;
@@ -2632,40 +2612,6 @@ void gfx_anel_fora(GfxRect peca, float raio, float folga, float esp,
   GfxRect r = { peca.x - g, peca.y - g, peca.w + 2.0f * g, peca.h + 2.0f * g };
   if (peca.h <= 0.0f) return;
   gfx_anel(r, (raio * peca.h + g) / r.h, esp, cr, cg, cb, ca);
-}
-void gfx_cartao_foco_vidro(GfxRect r, float raio, float foco, float alfa,
-                           float cr, float cg, float cb) {
-  float f, luminancia, lavagem, baseR, baseG, baseB;
-  GfxRect halo;
-  if (r.w <= 0.0f || r.h <= 0.0f || alfa <= 0.001f) return;
-  f = foco < 0.0f ? 0.0f : (foco > 1.0f ? 1.0f : foco);
-  if (ajustes_vidro()) {   // vidro: superficie fina + contorno branco, sem mancha
-    gfx_vidro_painel(r, raio, 0.45f, alfa);
-    if (f > 0.01f) gfx_anel(r, raio, 3.0f, cr, cg, cb, 0.96f * f * alfa);
-    return;
-  }
-  luminancia = cr * 0.2126f + cg * 0.7152f + cb * 0.0722f;
-  lavagem = 0.29f * (1.0f - 0.48f * (luminancia > 0.65f ? (luminancia - 0.65f) / 0.35f : 0.0f));
-  baseR = 0.057f + cr * 0.028f;
-  baseG = 0.062f + cg * 0.028f;
-  baseB = 0.078f + cb * 0.032f;
-  if (f > 0.001f) {
-    float folga = 0.38f;
-    halo.x = r.x - r.h * folga;
-    halo.y = r.y - r.h * folga;
-    halo.w = r.w + r.h * folga * 2.0f;
-    halo.h = r.h * (1.0f + folga * 2.0f);
-    gfx_rect(halo, 0, GFX_SOMBRA, 1.0f, 0, 0, 0.5f,
-             cr, cg, cb, 0.44f * f * alfa);
-  }
-  // O fundo deixa transparecer o painel de tras; duas passadas leves criam a
-  // lavagem de cor e a reflexao larga de vidro sem contorno nem degraus.
-  gfx_cor(r, raio, baseR, baseG, baseB, alfa * (0.93f - 0.08f * f));
-  if (f > 0.001f) {
-    gfx_rect(r, 0, GFX_VEU_CARD, 0, 0, 0, raio,
-             cr, cg, cb, lavagem * f * alfa);
-    gfx_brilho_topo(r, raio, 0.38f, 0.88f, 0.92f, 1.0f, 0.13f * f * alfa);
-  }
 }
 // Cor do miolo do vidro: 0,16 e um degrau ACIMA do fundo escuro da pagina, e
 // nao um preto — sobre #0D0D0D um miolo preto some e so o aro sobra.
@@ -2910,10 +2856,6 @@ void gfx_vidro_aro(GfxRect r, float raio, float esp, float cr, float cg, float c
   gfx_anel(r, raio, esp, cr, cg, cb, ca);
 }
 // Cartao/linha em repouso dentro de uma folha de vidro: um veu claro, sem aro.
-void gfx_vidro_superficie(GfxRect r, float raio, float a) {
-  if (r.w <= 0.0f || r.h <= 0.0f || a <= 0.001f) return;
-  gfx_cor(r, raio, 1, 1, 1, 0.05f * a);
-}
 // A COR DO FOCO NO VIDRO E O REALCE ESCOLHIDO. O vidro muda a SUPERFICIE (fina,
 // translucida, sem brilho nem sombra), nao a cor de quem esta selecionado: com
 // o tema padrao o realce e branco e o resultado e o da referencia (contorno /
@@ -3048,9 +2990,6 @@ void gfx_esqueleto(GfxRect r, float raio, float cr, float cg, float cb, float ca
            cr, cg, cb, ca);
 }
 
-void gfx_textura(GfxRect r, GLuint tex) {
-  gfx_rect(r, tex, GFX_CARD, 0, 0, 0, 0.0f, 0, 0, 0, 1);
-}
 
 int gfx_snap_iniciar(int w, int h) {
   snapW = w; snapH = h;
@@ -3281,50 +3220,7 @@ int gfx_borrao_iniciar(int w, int h) {
 
 // Desenha a arte no alvo e passa duas vezes o gaussiano. So roda quando a arte
 // muda — o resultado fica guardado na textura.
-void gfx_borrao_gerar(int via, unsigned int tex, float texAspecto) {
-  int a0 = via ? 2 : 0, a1 = via ? 3 : 1;
-  if (!borFbo[a0] || !tex) return;
-  GfxRect cheio = { 0, 0, NV_TELA_W, NV_TELA_H };
-  gfx_ambiente_descarregar();   // pendente e da tela, nao deste alvo
-  ESC_REAL_INI();
-  GFX_OUTRO_INI();
-  GLint fboAnt = fboLigado(), vpAnt[4];
-  glGetIntegerv(GL_VIEWPORT, vpAnt);
-  gfxBlend(0);
-  glViewport(0, 0, borW, borH);
 
-  glBindFramebuffer(GL_FRAMEBUFFER, borFbo[a0]);
-  // As tres passadas cobrem o alvo inteiro, opacas: o que havia nele nao
-  // interessa, e dizer isso a GPU de ladrilhos poupa a leitura dele.
-  gpun_descartar_cor(0);
-  gfx_tex_aspect_atual = texAspecto;
-  gfx_rect(cheio, tex, GFX_SNAP, 0, 0, 0, 0.0f, 0, 0, 0, 1.0f);
-  gfx_tex_aspect_atual = 0.0f;
-
-  // O passo e maior que um texel: com passo de um texel o desfoque mal cobre
-  // 4px do alvo, que esticado 4x ainda deixa a estrutura da imagem visivel.
-  float px = NV_BLUR_PASSO / (float)borW, py = NV_BLUR_PASSO / (float)borH;
-  glBindFramebuffer(GL_FRAMEBUFFER, borFbo[a1]);
-  gpun_descartar_cor(0);
-  gfx_rect(cheio, borTex[a0], GFX_BLUR, 0, px, 0.0f, 0.0f, 0, 0, 0, 1.0f);
-  glBindFramebuffer(GL_FRAMEBUFFER, borFbo[a0]);
-  gpun_descartar_cor(0);
-  gfx_rect(cheio, borTex[a1], GFX_BLUR, 0, 0.0f, py, 0.0f, 0, 0, 0, 1.0f);
-
-  gfxBlend(1);
-  // Volta ao alvo de ANTES (a janela, ou o alvo interno do nivel 2), e nao ao 0.
-  glBindFramebuffer(GL_FRAMEBUFFER, (GLuint)fboAnt);
-  glViewport(vpAnt[0], vpAnt[1], vpAnt[2], vpAnt[3]);
-  GFX_OUTRO_FIM();
-  ESC_REAL_FIM();
-}
-
-void gfx_borrao_desenhar(int via, GfxRect r, float alpha) {
-  int a0 = via ? 2 : 0;
-  if (!borTex[a0]) return;
-  gfx_tex_aspect_atual = 0.0f;
-  gfx_rect(r, borTex[a0], GFX_FUNDO, 0, 0, 0, 0.0f, 0, 0, 0, alpha);
-}
 
 void gfx_borrao_encerrar(void) {
   for (int i = 0; i < 4; i++) {

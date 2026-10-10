@@ -1,4 +1,4 @@
-// QUEM POE E TIRA OS CARTOES DA ILHA (ilha.h): a atividade ao vivo e a estreia.
+// QUEM POE E TIRA OS CARTOES DA ILHA (ilha.h): a atividade ao vivo.
 //
 // ATIVIDADE AO VIVO. O player, ao fechar, entrega a sessao (ilhacart_player_saiu).
 // Ela vira cartao pelo MESMO criterio da faixa "Retomar agora" (entre 1% e o
@@ -9,18 +9,6 @@
 // noite inteira oferecendo um episodio de horas atras, e quem volta ainda tem
 // a faixa da home. "Fechar" no modal tira na hora. Nada e gravado: fechar o
 // app encerra.
-//
-// ESTREIA. O episodio novo de serie com lembrete (AV_AGENDA em avisos.c) ainda
-// nao lido: o mais recente fica na pilula ate ser lido — a aba Avisos aberta,
-// "Depois" ou "Dispensar" no modal, ou a pagina do titulo aberta (com o relogio
-// ligado; desligado nada aqui marca coisa alguma). Desde 06/10 o modal da
-// estreia e Assistir / Depois / Dispensar: "Depois" tira o cartao ate o app
-// fechar, "Dispensar" tira aquele episodio de vez (ver ilha.h, ILHA_PEDIU_*).
-//
-// AMIGO VENDO AGORA (02/10; passageiro desde 06/10). Eventos de inicio de
-// amigos com menos de 15 min viram UM aviso que some sozinho ("Ana está vendo
-// Severance" ou "Ana e mais 2 estão assistindo"), uma vez por amigo + titulo,
-// lembrado em disco (avisodisp). Nao ha mais cartao fixo ao lado do relogio.
 //
 // FIO PRINCIPAL.
 #ifndef NV_ILHACART_H
@@ -43,12 +31,9 @@ void ilhacart_tecla(Uint32 agora);
 unsigned ilhacart_vivo_seq(void);
 // O titulo que o cartao ao vivo segura ("" sem cartao). Ver cwretido.h.
 const char *ilhacart_vivo_imdb(void);
-// Por quadro. `imdbAberto` = o titulo com a pagina aberta agora, ou NULL.
-void ilhacart_atualizar(Uint32 agora, const char *imdbAberto);
-// O modal pediu para tirar o cartao (Fechar / Dispensar). Na estreia,
-// Dispensar grava (avisos_dispensar): aquele episodio nao volta.
+// Por quadro: valida a identidade e o tempo de ociosidade.
+void ilhacart_atualizar(Uint32 agora);
+// O modal pediu para tirar o cartao (Fechar / Dispensar).
 void ilhacart_dispensar(int qual);
-// "Depois" no modal da estreia: sai da pilula so ate o app fechar.
-void ilhacart_adiar(int qual);
 
 #endif

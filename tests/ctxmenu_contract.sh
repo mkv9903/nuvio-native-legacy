@@ -7,7 +7,7 @@ cd "$ROOT"
 # Exercita o contrato de compilacao do escopo sem abrir SDL nem fazer rede.
 cc -Wall -Wextra -Werror -fsyntax-only \
   src/ctxmenu.c src/catalogo.c src/trakt.c tests/stub_fichameta.c src/cwordem.c \
-  -Isrc -I/opt/homebrew/include -I/opt/homebrew/include/SDL2 \
+  -Isrc -DNV_LINUX_DESKTOP $(pkg-config --cflags sdl2 SDL2_image SDL2_ttf)  \
   -Wno-deprecated-declarations -Wno-macro-redefined
 
 # Regressao da intencao: ela tem de ser capturada antes do POST e o mesmo

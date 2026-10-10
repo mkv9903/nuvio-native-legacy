@@ -92,7 +92,6 @@ void ling_local_audio(const char *v);
 // faixa" — que e o que o app sempre fez. Chutar um idioma seria pior: a pessoa
 // ouviria dublagem sem saber que foi o app que escolheu.
 void        ling_definir_original(const char *cod);
-const char *ling_original(void);
 
 // Indice de "Original do titulo" dentro da lista de opcoes. E o ULTIMO item de
 // proposito: o ajustes.txt grava indice, nao codigo, entao inserir no meio

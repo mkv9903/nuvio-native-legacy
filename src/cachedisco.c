@@ -1,5 +1,4 @@
 #include "cachedisco.h"
-#ifndef __EMSCRIPTEN__
 #include <sys/stat.h>
 #include <sys/statvfs.h>
 #include <dirent.h>
@@ -75,4 +74,3 @@ long nv_cache_podar(const char *dir, long *total, long entrada, long teto,
   }
   return apagados;
 }
-#endif

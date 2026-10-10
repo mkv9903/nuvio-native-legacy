@@ -3,19 +3,6 @@
 // Incluido por ajustes_ux_desenho.inc, depois das pecas e das previas.
 
 // --- INSPETOR -----------------------------------------------------------------------
-static const char *ajTipoRotulo(int op) {
-  if (inativa(op)) return "Indisponível agora";
-  if (op == AJ_ENVIAR_LOG) return "Ação";
-  switch (ajTipo(op)) {
-    case AJL_TOG: return "Ligar ou desligar";
-    case AJL_ACAO: return "Abre uma tela";
-    case AJL_LER: return "Informação";
-    default: return "Personalizar";
-  }
-}
-static const char *ajIconeOpcao(int op) {
-  return ajVisualIcone(op);
-}
 // As teclas que valem AGORA, pelo tipo da linha em foco.
 static int ajDicasDe(int op, AjDica *d) {
   if (focoIndice) {
@@ -211,21 +198,6 @@ static float ajMascara(float yc, float topo, float base) {
 }
 // Cabecalho da lista (listaV2): padding 42 46 18 50; kicker 18/700, titulo
 // 52/700 com 4 de margem, sub 24 com 8. Devolve onde a lista comeca.
-static float aj2Cabecalho(GfxRect fr, const char *kick, const char *titulo, const char *sub,
-                          float reservaDir, float a) {
-  float x = fr.x + 50.0f, y = fr.y + 42.0f;
-  ajCaps(TXT_V2_KICK, kick, 2.52f, x, y + (21.8f - 19.0f * 1.21f) * 0.5f, 0.45f * a);
-  y += 21.8f + 4.0f;
-  { TxtLinha t = ajTxtC(TXT_V2_TIT, titulo, fr.w - 96.0f - reservaDir);
-    txt_desenhar_alpha(t, x, y + (62.9f - t.h) * 0.5f, a); }
-  y += 62.9f + 8.0f;
-  if (sub && sub[0]) {
-    TxtLinha t = ajTxtC(TXT_V2_26, sub, fr.w - 96.0f);
-    txt_desenhar_alpha(t, x, y + (29.0f - t.h) * 0.5f, 0.55f * a);
-    y += 29.0f;
-  }
-  return y + 18.0f;
-}
 // A3: o cabecalho compacto da ilha da lista (o nome da categoria em 26/800 e,
 // a direita, o chip Avancados, que continua focavel com ↑ da primeira linha).
 // O kicker grande e a descricao da categoria moram agora na coluna da arte.
@@ -303,18 +275,6 @@ static float ajBotao(const char *rot, const char *icone, float x, float y, int f
   return w;
 }
 // Chip 56 (19/600) com icone: "Restaurar padrao" no rodape dos editores.
-static float ajChip(const char *rot, const char *icone, float x, float y, int foco, float a) {
-  TxtLinha t = foco ? ajTxtT(TXT_AJ_SEG, rot) : ajTxt(TXT_AJ_SEG, rot);
-  float w = 22 + (icone ? 20 + 10 : 0) + t.w + 22;
-  if (foco) ajPilulaAcento((GfxRect){ x, y, w, 56 }, 28, a);
-  else ajNeutro((GfxRect){ x, y, w, 56 }, 28, 0.08f, AJ_CHIP_SOL, a);
-  if (icone) {
-    if (foco) ajIconeT(icone, x + 22, y + 18, 20, a);
-    else ajIcone(icone, x + 22, y + 18, 20, 0.85f * a);
-  }
-  txt_desenhar_alpha(t, x + 22 + (icone ? 30 : 0), y + (56 - t.h) * 0.5f, (foco ? 1.0f : 0.85f) * a);
-  return w;
-}
 // A previa da opcao com o valor PENDENTE (so o desenho; nada e gravado).
 static float aj2PreviaEditor(int op, float x, float y, float w);
 static float aj2PreviaPendente(float x, float y, float w) {
@@ -500,13 +460,11 @@ static void desenhaVinculo(const char *servico, const char *codigo,
 static int ajVinculoAtivo(void) {
   TraEstado ta = traktauth_estado();
   SmkEstado sa = simklauth_estado();
-  DisEstado da = discord_estado();
 #ifdef AJUSTES_TESTE
   if (ajVinculoTeste) return 1;
 #endif
   return ta == TRA_PEDINDO || ta == TRA_AGUARDANDO || ta == TRA_ERRO ||
-         sa == SMK_PEDINDO || sa == SMK_AGUARDANDO || sa == SMK_ERRO ||
-         da == DIS_PEDINDO || da == DIS_AGUARDANDO || da == DIS_ERRO;
+         sa == SMK_PEDINDO || sa == SMK_AGUARDANDO || sa == SMK_ERRO;
 }
 
 // --- O EDITOR (v2: terceiro degrau) ------------------------------------------------

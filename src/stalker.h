@@ -52,7 +52,6 @@ void stalker_definir_portal(const char *portal);
 void stalker_definir_mac(const char *mac);
 // Opcionais: a maioria dos portais nao confere, e os que conferem pedem
 // exatamente estes dois campos.
-void stalker_definir_aparelho(const char *deviceId, const char *serial);
 
 // Apaga a configuracao deste perfil e a sessao em memoria. Chamado no logout e
 // na troca de perfil, como debrid_esquecer().

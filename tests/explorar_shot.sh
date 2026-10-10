@@ -19,10 +19,10 @@ for source in src/*.c src/dts/*.c; do
   [ "$source" != src/main.c ] && sources+=("$source")
 done
 cc "${sources[@]}" tests/explorar_shot.c -Isrc -o "$tmp/shot" \
-  -O1 -g -I/opt/homebrew/include -I/opt/homebrew/include/SDL2 \
+  -O1 -g -DNV_LINUX_DESKTOP $(pkg-config --cflags sdl2 SDL2_image SDL2_ttf)  \
   -DNV_SUPABASE_URL='""' -DNV_SUPABASE_ANON_KEY='""' -DNV_TV_LOGIN_BASE='""' \
   -DNV_TRAKT_CLIENT_ID='""' -DNV_TRAKT_CLIENT_SECRET='""' \
   -DNV_SIMKL_CLIENT_ID='""' -DNV_SIMKL_APP='""' -DNV_TMDB_API_KEY='""' \
-  -L/opt/homebrew/lib -lSDL2 -lSDL2_image -lSDL2_ttf -lz -framework OpenGL \
+   -lSDL2 -lSDL2_image -lSDL2_ttf -lz $(pkg-config --libs glesv2 egl) -ldl -pthread -lm \
   -Wno-deprecated-declarations -Wno-macro-redefined
 "$tmp/shot" "$out"

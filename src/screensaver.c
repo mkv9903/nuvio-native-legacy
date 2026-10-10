@@ -12,10 +12,9 @@
 #include "text.h"
 #include "tex_cache.h"
 #include "catalogo.h"
-#include "agenda.h"
+#include "app.h"
 #include "ajustes.h"
 #include "idioma.h"
-#include "app.h"
 #endif
 
 int screensaver_item_valid(int has_backdrop, int has_title, int on_list, int progress, int source) {
@@ -56,7 +55,6 @@ static float wait_t;               // black screen waiting for next art
 static int   current_idx = -1;     // catalog index on screen (or -1)
 static GLuint tex_art, tex_logo, tex_next;
 static int   request_open_idx = -1;
-static char  next_line[256];       // "Next premiere" for clock, assembled on enter
 
 static unsigned random_pick(unsigned *state) {
   *state = *state * 1664525u + 1013904223u;
@@ -96,27 +94,6 @@ static int queue_item(int pos) {
   return item_valid(i, SCREENSAVER_SOURCE_CATALOG) ? i : -1;
 }
 
-static void build_next(void) {
-  int i, n, best = 99, found = -1;
-  next_line[0] = 0;
-  n = agenda_n();
-  for (i = 0; i < n; i++) {
-    const AgItem *a = agenda_lista(i);
-    int d = a && a->dataProx[0] ? agenda_dias(a->dataProx) : AG_SEM_DATA;
-    // Without title line would read " · S2 E3 · tomorrow": nameless premiere
-    // says nothing. Schedule fills title later; until then keep looking.
-    if (d >= 0 && d <= 7 && d < best && a->titulo[0]) { best = d; found = i; }
-  }
-  if (found >= 0) {
-    const AgItem *a = agenda_lista(found);
-    char when[64];
-    agenda_falta(a->dataProx, when, sizeof when);
-    if (a->temporada > 0 && a->episodio > 0)
-      snprintf(next_line, sizeof next_line, i18n("%s · T%d E%d · %s"), a->titulo,
-               a->temporada, a->episodio, when);
-    else snprintf(next_line, sizeof next_line, i18n("%s · %s"), a->titulo, when);
-  }
-}
 
 static void enter(unsigned now) {
   active_time = 0.0f;
@@ -124,8 +101,6 @@ static void enter(unsigned now) {
   current_idx = -1; tex_art = tex_logo = tex_next = 0;
   build_queue(now ^ 0x9e3779b9u);
   current_idx = queue_item(0);
-  if (app_na_home() && agenda_n() == 0) agenda_montar();
-  build_next();
 }
 
 int screensaver_onscreen_index(void) {
@@ -184,13 +159,15 @@ static float smooth_step(float t) {
 static void time_now(char *time_str, size_t nh, char *suf, size_t ns, char *date_str, size_t nd, float *sec_frac) {
   static const char *DAYS[7] = { "domingo", "segunda-feira", "ter\xc3\xa7" "a-feira", "quarta-feira",
                                  "quinta-feira", "sexta-feira", "s\xc3\xa1" "bado" };
+  static const char *MONTHS[12] = { "janeiro", "fevereiro", "março", "abril", "maio", "junho",
+                                    "julho", "agosto", "setembro", "outubro", "novembro", "dezembro" };
   time_t t = time(NULL);
   struct tm lt;
   time_str[0] = 0; if (suf && ns) suf[0] = 0; if (date_str) date_str[0] = 0;
   if (!localtime_r(&t, &lt)) return;
   hora_tela_partes(time_str, nh, suf, ns, &lt);
   if (date_str) snprintf(date_str, nd, i18n("%s, %d de %s"), i18n(DAYS[lt.tm_wday]), lt.tm_mday,
-                         i18n(agenda_mes_nome(lt.tm_mon + 1)));
+                         i18n(MONTHS[lt.tm_mon]));
   if (sec_frac) *sec_frac = (float)lt.tm_sec / 60.0f;
 }
 
@@ -199,7 +176,7 @@ static void draw_clock(unsigned now, float a) {
   char time_str[12], suf[4], date_str[96];
   float sec, px, py, cx, cy, ar, ag, ab, s = (float)now / 1000.0f;
   int reduced = ajustes_animacoes_reduzidas();
-  TxtLinha lh, ld, lp;
+  TxtLinha lh, ld;
   time_now(time_str, sizeof time_str, suf, sizeof suf, date_str, sizeof date_str, &sec);
   // Block changes position EVERY CYCLE (OLED panel) and stays STATIONARY inside it,
   // at integer pixels: moving slightly every frame caused jitter.
@@ -241,13 +218,6 @@ static void draw_clock(unsigned now, float a) {
       gfx_cor((GfxRect){ x, yl, w * sec, 2.0f }, 0, ar, ag, ab, 0.70f * a);
       ld = txt_linha(TXT_HEADLINE, date_str, 200, 204, 212, 255);
       txt_desenhar_alpha(ld, floorf(cx - (float)ld.w * 0.5f), yl + 30.0f, 0.62f * a);
-      if (next_line[0]) {
-        TxtLinha k = txt_linha(TXT_CAPTION2, i18n("Próxima estreia"), 150, 154, 164, 255);
-        lp = txt_linha_corta(TXT_CALLOUT, next_line, 210, 214, 222, 255, 1100.0f);
-        txt_desenhar_alpha(k, floorf(cx - (float)k.w * 0.5f), yl + 30.0f + (float)ld.h + 40.0f, 0.5f * a);
-        txt_desenhar_alpha(lp, floorf(cx - (float)lp.w * 0.5f),
-                           yl + 30.0f + (float)ld.h + 40.0f + (float)k.h + 8.0f, 0.55f * a);
-      }
     }
   }
 }
@@ -408,7 +378,4 @@ int descanso_pedido_abrir(void) {
 }
 int descanso_item_serve(int temFundo, int temTitulo, int naLista, int progresso, int fonte) {
   return screensaver_item_valid(temFundo, temTitulo, naLista, progresso, fonte);
-}
-void descanso_rota(float s, float *px, float *py) {
-  screensaver_path(s, px, py);
 }

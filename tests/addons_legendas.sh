@@ -6,8 +6,8 @@ trap 'rm -rf "$work"' EXIT
 flags=()
 if [ "${SANITIZE:-0}" = 1 ]; then flags+=(-fsanitize=address,undefined -fno-omit-frame-pointer); fi
 cc "${flags[@]}" tests/addons_legendas.c src/linguas.c src/js.c src/legextras.c -Isrc \
-  -I/opt/homebrew/include -I/opt/homebrew/include/SDL2 \
-  -std=gnu11 -pthread -ffunction-sections -fdata-sections -Wl,-dead_strip -Wall -Wextra -Wno-unused-function -o "$work/test"
+  -DNV_LINUX_DESKTOP $(pkg-config --cflags sdl2 SDL2_image SDL2_ttf)  \
+  -std=gnu11 -pthread -ffunction-sections -fdata-sections -Wl,--gc-sections -Wall -Wextra -Wno-unused-function -o "$work/test"
 saida=$("$work/test")
 if printf '%s\n' "$saida" | rg -q 'fixture\.invalid|PRIVATE_TOKEN|tt123|Movie|Show\.S01'; then
   echo "subtitle diagnostic leaked fixture URL, token, or content id" >&2
@@ -18,7 +18,7 @@ printf '%s\n' "$saida" | rg -q 'array=1 recebidas=0 candidatas=0'
 printf '%s\n' "$saida" | rg -q 'array=0 recebidas=0 candidatas=0'
 printf '%s\n' "$saida"
 cc "${flags[@]}" tests/addons_legendas_faixas.c -Isrc \
-  -I/opt/homebrew/include -I/opt/homebrew/include/SDL2 \
-  -std=gnu11 -ffunction-sections -fdata-sections -Wl,-dead_strip \
+  -DNV_LINUX_DESKTOP $(pkg-config --cflags sdl2 SDL2_image SDL2_ttf)  \
+  -std=gnu11 -ffunction-sections -fdata-sections -Wl,--gc-sections \
   -Wall -Wextra -Wno-unused-function -Wno-macro-redefined -o "$work/menu"
 "$work/menu"

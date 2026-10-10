@@ -52,9 +52,6 @@
 #include "entrada_texto.h"
 #include <stdio.h>
 #include <string.h>
-#ifdef __EMSCRIPTEN__
-#include <emscripten.h>
-#endif
 
 #define TS_MAX 256
 
@@ -69,23 +66,6 @@ static SDL_SpinLock trava;
 static char pendValor[TS_MAX];
 static int pendTemValor, pendFim = -1;
 
-#ifdef NV_TPK
-typedef void (*FnTsAbrir)(const char *atual, int voz);
-typedef void (*FnTsFechar)(void);
-static FnTsAbrir hAbrir;
-static FnTsFechar hFechar;
-static int hFlags;
-__attribute__((visibility("default")))
-void nv_tpk_texto_registrar(FnTsAbrir abrir, FnTsFechar fechar, int flags) {
-  hAbrir = abrir; hFechar = fechar; hFlags = flags;
-  printf("[texto] host registrou o teclado do sistema (flags=%d)\n", flags);
-  fflush(stdout);
-}
-__attribute__((visibility("default")))
-void nv_tpk_texto_valor(const char *v) { texto_sistema_ponte_valor(v); }
-__attribute__((visibility("default")))
-void nv_tpk_texto_fim(int confirmou) { texto_sistema_ponte_fim(confirmou); }
-#endif
 
 static void copiar(char *dst, const char *src) {
   size_t n = 0;
@@ -123,11 +103,7 @@ static void terminar(int confirmou, const char *porque) {
 }
 
 int texto_sistema_disponivel(void) {
-#if defined(NV_TPK)
-  return hAbrir ? (TS_TECLADO | (hFlags & TS_VOZ)) : 0;
-#elif defined(__EMSCRIPTEN__)
-  return EM_ASM_INT({ return (typeof window !== "undefined" && window.nvTexto) ? 1 : 0; }) ? TS_TECLADO : 0;
-#elif defined(NV_ANDROID) || defined(NV_TEXTO_SDL_TESTE)
+#if defined(NV_TEXTO_SDL_TESTE)
   return TS_TECLADO;
 #elif defined(__linux__)
   return SDL_HasScreenKeyboardSupport() ? TS_TECLADO : 0;
@@ -152,28 +128,15 @@ void texto_sistema_abrir(const char *atual, int voz) {
   aberto = 1; viuTeclado = 0; quadrosAberto = 0;
   printf("[texto] abrindo o teclado do sistema%s (%d bytes)\n", voz ? " com ditado" : "", (int)strlen(valor));
   fflush(stdout);
-#if defined(NV_TPK)
-  hAbrir(valor, voz);
-#elif defined(__EMSCRIPTEN__)
-  EM_ASM({ try { window.nvTexto.abrir(UTF8ToString($0), $1); } catch (e) { console.warn("[texto] " + e); } }, valor, voz);
-#else
   SDL_StartTextInput();
-#endif
 }
 
 void texto_sistema_fechar(void) {
   if (!aberto) return;
-#if defined(NV_TPK)
-  if (hFechar) hFechar();
-#elif defined(__EMSCRIPTEN__)
-  EM_ASM({ try { window.nvTexto.fechar(); } catch (e) {} });
-#else
   SDL_StopTextInput();
-#endif
   terminar(0, "app");
 }
 
-#if !defined(NV_TPK) && !defined(__EMSCRIPTEN__)
 // Apaga o ultimo caractere UTF-8.
 static void apagarUltimo(void) {
   size_t n = strlen(valor);
@@ -183,7 +146,6 @@ static void apagarUltimo(void) {
   }
   valor[n] = 0;
 }
-#endif
 
 static int teclaDeTexto(SDL_Keycode k) {
   return k == SDLK_BACKSPACE || (k >= 32 && k < 127);
@@ -198,7 +160,6 @@ int texto_sistema_engole(const SDL_Event *e) {
 
 void texto_sistema_observar(const SDL_Event *e) {
   if (!aberto) return;
-#if !defined(NV_TPK) && !defined(__EMSCRIPTEN__)
   // LG e Android: o texto vem pelos eventos do SDL.
   if (e->type == SDL_TEXTINPUT) {
     size_t n = strlen(valor), m = strlen(e->text.text);
@@ -218,9 +179,6 @@ void texto_sistema_observar(const SDL_Event *e) {
     // os dois, e la o TEXTINPUT tambem chega, entao nada a acrescentar aqui.
     return;
   }
-#else
-  (void)e;
-#endif
 }
 
 void texto_sistema_quadro(void) {
@@ -228,20 +186,6 @@ void texto_sistema_quadro(void) {
   char v[TS_MAX];
   if (!aberto) return;
   quadrosAberto++;
-#ifdef __EMSCRIPTEN__
-  {
-    // window.nvTexto.seq sobe a cada mudanca; .fim e -1 (aberto), 0 ou 1.
-    static int seqVisto = -1;
-    int seq = EM_ASM_INT({ var t = window.nvTexto; return t ? t.seq : -1; });
-    if (seq >= 0 && seq != seqVisto) {
-      seqVisto = seq;
-      EM_ASM({ var t = window.nvTexto; stringToUTF8(t ? String(t.valor) : "", $0, $1); }, v, (int)sizeof v);
-      texto_sistema_ponte_valor(v);
-    }
-    fim = EM_ASM_INT({ var t = window.nvTexto; return t ? t.fim : -1; });
-    if (fim >= 0) { EM_ASM({ window.nvTexto.fim = -1; }); texto_sistema_ponte_fim(fim); }
-  }
-#endif
   SDL_AtomicLock(&trava);
   temValor = pendTemValor; pendTemValor = 0;
   if (temValor) memcpy(v, pendValor, sizeof v);
@@ -253,7 +197,7 @@ void texto_sistema_quadro(void) {
     avisar(TS_EV_TEXTO, 0);
   }
   if (fim >= 0) { terminar(fim, "sistema"); return; }
-#if !defined(NV_TPK) && !defined(__EMSCRIPTEN__) && defined(__linux__)
+#if defined(__linux__)
   // LG/Android: fechou por fora (Voltar no teclado da TV)? So depois de o
   // teclado ter sido visto aberto, e com folga para ele subir.
   {

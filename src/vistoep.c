@@ -181,7 +181,7 @@ int vistoep_lote(const char *imdb, int ateAqui, int temporada, int episodio,
   for (i = 0; cat && i < nCat && k < VE_LOTE; i++) {
     int t = cat[i].temporada, e = cat[i].episodio, dentro;
     if (e < 1) continue;
-    // Nao foi ao ar: a partir de (agT, agE), o proximo episodio da agenda.
+    // Nao foi ao ar: a partir de (agT, agE), o proximo episodio anunciado.
     if (agT > 0 && agE > 0 && (t != agT ? t > agT : e >= agE)) continue;
     dentro = ateAqui ? t > 0 && antesOuIgual(t, e, temporada, episodio)
                      : t == temporada;

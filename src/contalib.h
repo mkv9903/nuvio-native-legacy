@@ -105,7 +105,6 @@ int contalib_ler_vistos(const char *json);
 int contalib_n(void);
 const ContaLibItem *contalib_item(int i);   // NULL fora da faixa
 int contalib_n_vistos(void);
-const ContaVisto *contalib_visto(int i);
 
 // 1 quando a CONTA ja respondeu com pelo menos um item de biblioteca. E o que
 // decide o selo de origem da tela de Biblioteca: sem isto o selo diria "CONTA"

@@ -1,3 +1,4 @@
+#include "gles_test.h"
 // CAPTURA DOS ESTADOS NOVOS DA ILHA (mockup aprovado em 02/10, design/ilha):
 // avisos com rosto, capa e "duo", frase com destaque, INFO neutro e ACENTO no
 // acento, "+N" e o resumo da central, atividade do sync, o cartao do amigo e
@@ -45,9 +46,7 @@ static void fundo(int n) {
   glBindTexture(GL_TEXTURE_2D, fundoTex);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  glPixelStorei(GL_UNPACK_ROW_LENGTH, t->pitch / 4);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, t->w, t->h, 0, GL_RGBA, GL_UNSIGNED_BYTE, t->pixels);
-  glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+  gles_test_upload_surface(t);
   SDL_FreeSurface(t);
 }
 
@@ -156,8 +155,9 @@ int main(int argc, char **argv) {
   ajustes_dir(dir);
   assert(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) == 0);
   IMG_Init(IMG_INIT_PNG | IMG_INIT_JPG);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
   SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
-  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
   win = SDL_CreateWindow("Nuvio: ilha3", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
                          1920, 1080, SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN);
   assert(win);
@@ -177,28 +177,9 @@ int main(int argc, char **argv) {
   fundo(1); quadros(60); captura("01-relogio", 130);
 
   // --- 2. avisos curtos -------------------------------------------------------
-  { IlhaAvisoEx e = ex("amigo:c", ILHA_OK, NULL, 6000);
-    snprintf(txt, sizeof txt, "Você e %s agora são amigos", ilha_forte(f1, sizeof f1, "Carla"));
-    e.rostoNome = "Carla";
-    pilula(4, "amizade-nova", e); }
-  { IlhaAvisoEx e = ex("pedido:b", ILHA_ACENTO, NULL, 10000);
-    snprintf(txt, sizeof txt, "%s quer ser seu amigo", ilha_forte(f1, sizeof f1, "Bruno"));
-    e.rostoNome = "Bruno"; e.tecla = 1;
-    pilula(5, "pedido-amizade", e); }
-  { IlhaAvisoEx e = ex("av:rec", ILHA_ACENTO, NULL, 8000);
-    snprintf(txt, sizeof txt, "%s recomendou %s", ilha_forte(f1, sizeof f1, "Ana"), ilha_forte(f2, sizeof f2, "Fallout"));
-    e.rostoNome = "Ana"; e.capa = "deploy/app/art/poster/00.jpg"; e.tecla = 1; e.grupo = 1;
-    pilula(6, "recomendacao", e); }
   { IlhaAvisoEx e = ex("avisos", ILHA_ACENTO, "sino", 20000);
     snprintf(txt, sizeof txt, "3 avisos novos"); e.tecla = 1; e.grupo = 1;
     pilula(7, "central", e); }
-  { IlhaAvisoEx e = ex("av:agenda", ILHA_ACENTO, "aj_tv-minimal-play", 8000);
-    snprintf(txt, sizeof txt, "Saiu T2E5 de %s", ilha_forte(f1, sizeof f1, "The Bear"));
-    e.tecla = 1; e.grupo = 1;
-    pilula(8, "episodio-novo", e); }
-  { IlhaAvisoEx e = ex("av:agenda2", ILHA_ACENTO, "aj_calendar", 6000);
-    snprintf(txt, sizeof txt, "%s estreia hoje", ilha_forte(f1, sizeof f1, "Andor"));
-    pilula(9, "estreia-hoje", e); }
   { IlhaAvisoEx e = ex("lembrete-curto", ILHA_ACENTO, "sino", 4500);
     snprintf(txt, sizeof txt, "Lembrete marcado: Jornal Nacional");
     fundo(10); limpar(); direita = 1; ilha_avisar_ex(&e); quadros(70); captura("10-lembrete-guia-direita", 140); direita = 0; }

@@ -31,6 +31,5 @@ void tend_registrar(const CatFileira *f, const CatItem *itens);
 int  tend_delta(const char *chave, const char *imdb, int *delta, int *novo);
 
 // Data da lista anterior ("AAAA-MM-DD") ou "" — para o card dizer "desde 19/09".
-const char *tend_desde(const char *chave);
 
 #endif

@@ -122,10 +122,9 @@ int main(void) {
       "\"sources\":[{\"addonId\":\"a\",\"type\":\"movie\",\"catalogId\":\"k\"}]},"
     "{\"id\":\"g3\",\"title\":\"Desligado\",\"focusGifUrl\":\"https://cdn/c.gif\",\"focusGifEnabled\":false,"
       "\"sources\":[{\"addonId\":\"a\",\"type\":\"movie\",\"catalogId\":\"k\"}]}]}]}") == 3);
-  assert(!strcmp(col_folder(0)->focusGif, "https://cdn/a.gif"));
-  assert(!col_folder(1)->focusGif[0]);   // campo ausente e o caso comum
-  assert(!col_folder(2)->focusGif[0]);   // focusGifEnabled:false desliga
-  puts("ok  focusGifUrl entra, campo ausente fica vazio, focusGifEnabled:false desliga");
+  assert(col_n() == 3);
+  assert(!strcmp(col_folder(0)->id, "g1") && !strcmp(col_folder(2)->id, "g3"));
+  puts("ok  obsolete focus animation fields are ignored");
   // pacote + conta com o mesmo id: fica a arte local, grupo/titulo da conta
   { char dir[] = "/tmp/nuvio-col-XXXXXX"; char caminho[300]; FILE *f;
     assert(mkdtemp(dir));
@@ -165,8 +164,7 @@ int main(void) {
     assert(strstr(col_folder(1)->logo, "c/f2l.png"));
     col_arte_conta(1);   // refaz na hora, sem nova resposta da conta
     assert(col_n() == 2 && col_folder(0)->local && col_folder(1)->local);
-    assert(!strcmp(col_folder(0)->cover, "https://cdn/nf.webp") && col_folder(0)->frames == 0 &&
-           !strcmp(col_folder(0)->focusGif, "https://cdn/nf.gif"));
+    assert(!strcmp(col_folder(0)->cover, "https://cdn/nf.webp") && col_folder(0)->frames == 0);
     assert(!strcmp(col_folder(0)->hero, "https://cdn/nf-hero.jpg") && !col_folder(0)->editorial);
     assert(!strcmp(col_folder(0)->logo, "https://cdn/nf-logo.png"));
     // So o logo na conta: capa e fundo continuam os do pacote.
@@ -179,11 +177,6 @@ int main(void) {
            strstr(col_folder(0)->hero, "c/f1h.jpg") && strstr(col_folder(1)->logo, "c/f2l.png"));
     remove(caminho); rmdir(dir);
     puts("ok  arte das pastas da conta: desligado o pacote, ligado a conta campo a campo, volta na hora"); }
-  // O GIF DA CONTA CONTRA A ARTE DO PACOTE. A regra e "a versao local fica
-  // inteira", e o GIF nao a contradiz: o pacote nao TEM focusGif para perder.
-  //   frames > 0  — ja anima pela sequencia curada; a URL da conta e ignorada.
-  //   frames == 0 — nao ha animacao nenhuma; a URL entra, senao a pasta ficaria
-  //                 parada tendo GIF disponivel.
   { char dir[] = "/tmp/nuvio-colgif-XXXXXX"; char caminho[300]; FILE *f;
     const char *conta =
       "{\"collections\":[{\"id\":\"c1\",\"title\":\"G\",\"folders\":["
@@ -200,13 +193,13 @@ int main(void) {
             "\"sources\":[{\"title\":\"M\",\"base\":\"https://a\",\"type\":\"movie\",\"catId\":\"k\"}]}]}]}", f);
     fclose(f);
     assert(col_carregar(dir) == 2);
-    assert(!col_folder(0)->focusGif[0] && !col_folder(1)->focusGif[0]);
+    assert(col_folder(0)->frames == 12 && col_folder(1)->frames == 0);
     assert(col_definir_json(conta) == 2);
-    assert(col_folder(0)->frames == 12 && !col_folder(0)->focusGif[0]);
-    assert(col_folder(1)->frames == 0 && !strcmp(col_folder(1)->focusGif, "https://cdn/s.gif"));
+    assert(col_folder(0)->frames == 12);
+    assert(col_folder(1)->frames == 0);
     assert(col_folder(0)->local && col_folder(1)->local);
     remove(caminho); rmdir(dir);
-    puts("ok  o GIF da conta so entra na pasta local que nao tem sequencia de quadros"); }
+    puts("ok  JPEG sequences survive account data with obsolete animation fields"); }
   // OS QUATRO NIVEIS DE col_diagnostico. O que este teste guarda nao e a
   // funcao e sim a CAPACIDADE DE SEPARAR causas: os quatro casos abaixo
   // produzem hoje o mesmo sintoma na tela (fileira solta na home, #18) e o

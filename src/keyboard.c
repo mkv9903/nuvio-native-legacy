@@ -140,9 +140,6 @@ static int has_bar(void) { return ime_ok() || voice_ok() || phone_ok(); }
 
 // Modal height depends on how many rows alphabet requested, so three
 // measurements depending on it became functions. Still same formula.
-static float grid_h(void) {
-  return (float)num_rows * KB_KEY + (float)(num_rows - 1) * KB_GAP;
-}
 // GLASS UI (Settings mockup, "keyboard" board, 03/10): modal became a
 // TWO-COLUMN island to fit at 3m without scrolling — left title, hint,
 // field and modes (TV keyboard, voice, phone); right 74px grid and

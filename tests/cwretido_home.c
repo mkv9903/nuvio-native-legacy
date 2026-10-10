@@ -8,6 +8,7 @@
 // desc_continuar_otimista), sem mexer nas outras fileiras. Inclui src/home.c
 // direto, como tests/cwremover_home.c. Sem janela, rede ou TV.
 #include <assert.h>
+#include "ajustes.h"
 // Duples do cache de arte do Codex (mesmos de tests/home_layout.c).
 void cachearte_marcar_grupo(int grupo, const char *url, int variante, int essencial, int emUso) {
   (void)grupo; (void)url; (void)variante; (void)essencial; (void)emUso; }
@@ -25,7 +26,6 @@ char *dados_caminho(char *dst, unsigned tam, const char *nome) {
   (void)dst; (void)tam; (void)nome; return NULL;
 }
 int   dados_apagar(const char *nome) { (void)nome; return 1; }
-void  dados_marcar_sujo(int leve) { (void)leve; }
 // ajustes_aplicar_blob (abaixo) fala com linguas.c; nada disso entra na regra.
 const char *ling_legenda(void) { return ""; }
 const char *ling_audio(void) { return ""; }

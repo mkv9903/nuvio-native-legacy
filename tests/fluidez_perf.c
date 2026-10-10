@@ -29,7 +29,6 @@
 // texto rasterizado, artes enviadas a GPU, desenhos. Depois da home de cada
 // cenario, a lista dos Ajustes e rolada para baixo (uma seta a cada 8 quadros)
 // e para cima. NV_QUADROS=1 imprime todo quadro acima de 2 ms.
-#include "agendaui.h"
 #include "ajustes.h"
 #include "biblioteca.h"
 #include "menu.h"
@@ -435,18 +434,16 @@ static void cenario(SDL_Window *w, const char *cen) {
     }
     for (i = 0; i < 60; i++) { quadro(w, NULL, t); t += 16; }
   }
-  // BIBLIOTECA, AGENDA, SALVOS e MENU: assenta, mede parado e com a seta.
+  // BIBLIOTECA, SALVOS e MENU: assenta, mede parado e com a seta.
   { static const Tela bib = { biblioteca_evento, biblioteca_atualizar, biblioteca_desenhar, 0 };
-    static const Tela age = { agendaui_evento, agendaui_atualizar, agendaui_desenhar, 0 };
     static const Tela sal = { spainel_evento, spainel_atualizar, spainel_desenhar, 1 };
     static const Tela men = { menu_evento, menu_atualizar, menu_desenhar, 1 };
-    const Tela *ts[4] = { &bib, &age, &sal, &men };
-    static const char *const nomes[4] = { "biblioteca", "agenda", "salvos", "menu" };
+    const Tela *ts[3] = { &bib, &sal, &men };
+    static const char *const nomes[3] = { "biblioteca", "salvos", "menu" };
     int k;
-    for (k = 0; k < 4; k++) {
+    for (k = 0; k < 3; k++) {
       if (k == 0) biblioteca_iniciar();
-      else if (k == 1) agendaui_iniciar();
-      else if (k == 2) spainel_abrir();
+      else if (k == 1) spainel_abrir();
       else menu_abrir();
       telaAtual = ts[k];
       for (i = 0; i < 150; i++) { quadro(w, NULL, t); t += 16; }
@@ -458,7 +455,7 @@ static void cenario(SDL_Window *w, const char *cen) {
       if (getenv("NV_RASTRO")) { gfx_rastro_grandes = 1; quadro(w, NULL, t); t += 16; gfx_rastro_grandes = 0; }
       if (getenv("PERF_BMP")) { char b[800]; snprintf(b, sizeof b, "%s-%s-%s.bmp", getenv("PERF_BMP"), cen, nomes[k]); guardar(b); }
       if (k == 0) biblioteca_encerrar();
-      else if (k == 2) spainel_fechar();
+      else if (k == 1) spainel_fechar();
       else if (k == 3) menu_fechar();
       telaAtual = NULL;
       for (i = 0; i < 60; i++) { quadro(w, NULL, t); t += 16; }
@@ -481,11 +478,11 @@ int main(int argc, char **argv) {
     return 1;
   }
   perFreq = (double)SDL_GetPerformanceFrequency();
-  SDL_SetHint("SDL_MAC_BACKGROUND_APP", "1");
   assert(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) == 0);
   IMG_Init(IMG_INIT_PNG | IMG_INIT_JPG);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
   SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
-  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
   w = SDL_CreateWindow("Nuvio: fluidez (medida)", SDL_WINDOWPOS_CENTERED,
                        SDL_WINDOWPOS_CENTERED, 1920, 1080,
                        SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN);

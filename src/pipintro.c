@@ -191,15 +191,9 @@ static void pipintro_desenharCorpo_(Uint32 agora) {
         "Sair do player encolhe o canal para a borda — a imagem e o som "
         "continuam.", a);
   y += desenhaFeature(PI_TXT_X, y, PI_TXT_W, "avancar",
-#ifdef NV_ANDROID
-        "CH+ volta na hora",
-        "O CH+ devolve a tela cheia instantaneamente — a fonte nunca "
-        "parou.", a);
-#else
         "Azul volta na hora",
         "O botão AZUL devolve a tela cheia instantaneamente — a fonte nunca "
         "parou.", a);
-#endif
   y += desenhaFeature(PI_TXT_X, y, PI_TXT_W, "menu_guide",
         "CH+ e CH− zapeiam no canto",
         "Troque de canal sem sair da home, sem abrir nada.", a);

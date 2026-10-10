@@ -16,7 +16,7 @@
  * (-Wl,--export-dynamic-symbol=pthread_create), so the dynamic linker binds
  * the firmware libraries to it before libpthread. Successful calls are not
  * altered in any way. */
-#if defined(NV_WEBOS) && !defined(NV_TPK) && !defined(NV_ANDROID)
+#if defined(NV_WEBOS)
 #define _GNU_SOURCE
 #include <dlfcn.h>
 #include <errno.h>

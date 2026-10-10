@@ -6,8 +6,8 @@
 #   bash tests/faixasmkv.sh
 set -eu
 cd "$(dirname "$0")/.."
-FFMPEG=${FFMPEG:-/opt/homebrew/bin/ffmpeg}
-[ -x "$FFMPEG" ] || { echo "faixasmkv.sh: ffmpeg nao encontrado em $FFMPEG"; exit 1; }
+FFMPEG=${FFMPEG:-ffmpeg}
+command -v "$FFMPEG" >/dev/null 2>&1 || { echo "faixasmkv.sh: ffmpeg nao encontrado em $FFMPEG"; exit 1; }
 DIR=$(mktemp -d "${TMPDIR:-/tmp}/nuvio-faixasmkv.XXXXXX")
 trap 'rm -rf "$DIR"' EXIT
 printf '1\n00:00:01,000 --> 00:00:02,000\nx\n' > "$DIR/s.srt"
@@ -26,5 +26,5 @@ printf '1\n00:00:01,000 --> 00:00:02,000\nx\n' > "$DIR/s.srt"
   -metadata:s:s:3 language=eng -metadata:s:s:3 title="English SDH" -disposition:s:3 hearing_impaired \
   "$DIR/f.mkv"
 cc -Isrc tests/faixasmkv.c src/faixasmkv.c src/mkv.c src/linguas.c src/net.c src/net_url.c \
-  -o "$DIR/t" -O1 -g -Wall -I/opt/homebrew/include -Wno-deprecated-declarations
+  -o "$DIR/t" -O1 -g -Wall -DNV_LINUX_DESKTOP $(pkg-config --cflags sdl2 SDL2_image SDL2_ttf) -Wno-deprecated-declarations
 "$DIR/t" "$DIR/f.mkv"

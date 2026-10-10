@@ -130,7 +130,6 @@ void trakt_sessao_morta(void) {
   }
   pthread_mutex_unlock(&travaCred);
 }
-int trakt_sessao_e_morta(void) { return sessaoMorta; }
 
 // A CREDENCIAL FOI RECUSADA (HTTP 401). O 401 so chegava ao log — a tela
 // seguia dizendo "conectado" e o dono so percebia quando o "Continuar
@@ -1933,38 +1932,3 @@ void trakt_watchlist(const char *imdb, int adicionar) {
 // alvo viaja num bloco alocado, entao duas respostas seguidas nao disputam um
 // buffer global (a reacao e rara: no maximo uma por titulo).
 typedef struct { char id[24]; char tipo[8]; int nota; } AlvoNota;
-
-static void *enviarNota(void *u) {
-  AlvoNota *a = (AlvoNota *)u;
-  const char *cab[4];
-  char aut[200], chave[140], corpo[200];
-  char *resp;
-  int status = 0;
-  if (!trakt_cabecalhos(cab, aut, sizeof aut, chave, sizeof chave)) { free(a); return NULL; }
-  snprintf(corpo, sizeof corpo, "{\"%s\":[{\"rating\":%d,\"ids\":{\"imdb\":\"%s\"}}]}",
-           !strcmp(a->tipo, "series") ? "shows" : "movies", a->nota, a->id);
-  resp = rede_postar_st("https://api.trakt.tv/sync/ratings", 20, cab, corpo, &status);
-  printf("[trakt] nota %d %s (%s) -> HTTP %d\n", a->nota, a->id, a->tipo, status);
-  fflush(stdout);
-  free(resp);
-  free(a);
-  return NULL;
-}
-
-int trakt_avaliar(const char *imdb, const char *tipo, int nota) {
-  AlvoNota *a;
-  pthread_t f;
-  const char *dp;
-  if (!ligado || !imdb || imdb[0] != 't' || nota < 1 || nota > 10) return 0;
-  a = (AlvoNota *)calloc(1, sizeof *a);
-  if (!a) return 0;
-  dp = strchr(imdb, ':');
-  { size_t k = dp ? (size_t)(dp - imdb) : strlen(imdb);
-    if (k >= sizeof a->id) k = sizeof a->id - 1;
-    memcpy(a->id, imdb, k); a->id[k] = 0; }
-  snprintf(a->tipo, sizeof a->tipo, "%s", tipo_item(tipo, imdb));
-  a->nota = nota;
-  if (pthread_create(&f, NULL, enviarNota, a) != 0) { free(a); return 0; }
-  pthread_detach(f);
-  return 1;
-}

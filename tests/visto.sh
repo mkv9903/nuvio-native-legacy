@@ -6,7 +6,7 @@ set -eu
 cd "$(dirname "$0")/.."
 tmp="$(mktemp -d "${TMPDIR:-/tmp}/nuvio-visto-XXXXXX")"
 trap 'rm -rf "$tmp"' EXIT
-cc -O1 -g -Wall -Wextra -Isrc -I/opt/homebrew/include -I/opt/homebrew/include/SDL2 \
+cc -O1 -g -Wall -Wextra -Isrc -DNV_LINUX_DESKTOP $(pkg-config --cflags sdl2 SDL2_image SDL2_ttf)  \
   -Wno-deprecated-declarations -Wno-macro-redefined \
   src/visto.c src/account_pending.c src/simkl.c src/syncprog.c src/progress.c src/trakt.c tests/stub_fichameta.c src/traktscrobble.c src/cwordem.c \
   src/vistoep.c src/js.c src/metaprov.c src/jsw.c tests/visto.c -o "$tmp/visto" -lpthread

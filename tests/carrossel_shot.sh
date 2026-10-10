@@ -5,9 +5,10 @@
 #
 #   bash tests/carrossel_shot.sh /tmp/nv-carrossel
 #
-# Cada BMP vira PNG (sips) e o BMP e apagado — sao 8 MB por captura.
+# Cada BMP vira PNG (ImageMagick) e o BMP e apagado — sao 8 MB por captura.
 set -eu
 cd "$(dirname "$0")/.."
+IMAGE_TOOL="$(command -v magick || command -v convert)"
 
 saida="${1:-/tmp/nv-carrossel}"
 mkdir -p "$saida"
@@ -25,8 +26,8 @@ done
 binario="${NV_BINARY:-$NUVIO_DADOS/shot}"
 if [ -z "${NV_REUSE:-}" ]; then
 if ! cc "${sources[@]}" tests/carrossel_shot.c -Isrc -o "$binario" \
-  -O1 -g ${NV_CFLAGS:-} -I/opt/homebrew/include -I/opt/homebrew/include/SDL2 \
-  -L/opt/homebrew/lib -lSDL2 -lSDL2_image -lSDL2_ttf -lz -framework OpenGL \
+  -O1 -g ${NV_CFLAGS:-} -DNV_LINUX_DESKTOP $(pkg-config --cflags sdl2 SDL2_image SDL2_ttf)  \
+   -lSDL2 -lSDL2_image -lSDL2_ttf -lz $(pkg-config --libs glesv2 egl) -ldl -pthread -lm \
   -Wall -Wextra -Wno-deprecated-declarations -Wno-macro-redefined \
   >"$NUVIO_DADOS/build.log" 2>&1; then
   cat "$NUVIO_DADOS/build.log" >&2
@@ -38,5 +39,5 @@ fi
 [ -n "${NV_KEEP:-}" ] && exit 0   # deixa os BMP, para comparar byte a byte
 for f in "$saida"/c-*.bmp; do
   [ -e "$f" ] || continue
-  sips -s format png "$f" --out "${f%.bmp}.png" >/dev/null 2>&1 && rm -f "$f"
+  "$IMAGE_TOOL" -background none "$f" "${f%.bmp}.png" >/dev/null 2>&1 && rm -f "$f"
 done

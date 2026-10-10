@@ -46,7 +46,7 @@ PY
 
 tmp="$(mktemp -d "${TMPDIR:-/tmp}/nuvio-simkl-cw-XXXXXX")"
 trap 'rm -rf "$tmp"' EXIT
-cc -O1 -g -Wall -Wextra -Isrc -I/opt/homebrew/include -I/opt/homebrew/include/SDL2 \
+cc -O1 -g -Wall -Wextra -Isrc -DNV_LINUX_DESKTOP $(pkg-config --cflags sdl2 SDL2_image SDL2_ttf)  \
   -Wno-deprecated-declarations -Wno-macro-redefined \
   src/simkl.c src/js.c tests/simkl_cw.c -o "$tmp/simkl_cw" -lpthread
 "$tmp/simkl_cw"

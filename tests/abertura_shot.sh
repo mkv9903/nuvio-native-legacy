@@ -9,7 +9,7 @@ for source in src/*.c src/dts/*.c; do
 done
 BIN="${NUVIO_SHOT_BIN:-/tmp/nuvio-abertura-shot}"
 cc -DAJUSTES_TESTE "${sources[@]}" tests/abertura_shot.c -Isrc -o "$BIN" \
-  -O1 -g -I/opt/homebrew/include -I/opt/homebrew/include/SDL2 \
-  -L/opt/homebrew/lib -lSDL2 -lSDL2_image -lSDL2_ttf -lz -framework OpenGL \
+  -O1 -g -DNV_LINUX_DESKTOP $(pkg-config --cflags sdl2 SDL2_image SDL2_ttf)  \
+   -lSDL2 -lSDL2_image -lSDL2_ttf -lz $(pkg-config --libs glesv2 egl) -ldl -pthread -lm \
   -Wno-deprecated-declarations -Wno-macro-redefined
 "$BIN" "$@"

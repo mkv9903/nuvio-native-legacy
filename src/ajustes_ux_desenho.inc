@@ -11,7 +11,6 @@
 
 #include "home.h"
 // A linha e o inspetor do "Guia de uso" moram com o guia (ajustes_ux_guia.inc).
-static void guiaInspetorAjustes(GfxRect ir);
 static int guiaTotal(void);
 static char uxDirArte[1024];
 void ajustes_recursos(const char *dirArte) {
@@ -753,8 +752,7 @@ static float ajPressao(void) {
 // O estado curto de uma acao leva o ponto no acento quando e um VINCULO ativo.
 static int ajEstadoLigado(int op) {
   return (op == AJ_TRAKT && traktauth_estado() == TRA_LIGADO) ||
-         (op == AJ_SIMKL && simklauth_estado() == SMK_LIGADO) ||
-         (op == AJ_DISCORD && discord_estado() == DIS_LIGADO);
+         (op == AJ_SIMKL && simklauth_estado() == SMK_LIGADO);
 }
 static const char *ajEstadoAcao(int op) {
   static char b[64];

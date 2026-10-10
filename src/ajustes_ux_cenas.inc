@@ -180,7 +180,7 @@ static void ajcCenaHome(int op) {
       o.hero = 0.0f; o.marca = AJC_M_FILEIRAS; break;
     case AJ_ROTULOS: case AJ_NOME_ADDON: case AJ_SUFIXO_TIPO: o.hero = 0; o.marca = AJC_M_TITULOS; break;
     case AJ_NOTAS_HOME: case AJ_SELO_VISTO: o.hero = 0; break;
-    case AJ_RAIL_MODERNA: case AJ_RAIL: case AJ_MENU_EXPLORAR: case AJ_MENU_GUIA: case AJ_MENU_AGENDA:
+    case AJ_RAIL_MODERNA: case AJ_RAIL: case AJ_MENU_EXPLORAR: case AJ_MENU_GUIA:
     case AJ_MENU_PERFIL: case AJ_RAIL_BLUR: case AJ_DESCOBRIR:
       o.marca = AJC_M_RAIL; break;
     default:
@@ -537,18 +537,11 @@ static void ajcCenaPlayer(int op) {
       ajc_barras(60, 136 - 20 * (1 - k), 250, 4, k);
       ajc_play(320, 150, 50, 1 - k * 0.4f);
       ajcChaveCanto(ajcLig(op)); break; }
-    case AJ_REACAO_CREDITOS: {   // nos creditos: a pergunta aparece
-      float k = ajcLig(op) * ajc_onda(4.0f);
-      for (i = 0; i < 6; i++) ajc_barra(250, 60 + i * 24 - 30 * f, 140, 0.25f);
-      ajc_vidro(380, 200, 220, 70, 16, k);
-      for (i = 0; i < 3; i++) ajc_ladrilho(i == 0 ? "aj_thumbs-up" : i == 1 ? "pl_thumbs-down" : "aj_heart", 420 + i * 70, 235, 40, i == 0, k);
-      ajcChaveCanto(ajcLig(op)); break; }
-    case AJ_CACHE_SEEK: case AJ_SEEKR_LIGADO: case AJ_SEEKR_FITA: case AJ_SEEKR_AJUSTE: case AJ_SEEKR_CHAVE: case AJ_SEEKR_TESTAR: {
+     case AJ_SEEKR_LIGADO: case AJ_SEEKR_FITA: case AJ_SEEKR_AJUSTE: case AJ_SEEKR_CHAVE: case AJ_SEEKR_TESTAR: {
       // a fita de miniaturas sobre a barra; o cursor anda nela
       float c = ajc_onda(4.0f);
-      for (i = 0; i < 6; i++) ajc_cartaz(40 + i * 94, 210, 84, 48, i, op == AJ_CACHE_SEEK ? 0.5f : 1);
+      for (i = 0; i < 6; i++) ajc_cartaz(40 + i * 94, 210, 84, 48, i, 1);
       ajc_foco(40 + c * 5 * 94, 210, 84, 48, 6, 1);
-      if (op == AJ_CACHE_SEEK) for (i = 0; i < 8; i++) ajc_ret(40 + i * 70, 316, 60, 9, 4, 1, 1, 1, i < (int)(c * 8) + 1 ? 0.5f : 0.08f);
       if (op == AJ_SEEKR_LIGADO || op == AJ_SEEKR_FITA) ajcChaveCanto(ajcLig(op));
       break; }
     case AJ_SAIDA_PLAYER: case AJ_MANTER_VIDEO: {   // ao sair: o video encolhe para a ilha no canto
@@ -687,7 +680,7 @@ static void ajcCenaLegenda(int op) {
       ajc_foco(320 - lw * 0.5f, yb - 32 * tam * 0.9f, lw, 32 * tam * 0.9f, 6, 0.4f + 0.6f * ajc_onda(2.0f));
     }
   }
-  if (op == AJ_LEG_LINGUA || op == AJ_AUD_LINGUA || op == AJ_LEG_SYNC_AUDIO) {
+  if (op == AJ_LEG_LINGUA || op == AJ_AUD_LINGUA) {
     static const char *L[3] = { "PT", "EN", "ES" };
     int i, a = ajc_passo(1.6f, 3);
     ajc_vidro(430, 30, 180, 60, 16, 1);
@@ -742,7 +735,7 @@ static void ajcCenaAoVivo(int op) {
 }
 // Conta, perfis e servicos de lista.
 static void ajcCenaConta(int op) {
-  if (op == AJ_SYNC || op == AJ_TRAKT || op == AJ_SIMKL || op == AJ_CW_FONTE || op == AJ_SALVOS_DEST || op == AJ_HIST_CONTA || op == AJ_SOCIAL) {
+  if (op == AJ_SYNC || op == AJ_TRAKT || op == AJ_SIMKL || op == AJ_CW_FONTE || op == AJ_SALVOS_DEST || op == AJ_HIST_CONTA) {
     // duas telas trocando o progresso pela nuvem
     float f = ajc_fase(2.4f);
     ajc_tv(40, 120, 180, 101, 1); ajc_cartaz(44, 124, 172, 93, 1, 1); ajc_progresso(56, 200, 148, 0.4f + 0.3f * ajc_onda(4.8f), 1);
@@ -750,16 +743,6 @@ static void ajcCenaConta(int op) {
     ajc_ladrilho(op == AJ_TRAKT ? "aj_link" : op == AJ_SIMKL ? "aj_link" : "aj_cloud", 320, 90, 70, 1, 1);
     ajc_bolinha(220 + 100 * f, 170 - 80 * f, 9, 1, 1, 1, 1 - f * 0.4f);
     ajc_bolinha(420 - 100 * f, 90 + 80 * f, 9, 1, 1, 1, 1 - f * 0.4f);
-    return;
-  }
-  if (op == AJ_ENQUETES || op == AJ_DISCORD) {
-    float k = ajc_onda(3.0f);
-    AjcHome o = ajcHomePadrao();
-    ajcHome(&o);
-    ajc_vidro(380, 20 + 20 * (1 - k), 236, 70, 16, k);
-    ajc_ladrilho(op == AJ_DISCORD ? "aj_message-square" : "aj_bell", 414, 55 + 20 * (1 - k), 38, 1, k);
-    ajc_barra(444, 46 + 20 * (1 - k), 140, 0.8f * k); ajc_barra(444, 62 + 20 * (1 - k), 100, 0.4f * k);
-    ajcChaveCanto(ajcLig(op));
     return;
   }
   ajcCenaPerfis(op);
@@ -821,12 +804,6 @@ static void ajcCenaOpcao(int sec, int op) {
     case AJ_IDIOMA: case AJ_TMDB_IDIOMA: ajcCenaIdioma(op); return;
     case AJ_DEBRID_RD: case AJ_DEBRID_TB: case AJ_DEBRID_PM: case AJ_DEBRID_AD: case AJ_DEBRID_AD_TESTAR:
       ajcCenaServico(op, "aj_zap"); return;
-#ifndef __EMSCRIPTEN__
-    case AJ_P2P_LIGADO: case AJ_P2P_URL: case AJ_P2P_TESTAR: ajcCenaServico(op, "aj_link"); return;
-#endif
-    case AJ_JF_LIGADO: case AJ_JF_SERVIDOR: case AJ_JF_ENTRAR: case AJ_JF_SAIR: case AJ_EM_SERVIDOR: case AJ_EM_ENTRAR:
-    case AJ_EM_SAIR: case AJ_PX_ENTRAR: case AJ_PX_SERVIDOR: case AJ_PX_SAIR:
-      ajcCenaServico(op, "aj_server"); return;
     case AJ_XTREAM_SERVIDOR: case AJ_XTREAM_USUARIO: case AJ_XTREAM_SENHA: case AJ_XTREAM_CONTA: case AJ_XTREAM_LIMPAR:
     case AJ_STALKER_PORTAL: case AJ_STALKER_MAC: case AJ_STALKER_LIMPAR:
       ajcCenaServico(op, "aj_tv-minimal-play"); return;

@@ -59,9 +59,9 @@ int main(int argc, char **argv) {
   const char *dir = argc > 1 ? argv[1] : "/tmp";
   int pctTam = 90, corpo = 20 + (pctTam - 50) / 10 * 4;   // TXT_LEG_90 = 36 px
   TxtEstilo est = (TxtEstilo)(TXT_LEG_50 + (pctTam - 50) / 10);
-  SDL_SetHint("SDL_MAC_BACKGROUND_APP", "1");
   assert(SDL_Init(SDL_INIT_VIDEO) == 0);
-  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2); SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2); SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
   SDL_Window *w = SDL_CreateWindow("legenda negrito", 0, 0, 64, 64, SDL_WINDOW_OPENGL | SDL_WINDOW_HIDDEN); assert(w);
   SDL_GLContext gl = SDL_GL_CreateContext(w); assert(gl);
   glGenTextures(1, &fboTex); glBindTexture(GL_TEXTURE_2D, fboTex);
@@ -75,12 +75,6 @@ int main(int argc, char **argv) {
   txt_novo_quadro();
   TxtLinha l = txt_linha_corta_enfase(est, S, 255, 255, 255, 255, 1e9f, TXT_FAMILIA_MONTSERRAT, TXT_ENF_NEGRITO);
   assert(l.tex);
-  GLint tw = 0, th = 0;
-  glBindTexture(GL_TEXTURE_2D, l.tex);
-  glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &tw);
-  glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &th);
-  gfx_tex_esquecer(0);
-
   // The references: Montserrat-Bold and Regular+TTF_STYLE_BOLD, same size.
   TTF_Font *fb = TTF_OpenFont("deploy/app/fonts/Montserrat-Bold.ttf", corpo);
   TTF_Font *fr = TTF_OpenFont("deploy/app/fonts/Montserrat-Regular.ttf", corpo);
@@ -114,14 +108,13 @@ int main(int argc, char **argv) {
       "Bold real (TTF direto): %dx%d, borda parcial %.1f%%\n"
       "Regular+TTF_STYLE_BOLD:  %dx%d, borda parcial %.1f%%\n"
       "na tela:                 borda parcial %.1f%%, diferenca para o TTF direto max %d media %.3f\n",
-      tw, th, l.w, l.h,
+      ref->w, ref->h, l.w, l.h,
       ref->w, ref->h, rampa((unsigned char *)ref->pixels + 3, ref->pitch, 4, ref->w, ref->h),
       sint->w, sint->h, rampa((unsigned char *)sint->pixels + 3, sint->pitch, 4, sint->w, sint->h),
       rampa(tela, l.w, 1, l.w, l.h), difMax, (double)difSoma / (ref->w * ref->h));
     free(tela); }
 
-  assert(tw == l.w && th == l.h);           // 1:1 at 1080p, no stretched texture
-  assert(tw == ref->w && th == ref->h);     // the real Bold face, not the smear
+  assert(l.w == ref->w && l.h == ref->h);     // the real Bold face, not the smear
   assert(sint->w > ref->w);                 // the smear really is wider
   assert(difMax <= 2);                      // no resampling between texture and screen
   printf("legenda_negrito_shot: ok\n");

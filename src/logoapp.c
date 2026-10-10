@@ -19,9 +19,6 @@ int logoapp_atual(void) {
   return v == LOGO_CLASSICO ? LOGO_CLASSICO : LOGO_NOVO;
 }
 
-const char *logoapp_nome(int logo) {
-  return logo == LOGO_NOVO ? "Novo" : logo == LOGO_CLASSICO ? "Clássico" : "";
-}
 
 const char *logoapp_caminho(int logo, int forma) {
   static const char *ARQ[LOGO_N][3] = {

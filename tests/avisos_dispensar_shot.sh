@@ -7,6 +7,7 @@
 # Nao entra na suite (*_shot).
 set -eu
 cd "$(dirname "$0")/.."
+IMAGE_TOOL="$(command -v magick || command -v convert)"
 saida="${1:-/tmp/nv-dispensar}"
 basec="${2:-}"
 mkdir -p "$saida"
@@ -20,8 +21,8 @@ monta() {   # $1 = raiz das fontes, $2 = binario, $3.. = -D extras
     sources+=("$source")
   done
   cc "${sources[@]}" tests/avisos_dispensar_shot.c -I"$raiz/src" -o "$bin" "$@" \
-    -O1 -g -DNV_LEVE -I/opt/homebrew/include -I/opt/homebrew/include/SDL2 \
-    -L/opt/homebrew/lib -lSDL2 -lSDL2_image -lSDL2_ttf -lz -framework OpenGL -w
+    -O1 -g -DNV_LEVE -DNV_LINUX_DESKTOP $(pkg-config --cflags sdl2 SDL2_image SDL2_ttf)  \
+     -lSDL2 -lSDL2_image -lSDL2_ttf -lz $(pkg-config --libs glesv2 egl) -ldl -pthread -lm -w
 }
 roda() {   # $1 = binario, $2 = prefixo
   mkdir -p "$tmp/dados-$2"
@@ -37,5 +38,5 @@ monta "." "$tmp/depois" -DDEPOIS
 roda "$tmp/depois" depois
 for f in "$saida"/*.bmp; do
   [ -e "$f" ] || continue
-  sips -s format png "$f" --out "${f%.bmp}.png" >/dev/null 2>&1 && rm -f "$f"
+  "$IMAGE_TOOL" -background none "$f" "${f%.bmp}.png" >/dev/null 2>&1 && rm -f "$f"
 done

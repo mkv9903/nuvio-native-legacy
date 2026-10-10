@@ -34,13 +34,6 @@ int  video_registro_negado(void);
 // o transporte sai do prefixo da URL, e mandar o campo faz o load aceitar,
 // devolver mediaId e nunca buscar o arquivo — falha silenciosa.
 int  video_tocar(const char *url);
-#ifdef NV_ANDROID
-// Posicao absoluta em segundos, zero = inicio/default. O Kotlin configura o
-// MediaItem antes de prepare; o ack e da geracao desta abertura. Estado:
-// 0 aguardando, 1 aceito, -1 abertura normal (seek tardio como fallback).
-int  video_tocar_posicao(const char *url, double segundos);
-int  video_retomada_inicial_estado(void);
-#endif
 
 // Chamar UMA VEZ POR QUADRO. Hoje serve ao prazo do recuo de Dolby Vision
 // (ver o comentario em video.c): sem esta batida, um arquivo que a TV recusa
@@ -171,29 +164,16 @@ int video_dts_legenda_desenhar(double seconds, int delay_ms, float x, float y, f
 // Dolby Vision in MKV (webOS, Settings > Playback): 1 while our demux feeds
 // the TV with the file's Dolby Vision; video_dv_recuo_consumir says once why
 // it handed playback back to the TV player (1 slow source, 2 did not start).
-int video_dv_ativo(void);
 int video_dv_recuo_consumir(void);
 // 1 once the current source has played on webOS (kept across reloads of it).
 int video_fonte_tocou(void);
-const char *video_dts_saida(void);  // actual local conversion output, empty for native playback
+  // actual local conversion output, empty for native playback
 int    video_audio_nao_suportado(void);  // uMS errorCode 200: video segue sem som
 int    video_terminou(void); // 1 depois do fim de fluxo (endOfStream) da fonte atual
 // 1 depois que OUTRO app tomou o video da TV nesta sessao (so o .tpk sabe:
 // "interrompido: ResourceConflict" do host). Pegajoso ate o fim da sessao.
 int    video_conflito_recurso(void);
-#ifdef NV_TPK
-void   video_tpk_log_host(const char *linha);   // tpk.c repassa cada linha do host
-int    video_tpk_codec_recusado(const char *codecId);  // #313: DTS/TrueHD/MLP, que a Samsung nao toca
-// Zoom/recorte do plano de video (ROI), experimental (#241): liga/desliga em
-// execucao; o padrao e NV_TPK_ZOOM_ROI (0). Loga "[trailer] tpk zoom ROI: ...".
-void   video_tpk_zoom_roi_definir(int ligado);
-int    video_tpk_zoom_roi(void);
-// trailer.c marca que o que toca agora e um trailer (so ele pode ter ROI fora da tela).
-void   video_tpk_trailer_marcar(int sim);
-int    video_recorte_fonte_trailer(void);   // so o trailer: o ajuste em execucao
-#else
 static inline int video_recorte_fonte_trailer(void) { return video_recorte_fonte(); }
-#endif
 
 // --- faixas -----------------------------------------------------------------
 // Tudo isto sai do evento sourceInfo da assinatura do uMS: o addon nao informa
@@ -374,7 +354,7 @@ void video_encerrar(void);
 // que estiver aqui — faixas, tamanho, HDR, Atmos, buffer — para as telas do
 // player serem desenhadas com dados de um video "de verdade". Zerado (o padrao)
 // e o mesmo coto mudo de sempre. Nos alvos de TV a funcao nao existe.
-#if defined(__APPLE__) || defined(NV_LINUX_DESKTOP)
+#if defined(NV_LINUX_DESKTOP)
 typedef struct {
   int nAudio, nLeg, audioAtual, legAtual;
   VideoFaixa audio[8], leg[8];
@@ -389,7 +369,5 @@ void video_simular(const VideoSimulacao *s);
 #endif
 
 // One-reply webOS LS2 request; callback runs on the GLib thread.
-#if !defined(NV_TPK) && !defined(NV_ANDROID)
 int video_luna(const char *uri, const char *payload, void (*callback)(const char *, void *), void *context);
-#endif
 #endif

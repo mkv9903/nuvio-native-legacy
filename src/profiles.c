@@ -270,7 +270,6 @@ void plugins_perfil_mudou(void);
 
 void profiles_set_active(int index) {
   char line[32];
-  int prev = active_profile_index;
   if (index <= 0) return;
   active_profile_index = index;
   fil_definir_perfil(index);

@@ -3,9 +3,6 @@
 // HLS da Apple o trava ("[DEADLOCK] ... 90 second", ver varianteMidia): la
 // vale o caminho da Samsung, a playlist de UMA variante, e nao o reduzido em
 // file:// da LG (o player roda em outro processo, fora da pasta do app).
-#if defined(__EMSCRIPTEN__) || defined(NV_TPK)
-#define NV_TRAILER_SAMSUNG 1
-#endif
 // ANDROID: NV_TRAILER_SAMSUNG fica DESLIGADO de proposito. O ExoPlayer toca HLS
 // master, mas o ramo da LG (reduzido de UMA variante em <dados>/trailer, entregue
 // como file://) nao depende de nada do webOS: so de dados_caminho e de
@@ -76,10 +73,6 @@ static int lerDisco(Entrada *e) {
   e->expira = atol(linha);
   e->url[0] = 0;
   if (fgets(linha, sizeof linha, f)) { linha[strcspn(linha, "\r\n")] = 0; if (strcmp(linha, "-")) snprintf(e->url, sizeof e->url, "%s", linha); }
-#ifdef NV_TRAILER_SAMSUNG
-  e->toca[0] = 0;
-  if (fgets(linha, sizeof linha, f)) { linha[strcspn(linha, "\r\n")] = 0; if (strcmp(linha, "-")) snprintf(e->toca, sizeof e->toca, "%s", linha); }
-#endif
   fclose(f);
   return 1;
 }
@@ -93,7 +86,6 @@ static void gravarDisco(const Entrada *e) {
   // trailerapple_pedir).
   fprintf(f, "%ld\n%s\n%s\n", e->expira, e->url[0] ? e->url : "-", e->toca[0] && strncmp(e->toca, "file://", 7) ? e->toca : "-");
   fclose(f);
-  dados_marcar_sujo(1);   // IDBFS (Samsung): cache re-obtivel, descarga leve
 }
 static int valido(const Entrada *e) { return e->respondeu && e->expira > (long)time(NULL); }
 
@@ -130,19 +122,11 @@ static int atributo(const char *linha, const char *nome, char *dst, unsigned tam
   return 0;
 }
 
-#ifndef NV_TRAILER_SAMSUNG   /* so a LG monta o reduzido em disco */
 static int montarReduzido(const char *imdb, int teto, char *saida, unsigned tam) {
   char cm[600], cr[600], linha[2048];
   char melhorInf[2048] = "", melhorUri[1024] = "", melhorAudio[128] = "";
   int melhorW = 0, melhorAvc = 0;
   FILE *f, *g;
-#ifdef NV_ANDROID
-  // ANDROID: "Máxima" vira 1080p. Na TCL Smart TV Pro (Mali-G52) a variante
-  // 3840px hvc1 travou a interface 8 s e depois 20 s ao abrir o trailer de
-  // fundo (log de 30/09: clr=19535 ms). O trailer toca atras do texto da
-  // pagina; 1080p ja enche a tela.
-  if (!teto || teto > 1080) teto = 1080;
-#endif
   caminhoMaster(imdb, cm, sizeof cm, ".m3u8");
   caminhoMaster(imdb, cr, sizeof cr, "-play.m3u8");
   if (!cm[0] || !(f = fopen(cm, "r"))) return 0;
@@ -190,79 +174,7 @@ static int montarReduzido(const char *imdb, int teto, char *saida, unsigned tam)
   snprintf(saida, tam, "file://%s", cr);
   return 1;
 }
-#endif  /* !NV_TRAILER_SAMSUNG */
 
-#ifdef NV_TRAILER_SAMSUNG
-// SAMSUNG: NUNCA O MASTER NO <video>. Provado no emulador Tizen 10 (winpc,
-// 22/09/2026, klog do muse-server): entregue o master da Apple (93 a 165
-// #EXT-X-STREAM-INF, tres "pathways" de CDN, content steering), o motor HLS
-// da Samsung (STREAMING_ENGINE, dentro do muse-server — o servidor de midia
-// do SISTEMA, nao do app) as vezes monta a tabela de variantes errada
-// ("total streams are = 4" para o mesmo master que noutra vez deu 7) e, na
-// primeira troca de ABR ("Bitrate Change: 0 -> 3"), pede a variante 3 com uma
-// URL de lixo de memoria (".../MZPlayLocal.woa/hls/%A5%DE%96..."). Dali em
-// diante repete o pedido a cada 10 ms para sempre; o fechamento do elemento
-// fica preso nele e o muse-server acusa "[DEADLOCK] player ... does not return
-// value within (90) second" e se reinicia. Enquanto isso NENHUM <video> toca:
-// e o "tocou um trailer e depois nenhum toca mais" do dono, e o silencio total
-// do log 1646 (nem erro, nem playing).
-//
-// O remedio e o mesmo do reduzido da LG, por outro caminho: a playlist de
-// MIDIA de uma unica variante (so video, avc1, na largura do teto). Sem
-// master nao ha tabela, nem troca de ABR, nem a URL corrompida. Medido no
-// mesmo emulador, quatro titulos seguidos criando e destruindo o elemento:
-// `playing` em 1,1 a 3,2 s, na definicao escolhida desde o primeiro quadro
-// (o master levava 10,5 s e comecava em 556x232). O preco: sem audio — a
-// Apple entrega o audio em playlist separada, e um <audio> ao lado do <video>
-// travou o video no emulador (dois players de uma vez). No fundo o trailer e
-// mudo, e a tela cheia tambem (dono, 22/09/2026: "trailer fica mudo" — nada
-// troca para o YouTube por causa de som; ver trailerfonte.h).
-//
-// Escolha: igual a montarReduzido (maior largura que cabe no teto, sem Dolby
-// Vision), mas avc1 OBRIGATORIO quando existe: decodifica em qualquer Samsung
-// e e o que o emulador provou. hvc1 so quando o titulo nao tem avc1. As URIs
-// do master sao absolutas; relativa e descartada (resolver contra o master
-// seria refazer justamente o que o motor da Samsung erra).
-static int varianteMidia(const char *master, int teto, char *dst, unsigned tam) {
-  const char *p = master;
-  char melhorUri[1024] = "";
-  int melhorW = 0, melhorAvc = 0;
-  if (!master) return 0;
-  while ((p = strstr(p, "#EXT-X-STREAM-INF:")) != NULL) {
-    char linha[2048], res[32], cod[128], uri[1024];
-    const char *fimLinha = strchr(p, '\n'), *u, *fimU;
-    size_t n;
-    int w, avc;
-    if (!fimLinha) break;
-    n = (size_t)(fimLinha - p);
-    if (n >= sizeof linha) n = sizeof linha - 1;
-    memcpy(linha, p, n); linha[n] = 0;
-    u = fimLinha + 1;
-    fimU = strchr(u, '\n');
-    n = fimU ? (size_t)(fimU - u) : strlen(u);
-    if (n >= sizeof uri) n = sizeof uri - 1;
-    memcpy(uri, u, n); uri[n] = 0;
-    uri[strcspn(uri, "\r")] = 0;
-    p = fimLinha;
-    atributo(linha, "RESOLUTION", res, sizeof res);
-    atributo(linha, "CODECS", cod, sizeof cod);
-    w = atoi(res);
-    if (w <= 0 || strncmp(uri, "http", 4)) continue;
-    if (strstr(cod, "dvh1") || strstr(cod, "dvhe")) continue;
-    if (teto && w > (teto >= 1080 ? 1920 : teto >= 720 ? 1280 : 864)) continue;
-    avc = strstr(cod, "avc1") != NULL;
-    if ((avc && !melhorAvc) || (avc == melhorAvc && w > melhorW)) {
-      melhorW = w; melhorAvc = avc;
-      snprintf(melhorUri, sizeof melhorUri, "%s", uri);
-    }
-  }
-  if (!melhorW) return 0;
-  snprintf(dst, tam, "%s", melhorUri);
-  printf("[trailer] apple: variante de midia %dpx %s (teto %d), sem master\n", melhorW, melhorAvc ? "avc1" : "hvc1", teto);
-  fflush(stdout);
-  return 1;
-}
-#endif
 
 // NORMALIZACAO igual a do tvOS: minusculas, sem acento (so o bloco latino de
 // dois bytes, que e o que titulo de filme tem), "&" vira " and ", tudo que
@@ -515,18 +427,6 @@ static void *buscar(void *arg) {
     if (r < 0) semResposta = 1;
     else if (r == 1) { r = hlsDe(id, serie, url, sizeof url); if (r < 0) semResposta = 1; }
   }
-#ifdef NV_TRAILER_SAMSUNG
-  char midia[600] = "";
-  if (url[0]) {
-    // Samsung: o master so e LIDO aqui, nunca entregue ao <video> (ver
-    // varianteMidia). Sem variante utilizavel a Apple conta como "sem
-    // trailer" e quem chama cai no YouTube.
-    char *m = rede_baixar_com(url, 12, NULL);
-    if (!m) semResposta = 1;
-    else if (!varianteMidia(m, ajustes_trailer_qualidade(), midia, sizeof midia)) url[0] = 0;
-    free(m);
-  }
-#else
   if (url[0]) {
     // O master vai para o disco: e dele que sai o reduzido de uma variante.
     // (Na Samsung o master nao vai ao <video>: ver varianteMidia.)
@@ -536,7 +436,6 @@ static void *buscar(void *arg) {
     if (m && cm[0]) { FILE *g = fopen(cm, "w"); if (g) { fputs(m, g); fclose(g); } }
     free(m);
   }
-#endif
   printf("[trailer] apple %s (%s %d): %s\n", p->imdb, p->titulo, ano,
          semResposta ? "sem resposta" : url[0] ? "HLS" : !ano ? "sem ano" : "sem trailer");
   fflush(stdout);
@@ -545,12 +444,6 @@ static void *buscar(void *arg) {
   e->emVoo = 0; e->respondeu = 1;
   snprintf(e->url, sizeof e->url, "%s", url);
   e->toca[0] = 0; e->tocaQual = -1;
-#ifdef NV_TRAILER_SAMSUNG
-  // A variante vale pelo teto do momento da busca. Trocar o teto nos Ajustes
-  // so pega na proxima busca (acerto dura 1 h): guardar o master inteiro por
-  // titulo para refazer a escolha custaria ~80 KB x TA_MAX de heap na TV.
-  if (url[0]) { snprintf(e->toca, sizeof e->toca, "%s", midia); e->tocaQual = ajustes_trailer_qualidade(); }
-#endif
   e->expira = semResposta ? 0 : (long)time(NULL) + (url[0] ? 3600 : 12 * 3600);
   if (!semResposta) gravarDisco(e);
   destrancar();
@@ -572,13 +465,7 @@ void trailerapple_pedir(const char *imdb, const char *titulo, const char *meta, 
     char cm[600];
     struct stat st;
     caminhoMaster(imdb, cm, sizeof cm, ".m3u8");
-#ifdef NV_TRAILER_SAMSUNG
-    // Cache de antes desta versao guarda so o master: sem variante de midia
-    // ele nao serve (o master nao vai mais ao <video>), entao busca de novo.
-    (void)st; (void)cm; e->respondeu = !e->url[0] || e->toca[0];
-#else
     e->respondeu = !e->url[0] || (cm[0] && stat(cm, &st) == 0);
-#endif
   }
   if (e->emVoo || valido(e)) { destrancar(); return; }
   e->emVoo = 1; e->respondeu = 0;
@@ -600,9 +487,6 @@ const char *trailerapple_url(const char *imdb) {
   trancar();
   e = achar(imdb);
   if (e && valido(e) && e->url[0]) {
-#ifdef NV_TRAILER_SAMSUNG
-    r = e->toca[0] ? e->toca : NULL;
-#else
     int teto = ajustes_trailer_qualidade();
     if (e->tocaQual != teto) {
       e->tocaQual = teto;
@@ -610,7 +494,6 @@ const char *trailerapple_url(const char *imdb) {
     }
     // Sem reduzido, sem Apple: quem chama cai no IMDb.
     r = e->toca[0] ? e->toca : NULL;
-#endif
   }
   destrancar();
   return r;

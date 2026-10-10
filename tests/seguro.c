@@ -1,4 +1,4 @@
-// Modo seguro (src/seguro.c): diario de mudancas arriscadas, reversao no arranque
+// Modo seguro (src/safemode.c): diario de mudancas arriscadas, reversao no arranque
 // depois de uma queda, confirmacao por tempo ou por saida limpa, e o laco de
 // quedas que liga o perfil seguro. So a logica: os arquivos sao uma tabela em
 // memoria no lugar de dados.c, e `caiu` (o veredito de avisos.c) e um parametro.

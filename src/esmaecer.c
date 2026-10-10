@@ -52,7 +52,6 @@ void esmaecer_escolha(int escolha) {
   escolhaAtual = escolha >= 0 && escolha < ESM_ESCOLHAS ? escolha : ESM_PADRAO;
 }
 void esmaecer_estilo(int estilo) { estiloAtual = estiloValido(estilo); }
-int  esmaecer_estilo_atual(void) { return estiloAtual; }
 
 static void definirEstagio(int e) {
   if (e == estagio) return;

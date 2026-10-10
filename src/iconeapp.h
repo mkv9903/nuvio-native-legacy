@@ -47,7 +47,4 @@ int  iconeapp_desenhar(int i, GfxRect r, int ladrilho, float alpha);
 // A marca nos lugares NOVOS (barra, abertura, login): so com um icone
 // alternativo em vigor. Devolve 1 se desenhou.
 int  iconeapp_marca(GfxRect r, float alpha);
-// Leva o icone em vigor para fora do nucleo: alias do launcher no Android,
-// localStorage da abertura no Tizen. Idempotente; chamar no arranque e a cada troca.
-void iconeapp_aplicar_plataforma(void);
 #endif

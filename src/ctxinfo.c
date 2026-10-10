@@ -3,7 +3,7 @@
 #include "extras.h"
 #include "notasui.h"
 #include "imdbnota.h"
-#include "agenda.h"
+#include "releaseinfo.h"
 #include "logotitulo.h"
 #include "descoberta.h"
 #include "badges.h"
@@ -118,7 +118,7 @@ typedef struct {
   int  cru[EX_NFONTES], notasCarregando, temNotas;
   const char *sinopse;
   char prog[200]; float progFrac;
-  char amigos[220], agenda[200];
+  char amigos[220], release[200];
   int  salvo, visto;
 } Modelo;
 static ExResumo resumo;   // copia do quadro (a sinopse aponta para ca)
@@ -207,7 +207,7 @@ static void montar(const CatItem *ci, const CtxInfoEstado *st, Modelo *m) {
     } }
 
   m->amigos[0] = 0;
-  if (serie && temId(ci)) agenda_frase(ci->imdb, m->agenda, sizeof m->agenda);
+  if (serie && temId(ci)) releaseinfo_phrase(ci->imdb, m->release, sizeof m->release);
   m->salvo = st && st->salvo;
   m->visto = st && st->visto == 1;
 }
@@ -378,7 +378,7 @@ static float fazer(const CatItem *ci, const CtxInfoEstado *st, float x, float y,
   }
 
   // ONDE PAROU, AMIGOS, AGENDA.
-  if (m.prog[0] || m.amigos[0] || m.agenda[0]) y += 14.0f;
+  if (m.prog[0] || m.amigos[0] || m.release[0]) y += 14.0f;
   if (m.prog[0]) {
     y += linhaIcone("aj_circle-play", m.prog, cx, y, cw, ca, desenhar);
     if (m.progFrac > 0.0f) {
@@ -393,7 +393,7 @@ static float fazer(const CatItem *ci, const CtxInfoEstado *st, float x, float y,
     }
   }
   if (m.amigos[0]) y += linhaIcone("aj_users", m.amigos, cx, y, cw, ca, desenhar);
-  if (m.agenda[0]) y += linhaIcone("aj_calendar", m.agenda, cx, y, cw, ca, desenhar);
+  if (m.release[0]) y += linhaIcone("aj_calendar", m.release, cx, y, cw, ca, desenhar);
 
   // SELOS de estado: o que ja e verdade sobre o titulo nesta conta.
   if (m.salvo || m.visto) {
@@ -429,9 +429,9 @@ void ctxinfo_texto(const CatItem *ci, const CtxInfoEstado *st, char *dst, size_t
   for (f = 0; f < EX_NFONTES; f++)
     if (m.cru[f] > 0) { n = strlen(dst); snprintf(dst + n, cap - n, " %d=%d", f, m.cru[f]); }
   n = strlen(dst);
-  snprintf(dst + n, cap - n, "%s\nsynopsis: %.60s\nprogress: %s\nfriends: %s\nschedule: %s\nbadges:%s%s\n",
+  snprintf(dst + n, cap - n, "%s\nsynopsis: %.60s\nprogress: %s\nfriends: %s\nrelease: %s\nbadges:%s%s\n",
            m.notasCarregando ? " (loading)" : "", m.sinopse ? m.sinopse : "", m.prog,
-           m.amigos, m.agenda, m.salvo ? " saved" : "", m.visto ? " watched" : "");
+           m.amigos, m.release, m.salvo ? " saved" : "", m.visto ? " watched" : "");
 }
 
 // A VERSAO COMPACTA, para dentro da linha expandida do painel de Salvos: meta +

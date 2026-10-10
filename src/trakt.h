@@ -57,7 +57,6 @@ int trakt_historico_aplicar(const char *imdb, const char *tipo, int visto,
 int  trakt_recusada(void);
 // Sessao confirmada morta: para os pedidos autenticados ate trakt_definir/esquecer.
 void trakt_sessao_morta(void);
-int  trakt_sessao_e_morta(void);
 
 // Credencial vinda da CONTA, no lugar do arquivo. O token sai de
 // sync_pull_provider_credentials (provider "trakt"); o clientId e do
@@ -139,5 +138,4 @@ int trakt_ler_filmes_vistos(const char *corpo);
 
 // Nota de 1 a 10 em /sync/ratings (a reacao dos creditos, reacao.c). Nao
 // bloqueia; 0 quando o Trakt esta desligado ou o id nao e IMDb.
-int trakt_avaliar(const char *imdb, const char *tipo, int nota);
 #endif

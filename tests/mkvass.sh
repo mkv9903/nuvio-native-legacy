@@ -8,10 +8,10 @@
 #   bash tests/mkvass.sh
 set -eu
 cd "$(dirname "$0")/.."
-cc -I/opt/homebrew/include tests/video_url.c src/video.c -o /tmp/nuvio-video-url-test
+cc -DNV_LINUX_DESKTOP $(pkg-config --cflags sdl2 SDL2_image SDL2_ttf) tests/video_url.c src/video.c -o /tmp/nuvio-video-url-test
 /tmp/nuvio-video-url-test
-FFMPEG=${FFMPEG:-/opt/homebrew/bin/ffmpeg}
-[ -x "$FFMPEG" ] || { echo "mkvass.sh: ffmpeg nao encontrado em $FFMPEG"; exit 1; }
+FFMPEG=${FFMPEG:-ffmpeg}
+command -v "$FFMPEG" >/dev/null 2>&1 || { echo "mkvass.sh: ffmpeg nao encontrado em $FFMPEG"; exit 1; }
 
 DIR=$(mktemp -d "${TMPDIR:-/tmp}/nuvio-mkvass.XXXXXX")
 trap 'kill $SRV 2>/dev/null || true; if [ "${NUVIO_MKVASS_KEEP:-0}" = "1" ]; then echo "mkvass.sh: arquivos de teste mantidos em $DIR"; else rm -rf "$DIR"; fi' EXIT
@@ -57,9 +57,9 @@ EOF
 # e sem Cues nenhum. mkvmerge renumera as faixas na ordem (video 1, audio 2,
 # legenda 3), a mesma da fixture do ffmpeg, entao a faixa 3 continua sendo a
 # legenda. Sem mkvmerge os dois casos sao pulados, com aviso.
-MKVMERGE=${MKVMERGE:-/opt/homebrew/bin/mkvmerge}
+MKVMERGE=${MKVMERGE:-mkvmerge}
 SEMCUES=""; NOCUES=""; SEMREL=""
-if [ -x "$MKVMERGE" ]; then
+if command -v "$MKVMERGE" >/dev/null 2>&1; then
   "$MKVMERGE" -q -o "$DIR/semcues.mkv" --cues 2:none "$DIR/t.mkv" >/dev/null 2>&1 || true
   "$MKVMERGE" -q -o "$DIR/nocues.mkv" --no-cues "$DIR/t.mkv" >/dev/null 2>&1 || true
   # CuePoint da faixa SEM CueRelativePosition (mkvmerge --engage
@@ -102,7 +102,7 @@ PORTA=$(awk '/porta/{print $2}' "$DIR/porta.txt")
 # Janela da VARREDURA em 30 s (padrao 120) para a fixture de 120 s poder
 # provar que os bytes lidos sao proporcionais a janela, nao ao arquivo.
 cc -Isrc -DMKVASS_VARRE_JANELA_SEG=30.0 tests/mkvass.c src/mkvass.c src/assrender.c src/legenda.c src/net.c src/net_url.c src/data.c src/mkv.c \
-  -o /tmp/nuvio-mkvass-tests -O1 -g -Wall -I/opt/homebrew/include \
+  -o /tmp/nuvio-mkvass-tests -O1 -g -Wall -DNV_LINUX_DESKTOP $(pkg-config --cflags sdl2 SDL2_image SDL2_ttf) \
   -Wno-deprecated-declarations
 mkdir -p "$DIR/dados"
 if [ "${NUVIO_MKVASS_LLDB:-0}" = "1" ]; then

@@ -1,7 +1,7 @@
 #!/bin/bash
 # Capturas da linha de AutoSync na folha de legendas. Nao entra na suite
 # (*_shot.sh): janela GL. HTTP real contra servidor Range local.
-#   bash tests/legsync_shot.sh /Volumes/ExternalSSD/nv-f05-shots/legsync
+#   bash tests/legsync_shot.sh /tmp/nv-f05-shots/legsync
 set -eu
 cd "$(dirname "$0")/.."
 T=${TMPDIR:-/tmp}; FX="$T/nv-legref-fx"
@@ -10,8 +10,8 @@ sources=()
 for source in src/*.c src/dts/*.c; do [ "$source" != src/main.c ] && sources+=("$source"); done
 # LS_RITMO=0: sem o teto de 8 Ranges/s (servidor local).
 cc "${sources[@]}" tests/legsync_shot.c -Isrc -DLS_RITMO=0 -o /tmp/nuvio-legsync-shot \
-  -O1 -g -I/opt/homebrew/include -I/opt/homebrew/include/SDL2 \
-  -L/opt/homebrew/lib -lSDL2 -lSDL2_image -lSDL2_ttf -lz -framework OpenGL \
+  -O1 -g -DNV_LINUX_DESKTOP $(pkg-config --cflags sdl2 SDL2_image SDL2_ttf)  \
+   -lSDL2 -lSDL2_image -lSDL2_ttf -lz $(pkg-config --libs glesv2 egl) -ldl -pthread -lm \
   -Wno-deprecated-declarations -Wno-macro-redefined
 # R4: uma legenda que nao fecha com nenhuma referencia (tempos irregulares).
 python3 - "$FX/ext_ruim.srt" <<'PY'

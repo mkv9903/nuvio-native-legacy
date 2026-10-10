@@ -25,15 +25,6 @@ void net_epoch_observe(uint64_t seq, int known) {
   pthread_mutex_unlock(&lock);
 }
 
-#ifdef NV_ANDROID
-#include <jni.h>
-JNIEXPORT void JNICALL
-Java_space_nuvio_nativelegacy_NuvioActivity_nativeRedeAlterou(JNIEnv *env,
-    jobject act, jlong seq, jboolean conhecida) {
-  (void)env; (void)act;
-  if (seq > 0) net_epoch_observe((uint64_t)seq, conhecida == JNI_TRUE);
-}
-#endif
 
 // Backward-compatibility shims
 uint64_t redemarca_atual(void) { return net_epoch_current(); }

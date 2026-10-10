@@ -106,7 +106,6 @@ int  prog_gravar_local(const char *imdb, int temporada, int episodio, double pos
 int  prog_aplicar_remoto(const ProgRegistro *r);
 int  prog_pendentes(ProgRegistro *saida, int max);
 void prog_confirmar_empurrados(const ProgRegistro *enviados, int n);
-void prog_marcar_empurrados(const char *const *chaves, int n);
 void prog_remover(const char *chave);
 void prog_marcar_removido(const char *imdb);
 int  prog_removido_vence(const char *imdb, long long instanteMs);

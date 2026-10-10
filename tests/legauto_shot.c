@@ -2,7 +2,7 @@
 // (legendasui.c + legenda2.c through the real player draw path). GL window,
 // not part of the suite; the pixel checks below keep it honest:
 //
-//   bash tests/legendas_shot.sh /Volumes/ExternalSSD/nv-f04-shots
+//   bash tests/legendas_shot.sh /tmp/nv-f04-shots
 //
 // Frames: simple view, More options, dual subtitles without and with the
 // controls, and a three-line primary to show the bands do not collide.
@@ -135,10 +135,10 @@ static void estado(int controles) {
 int main(int argc, char **argv) {
   Legenda add[6];
   saida = argc > 1 ? argv[1] : "/tmp/nv-legauto-shot";
-  SDL_SetHint("SDL_MAC_BACKGROUND_APP", "1");
   assert(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) == 0);
   IMG_Init(IMG_INIT_PNG | IMG_INIT_JPG);
-  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2); SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2); SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
   SDL_Window *w = SDL_CreateWindow("Nuvio: legenda automatica", 0, 0, 64, 64, SDL_WINDOW_OPENGL | SDL_WINDOW_HIDDEN); assert(w);
   SDL_GLContext gl = SDL_GL_CreateContext(w); assert(gl); SDL_GL_SetSwapInterval(0);
   glGenTextures(1, &fboTex); glBindTexture(GL_TEXTURE_2D, fboTex);

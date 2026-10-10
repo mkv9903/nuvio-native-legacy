@@ -136,7 +136,7 @@ int main(int argc,char **argv) {
   assert(!pthread_join(thread,NULL)); clock_gettime(CLOCK_MONOTONIC,&after);
   assert((after.tv_sec-before.tv_sec)*1e9+after.tv_nsec-before.tv_nsec<2500000000.0);
   dts_engine_destroy(e);
-  #else
+#else
   assert(requests>0);
   #endif
   fprintf(stderr,"DTS AAC stereo: video=%d audio=%d requests=%u, repeated seeks/cancel/track selection OK\n",counts[1],counts[2],requests);

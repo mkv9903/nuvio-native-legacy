@@ -56,13 +56,11 @@ void plrilha_velocidade(int cent);
 // formato no outro canto.
 int  plrilha_direita(void);
 // Esconde a ilha neste quadro (a folha de Fontes por cima de tudo).
-void plrilha_esconder(void);
 void plrilha_desenhar(Uint32 agora);
 // O retangulo desenhado no ultimo quadro; 0 = fora da tela.
 int  plrilha_rect(GfxRect *r);
 // O pedido deste quadro tem corpo e ele ja esta assentado (para quem
 // precisa saber se o corpo esta de pe, como o foco do erro).
-float plrilha_corpo_alfa(void);
 
 #ifdef NV_SHOT_HOOKS
 // Capturas: hora fixa (0 = a do relogio).

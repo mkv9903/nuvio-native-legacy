@@ -139,7 +139,6 @@ int  stream_ordem_addon(int i);
 int  stream_auto_pode_decidir(int preferida, int prefPendente, int prazoPassou, int instantaneo);
 // REGRAS DE AUTO-PLAY (#202, fonteregra.h): o grupo da fonte i (-1 = fora,
 // 0..3 = ordem) e se a ultima escolha so falhou por causa delas.
-int  stream_grupo_regra(int i);
 int  stream_regra_bloqueou(void);
 // Candidatas que o automatico ainda pode tentar nesta lista (nao excluidas).
 int  stream_n_candidatas(void);
@@ -265,7 +264,6 @@ int  stream_cabe_no_teto(const Stream *s);
 unsigned stream_lista_geracao(void);
 // Quantos torrents SEM url (so infoHash) ha na lista: os que so o P2P ou o
 // debrid tocam. Serve ao cartao "nenhuma fonte serve" dizer que ha P2P.
-int  stream_qtd_torrents(void);
 int  stream_resolver_escolhida(int i, unsigned geracao, char *url, unsigned nu,
                                char *servico, unsigned ns, int *pct);
 

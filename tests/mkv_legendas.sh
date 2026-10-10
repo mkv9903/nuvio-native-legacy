@@ -6,8 +6,8 @@
 #   bash tests/mkv_legendas.sh
 set -eu
 cd "$(dirname "$0")/.."
-FFMPEG=${FFMPEG:-/opt/homebrew/bin/ffmpeg}
-[ -x "$FFMPEG" ] || { echo "mkv_legendas.sh: ffmpeg nao encontrado em $FFMPEG"; exit 1; }
+FFMPEG=${FFMPEG:-ffmpeg}
+command -v "$FFMPEG" >/dev/null 2>&1 || { echo "mkv_legendas.sh: ffmpeg nao encontrado em $FFMPEG"; exit 1; }
 
 DIR=$(mktemp -d /tmp/nuvio-mkvleg.XXXXXX)
 trap 'kill $SRV 2>/dev/null || true; rm -rf "$DIR"' EXIT
@@ -61,7 +61,7 @@ PORTA=$(awk '/porta/{print $2}' "$DIR/porta.txt")
 [ -n "$PORTA" ] || { echo "mkv_legendas.sh: servidor nao subiu"; exit 1; }
 
 cc -Isrc tests/mkv_legendas.c src/mkv.c src/mkvass.c src/assrender.c src/legenda.c \
-  src/net.c src/net_url.c src/data.c -o /tmp/nuvio-mkv-legendas-tests -O1 -g -Wall \
-  -I/opt/homebrew/include -Wno-deprecated-declarations
+  src/net.c src/net_url.c src/data.c -o /tmp/nuvio-mkv-legendas-tests -O1 -g -Wall -lm \
+  -DNV_LINUX_DESKTOP $(pkg-config --cflags sdl2 SDL2_image SDL2_ttf) -Wno-deprecated-declarations
 mkdir -p "$DIR/dados"
 NUVIO_DADOS="$DIR/dados" /tmp/nuvio-mkv-legendas-tests "http://127.0.0.1:$PORTA/multi.mkv"

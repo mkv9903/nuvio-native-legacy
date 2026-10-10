@@ -52,7 +52,6 @@ int  trocaarte_consumir_mudanca(void);
 // Poe uma miniatura na aba (0 fundos, 1 logos) sem rede. `rotulo` e copiado.
 void trocaarte_teste_candidato(int aba, const char *url, const char *rotulo);
 // Aba e foco (indice na lista visivel) direto, como se o D-pad tivesse andado.
-void trocaarte_teste_foco(int aba, int pos);
 int  trocaarte_n(int aba);
 // Publica uma resposta do /images como o fio faria (ordem por idioma).
 void trocaarte_teste_tmdb(const char *json, const char *lingua);

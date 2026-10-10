@@ -159,7 +159,7 @@ int main(void) {
     // Fixed order, only what this title has: no Recomendar without the service.
     assert(achou >= 0 && detmais_acao(detmais_n()) == -1);
     for (i = 1; i < detmais_n(); i++) assert(detmais_acao(i) > detmais_acao(i - 1));
-    assert(temArte() && detmais_n() == (temTrailer() ? 1 : 0) + 2 + (temRecomendar() ? 1 : 0));
+    assert(temArte() && detmais_n() == (temTrailer() ? 1 : 0) + 2);
     // Back closes the island and keeps the focus on "..." (the page stays).
     e.type = SDL_KEYDOWN; e.key.keysym.sym = SDLK_ESCAPE; detail_evento(&e);
     assert(!detmais_aberto() && !saindo && botao == nBotoesTodos() - 1);

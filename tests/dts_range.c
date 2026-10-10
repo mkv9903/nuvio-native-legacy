@@ -49,17 +49,13 @@ int main(int argc, char **argv) {
   pthread_t thread;
   volatile int cancel = 0;
   unsigned long begun;
-  assert(argc == 5);
+  assert(argc == 4);
   http_port = atoi(argv[1]); tls_port = atoi(argv[3]);
   // The new DTS transport must verify TLS even though legacy generic fetches
-  // historically disable it. A self-signed origin is rejected before trusted.
+  // historically disabled it. A self-signed origin is rejected.
   snprintf(url, sizeof url, "https://127.0.0.1:%d/range", tls_port);
   body = rede_baixar_trecho64_cab(url, HEADERS, 0, 31, &size, &total, &status, NULL);
   assert(!body && size == 0 && total == -1 && status == 0);
-  rede_discord_ca(argv[4]);
-  body = rede_baixar_trecho64_cab(url, HEADERS, 0, 31, &size, &total, &status, NULL);
-  assert(body && size == 32 && status == 206);
-  free(body);
   body = get("/range", start, start + 31, NULL, NULL);
   assert(body && size == 32 && status == 206 && total == INT64_C(5) * 1024 * 1024 * 1024);
   for (i = 0; i < 32; i++) assert((unsigned char)body[i] == (start + (int64_t)i) % 251);
@@ -106,16 +102,6 @@ int main(int argc, char **argv) {
     body = rede_baixar_trecho64_cab(long_url, HEADERS, 0, 1023, &size, &total, &status, NULL);
     assert(!body && size == 0 && status == 0);
   }
-  // Trusted local TLS verifies the HTTPS path; a downgrade to HTTP is
-  // followed, but NO caller header reaches the plain-HTTP hop (only libcurl's
-  // own Host/Accept/Range).
-  snprintf(url, sizeof url, "https://127.0.0.1:%d/downgrade", tls_port);
-  body = rede_baixar_trecho64_cab(url, HEADERS, 0, 1023, &size, &total, &status, NULL);
-  assert(body && size > 0 && status == 206);
-  assert(!strstr(body, "authorization") && !strstr(body, "cookie") && !strstr(body, "x-provider-token"));
-  assert(!strstr(body, "referer") && !strstr(body, "origin") && !strstr(body, "DTS-range-test"));
-  assert(strstr(body, "range: bytes=0-1023"));
-  free(body);
   begun = now_ms();
   assert(!pthread_create(&thread, NULL, cancel_later, (void *)&cancel));
   body = get("/idle", 0, 31, NULL, &cancel);

@@ -22,7 +22,7 @@ done
 # provisionamento da chave, entao ele configura o pacote como um pacote real.
 cc "${sources[@]}" tests/listas.c -Isrc -o "$tmp/listas" \
   -DNV_TRAKT_CLIENT_ID='"chave-de-teste"' \
-  -O1 -g -Wall -Wextra -I/opt/homebrew/include -I/opt/homebrew/include/SDL2 \
-  -L/opt/homebrew/lib -lSDL2 -lSDL2_image -lSDL2_ttf -lz -framework OpenGL \
+  -O1 -g -Wall -Wextra -DNV_LINUX_DESKTOP $(pkg-config --cflags sdl2 SDL2_image SDL2_ttf)  \
+   -lSDL2 -lSDL2_image -lSDL2_ttf -lz $(pkg-config --libs glesv2 egl) -ldl -pthread -lm \
   -Wno-deprecated-declarations -Wno-macro-redefined
 NUVIO_DADOS="$tmp/dados" "$tmp/listas" "$@"

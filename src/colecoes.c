@@ -164,6 +164,7 @@ int col_extra_definir(const ColFolder *v, int n) {
     extras[nExtras].extra = 1;
     extras[nExtras].local = 0;   // nao e do pacote: nao disputa a arte curada
     nExtras++;
+
   }
   aplicarExtras();
   free(velho);
@@ -258,9 +259,6 @@ int col_grupo_forma(const char *name) {
   return melhor;
 }
 
-int col_grupo(const char *name,int *indices,int max) {
-  int n=0;for(int i=0;i<count&&n<max;i++) if(!strcasecmp(name,PASTA(i).group)) indices[n++]=i;return n;
-}
 // RESOLVE A BASE ANTES DE COMPARAR, e isso e o conserto de verdade do #18.
 //
 // Era o unico leitor de `folders[]` que NAO passava por col_folder(), e por
@@ -312,37 +310,6 @@ int col_fontes_sem_base(void) {
 
 // O OUTRO LADO DA COMPARACAO. Base REDIGIDA: a fonte do Xperience carrega um
 // JWT no caminho e este log vai para relato de defeito.
-void col_despejar_fontes(int max) {
-  char seg[120];
-  int i, s2, n = 0;
-  pthread_mutex_lock(&colTrava);
-  for (i = 0; i < count && n < max; i++) {
-    resolverBases(&PASTA(i));
-    for (s2 = 0; s2 < PASTA(i).nSources && n < max; s2++, n++) {
-      const ColSource *v = &PASTA(i).sources[s2];
-      // O addonId ENTRA no despejo, e ele e o campo que decide.
-      //
-      // Uma fonte sem base nao esta "meio pronta": ela quer um addon que o app
-      // nao soube apontar. Sem o id nao da para dizer se o addon nao esta
-      // instalado, se o manifesto dele falhou, ou se o id mudou dos dois lados
-      // — tres causas com o mesmo "fontes-sem-base>0". Um relator do #18 mandou
-      // colecoes=137 e fontes-sem-base=360: sem esta linha nao havia como saber
-      // QUAIS 360.
-      if (v->prov[0])
-        printf("[col]   fonte[%s/%s]: prov=%s tmdbTipo=%s tmdbId=%ld lista=%ld midia=%s\n",
-               PASTA(i).group, PASTA(i).title, v->prov, v->tmdbTipo,
-               v->tmdbId, v->traktLista, v->midia);
-      else
-        printf("[col]   fonte[%s/%s]: addon=%s base=%s tipo=%s id=%s\n",
-               PASTA(i).group, PASTA(i).title,
-               v->addonId[0] ? v->addonId : "(sem id)",
-               v->base[0] ? rede_url_publica(v->base, seg, sizeof seg)
-                          : "(NAO RESOLVIDA)",
-               v->type, v->catId);
-    }
-  }
-  pthread_mutex_unlock(&colTrava);
-}
 
 // POR QUE ESTA FILEIRA NAO FOI ENGOLIDA. O despejo de fontes nao respondia
 // isso: com 137 pastas ele mostra as 6 primeiras, todas da MESMA pasta, e um
@@ -398,24 +365,6 @@ pronto:
 // A copia entregue a descoberta leva as fontes JUNTO: a pasta so aponta para o
 // bloco do conjunto, e o proximo sync o libera.
 typedef struct { ColFolder f; ColSource s[COL_SOURCE_MAX]; } ColCopia;
-#ifdef NV_TPK40
-// Tizen 4/5's manual ELF loader cannot initialize compiler TLS (tpk.sh rejects
-// PT_TLS). Same per-thread snapshot lifetime with a pthread key, as discord.c.
-static pthread_key_t colCopiaKey;
-static pthread_once_t colCopiaOnce = PTHREAD_ONCE_INIT;
-static int colCopiaKeyOk;
-static void colCopiaCriar(void) { colCopiaKeyOk = pthread_key_create(&colCopiaKey, free) == 0; }
-static ColCopia *colCopiaDoFio(void) {
-  pthread_once(&colCopiaOnce, colCopiaCriar);
-  if (!colCopiaKeyOk) return NULL;
-  ColCopia *p = pthread_getspecific(colCopiaKey);
-  if (!p) {
-    p = calloc(1, sizeof *p);
-    if (p && pthread_setspecific(colCopiaKey, p)) { free(p); p = NULL; }
-  }
-  return p;
-}
-#endif
 const ColFolder *col_por_catalogo(const char *base,const char *type,const char *id) {
   // Base vazia nao pergunta nada: sem esta guarda uma consulta sem URL casava
   // com QUALQUER fonte cuja base ainda estivesse vazia — um falso positivo que
@@ -424,13 +373,7 @@ const ColFolder *col_por_catalogo(const char *base,const char *type,const char *
   // Discovery runs concurrently with main-thread account sync. Never let it
   // observe the cleared/partially parsed builder or keep a pointer that sync
   // can replace after the lock is released.
-#ifdef NV_TPK40
-  ColCopia *copiaP = colCopiaDoFio();
-  if (!copiaP) return NULL;
-#define copia (*copiaP)
-#else
   static __thread ColCopia copia;
-#endif
   const ColFolder *resultado = NULL;
   pthread_mutex_lock(&colTrava);
   for(int i=0;i<count;i++) {
@@ -448,9 +391,6 @@ const ColFolder *col_por_catalogo(const char *base,const char *type,const char *
 pronto:
   pthread_mutex_unlock(&colTrava);
   return resultado;
-#ifdef NV_TPK40
-#undef copia
-#endif
 }
 /* Arte editorial: JPEG primeiro, PNG depois.
  *
@@ -567,7 +507,7 @@ static void tirarManifest(char *base) {
 // descartadas nao deixavam rastro nenhum: quem instalava uma colecao na conta e
 // nao a via na TV nao tinha como saber se ela nao chegou, se chegou vazia, ou se
 // foi recusada aqui — e os tres tem conserto diferente. E o issue #13.
-static int fPulProvedor, fPulSemFonte, fPulSemTitulo, fPulCheio, fGifCortado;
+static int fPulProvedor, fPulSemFonte, fPulSemTitulo, fPulCheio, fCapaCortada;
 static char fPrimeiraPulada[128];
 
 // Devolve 0 quando a colecao NAO COUBE (teto de pastas, de fontes ou falta de
@@ -590,20 +530,11 @@ static int lerColecaoWeb(const char *c, const char *ce) {
     js_texto(p, pe, "heroBackdropUrl", v->hero, sizeof v->hero);
     snprintf(v->groupBackdrop, sizeof v->groupBackdrop, "%s", fundo);
     js_texto(p, pe, "titleLogoUrl", v->logo, sizeof v->logo);
-    // GIF DE FOCO (#29). Fica como URL, igual a cover/hero/logo: quem for
-    // anima-lo pede o arquivo ao cache de disco (tex_arquivo) na hora em que o
-    // cartaz recebe foco. O campo pode simplesmente nao vir — pasta sem
-    // animacao e o caso comum, e ai `focusGif` continua vazio.
-    //
-    // focusGifEnabled:false DESLIGA a animacao mesmo com a URL presente, que e
-    // a mesma regra de tools/import-collections.mjs. Ausente vale como ligado.
-    js_texto(p, pe, "focusGifUrl", v->focusGif, sizeof v->focusGif);
     // URL QUE NAO COUBE (#141): js_texto corta calado no tamanho do campo, e
     // uma URL cortada nao e URL — baixaria um 404 ou outra coisa, e o cartaz
     // ficaria parado sem dizer nada. Cheia ate o ultimo byte = cortada:
     // descarta e conta (a linha do fim diz quantas).
-    if (strlen(v->focusGif) >= sizeof v->focusGif - 1) { v->focusGif[0] = 0; fGifCortado++; }
-    if (strlen(v->cover) >= sizeof v->cover - 1) { v->cover[0] = 0; fGifCortado++; }
+    if (strlen(v->cover) >= sizeof v->cover - 1) { v->cover[0] = 0; fCapaCortada++; }
     { char b[8]; v->hideTitle = js_bruto(p, pe, "hideTitle", b, sizeof b) && strstr(b, "true") ? 1 : 0; }
     // FORMA DO CARTAO: tileShape, e posterShape como o web aceita
     // (homeScreen.js le `item.tileShape || item.posterShape`). Ausente vira
@@ -612,8 +543,6 @@ static int lerColecaoWeb(const char *c, const char *ce) {
       if (!js_texto(p, pe, "tileShape", forma, sizeof forma))
         js_texto(p, pe, "posterShape", forma, sizeof forma);
       v->forma = col_forma_texto(forma); }
-    { char b[8];
-      if (js_bruto(p, pe, "focusGifEnabled", b, sizeof b) && strstr(b, "false")) v->focusGif[0] = 0; }
     const char *src = js_array(p, pe, "sources");
     if (!src) src = js_array(p, pe, "catalogSources");
     for (const char *s = src, *se = NULL; s && v->nSources < COL_SOURCE_MAX; s = js_prox(se)) {
@@ -982,7 +911,7 @@ static int definirJson(const char *json) {
   for (int i = 0; i < antes; i++) antigas[i] = PASTA(i);
   count = 0;
   comecarMontagem();
-  fPulProvedor = fPulSemFonte = fPulSemTitulo = fPulCheio = fGifCortado = 0;
+  fPulProvedor = fPulSemFonte = fPulSemTitulo = fPulCheio = fCapaCortada = 0;
   fPrimeiraPulada[0] = 0;
   { const char *c = arr, *cFim;
     for (; c && *c == '{'; c = js_prox(cFim)) {
@@ -1027,19 +956,6 @@ static int definirJson(const char *json) {
       // Preserve artwork, never stale account membership or source ordering.
       v.nSources = PASTA(i).nSources;
       v.sources = PASTA(i).sources;
-      // O GIF DA CONTA SO ENTRA ONDE NAO HA SEQUENCIA LOCAL, e isso nao abre
-      // excecao na regra acima: a versao local nao tem GIF nenhum para perder.
-      // col_carregar nunca preenche focusGif — no pacote o GIF ja virou
-      // 001.jpg..090.jpg na importacao e o que resta dele e frames+frameDir.
-      //
-      // Entao ha dois casos, e so um deles muda de mao:
-      //   frames > 0  — a pasta ja anima pela sequencia curada. Fica como esta.
-      //   frames == 0 — nao ha animacao nenhuma para preservar (117 das 169
-      //                 pastas do collections.json do pacote estao assim, por
-      //                 falta de focusGifUrl no perfil na hora da importacao).
-      //                 Descartar a URL da conta aqui seria jogar fora a unica
-      //                 animacao que existe, sem nada no lugar.
-      if (!v.frames) snprintf(v.focusGif, sizeof v.focusGif, "%s", PASTA(i).focusGif);
       // FUNDO ESCOLHIDO NO XPERIENCE (19/09/2026). O CDN passou a ter 17
       // estilos de fundo por marca, em covers/<estilo>/<pasta>.backdrop.webp
       // (3840x2160), e quem escolhe e o dono, no Xperience, por pasta ou por
@@ -1057,13 +973,12 @@ static int definirJson(const char *json) {
         fundosXp++;
       }
       // ARTE DA CONTA LIGADA: campo a campo, so o que a conta mandou. A capa
-      // da conta leva junto o GIF dela (a sequencia do pacote e da capa do
+      // da conta substitui a sequencia do pacote (ela e da capa do
       // pacote); o fundo da conta desliga o modo editorial, como o Xperience.
       if (arteConta) {
         int trocou = 0;
         if (PASTA(i).cover[0]) {
           snprintf(v.cover, sizeof v.cover, "%s", PASTA(i).cover);
-          snprintf(v.focusGif, sizeof v.focusGif, "%s", PASTA(i).focusGif);
           v.frames = 0;
           trocou = 1;
         }
@@ -1089,20 +1004,8 @@ static int definirJson(const char *json) {
     // da home mudar a CADA ciclo de sync, inclusive quando a conta veio vazia e
     // as pastas locais foram mantidas — uma remontagem por ciclo, de graca, que
     // reinicia animacoes e refaz o foco.
-    // QUANTAS TEM GIF (#141): "Netflix anima e Apple TV nao" comeca aqui — se
-    // a conta so mandou focusGifUrl para uma pasta, o resto nao e defeito de
-    // animacao. Capa .gif na URL e so indicio (a decisao e pelos bytes, ver
-    // gifcolecao.h); conta aqui para o log ja responder o caso comum.
-    { int comGif = 0, capaGif = 0;
-      for (int i = 0; i < count; i++) {
-        if (PASTA(i).focusGif[0]) comGif++;
-        else if (strstr(PASTA(i).cover, ".gif") || strstr(PASTA(i).cover, "giphy.com/") ||
-                 strstr(PASTA(i).cover, "tenor.com/")) capaGif++;
-      }
-      printf("[colecoes] %d pastas vindas da conta: %d com focusGifUrl, %d sem ele com capa que parece GIF\n",
-             nConta, comGif, capaGif);
-      if (fGifCortado)
-        printf("[colecoes] %d URL(s) de capa/GIF passavam de 511 bytes e foram descartadas\n", fGifCortado); }
+    if (fCapaCortada)
+      printf("[colecoes] %d URL(s) de capa passavam de 511 bytes e foram descartadas\n", fCapaCortada);
   }
   aplicarExtras();
   for (int i = 0; i < count; i++) resolverBases(&PASTA(i));

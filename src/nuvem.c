@@ -83,7 +83,6 @@ int nuvem_configurar(const char *dirArte) {
 const char *nuvem_ultimo_erro(void) { return rede_ultimo_erro(); }
 int         nuvem_pronta(void)     { return url[0] && anon[0]; }
 const char *nuvem_url(void)        { return url; }
-const char *nuvem_anon(void)       { return anon; }
 const char *nuvem_base_login(void) { return baseLogin; }
 const char *nuvem_trakt_cliente(void) { return traktCliente; }
 const char *nuvem_trakt_segredo(void) { return traktSegredo; }

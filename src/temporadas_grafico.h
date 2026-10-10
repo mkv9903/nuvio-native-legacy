@@ -11,7 +11,7 @@
 // NADA E PEDIDO DAQUI. Tudo ja esta na memoria quando a pagina abre:
 //   - os episodios e as temporadas: a lista do meta (catalogo.h);
 //   - o que voce viu: o mapa do vistoep (Trakt/conta Nuvio), tri-estado;
-//   - o que ainda nao foi ao ar: a agenda do TMDB (extras_agenda_*), a mesma
+//   - o que ainda nao foi ao ar: os metadados do TMDB (extras_next_episode_*), a mesma
 //     regra de epNaoExibido em detail.c;
 //   - os amigos: amigostitulo.h, que so tem o que cada um publicou dentro do
 //     alcance dele.
@@ -59,7 +59,7 @@ int  tgraf_montar(TgDados *d, const TgEp *eps, int n, int sabe, int agT, int agE
 int  tgraf_existe(const TgDados *d);
 
 // Os dados da serie `idxCatalogo` aberta na pagina, refeitos so quando o
-// catalogo, o vistoep ou a agenda mudam. Nunca NULL.
+// catalogo, o vistoep ou os metadados mudam. Nunca NULL.
 const TgDados *tgraf_dados(int idxCatalogo);
 
 // Indice da coluna da temporada `numero` (-1 = nao esta no grafico).

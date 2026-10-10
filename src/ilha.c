@@ -38,7 +38,7 @@ enum { M_RELOGIO = 0, M_AVISO, M_ATIVIDADE, M_CARTAO };
 
 typedef struct {
   char chave[80], icone[32], texto[240];
-  int tipo, tecla, prior, grupo, vivo, cartao;
+  int tipo, tecla, prior, grupo, vivo;
   int conta;                    // quantos avisos este representa ("N avisos novos")
   unsigned ms, ordem;           // ordem: chegada, para o FIFO dentro da prioridade
   char rosto[256], rostoNome[64], capa[512], meta[64];
@@ -89,6 +89,7 @@ static char hora[12];
 static time_t horaSeg;
 
 // Cartoes persistentes (ilha.h) e o que a pilula mostra deles.
+static int cartaoDaVez(void);
 static IlhaCartao cartoes[ILHA_N_CARTOES];
 static int temCartao[ILHA_N_CARTOES];
 static int cartaoVez = -1;              // o da vez neste quadro (-1 = nenhum)
@@ -143,7 +144,6 @@ static Uint32 svooDesde;
 static GfxRect svooDe;
 static char svooPoster[1024];
 static Uint32 pousouEm;          // o pulso da pilula conta daqui
-static Uint32 altBase;           // a alternancia dos cartoes conta daqui
 
 static int priorDoTipo(int tipo) {
   return tipo == ILHA_ERRO ? ILHA_P1 : tipo == ILHA_ACENTO ? ILHA_P2 : ILHA_P3;
@@ -216,8 +216,8 @@ void ilha_avisar_ex(const IlhaAvisoEx *e) {
   snprintf(a.meta, sizeof a.meta, "%s", e->meta ? e->meta : "");
   a.tipo = e->tipo; a.ms = e->ms ? e->ms : 4000u;
   a.prior = e->prior ? e->prior : priorDoTipo(e->tipo);
-  a.grupo = e->grupo; a.vivo = e->vivo; a.cartao = e->cartao; a.conta = 1;
-  a.tecla = e->tecla || e->modal || e->cartao;
+  a.grupo = e->grupo; a.vivo = e->vivo; a.conta = 1;
+  a.tecla = e->tecla || e->modal;
   if (e->modal) { a.temModal = 1; a.modal = *e->modal; a.abrir = e->abrir; }
   snprintf(a.titulo, sizeof a.titulo, "%s", e->titulo ? e->titulo : "");
   snprintf(a.kicker, sizeof a.kicker, "%s", e->kicker ? e->kicker : "");
@@ -332,10 +332,7 @@ void ilha_retirar_grupo(void) {
 }
 
 int ilha_tecla_central(void) {
-  // O episodio novo abre o modal da ESTREIA; sem o cartao na pilula (relogio
-  // desligado), a mesma tecla cai na central, onde o item esta.
-  int cartaoNaPilula = cur.cartao > 0 && cur.cartao <= ILHA_N_CARTOES && temCartao[cur.cartao - 1];
-  return temCur && curAte && cur.tecla && !cur.temModal && !cur.acao && !cartaoNaPilula && A > 0.5f;
+  return temCur && curAte && cur.tecla && !cur.temModal && !cur.acao && A > 0.5f;
 }
 
 int ilha_aviso_pediu(char *chave, size_t tam) {
@@ -427,16 +424,6 @@ void ilha_cartao_invalidar(int qual) {
   }
 }
 
-// QUAL CARTAO E O DA VEZ. Com os dois, alternam a cada ILHA_ALTERNA_MS: a
-// sessao interrompida e a estreia sao as duas "o que eu faco agora", e nenhuma
-// deve esconder a outra para sempre. Um so: ele.
-static int cartaoDaVez(Uint32 agora) {
-  int q[ILHA_N_CARTOES], n = 0, i;
-  for (i = 0; i < ILHA_N_CARTOES; i++) if (temCartao[i]) q[n++] = i;
-  if (!n) return -1;
-  return q[((agora - altBase) / ILHA_ALTERNA_MS) % (unsigned)n];
-}
-
 int ilha_cartao_na_tela(void) { return relogioQuer && cartaoVez >= 0; }
 
 void ilha_coberta(int c) { coberta = c; }
@@ -448,12 +435,6 @@ int ilha_rect(float *x, float *y, float *w, float *h) {
 }
 
 // --- o modal ---------------------------------------------------------------------
-// ESTREIA: Assistir · Depois · Dispensar. O par aprovado em 02/10 era
-// Assistir / Depois, com "Depois" recolhendo SEM marcar e o cartao ficando na
-// pilula — e ficava ate a pessoa abrir a serie (dono, 06/10: "o lembrete de
-// serie so sai se eu entrar na serie"). Agora "Depois" tira o cartao ate o app
-// fechar e "Dispensar" tira de vez aquele episodio (ver ILHA_PEDIU_* em ilha.h).
-// AMIGO: Ver tambem · Detalhes · Fechar, o A5 de oportunidades.md.
 static int nBotoes(void) {
   if (modalAtividade) return 1;
   if (modalAviso) return modalM.nBotoes < 1 ? 1 : modalM.nBotoes > ILHA_MODAL_BOTOES ? ILHA_MODAL_BOTOES : modalM.nBotoes;
@@ -462,7 +443,6 @@ static int nBotoes(void) {
 static const char *rotuloBotao(int i) {
   if (modalAtividade) return i18n("Fechar");
   if (modalAviso) return modalM.botao[i];
-  if (modalQual == ILHA_ESTREIA) return i == 0 ? i18n("Assistir") : i == 1 ? i18n("Depois") : i18n("Dispensar");
   if (i == 0) return i18n("Retomar");
   if (i == 1) return i18n("Detalhes");
   return i18n("Dispensar");   // a mesma palavra do menu do cartao "Retomar agora"
@@ -470,7 +450,6 @@ static const char *rotuloBotao(int i) {
 static const char *iconeBotao(int i) {
   if (modalAviso) return modalM.botaoIcone[i][0] ? modalM.botaoIcone[i] : NULL;
   if (i == 0) return "play";
-  if (modalQual == ILHA_ESTREIA) return i == 1 ? "aj_clock" : "aj_x";
   if (i == 1) return "aj_info";
   return NULL;
 }
@@ -498,15 +477,10 @@ int ilha_modal_abrir(void) {
 
 // O AVISO NA TELA ABRE O SEU MODAL (AZUL/CH+ ou o clique): a pilula cresce
 // dele, e o aviso sai da fila — respondido, ele nao volta quando o modal
-// recolhe. Com `cartao`, o modal e o do cartao (o episodio novo abre a estreia).
+// recolhe.
 static int abrirDoAviso(void) {
   if (modalAberto || !temCur || !curAte) return 0;
   modalAtividade = 0;
-  if (cur.cartao > 0 && cur.cartao <= ILHA_N_CARTOES && temCartao[cur.cartao - 1]) {
-    abrirCartao(cur.cartao - 1);
-    proximo();
-    return 1;
-  }
   // AVISO COM ACAO (a atualizacao: o cartao dela nasce da propria pilula):
   // quem pos decide, pelo contrato dos botoes do modal (ilha_aviso_pediu).
   if (cur.acao) {
@@ -559,13 +533,7 @@ static void acionar(int i) {
     return;
   }
   if (i == 0) { pedir(ILHA_PEDIU_TOCAR); ilha_modal_fechar(0); }
-  else if (modalQual == ILHA_ESTREIA && i == 1) {
-    // "Depois": o cartao sai da pilula ate a proxima sessao (ilhacart_adiar).
-    pedir(ILHA_PEDIU_DEPOIS);
-    temCartao[modalQual] = 0;
-    ilha_modal_fechar(0);
-  }
-  else if (i == 1) { pedir(ILHA_PEDIU_DETALHES); ilha_modal_fechar(0); }
+    else if (i == 1) { pedir(ILHA_PEDIU_DETALHES); ilha_modal_fechar(0); }
   else {
     // "Fechar" tira o cartao: o modal recolhe para uma pilula que ja nao o tem.
     pedir(ILHA_PEDIU_DISPENSAR);
@@ -651,8 +619,6 @@ void ilha_posicionar(int guia) {
 static int atividadeViva(Uint32 agora) {
   return atvVisto && atvTexto[0] && (Sint32)(agora - atvVisto) < 400;
 }
-
-int ilha_ocupada(void) { return temCur || atividadeViva(SDL_GetTicks()); }
 
 // MOLA SUBAMORTECIDA (zeta 0,68): passa um pouco do alvo e volta, que e o
 // "pulo" da Dynamic Island. As molas de anim.h sao criticas de proposito (sem
@@ -1095,33 +1061,23 @@ static void desenharConteudo(int m, GfxRect r, float a, Uint32 agora) {
 #define CT_VAO      14.0f
 typedef struct { TxtLinha hora, tit, meta; float ds; } LinhasCartao;
 
-// "T1E3 · 32 min restantes" / "T2E5 · hoje". O FORMATO passa por i18n inteiro
-// quando existe; na estreia sao duas partes ja traduzidas juntadas por " · ",
-// que nao e palavra.
-static void metaCartao(const IlhaCartao *c, int qual, char *b, size_t n) {
-  if (qual == ILHA_ESTREIA) {
-    char te[32] = "";
-    if (c->serie && c->t > 0 && c->e > 0) snprintf(te, sizeof te, i18n("T%dE%d"), c->t, c->e);
-    if (te[0] && c->quando[0]) snprintf(b, n, "%s · %s", te, c->quando);
-    else snprintf(b, n, "%s", te[0] ? te : c->quando);
-    return;
-  }
+// Playback card metadata uses the full translated format.
+static void metaCartao(const IlhaCartao *c, char *b, size_t n) {
   { int m = c->restanteMin < 1 ? 1 : c->restanteMin;
     if (c->serie && c->t > 0 && c->e > 0) snprintf(b, n, i18n("T%dE%d · %d min restantes"), c->t, c->e, m);
     else snprintf(b, n, i18n("%d min restantes"), m); }
 }
 
-static float larguraCartao(const IlhaCartao *c, int qual, LinhasCartao *L) {
+static float larguraCartao(const IlhaCartao *c, LinhasCartao *L) {
   char meta[96];
   float w;
   L->hora = txt_linha(TXT_PG_RELOGIO, hora, 244, 245, 248, 255);
   L->tit = txt_linha_corta(TXT_BODY, c->titulo, 240, 242, 246, 255, CT_TIT_MAX);
-  metaCartao(c, qual, meta, sizeof meta);
+  metaCartao(c, meta, sizeof meta);
   L->meta = txt_linha_corta(TXT_CAPTION2, meta, 176, 180, 190, 255, CT_TIT_MAX);
   w = (float)L->hora.w + CT_VAO * 2.0f + 1.5f +
-      (qual == ILHA_VIVO ? CT_CAPA_W : ICONE) + VAO +
+      CT_CAPA_W + VAO +
       (float)L->tit.w + 10.0f + (float)L->meta.w;
-  if (qual != ILHA_VIVO) w += 12.0f + 10.0f;   // o ponto de nao lido
   // O medidor em Minimo depois do cartao, so se a pilula ainda couber.
   L->ds = dsCartao ? desempenho_linha_w(DS_MINIMO) : 0.0f;
   if (L->ds > 0.0f && PAD_E + PAD_D + w + L->ds > DS_CARTAO_MAX) L->ds = 0.0f;
@@ -1132,16 +1088,16 @@ static float larguraCartao(const IlhaCartao *c, int qual, LinhasCartao *L) {
 // desenharCartao, e o alvo do voo (ilha_minimizar).
 static GfxRect capaNaPilula(const IlhaCartao *c, GfxRect r) {
   LinhasCartao L;
-  float cw = larguraCartao(c, ILHA_VIVO, &L);
+  float cw = larguraCartao(c, &L);
   float x = r.x + (r.w - cw) * 0.5f + (float)L.hora.w + CT_VAO + 1.5f + CT_VAO;
   return (GfxRect){ x, r.y + r.h * 0.5f - CT_CAPA_H * 0.5f, CT_CAPA_W, CT_CAPA_H };
 }
 
-static void desenharCartao(const IlhaCartao *c, int qual, GfxRect r, float a) {
+static void desenharCartao(const IlhaCartao *c, GfxRect r, float a) {
   LinhasCartao L;
-  float cw = larguraCartao(c, qual, &L);
+  float cw = larguraCartao(c, &L);
   float x = r.x + (r.w - cw) * 0.5f, yc = r.y + r.h * 0.5f, cr, cg, cb, xTexto;
-  int barra = qual == ILHA_VIVO && c->progresso >= 0.0f;
+  int barra = c->progresso >= 0.0f;
   float yt = barra ? yc - 3.0f : yc;
   if (a < 0.01f) return;
   ajustes_acento(&cr, &cg, &cb);
@@ -1150,7 +1106,7 @@ static void desenharCartao(const IlhaCartao *c, int qual, GfxRect r, float a) {
   // Fio entre o relogio e o cartao: e a mesma pilula, com duas coisas dentro.
   gfx_cor((GfxRect){ x, yc - 13.0f, 1.5f, 26.0f }, 0.0f, 1.0f, 1.0f, 1.0f, 0.22f * a);
   x += 1.5f + CT_VAO;
-  if (qual == ILHA_VIVO) {
+  {
     GfxRect capa = { x, yc - CT_CAPA_H * 0.5f, CT_CAPA_W, CT_CAPA_H };
     GLuint tex = c->poster[0] ? tex_obter_larg(c->poster, CT_CAPA_W) : 0;
     if (voo) {
@@ -1165,18 +1121,14 @@ static void desenharCartao(const IlhaCartao *c, int qual, GfxRect r, float a) {
       gfx_tex_aspect_atual = 0.0f;
     } else gfx_cor(capa, 6.0f / CT_CAPA_H, NV_COR_ESQUELETO_R, NV_COR_ESQUELETO_G, NV_COR_ESQUELETO_B, a);
     x += CT_CAPA_W + VAO;
-  } else {
-    gfx_icone((GfxRect){ x, yc - ICONE * 0.5f, ICONE, ICONE }, "aj_calendar", cr, cg, cb, a);
-    x += ICONE + VAO;
+
   }
   xTexto = x;
   txt_desenhar_alpha(L.tit, x, yt - (float)L.tit.h * 0.5f, a);
   x += (float)L.tit.w + 10.0f;
   txt_desenhar_alpha(L.meta, x, yt - (float)L.meta.h * 0.5f, a);
   x += (float)L.meta.w;
-  if (qual == ILHA_ESTREIA)
-    gfx_cor((GfxRect){ x + 12.0f, yc - 5.0f, 10.0f, 10.0f }, 0.5f, cr, cg, cb, a);
-  if (L.ds > 0.0f) desempenho_linha(DS_MINIMO, x + (qual != ILHA_VIVO ? 22.0f : 0.0f), yc, a);
+  if (L.ds > 0.0f) desempenho_linha(DS_MINIMO, x, yc, a);
   if (barra) {
     // A BARRA FINA vai sob o texto (nao sob a capa): ela mede o titulo.
     float pr = c->progresso > 1.0f ? 1.0f : c->progresso;
@@ -1595,23 +1547,18 @@ static void desenharModal(GfxRect m, float a) {
   // A linha de estado fica na base da arte; a sinopse usa o que sobra entre.
   { char b[120];
     TxtLinha t;
-    if (modalQual == ILHA_VIVO) {
-      int mi = c->restanteMin < 1 ? 1 : c->restanteMin;
-      snprintf(b, sizeof b, i18n("%d min restantes"), mi);
-    } else if (c->quando[0]) snprintf(b, sizeof b, "%s · %s", i18n("Episódio novo"), c->quando);
-    else snprintf(b, sizeof b, "%s", i18n("Episódio novo"));
+    int mi = c->restanteMin < 1 ? 1 : c->restanteMin;
+    snprintf(b, sizeof b, i18n("%d min restantes"), mi);
     t = txt_linha(TXT_CAPTION, b, 200, 204, 212, 255);
     sy = ay + MD_ARTE_H - (float)t.h;
-    if (modalQual == ILHA_ESTREIA) {
-      gfx_cor((GfxRect){ cx, sy + (float)t.h * 0.5f - 5.0f, 10.0f, 10.0f }, 0.5f, cr, cg, cb, a);
-      txt_desenhar_alpha(t, cx + 20.0f, sy, a);
-    } else {
+    {
       // O trilho de 220 primeiro e o tempo depois (mockup do player, 03/10).
       float pr = c->progresso < 0.0f ? 0.0f : c->progresso > 1.0f ? 1.0f : c->progresso;
       GfxRect tr = { cx, sy + (float)t.h * 0.5f - 2.0f, 220.0f, 4.0f };
       gfx_cor(tr, 0.5f, 1.0f, 1.0f, 1.0f, 0.16f * a);
       if (tr.w * pr > 4.0f) gfx_cor((GfxRect){ tr.x, tr.y, tr.w * pr, 4.0f }, 0.5f, cr, cg, cb, a);
       txt_desenhar_alpha(t, cx + 220.0f + 14.0f, sy, a);
+
     } }
   if (c->sinopse[0]) {
     int linhas = (int)((sy - 12.0f - y) / 30.0f);
@@ -1662,7 +1609,6 @@ int ilha_minimizar(const char *fundoReserva) {
   // relogioQuer ainda e o do ultimo quadro desenhado (o da pagina, antes do
   // player): quem vale e o do proximo, conferido em ilha_desenhar.
   if (!temCartao[ILHA_VIVO] || !ajustes_relogio_ligado()) return 0;
-  altBase = SDL_GetTicks();
   if (anim_politica_reduzida || ajustes_animacoes_reduzidas()) { voo = 0; return 1; }
   snprintf(vooArte, sizeof vooArte, "%s", c->arte[0] ? c->arte : fundoReserva ? fundoReserva : "");
   // A arte do episodio pode nunca ter sido decodificada nesta sessao (serie
@@ -1689,7 +1635,6 @@ void ilha_minimizar_dissolver(int sim) {
 static void vooFim(const char *por, Uint32 agora) {
   if (!voo) return;
   voo = 0;
-  altBase = agora;
   pousouEm = strcmp(por, "pousou") ? 0 : agora ? agora : 1;
   printf("[ilha] minimizar: fim (%s, %u ms)\n", por, vooDesde ? (unsigned)(agora - vooDesde) : 0u);
 }
@@ -1847,7 +1792,7 @@ static void ilha_desenharCorpo_(Uint32 agora) {
   if (temCur && cur.abrir && curAte) { cur.abrir = 0; abrirDoAviso(); }
   atualizarHora();
 
-  cartaoVez = cartaoDaVez(agora);
+  cartaoVez = cartaoDaVez();
   // EM VOO o cartao e o da sessao que acabou de sair; se ela sumiu, a pilula
   // saiu da tela ou o modal abriu por cima, o voo acaba seco.
   if (voo) {
@@ -1922,7 +1867,7 @@ static void ilha_desenharCorpo_(Uint32 agora) {
   alvoH = alvo == M_RELOGIO ? NV_ILHA_H : NV_ILHA_H_ABERTA;
   if (alvo == M_AVISO && avisoV2(&cur)) alvoH = V2_AV_H;
   if (alvo == M_ATIVIDADE && atvV2) alvoH = V2_ATV_H;
-  if (alvo == M_CARTAO) { LinhasCartao L; alvoW = PAD_E + PAD_D + larguraCartao(&cartoes[cartaoVez], cartaoVez, &L); }
+  if (alvo == M_CARTAO) { LinhasCartao L; alvoW = PAD_E + PAD_D + larguraCartao(&cartoes[cartaoVez], &L); }
   else if (alvo == M_AVISO) { LinhasAviso L; alvoW = PAD_E + PAD_D + larguraAviso(&cur, esperando(), &L); }
   else alvoW = PAD_E + PAD_D + larguraConteudo(alvo, &t1, &t2);
   if (alvo == M_RELOGIO && dsVez != DS_DESLIGADO) {
@@ -1963,7 +1908,7 @@ static void ilha_desenharCorpo_(Uint32 agora) {
   // O alvo do voo e a pilula ASSENTADA (a mola da forma e mais rapida que a
   // do voo: quando o quadro pousa, ela ja esta la).
   { LinhasCartao Lv;
-    float pw = voo ? PAD_E + PAD_D + larguraCartao(&cartoes[ILHA_VIVO], ILHA_VIVO, &Lv) : alvoW;
+    float pw = voo ? PAD_E + PAD_D + larguraCartao(&cartoes[ILHA_VIVO], &Lv) : alvoW;
     GfxRect pf = { dir ? x - pw : x, y, pw, NV_ILHA_H_ABERTA };
     vooPasso(agora);
     if (A < 0.01f) {
@@ -2085,7 +2030,7 @@ static void ilha_desenharCorpo_(Uint32 agora) {
       gfx_luz_canto(R, raio, R.w * 0.25f, -R.h * 0.9f, R.w * 0.85f, cr, cg, cb, luz * A); }
     gfx_recorte(R.x + 6.0f, R.y, R.w - 12.0f, R.h);
     if (aPil > 0.0f) {
-      if (mostra == M_CARTAO) desenharCartao(&mostraC, mostraQual, r, A * conteudoA * aPil);
+      if (mostra == M_CARTAO) desenharCartao(&mostraC, r, A * conteudoA * aPil);
       else desenharConteudo(mostra, r, A * conteudoA * aPil, agora);
     }
     if (aMod > 0.0f && modalT > 0.0f) desenharModal(modalAlvo(r, dir), A * aMod);
@@ -2098,8 +2043,13 @@ static void ilha_desenharCorpo_(Uint32 agora) {
     if (modalT <= 0.0f && corpoT <= 0.0f && (mostra == M_CARTAO || (mostra == M_ATIVIDADE && ilha_atividade_expansivel())) && A > 0.5f) ponteiro_alvo(r.x, r.y, r.w, r.h, NULL, pontPilula, 0, 0);
     if (modalT <= 0.0f && corpoT <= 0.0f && mostra == M_RELOGIO && relogioQuer && A > 0.5f) ponteiro_alvo(r.x, r.y, r.w, r.h, NULL, pontRelogio, 0, 0);
     // E num aviso com modal (ou que abre um cartao), o mesmo clique abre o dele.
-    if (modalT <= 0.0f && corpoT <= 0.0f && mostra == M_AVISO && temCur && (cur.temModal || cur.cartao || cur.acao) && A > 0.5f)
+    if (modalT <= 0.0f && corpoT <= 0.0f && mostra == M_AVISO && temCur && (cur.temModal || cur.acao) && A > 0.5f)
       ponteiro_alvo(r.x, r.y, r.w, r.h, NULL, pontAviso, 0, 0);
     if (voo) desenharVoo(vooPf, 1);
     salvarVoo(agora, x, y, dir); }
+}
+
+// The interrupted playback session is the only persistent card.
+static int cartaoDaVez(void) {
+  return temCartao[ILHA_VIVO] ? ILHA_VIVO : -1;
 }

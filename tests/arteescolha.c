@@ -154,11 +154,7 @@ static void precedencia(void) {
   artehero_qualidade(0);
   IGUAL(artehero_url_escolhida(&it), "https://image.tmdb.org/t/p/w780/escolhido.jpg");
   artehero_qualidade(2);
-#ifdef __EMSCRIPTEN__
-  IGUAL(artehero_url_escolhida(&it), "https://image.tmdb.org/t/p/w1280/escolhido.jpg");
-#else
   IGUAL(artehero_url_escolhida(&it), "https://image.tmdb.org/t/p/original/escolhido.jpg");
-#endif
   artehero_qualidade(1);
   // O LOGO escolhido, no tamanho unico de artehero_url_logo (w1280 no padrao),
   // na sessao do detalhe, na observacao do hero e no card aberto.

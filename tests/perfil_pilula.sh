@@ -10,8 +10,8 @@ for source in src/*.c src/dts/*.c; do
   sources+=("$source")
 done
 cc "${sources[@]}" tests/perfil_pilula.c -Isrc -o "$tmp/teste" -O1 -g \
-  -I/opt/homebrew/include -I/opt/homebrew/include/SDL2 \
-  -L/opt/homebrew/lib -lSDL2 -lSDL2_image -lSDL2_ttf -lz -framework OpenGL \
+  -DNV_LINUX_DESKTOP $(pkg-config --cflags sdl2 SDL2_image SDL2_ttf)  \
+   -lSDL2 -lSDL2_image -lSDL2_ttf -lz $(pkg-config --libs glesv2 egl) -ldl -pthread -lm \
   -w
 mkdir -p "$tmp/dados"
 NUVIO_DADOS="$tmp/dados" "$tmp/teste"

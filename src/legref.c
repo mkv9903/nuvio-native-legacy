@@ -1011,11 +1011,7 @@ static unsigned char *lerHttp(void *u, const char *url, long long ini, long n, l
 }
 
 int legref_disponivel(void) {
-#if defined(__EMSCRIPTEN__) || defined(NV_TPK) || defined(NV_TPK40)
-  return 0;
-#else
   return (rede_pedido_capacidades() & REDE_CAP_JOB) != 0;
-#endif
 }
 
 LegRef *legref_criar(LegRefLer ler, void *u) {

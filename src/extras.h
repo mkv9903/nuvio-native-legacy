@@ -21,7 +21,6 @@ void extras_pedir(const char *imdb, int serie, long tmdbId);
 // Nota do Trakt em 0..100 (0 = ainda nao chegou ou nao existe) e quantos
 // votaram. O web mostra a mesma nota que o mdbList devolve para "trakt".
 int  extras_nota_trakt(void);
-int  extras_votos_trakt(void);
 
 // FONTES DE NOTA, na ordem em que o web as lista (renderExternalRatingsRow,
 // metaDetailsScreen.js:3410). Todas menos IMDb e Trakt vem do mdbList, que
@@ -55,7 +54,6 @@ void extras_definir_chave(const char *chave);
 // extras_fonte_percentual() para saber se o resultado e "6.2" ou "66%".
 int  extras_nota(int fonte);
 int  extras_fonte_percentual(int fonte);
-const char *extras_fonte_marca(int fonte);
 // Caminho ABSOLUTO do arquivo de marca. Ver a nota em extras.c: relativo nao
 // funciona porque o diretorio de trabalho do app nao e a pasta da arte.
 const char *extras_caminho_marca(int fonte);
@@ -208,16 +206,14 @@ void        extras_trailer_abrir(int i);
 // ficha ou trailers que outra tela ainda esta desenhando. O pedido e
 // single-flight por IMDb e tem geracao, portanto uma resposta de um destaque
 // antigo nunca e publicada no titulo novo.
-void        extras_hero_trailer_pedir(const char *imdb, int serie, long tmdbId);
 // Copia um id valido para `dst` somente quando a resposta completa pertence
 // ao IMDb pedido. O snapshot sob trava evita que home combine n e ponteiro de
 // duas geracoes durante uma troca A -> B -> A.
-int         extras_hero_trailer_obter(const char *imdb, char *dst, unsigned cap);
 #ifdef NUVIO_TRAILER_TEST
 int         extras_hero_trailer_parse(const char *json, char *dst, unsigned cap);
 #endif
 
-// AGENDA DA SERIE — quando sai o proximo episodio, e a situacao da serie.
+// RELEASE INFORMATION — quando sai o proximo episodio, e a situacao da serie.
 //
 // Sai do MESMO corpo /tv/<id> que ja trazia redes, "mais como este" e a lista
 // de temporadas: `status`, `next_episode_to_air` e `last_episode_to_air`
@@ -228,15 +224,12 @@ int         extras_hero_trailer_parse(const char *json, char *dst, unsigned cap)
 // OMITE a linha. Serie encerrada devolve `status` com data vazia: e o caso em
 // que a interface diz "Série encerrada" em vez de uma data inventada.
 //
-// Estes campos tambem sao entregues a agenda.c, que os guarda por perfil — os
+// Estes campos tambem sao entregues a releaseinfo.c, que os guarda por perfil — os
 // acessores aqui existem para o teste e para quem quiser o dado cru da visita
 // em curso.
-const char *extras_agenda_status(void);       // "Returning Series", "Ended"
-const char *extras_agenda_data(void);         // "2026-09-18"; "" = nao ha
-const char *extras_agenda_data_ultimo(void);  // ultimo episodio que foi ao ar
-const char *extras_agenda_nome_ep(void);
-int         extras_agenda_temporada(void);
-int         extras_agenda_episodio(void);
+const char *extras_series_status(void);       // "Returning Series", "Ended"
+int         extras_next_episode_season(void);
+int         extras_next_episode_number(void);
 
 // Titulos relacionados, para a aba "Mais como este".
 int  extras_n_relacionados(void);

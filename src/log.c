@@ -18,9 +18,6 @@
 #include <time.h>
 #include <math.h>
 #include <sys/stat.h>
-#ifdef __EMSCRIPTEN__
-#include <emscripten.h>
-#endif
 
 #ifndef NV_VERSAO
 #define NV_VERSAO "dev"
@@ -101,23 +98,16 @@ static Uint32 ultLeitura;
 static char cru[LOG_WINDOW + 1];
 
 const char *log_file_path(void) {
-#ifdef __EMSCRIPTEN__
-  // No useful file in browser: "filesystem" is MEMFS, dies on reload, and log is in console.
-  return NULL;
-#else
   static char caminho[256];
   static int resolvido;
   if (!resolvido) {
     const char *env = getenv("NUVIO_LOG");
     resolvido = 1;
     if (env && env[0]) snprintf(caminho, sizeof caminho, "%s", env);
-#if defined(__APPLE__) || defined(NV_LINUX_DESKTOP)
+#if defined(NV_LINUX_DESKTOP)
     // On Mac log goes to TERMINAL and stays that way. To exercise panel:
     // NUVIO_LOG=/tmp/nuvio.log bash tools/mac.sh
     else caminho[0] = 0;
-#elif defined(NV_ANDROID)
-    else snprintf(caminho, sizeof caminho, "%s/nuvio.log",
-                  getenv("NUVIO_DADOS") ? getenv("NUVIO_DADOS") : ".");
 #else
 #ifdef NV_DTS_DEBUG
     else snprintf(caminho, sizeof caminho, "/tmp/" NV_APP_ID ".log");
@@ -127,7 +117,6 @@ const char *log_file_path(void) {
 #endif
   }
   return caminho[0] ? caminho : NULL;
-#endif
 }
 
 // Cuts URL at HOST. See privacy note in log.h: debrid key travels in URL PATH,
@@ -274,33 +263,13 @@ static void fatiar(char *texto, int parcial) {
   cont[RG_TUDO] = nLidas;
 }
 
-#ifdef __EMSCRIPTEN__
-EM_JS(int, nv_registro_js, (char *dst, int tam, int *total), {
-  try {
-    var a = (typeof window !== "undefined") ? window.__nvLinhas : null;
-    if (!a) return -1;
-    HEAP32[total >> 2] = a.length;
-    if (!a.length) return 0;
-    var t = a.slice(-260).join("\n");
-    if (t.length > tam - 8) t = t.slice(-(tam - 8));
-    stringToUTF8(t, dst, tam);
-    return 1;
-  } catch (e) { return 0; }
-});
-#endif
 
 // Current source mark (file bytes, or lines in wasm); -1 without source.
 static long marcaAtual(void) {
-#ifdef __EMSCRIPTEN__
-  int total = 0;
-  if (nv_registro_js(cru, 2, &total) < 0) return -1;
-  return total;
-#else
   struct stat st;
   const char *c = log_file_path();
   if (!c || stat(c, &st) != 0) return -1;
   return (long)st.st_size;
-#endif
 }
 
 #ifdef REGISTRO_TESTE
@@ -321,14 +290,6 @@ static void carregar(void) {
     return;
   }
 #endif
-#ifdef __EMSCRIPTEN__
-  { int r, total = 0;
-    cru[0] = 0;
-    r = nv_registro_js(cru, (int)sizeof cru, &total);
-    marcaLida = total;
-    if (r <= 0) { semFonte = (r < 0); return; }
-    fatiar(cru, 0); }
-#else
   { const char *caminho = log_file_path();
     FILE *f;
     long tam, comeco;
@@ -346,7 +307,6 @@ static void carregar(void) {
     fclose(f);
     marcaLida = tam;
     fatiar(cru, comeco > 0); }
-#endif
 }
 
 // --- PANEL STATE -------------------------------------------------------------
@@ -414,9 +374,6 @@ static void passoAoVivo(void) {
   if (m == marcaLida) return;
   if (!pausado) { recarregar(); return; }
   // Paused: count lines arriving after pause without touching list.
-#ifdef __EMSCRIPTEN__
-  novas = (int)(m - marcaPausa);
-#else
   { const char *c = log_file_path();
     FILE *f = c ? fopen(c, "rb") : NULL;
     if (f) {
@@ -430,7 +387,6 @@ static void passoAoVivo(void) {
       for (k = 0; k < n; k++) if (buf[k] == '\n') q++;
       novas = q;
     } }
-#endif
   if (novas < 0) novas = 0;
 }
 

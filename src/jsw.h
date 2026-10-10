@@ -39,7 +39,6 @@ void jsw_arr_fim(Jsw *w);
 void jsw_chave(Jsw *w, const char *nome);
 
 void jsw_str(Jsw *w, const char *s);     // string com escape; NULL vira null
-void jsw_num(Jsw *w, double v);
 void jsw_int(Jsw *w, long long v);
 void jsw_bool(Jsw *w, int v);
 void jsw_nulo(Jsw *w);

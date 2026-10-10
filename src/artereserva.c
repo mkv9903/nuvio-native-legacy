@@ -379,11 +379,7 @@ static int reservaStill(const char *chave, const char *id, int temp, int ep,
   // Na Samsung nunca `original`: o decode do navegador devolve o still inteiro
   // (3840 px em varias series) e foi um fundo desses que zerou o heap no
   // registro 1450 — ver fundoOriginal() em artehero.c.
-#ifdef __EMSCRIPTEN__
-  snprintf(saida, tam, "https://image.tmdb.org/t/p/w1280%s", caminho);
-#else
   snprintf(saida, tam, "https://image.tmdb.org/t/p/original%s", caminho);
-#endif
   printf("[tex] reserva do TMDB para still de %s S%dE%d\n", id, temp, ep);
   fflush(stdout);
   return 1;
@@ -740,14 +736,6 @@ static int lerPedido(const char *url, ArfPedido *p) {
     if (b) af_decodificar(b + 1, p->titulo, sizeof p->titulo);
     if (!strcmp(p->fonte, "apple") && (!p->titulo[0] || p->ano <= 0)) return -1;
   }
-#ifdef __EMSCRIPTEN__
-  // Samsung: nunca o fundo de 3840 (fundoOriginal() em artehero.c). A url
-  // virtual ja nasce pequena la; isto e a segunda trava, para uma url gravada
-  // por outra build ou montada por outro caminho.
-  if (!strcmp(p->tamanho, "original")) snprintf(p->tamanho, sizeof p->tamanho, "w1280");
-  if (!strcmp(p->tamanho, "full") && !strcmp(p->fonte, "trakt"))
-    snprintf(p->tamanho, sizeof p->tamanho, "medium");
-#endif
   if (!strcmp(p->fonte, "tmdb") || !strcmp(p->fonte, "tmdbalt")) {
     if (strcmp(p->tamanho, "w780") && strcmp(p->tamanho, "w1280") && strcmp(p->tamanho, "original")) return -1;
   } else if (!strcmp(p->fonte, "trakt")) {

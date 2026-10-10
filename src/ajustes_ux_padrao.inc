@@ -145,14 +145,12 @@
   0,                /* chave do fanart.tv: acao (o valor mora em fanart.txt) */
   0,                /* diagnostico */
   0,                /* teste de velocidade: acao */
-  0, 0, 0, 0,       /* explorar, guia, agenda, perfil na barra lateral: ligados */
+  0, 0, 0,          /* explorar, guia, perfil na barra lateral: ligados */
   1,                /* trailer do cartaz em foco: desligado (DEFAULT do web) */
   0,                /* itens por fileira: 12, como sempre foi (ver V_ITENS_FIL) */
   TXT_FAMILIA_INTER,/* fonte da interface: independente da legenda */
   0,                /* efeitos visuais do .tpk: automatico (adaptativo, ate o nivel 1) */
-  1,                /* interface de vidro: DESLIGADA (V_LIGA: 1 = Desligado) */
-  1,                /* servidor P2P: DESLIGADO (V_LIGA: 1 = Desligado) */
-  0, 0,             /* endereco, testar: acoes */
+  1,             /* endereco, testar: acoes */
   0,                /* posteres personalizados: DESLIGADO (indice 0) */
   0, 0, 0, 0, 0, 0,/* endereco, token, parametros, chave, modelo, testar: acoes */
   0,                /* layout da home: Moderna (a de sempre) */
@@ -161,9 +159,7 @@
   // Notas na linha do titulo: de fabrica so o que a linha ja mostrava antes de
   // existir a escolha (IMDb, Rotten Tomatoes, Trakt). V_LIGA: 0 = Ligado.
   0, 0, 1, 1, 1,   /* imdb, tomates, popcornmeter, metacritic, metacritic usuarios */
-  0, 1, 1, 1, 1, 1,/* trakt, tmdb, letterboxd, mal, ebert, nota do mdblist */
-  1,                /* perfil pesquisavel: DESLIGADO (V_LIGA: 1 = Desligado). Padrao de todo mundo. */
-  0,                /* meu perfil publico: acao */
+  0, 1, 1, 1, 1, 1,                /* meu perfil publico: acao */
   0,                /* contorno do vidro: LIGADO (V_LIGA: 0 = Ligado), o visual de antes */
   1,                /* som do trailer no destaque: DESLIGADO (V_LIGA: 1 = Desligado) */
   22,               /* espera do trailer no destaque: 2,2 s (em decimos de segundo) */
@@ -189,8 +185,7 @@
   0, 0,             /* chave e teste do Seekr: acoes */
   1,                /* fita de miniaturas: DESLIGADA (V_LIGA: 1 = Desligado), uma so */
   0,                /* sincronia da miniatura: 0 s (a documentacao: nada automatico) */
-  0,                /* ao sair do player: a home, minimizando na ilha (com o relogio) */
-  0,                /* perguntar o que achou nos creditos: LIGADO (V_LIGA: 0 = Ligado) */
+  0,
   2,                /* espera pelos add-ons: 5 s (#221; indice 2 da lista do #202) */
   0,                /* ver o registro na tela: acao */
   0,                /* medidor de desempenho: DESLIGADO (V_MEDIDOR: 0 = Desligado) */
@@ -201,27 +196,18 @@
   2,                /* opacidade do vidro: 78%, a de sempre */
   0,                /* vidro fosco: desligado */
 
-  0, /* app icon: Original */
-
-  0, /* Discord action; appended to preserve option indices */
+  0,
   0, /* Settings size: 80%, independent of global UI zoom */
   1, /* hide corner logo during trailer: Desligado (V_LIGA: 1 = Desligado) */
-  0, /* second subtitle language: Da conta (F04) */
-  1, /* subtitle sync by audio: Desligado (V_LIGA: 1 = Desligado) (F06) */
-  0, /* seek cache on disk: Desligado (F07; free disk is unknown until the player opens) */
-  1, /* experimental trailer zoom, .tpk only: Desligado (V_LIGA: 1 = Desligado) (#241) */
-  0, /* plugins: action (state lives in plugins.c, F09) */
-  1, 0, 0, 0, /* personal servers (F11): OFF (V_LIGA: 1 = Desligado); actions */
+  0,
+  0,
   1, /* show advanced options (R6): Desligado (V_LIGA: 1 = Desligado) */
-  0, 0, 0, 0, 0, /* second subtitle (R4): No topo; Automatico; Igual a principal x3 */
-  0, 0, 0, 0, 0, 0, /* Emby (address, sign in, sign out) and Plex (sign in, server, sign out): actions */
+  0, 0, 0, 0, 0,
   0, 0, /* automatic source (R9b): Equilibrio; HDR e Dolby Vision: Preferir */
-  0, 0, /* 2.0 (N1): app logo: Novo; app opening: Padrao */
-  0, /* receive polls (N3): Ligado (V_LIGA: 0 = Ligado) */
+  0, 0,
   0, /* search Cinemeta (#231): Ligado (V_LIGA: 0 = Ligado), as before */
   3, /* rest screen delay (OLED): 2 min */
-  1, /* player UI brightness (OLED): 80% */
-  0, /* 2.0 guide (Sobre e ajuda › Novidades 2.0): action */
+  1,
   1, /* keep the video ready on exit: Desligado (V_LIGA: 1); retention costs memory */
   0, /* rest screen style: Vitrine */
   0, /* showcase titles: Catalogo */
@@ -241,10 +227,9 @@
   0, /* continue on the profile picker (#303): Ligado (V_LIGA: 0 = Ligado) = as before */
   0, /* DTS converted to: Estereo (AAC) = the proven path */
   1, /* Dolby Vision in MKV (2.0.2, experimental): Desligado */
-  0, /* send history to the Nuvio account (2.0.2, per profile): Ligado */
-  0, /* social features (2.0.2, per profile): Ligado */
+  0,
   0, 0, /* add-on order (action; list lives in fonteregra.c) and use of it: Nao */
   0, /* play while verifying the first auto source (2.0.2): Ligado */
   0, /* warm connections when a title opens (2.0.2): Ligado */
   0, /* check several sources at once (2.0.2; only sources ready on the debrid): Ligado */
-  1, /* prepare the source when a title opens (2.0.2): Desligado */
+  1,

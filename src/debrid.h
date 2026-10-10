@@ -49,7 +49,6 @@ int  debrid_testar_alldebrid(char *msg, unsigned n, char *data, unsigned nd);
 // arquivo certo dentro de um torrent de temporada inteira.
 void debrid_definir_episodio(int temporada, int episodio);
 // O mesmo par, de volta: o P2P (p2p.c) escolhe o arquivo do episodio com ele.
-void debrid_episodio(int *temporada, int *episodio);
 
 // BLOQUEIA. Devolve 1 e grava em `url` um link direto que toca; 0 se nao deu.
 // So conteudo EM CACHE: e o caminho da escolha AUTOMATICA.

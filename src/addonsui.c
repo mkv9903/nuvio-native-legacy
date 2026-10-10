@@ -86,25 +86,6 @@ void addonsui_atualizar(float dt, Uint32 agora) {
 
 // "catalogo · fontes · legendas" com o que o manifesto respondeu. Enquanto a
 // sonda nao voltou, dizer "nao fornece" seria afirmar o que nao se sabe.
-static const char *capacidades(int i) {
-  static char buf[96];
-  // CADA PEDACO PASSA POR i18n(): a linha montada ("Catálogo  ·  Fontes")
-  // nunca casa com chave nenhuma, e foi assim que a tela de addons ficou em
-  // portugues no meio da interface em ingles (captura de 16/09).
-  if (!addons_sondado(i)) return i18n("conferindo o manifesto…");
-  buf[0] = 0;
-  if (addons_fornece(i, ADD_CATALOGO)) strcat(buf, i18n("Catálogo"));
-  if (addons_fornece(i, ADD_STREAM)) {
-    if (buf[0]) strcat(buf, "  ·  ");
-    strcat(buf, i18n("Fontes"));
-  }
-  if (addons_fornece(i, ADD_LEGENDA)) {
-    if (buf[0]) strcat(buf, "  ·  ");
-    strcat(buf, i18n("Legendas"));
-  }
-  if (!buf[0]) snprintf(buf, sizeof buf, "%s", i18n("não fornece nada que este app use"));
-  return buf;
-}
 
 // A TELA DE ADDONS NO GLASS UI (mockup de Ajustes, quadro "addons"): o mesmo
 // arranjo de ilhas de Ajustes, desenhado por ajustes.c (que tem as pecas).

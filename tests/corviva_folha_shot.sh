@@ -14,8 +14,8 @@ SAIDA="${1:-/tmp/nuvio-folha}"
 D="$SAIDA-artes"
 mkdir -p "$D"
 cc -O2 tests/corviva_folha_shot.c src/corviva.c -Isrc \
-  -I/opt/homebrew/include -I/opt/homebrew/include/SDL2 \
-  -L/opt/homebrew/lib -lSDL2 -lSDL2_image -lSDL2_ttf -o /tmp/nuvio-corviva-folha
+  -DNV_LINUX_DESKTOP $(pkg-config --cflags sdl2 SDL2_image SDL2_ttf)  \
+   -lSDL2 -lSDL2_image -lSDL2_ttf -o /tmp/nuvio-corviva-folha
 args=()
 while read -r tt nome; do
   [ -z "$tt" ] && continue

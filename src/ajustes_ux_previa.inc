@@ -574,21 +574,6 @@ static float ajPreviaContinuar(float x, float y, float w) {
 }
 // CARTAO DO AJUSTE para contas, servicos, dados e acoes: o icone da secao, o
 // nome, o valor atual e o que a linha faz.
-static float ajPreviaCartao(int op, float x, float y, float w) {
-  float ix = x + 26, y0 = y;
-  const char *v = textoValor(op);
-  const char *ic = TELA[secIni[uxSecaoDe(op)]].icone;
-  float h = 26 + 64 + 26;
-  ajNeutro((GfxRect){ x, y, w, h }, 22, 0.04f, 0.106f, 0.110f, 0.129f, 1);
-  y += 26;
-  gfx_cor((GfxRect){ ix, y, 64, 64 }, 20.0f / 64, 1, 1, 1, 0.1f);
-  ajIcone(ic, ix + 18, y + 18, 28, 0.9f);
-  { TxtLinha n = ajTxtC(TXT_AJ_NOME, rotuloOpcao(op), w - 52 - 80), e = ajTxtC(TXT_AJ_ESTADO, v && v[0] ? v : i18n(TELA[secIni[uxSecaoDe(op)]].titulo), w - 52 - 80);
-    float ty = y + 32 - (n.h + 4 + e.h) * 0.5f;
-    txt_desenhar(n, ix + 80, ty);
-    txt_desenhar_alpha(e, ix + 80, ty + n.h + 4, 0.6f); }
-  return y + 64 + 26 - y0;
-}
 
 // A galeria usa as artes reais do launcher; editar so mostra o candidato,
 // sem aplicar o alias do Android antes de confirmar.
@@ -876,47 +861,6 @@ static const char *ajPosterFileira(int fil, int k) {
 }
 // A ORDEM REAL DA HOME no editor do limite: quais fileiras entram (ou saem)
 // com o valor novo. As de fora da Home nao contam.
-static float ajOrdemHome(float x, float y, float w) {
-  int ordem[40], n = 0, i, salvo = uxOriginal;
-  int pend = valor[AJ_FIL_LIMITE], lim, corte;
-  float y0 = y, h;
-  for (i = 0; i < fil_n() && n < 40; i++) if (fil_estado(i) != FIL_FORA) ordem[n++] = i;
-  lim = pend > salvo ? pend : salvo;
-  if (lim > n) lim = n;
-  if (lim > 12) lim = 12;
-  corte = pend < salvo ? pend : salvo;
-  h = 18 * 2 + lim * 36 + (corte < lim ? 32 : 0);
-  ajKicker("Ordem da Home", x, y, 1);
-  y += 18 + 12; y0 = y;
-  ajNeutro((GfxRect){ x, y, w, h }, 16, 0.04f, 0.106f, 0.110f, 0.129f, 1);
-  y += 18;
-  for (i = 0; i < lim; i++) {
-    int f = ordem[i], k, novo = pend > salvo && i >= salvo && i < pend, sai = pend < salvo && i >= pend;
-    char num[8];
-    TxtLinha l;
-    if (i == corte && corte < lim) {
-      char t[64];
-      snprintf(t, sizeof t, pend > salvo ? i18n("Entram com %d") : i18n("Saem com %d"), pend);
-      { float dw = ajCaps(TXT_AJ_CAPS13, t, 1.56f, -1, 0, 0), cx = x + 20 + (w - 40 - dw) * 0.5f;
-        gfx_cor((GfxRect){ x + 20, y + 16, cx - 10 - x - 20, 1 }, 0, 1, 1, 1, 0.14f);
-        gfx_cor((GfxRect){ cx + dw + 10, y + 16, x + w - 20 - cx - dw - 10, 1 }, 0, 1, 1, 1, 0.14f);
-        ajCaps(TXT_AJ_CAPS13, t, 1.56f, cx, y + 8, 0.4f); }
-      y += 32;
-    }
-    snprintf(num, sizeof num, "%d", i + 1);
-    l = ajTxt(TXT_AJ_MINI13, num);
-    txt_desenhar_alpha(l, x + 20 + 20 - l.w, y + (36 - l.h) * 0.5f, 0.35f);
-    ajIcone(fil_origem_icone(fil_linha_origem(f)), x + 20 + 32, y + 9, 18, 0.45f);
-    l = ajTxtC(TXT_ILHA_GENERO, fil_titulo(f)[0] ? fil_titulo(f) : fil_chave(f), w - 40 - 62 - 80);
-    txt_desenhar_alpha(l, x + 20 + 62, y + (36 - l.h) * 0.5f, sai ? 0.35f : novo ? 1.0f : 0.62f);
-    for (k = 0; k < 3; k++)
-      { float mr, mg, mb;   // 2.0.2: cartaz abstrato (bloco de cor), sem foto
-        ajc_matiz(f * 3 + k, &mr, &mg, &mb);
-        gfx_cor((GfxRect){ x + w - 20 - 3 * 20 - 2 * 6 + k * 26, y + 3, 20, 30 }, 4.0f / 30.0f, mr, mg, mb, (novo ? 1.0f : 0.7f) * (sai ? 0.4f : 1.0f)); }
-    y += 36;
-  }
-  return 30 + h;
-}
 
 // Previa da coluna direita dos editores modais.
 static float ajPreviaEditor(int op, float x, float y, float w) {

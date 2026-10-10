@@ -39,10 +39,8 @@ int  episodios_menu_pediu_fontes(void);
 // Eventos e desenho pelas mesmas episodios_menu_evento/desenhar.
 void episodios_menu_temporada(int idxCat, int temporada);
 // 1 com o menu aberto no modo temporada (para teste).
-int  episodios_menu_modo_temporada(void);
 // O lote que "temporada inteira" aplica: catalogo + mapa, sem o que nao foi ao
 // ar. `saida` nula conta. Publico para o teste.
-int  episodios_lote(int idxCat, int temporada, VistoPar *saida, int max);
 void episodios_fechar(void);
 // O titulo da folha, ja conferido pelo id. Para teste (#190).
 int  episodios_titulo(void);

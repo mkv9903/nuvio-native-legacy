@@ -35,7 +35,6 @@ int  trailer_suportado(void);
 // `cheia` marca o modo de tela
 // cheia com teclado proprio.
 void trailer_abrir(const char *fonte, GfxRect r, int som, int cheia);
-void trailer_rect(GfxRect r);
 // O recorte da FONTE (sx,sy,sw,sh) que o plano de video recebe para um
 // quadro vw x vh com o zoom `z` do ajuste, num destino dw x dh: o zoom e a
 // tarja de sempre e depois o "cover" na proporcao do destino, pelo centro.
@@ -74,7 +73,6 @@ GfxRect trailer_retangulo(void);
 enum { TRAILER_DONO_NENHUM = 0, TRAILER_DONO_HOME = 1, TRAILER_DONO_DETALHE = 2 };
 void        trailer_marcar_dono(int dono, const char *imdb);
 int         trailer_dono(void);
-const char *trailer_dono_imdb(void);
 // Leva o trailer aberto (fora da tela cheia) para `r` com `som`, SEM trocar
 // de fonte nem reabrir o player. 0 quando nao ha o que levar.
 int  trailer_continuar(GfxRect r, int som);

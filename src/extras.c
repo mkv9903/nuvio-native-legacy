@@ -8,7 +8,7 @@
 #include "js.h"
 #include "descoberta.h"
 #include "ajustes.h"
-#include "agenda.h"
+#include "releaseinfo.h"
 #include "comentordem.h"
 #include "idiomacod.h"
 extern void cat_historico_definir_id(const char *imdb, const char *tipo, int visto);
@@ -18,9 +18,6 @@ extern void cat_historico_definir_id(const char *imdb, const char *tipo, int vis
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
-#ifdef __EMSCRIPTEN__
-#include <emscripten.h>
-#endif
 
 static int  notaTrakt, votosTrakt;
 static int  notas[EX_NFONTES];
@@ -92,9 +89,6 @@ int extras_nota(int fonte) {
   if (fonte < 0 || fonte >= EX_NFONTES) return 0;
   if (!ajustes_mdblist_fonte(fonte)) return 0;
   return notas[fonte];
-}
-const char *extras_fonte_marca(int fonte) {
-  return (fonte >= 0 && fonte < EX_NFONTES) ? FONTE[fonte] : "";
 }
 
 const char *extras_caminho_marca(int fonte) {
@@ -172,36 +166,14 @@ static char fichaStatus[32], fichaPaises[160], fichaCert[12], fichaLanc[16];
 // deducao nao existe aqui.
 static char fichaIdiomaOrig[8];
 static int  fichaDur;
-// AGENDA DA SERIE — proximo episodio e situacao, do MESMO corpo /tv/<id>.
-// Ver agenda.h para o porque de nao ser o Trakt. Os campos sempre estiveram
+// METADADOS DE LANÇAMENTO DA SERIE — proximo episodio e situacao, do MESMO corpo /tv/<id>.
+// Ver releaseinfo.h para o cache compartilhado de datas de lançamento. Os campos sempre estiveram
 // neste corpo; o parse antigo os jogava fora, como jogava fora status e
 // runtime do filme antes da ficha tecnica existir.
-static char agStatus[32], agDataProx[16], agDataUlt[16], agNomeEp[120];
+static char agStatus[32], agDataProx[16], agDataUlt[16];
 static int  agTemp, agEp;
 static struct { char yt[16], nome[80], mini[80]; } trailer[EX_TRAILER_MAX];
 static int  nTrailer;
-// O hero precisa de um trailer antes de a pessoa abrir a pagina de detalhe,
-// mas carregar `extras_pedir` inteiro nesse ponto faria creditos, ficha,
-// relacionados e imagens competirem com a arte. Mantemos uma fila separada
-// que consulta apenas /videos. O fio e unico; pedidos novos substituem a
-// geracao pendente e uma resposta velha e descartada.
-typedef struct { char yt[16]; } HeroTrailer;
-static HeroTrailer heroTrailer[EX_TRAILER_MAX];
-static int nHeroTrailer;
-static char heroTrailerPedido[24];
-static int heroTrailerSerie;
-static long heroTrailerTmdb;
-static unsigned long heroTrailerGer, heroTrailerExecutada;
-static int heroTrailerVivo, heroTrailerFio;
-static int heroTrailerTentativas;
-static time_t heroTrailerTentativaEm;
-static pthread_t heroTrailerThread;
-static pthread_cond_t heroTrailerCv = PTHREAD_COND_INITIALIZER;
-static pthread_mutex_t heroTrailerTrava = PTHREAD_MUTEX_INITIALIZER;
-// Um vazio pode ser uma falha passageira (timeout, 5xx, Wi-Fi acordando).
-// A mesma obra pode tentar de novo depois deste intervalo; resultado valido
-// continua sendo idempotente e nao repete a viagem.
-#define HERO_TRAILER_RETRY_S 30
 static struct { char titulo[120], ano[8], poster[160], sinopse[420]; long tmdb;
                 int nota; } col[EX_COL_MAX];
 static int  nCol;
@@ -822,13 +794,13 @@ static void *buscar(void *arg) {
         // fichaIdiomaOrig.
         js_texto(corpo, fimC, "original_language",
                  fichaIdiomaOrig, sizeof fichaIdiomaOrig);
-        // --- AGENDA DA SERIE (nenhuma viagem a mais) ----------------------
+        // --- METADADOS DE LANÇAMENTO DA SERIE (nenhuma viagem a mais) ----------------------
         //
         // `status`, `next_episode_to_air` e `last_episode_to_air` ja vinham
         // neste corpo e eram descartados. Sao os tres campos de que a tela de
-        // titulo e o calendario precisam para dizer QUANDO sai o proximo
+        // titulo precisa para dizer QUANDO sai o proximo
         // episodio — ou para dizer que a serie acabou, em vez de inventar uma
-        // data. Ver agenda.h.
+        // data. Ver releaseinfo.h.
         //
         // `null` e um valor legitimo dos dois blocos: serie encerrada nao tem
         // proximo episodio. A guarda compara a posicao do "null" com a da
@@ -837,7 +809,7 @@ static void *buscar(void *arg) {
         if (serie) {
           const char *b = strstr(corpo, "\"next_episode_to_air\"");
           agTemp = agEp = 0;
-          agDataProx[0] = agNomeEp[0] = agDataUlt[0] = 0;
+          agDataProx[0] = agDataUlt[0] = 0;
           js_texto(corpo, fimC, "status", agStatus, sizeof agStatus);
           if (b) {
             const char *o = strchr(b, '{');
@@ -847,7 +819,6 @@ static void *buscar(void *arg) {
               agTemp = (int)js_num(o, of, "season_number", 0.0);
               agEp   = (int)js_num(o, of, "episode_number", 0.0);
               js_texto(o, of, "air_date", agDataProx, sizeof agDataProx);
-              js_texto(o, of, "name", agNomeEp, sizeof agNomeEp);
             }
           }
           b = strstr(corpo, "\"last_episode_to_air\"");
@@ -864,7 +835,7 @@ static void *buscar(void *arg) {
             // Filme sem saga traz `"belongs_to_collection":null`, e a busca
             // por '{' pulava para o objeto seguinte (o primeiro genero): o id
             // do genero virava um /collection/<id> inutil. Mesma guarda do
-            // `null` da agenda acima.
+            // `null` dos metadados acima.
             const char *o = strchr(b, '{');
             const char *nulo = strstr(b, "null");
             if (o && nulo && nulo < o) o = NULL;
@@ -1041,12 +1012,11 @@ static void *buscar(void *arg) {
 
         pthread_mutex_unlock(&trava);
         free(corpo);
-        // FORA DA TRAVA de proposito: agenda_registrar grava em disco e tem
+        // FORA DA TRAVA de proposito: releaseinfo_record grava em disco e tem
         // trava propria. Segurar a deste modulo durante uma escrita de arquivo
         // faria o desenho esperar o disco no fio principal.
         if (serie && (agStatus[0] || agDataProx[0]))
-          agenda_registrar(id, NULL, NULL, agStatus, agTemp, agEp, agNomeEp,
-                           agDataProx, agDataUlt);
+          releaseinfo_record(id, agStatus, agTemp, agEp, agDataProx, agDataUlt);
         // TRAILER DA TEMPORADA MAIS RECENTE, quando a obra nao tem nenhum
         // (#123). Um GET a mais so nesse caso; o trailer de temporada e da
         // serie, nao de episodio.
@@ -1368,7 +1338,7 @@ static void zerarPublicado(void) {
   nTrailer = fichaDur = nEstudio = 0;
   fichaStatus[0] = fichaPaises[0] = fichaCert[0] = fichaLanc[0] = 0;
   fichaIdiomaOrig[0] = 0;
-  agStatus[0] = agDataProx[0] = agDataUlt[0] = agNomeEp[0] = 0;
+  agStatus[0] = agDataProx[0] = agDataUlt[0] = 0;
   agTemp = agEp = 0;
   memset(vistos, 0, sizeof vistos);
   progressoPronto = proximoT = proximoE = 0;
@@ -1445,7 +1415,6 @@ void extras_pedir(const char *imdb, int serie, long tmdbId) {
 }
 
 int extras_nota_trakt(void)  { return notaTrakt; }
-int extras_votos_trakt(void) { return votosTrakt; }
 
 int extras_n_comentarios(void) { return nComent; }
 const char *extras_comentario_usuario(int i) {
@@ -1610,12 +1579,9 @@ int extras_comentario_nota(int i) {
 }
 
 const char *extras_ficha_status(void)        { return fichaStatus; }
-const char *extras_agenda_status(void)       { return agStatus; }
-const char *extras_agenda_data(void)         { return agDataProx; }
-const char *extras_agenda_data_ultimo(void)  { return agDataUlt; }
-const char *extras_agenda_nome_ep(void)      { return agNomeEp; }
-int         extras_agenda_temporada(void)    { return agTemp; }
-int         extras_agenda_episodio(void)     { return agEp; }
+const char *extras_series_status(void)       { return agStatus; }
+int         extras_next_episode_season(void)    { return agTemp; }
+int         extras_next_episode_number(void)     { return agEp; }
 int         extras_ficha_duracao(void)       { return fichaDur; }
 const char *extras_ficha_paises(void)        { return fichaPaises; }
 const char *extras_ficha_classificacao(void) { return fichaCert; }
@@ -1632,38 +1598,14 @@ const char *extras_trailer_miniatura(int i) {
   return (i >= 0 && i < nTrailer) ? trailer[i].mini : "";
 }
 
-static void normalizarHeroId(const char *imdb, char *dst, size_t cap) {
-  const char *p;
-  size_t n;
-  if (!dst || !cap) return;
-  dst[0] = 0;
-  if (!imdb || imdb[0] != 't' || !strncmp(imdb, "tmdb:", 5)) return;
-  p = strchr(imdb, ':');
-  n = p ? (size_t)(p - imdb) : strlen(imdb);
-  if (n >= cap) n = cap - 1;
-  memcpy(dst, imdb, n);
-  dst[n] = 0;
-}
-
-// A resposta e a mesma selecao (e a mesma ordem) usada pelos extras da
-// pagina: parsearVideos. O hero so guarda o id.
-static int parsearHeroVideos(const char *corpo, int serie, const char *idioma,
-                             HeroTrailer *saida) {
-  VideoTmdb v[EX_TRAILER_MAX];
-  int n, i;
-  if (!corpo || !saida) return 0;
-  n = parsearVideos(js_array(corpo, NULL, "results"), serie, idioma, v, EX_TRAILER_MAX);
-  for (i = 0; i < n; i++) snprintf(saida[i].yt, sizeof saida[i].yt, "%s", v[i].yt);
-  return n;
-}
 
 #ifdef NUVIO_TRAILER_TEST
 // Ponto de teste pequeno para o parser usado pelo worker real. O alvo normal
 // nao exporta este auxiliar; o harness compila com NUVIO_TRAILER_TEST e assim
 // exercita o mesmo filtro de site/tipo/chave sem simular o JSON em JavaScript.
 int extras_hero_trailer_parse(const char *corpo, char *dst, unsigned cap) {
-  HeroTrailer encontrados[EX_TRAILER_MAX];
-  int n = parsearHeroVideos(corpo, 0, "", encontrados);
+  VideoTmdb encontrados[EX_TRAILER_MAX];
+  int n = parsearVideos(js_array(corpo, NULL, "results"), 0, "", encontrados, EX_TRAILER_MAX);
   if (dst && cap) {
     dst[0] = 0;
     if (n > 0) snprintf(dst, cap, "%s", encontrados[0].yt);
@@ -1671,8 +1613,8 @@ int extras_hero_trailer_parse(const char *corpo, char *dst, unsigned cap) {
   return n;
 }
 int extras_teste_hero_serie(const char *corpo, const char *idioma, char *dst, unsigned cap) {
-  HeroTrailer encontrados[EX_TRAILER_MAX];
-  int n = parsearHeroVideos(corpo, 1, idioma, encontrados);
+  VideoTmdb encontrados[EX_TRAILER_MAX];
+  int n = parsearVideos(js_array(corpo, NULL, "results"), 1, idioma, encontrados, EX_TRAILER_MAX);
   dst[0] = 0;
   if (n > 0) snprintf(dst, cap, "%s", encontrados[0].yt);
   return n;
@@ -1682,141 +1624,20 @@ void extras_teste_url_hero(char *dst, unsigned cap, int serie, long id, const ch
 }
 #endif
 
-static void *lacoHeroTrailer(void *ignorado) {
-  (void)ignorado;
-  for (;;) {
-    char id[24], chave[140], url[640];
-    int serie;
-    long tmdb;
-    unsigned long ger;
-    HeroTrailer encontrados[EX_TRAILER_MAX];
-    int n = 0;
-    pthread_mutex_lock(&heroTrailerTrava);
-    while (heroTrailerExecutada == heroTrailerGer)
-      pthread_cond_wait(&heroTrailerCv, &heroTrailerTrava);
-    ger = heroTrailerGer;
-    snprintf(id, sizeof id, "%s", heroTrailerPedido);
-    serie = heroTrailerSerie;
-    tmdb = heroTrailerTmdb;
-    heroTrailerExecutada = ger;
-    pthread_mutex_unlock(&heroTrailerTrava);
 
-    snprintf(chave, sizeof chave, "%s", desc_chave_tmdb());
-    if (chave[0]) {
-      long idT = tmdb;
-      if (idT <= 0) {
-        snprintf(url, sizeof url,
-                 "https://api.themoviedb.org/3/find/%s?api_key=%s&external_source=imdb_id",
-                 id, chave);
-        { char *corpo = rede_baixar(url, 4);
-          if (corpo) {
-            const char *v = js_array(corpo, NULL, serie ? "tv_results" : "movie_results");
-            if (v) idT = (long)js_num(v, js_fim(v), "id", 0.0);
-            free(corpo);
-          } }
-      }
-      if (idT > 0) {
-        urlVideos(url, sizeof url, serie, idT, 0, chave, desc_tmdb_idioma());
-        { char *corpo = rede_baixar(url, 4);
-          if (corpo) {
-            n = parsearHeroVideos(corpo, serie, desc_tmdb_idioma(), encontrados);
-            free(corpo);
-          } }
-      }
-    }
 
-    pthread_mutex_lock(&heroTrailerTrava);
-    // A pessoa pode ter mudado o destaque durante a rede_baixar. Nesse caso
-    // nao publicar nem mesmo um resultado vazio: o pedido novo continua sendo
-    // processado no proximo ciclo do mesmo fio.
-    if (ger == heroTrailerGer && !strcmp(id, heroTrailerPedido)) {
-      int i;
-      nHeroTrailer = n;
-      for (i = 0; i < n; i++) heroTrailer[i] = encontrados[i];
-      heroTrailerVivo = 0;
-    }
-    pthread_mutex_unlock(&heroTrailerTrava);
-  }
-  return NULL;
-}
-
-void extras_hero_trailer_pedir(const char *imdb, int serie, long tmdbId) {
-  char id[24];
-  time_t agora = time(NULL);
-  normalizarHeroId(imdb, id, sizeof id);
-  if (!id[0] || !desc_chave_tmdb()[0] || !ajustes_tmdb_trailers()) return;
-  pthread_mutex_lock(&heroTrailerTrava);
-  if (!strcmp(heroTrailerPedido, id) && heroTrailerSerie == serie &&
-      heroTrailerTmdb == tmdbId) {
-    if (heroTrailerVivo || nHeroTrailer > 0 ||
-        agora - heroTrailerTentativaEm < HERO_TRAILER_RETRY_S) {
-      pthread_mutex_unlock(&heroTrailerTrava);
-      return;
-    }
-  } else {
-    heroTrailerTentativas = 0;
-  }
-  snprintf(heroTrailerPedido, sizeof heroTrailerPedido, "%s", id);
-  heroTrailerSerie = serie;
-  heroTrailerTmdb = tmdbId;
-  nHeroTrailer = 0;
-  heroTrailerVivo = 1;
-  heroTrailerTentativas++;
-  heroTrailerTentativaEm = agora;
-  heroTrailerGer++;
-  if (!heroTrailerFio) {
-    if (pthread_create(&heroTrailerThread, NULL, lacoHeroTrailer, NULL) == 0) {
-      pthread_detach(heroTrailerThread);
-      heroTrailerFio = 1;
-    } else {
-      heroTrailerVivo = 0;
-      pthread_mutex_unlock(&heroTrailerTrava);
-      return;
-    }
-  }
-  pthread_cond_signal(&heroTrailerCv);
-  pthread_mutex_unlock(&heroTrailerTrava);
-}
-
-int extras_hero_trailer_obter(const char *imdb, char *dst, unsigned cap) {
-  char id[24];
-  int ok = 0;
-  if (dst && cap) dst[0] = 0;
-  normalizarHeroId(imdb, id, sizeof id);
-  if (!id[0] || !dst || cap < 2) return 0;
-  pthread_mutex_lock(&heroTrailerTrava);
-  if (!strcmp(heroTrailerPedido, id) && !heroTrailerVivo &&
-      heroTrailerExecutada == heroTrailerGer && nHeroTrailer > 0) {
-    snprintf(dst, cap, "%s", heroTrailer[0].yt);
-    ok = 1;
-  }
-  pthread_mutex_unlock(&heroTrailerTrava);
-  return ok;
-}
 
 // Abre o trailer no app nativo da plataforma. O app nao tem reprodutor de
 // YouTube embutido; em vez de prometer e nao cumprir, entrega o video ao
 // componente que cada plataforma ja tem: o navegador do webOS (via luna-send)
-// ou o browser do desktop (open). Na Samsung, nada (ver abaixo).
+// ou o browser do Linux via SDL_OpenURL.
 void extras_trailer_abrir(int i) {
   const char *yt = extras_trailer_yt(i);
   if (!yt[0]) return;
   char url[128];
   snprintf(url, sizeof url, "https://www.youtube.com/watch?v=%s", yt);
-#if defined(__EMSCRIPTEN__) || defined(NV_TPK) || defined(NV_ANDROID)
-  // SAMSUNG (e Android, por ora; TODO Intent ACTION_VIEW): NAO abre mais nada (#136). No wgt o window.open trocava a
-  // propria pagina do app pelo youtube.com/watch — o video tocava, mas o
-  // Voltar nao tinha mais o Nuvio para onde voltar. O trailer da Samsung
-  // toca dentro do app (detail.c, SEC_TRAILERS); chegar aqui e defeito de
-  // quem chamou, e fica no registro.
-  printf("[trailer] extras_trailer_abrir na Samsung ignorado (%s)\n", url);
-  fflush(stdout);
-#elif defined(NV_LINUX_DESKTOP)
+#if defined(NV_LINUX_DESKTOP)
   SDL_OpenURL(url);
-#elif defined(__APPLE__)
-  char cmd[160];
-  snprintf(cmd, sizeof cmd, "open '%s'", url);
-  system(cmd);
 #else
   // webOS: luna-send lanca o navegador com a URL. O app roda como root e
   // /usr/bin/luna-send e acessivel dentro do jail.

@@ -1,5 +1,5 @@
 // #162: itens escondidos nos Ajustes somem da barra lateral e as setas pulam
-// por cima deles. Guia e Agenda desligados pelo ajustes.txt, como o arranque le.
+// por cima deles. Guia desligado; a antiga chave da Agenda deve ser ignorada.
 #include "ajustes.h"
 #include "menu.h"
 #include <SDL2/SDL.h>
@@ -36,13 +36,13 @@ int main(void) {
   fclose(f);
   ajustes_dir(dir);
   assert(ajustes_menu_explorar() && !ajustes_menu_guia());
-  assert(!ajustes_menu_agenda() && ajustes_menu_perfil());
+  assert(ajustes_menu_perfil());  // obsolete menuAgendaLocal is ignored
 
   menu_iniciar();
   assert(descer(1) == MENU_EXPLORAR);
   assert(descer(2) == MENU_BUSCAR);       // pulou o Guia
   assert(descer(3) == MENU_BIBLIOTECA);
-  assert(descer(4) == MENU_PERFIL);       // pulou a Agenda
+  assert(descer(4) == MENU_PERFIL);       // follows Library directly
   assert(descer(5) == MENU_AJUSTES);
   // Subindo a partir dos Ajustes tambem pula.
   menu_fechar(); menu_definir_destino(MENU_AJUSTES); menu_abrir();

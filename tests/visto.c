@@ -55,7 +55,6 @@ int cat_historico_definir_se_geracao(const char *i, const char *t, int v,
   cat_historico_definir_id(i, t, v); return 1;
 }
 const char *cat_tipo_por_imdb(const char *imdb) { (void)imdb; return "series"; }
-int ajustes_social(void) { return 1; }
 int ajustes_hist_conta(void) { return 1; }
 int ajustes_tmdb_cw(void) { return 0; }
 const char *ajustes_tmdb_idioma(void) { return "en-US"; }

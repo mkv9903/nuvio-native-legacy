@@ -8,7 +8,7 @@ if [ "${SANITIZE:-0}" = 1 ]; then flags+=(-fsanitize=address,undefined -fno-omit
 # ${arr[@]+...}: o bash 3.2 do macOS chama "${flags[@]}" de unbound quando o
 # vetor esta vazio e set -u esta ligado.
 cc ${flags[@]+"${flags[@]}"} -DFIL_TESTE src/fileiras.c tests/fileiras.c \
-  -Isrc -I/opt/homebrew/include -I/opt/homebrew/include/SDL2 \
+  -Isrc -DNV_LINUX_DESKTOP $(pkg-config --cflags sdl2 SDL2_image SDL2_ttf)  \
   -o /tmp/nuvio-fileiras-tests -O1 -g \
   -Wall -Wno-deprecated-declarations -Wno-macro-redefined
 /tmp/nuvio-fileiras-tests

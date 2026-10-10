@@ -73,7 +73,6 @@ int  seriefrases_carregando(void);
 // --- FRASES ------------------------------------------------------------------
 int  seriefrases_n(void);
 const char *seriefrases_quem(int i);    // personagem; "" quando a pagina nao diz
-const char *seriefrases_texto(int i);
 // Nome da pagina do Wikiquote de onde vieram, para o credito na tela.
 const char *seriefrases_pagina(void);
 // 1 quando a pagina lida e a portuguesa; 0 quando e a inglesa. Muda o rotulo:

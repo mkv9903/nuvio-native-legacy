@@ -12,7 +12,6 @@ void pluginsui_atualizar(float dt, Uint32 agora);
 void pluginsui_desenhar(Uint32 agora);
 int  pluginsui_quer_sair(void);
 #ifdef AJUSTES_TESTE
-void pluginsui_teste(int nivel, int foco, int repo);
 #endif
 
 #endif

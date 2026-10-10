@@ -14,19 +14,11 @@ test -s "$tmp/ports"
 base=$(sed -n '1p' "$tmp/ports")
 tlsbase=$(sed -n '2p' "$tmp/ports")
 flags=(-O1 -g -std=gnu11 -Wall -Wextra -Werror -Isrc -pthread)
-if [ "$(uname -s)" != Darwin ]; then flags+=(-ldl); fi
+flags+=(-ldl)
 if [ "${NV_SANITIZERS:-0}" = 1 ]; then flags+=(-fsanitize=address,undefined -fno-omit-frame-pointer); fi
 if [ "${NV_TSAN:-0}" = 1 ]; then flags+=(-fsanitize=thread -fno-omit-frame-pointer); fi
-if [ "${NV_TPK40_TEST:-0}" = 1 ]; then
-  printf '%s\n' 'void nv_tpk40_etapa(const char *);' > "$tmp/tpk40.h"
-  flags+=(-DNV_TPK40 -include "$tmp/tpk40.h")
-  cc "${flags[@]}" -c src/net.c -o "$tmp/rede40.o"
-  if nm "$tmp/rede40.o" | rg 'tlv_bootstrap|tls_get_addr|emutls'; then
-    echo 'TPK40 compiler TLS detected' >&2; exit 1
-  fi
-fi
+
 cc "${flags[@]}" tests/rede_pedido.c src/net.c src/net_url.c -o "$tmp/teste"
 "$tmp/teste" "$base" "$tlsbase" "$tmp/cert.pem"
 cc "${flags[@]}" tests/rede_pedido_buffer.c src/net_url.c -o "$tmp/buffer"
 "$tmp/buffer"
-node tests/rede_retry_wgt.cjs

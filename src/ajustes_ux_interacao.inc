@@ -93,7 +93,7 @@ static void uxAplicar(void) {
   }
   riscoNotar(uxOp, antes);
   uxCancelar();
-  uxNotificar(uxOp == AJ_PERFIL_PESQ ? "Pedido enviado ao perfil." : "Ajuste salvo nesta TV.");
+  uxNotificar("Ajuste salvo nesta TV.");
   // A lista de diferenças permanece estável até sair dela, mesmo após restaurar.
 }
 // Interruptor (Ligado/Desligado): OK troca e grava na hora, sem abrir editor nem

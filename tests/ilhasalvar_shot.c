@@ -1,3 +1,4 @@
+#include "gles_test.h"
 // CAPTURA DE SALVAR NA ILHA (ilhasalvar.h): a capa em voo ate a pilula, o
 // "Salvo em ..." assentado, o "Removido da lista", a pergunta de primeira vez
 // ("Onde o + salva?") nascendo da pilula e a resposta.
@@ -52,9 +53,7 @@ static void fundo(int n) {
   glBindTexture(GL_TEXTURE_2D, fundoTex);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  glPixelStorei(GL_UNPACK_ROW_LENGTH, t->pitch / 4);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, t->w, t->h, 0, GL_RGBA, GL_UNSIGNED_BYTE, t->pixels);
-  glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+  gles_test_upload_surface(t);
   SDL_FreeSurface(t);
 }
 
@@ -193,8 +192,9 @@ int main(int argc, char **argv) {
   f = fopen(arq, "w"); assert(f); fputs("tok\n", f); fclose(f);
   assert(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) == 0);
   IMG_Init(IMG_INIT_PNG | IMG_INIT_JPG);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
   SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
-  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
   win = SDL_CreateWindow("Nuvio: ilhasalvar", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
                          1920, 1080, SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN);
   assert(win);

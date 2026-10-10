@@ -13,6 +13,13 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+// Exercise the unknown-RAM TV policy independently of the Linux host's RAM.
+FILE *__real_fopen(const char *path, const char *mode);
+FILE *__wrap_fopen(const char *path, const char *mode) {
+  if (!strcmp(path, "/proc/meminfo")) return NULL;
+  return __real_fopen(path, mode);
+}
+
 static int orcamento(void) { int mb = 0; tex_orcamento_info(&mb, NULL, NULL, NULL); return mb; }
 
 // A tela usa o cache REAL, inclusive quando o candidato foi restaurado ou
@@ -48,8 +55,7 @@ int main(void) {
   assert(tex_iniciar(64));
   assert(orcamento() == 96 && tex_fios_rede() == 4 && tex_teto_heroi() == 1920);
 
-  // 0. OK NA APRESENTACAO (issue #113): grava a marca de "vista". Com a trava
-  // de verdade (NV_DADOS_TRAVA_TESTE, a do Tizen), a trava dupla abortava aqui.
+  // 0. Confirming the introduction writes the persistent seen marker.
   assert(!apresentacaoVista());
   marcarApresentacaoVista();
   assert(apresentacaoVista());

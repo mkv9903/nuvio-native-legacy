@@ -1,3 +1,4 @@
+#include "gles_test.h"
 // CAPTURAS DO PLAYER NO GLASS UI, quadro a quadro, para comparar lado a lado
 // com o mockup aprovado em 03/10 (player-mockup.html, um PNG por quadro e
 // material). Fora da suite: janela GL e olho humano.
@@ -24,7 +25,6 @@
 #include "plrilha.h"
 #include "intro.h"
 #include "video.h"
-#include "cacheboost.h"
 #include "extras.h"
 #include "badges.h"
 #include "seekr.h"
@@ -191,9 +191,7 @@ static GLuint texDe(const char *rel) {
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-  glPixelStorei(GL_UNPACK_ROW_LENGTH, t->pitch / 4);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, t->w, t->h, 0, GL_RGBA, GL_UNSIGNED_BYTE, t->pixels);
-  glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+  gles_test_upload_surface(t);
   SDL_FreeSurface(t);
   return tex;
 }
@@ -328,10 +326,10 @@ int main(int argc, char **argv) {
   saida = argc > 1 ? argv[1] : "/tmp/nv-player-glass";
   { const char *v = getenv("NUVIO_SHOT_VIDRO"); material = v && *v == '1' ? "vidro" : "solido"; }
   { const char *m = getenv("NUVIO_SHOT_MOCK"); snprintf(mock, sizeof mock, "%s", m ? m : ""); }
-  SDL_SetHint("SDL_MAC_BACKGROUND_APP", "1");
   assert(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) == 0);
   IMG_Init(IMG_INIT_PNG | IMG_INIT_JPG);
-  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2); SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2); SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
   SDL_Window *w = SDL_CreateWindow("Nuvio: player glass", 0, 0, 64, 64, SDL_WINDOW_OPENGL | SDL_WINDOW_HIDDEN); assert(w);
   SDL_GLContext gl = SDL_GL_CreateContext(w); assert(gl); SDL_GL_SetSwapInterval(0);
   glGenTextures(1, &fboTex); glBindTexture(GL_TEXTURE_2D, fboTex);
@@ -437,12 +435,10 @@ int main(int argc, char **argv) {
       faixa(&v.audio[0], q == 0 ? "Ingl\xc3\xaas  \xc2\xb7  TrueHD 7.1 Atmos" : "Ingl\xc3\xaas", "en", cod[q]);
       v.audio[0].canais = can[q];
       video_simular(&v);
-      cacheboost_ganho_relato(q == 1 ? CB_GANHO_PASSTHROUGH : CB_GANHO_PCM);
       quadros(10);
       player_shot_estado(relogio, 4360.0f, 9420.0f, 1, 0, 0, 0);
       quadros(120);
       salvar(ids[q]);
-      cacheboost_ganho_relato(CB_GANHO_PCM);
       simular(0, 0, "", 0, 0);
     }
   }

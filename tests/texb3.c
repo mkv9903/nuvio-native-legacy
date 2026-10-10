@@ -12,6 +12,7 @@
 #include <SDL2/SDL_image.h>
 #include <unistd.h>
 #include "../src/tex_cache.c"
+#include "gles_test.h"
 #include <assert.h>
 #include <stdio.h>
 
@@ -54,8 +55,9 @@ static void decodificado(int i, const char *nome, SDL_Surface *s, int urgente) {
 int main(void) {
   SDL_Window *w; SDL_GLContext gl;
   assert(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) == 0);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
   SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
-  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
   w = SDL_CreateWindow("texb3", 0, 0, 64, 64, SDL_WINDOW_OPENGL | SDL_WINDOW_HIDDEN);
   assert(w); gl = SDL_GL_CreateContext(w); assert(gl);
 
@@ -86,7 +88,7 @@ int main(void) {
     assert(uplIdx == -1 && uplTex == 0);
     lido = malloc((size_t)1920 * 1080 * 4);
     glBindTexture(GL_TEXTURE_2D, itens[0].tex);
-    glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, lido);
+    gles_test_read_texture(itens[0].tex, 1920, 1080, lido);
     for (i = 0; i < 1080; i++)
       assert(!memcmp(lido + (size_t)i * 1920 * 4,
                      (unsigned char *)copia->pixels + (size_t)i * copia->pitch, 1920 * 4));
@@ -114,7 +116,7 @@ int main(void) {
     puts("ok  logo/heroi decodificado sobe antes do cartaz"); }
 
   // 3. Disco direto.
-  { char dir[] = "/Volumes/ExternalSSD/tmp/texb3-XXXXXX", arq[700];
+  { char dir[] = "/tmp/texb3-XXXXXX", arq[700];
     FILE *f;
     int i;
     assert(mkdtemp(dir));

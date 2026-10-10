@@ -2,8 +2,8 @@
 # "Termina as HH:MM" do player cabe em todos os idiomas (issue #213).
 set -eu
 cd "$(dirname "$0")/.."
-cc tests/relogiofim.c src/idioma.c -Isrc -I/opt/homebrew/include \
-   -I/opt/homebrew/include/SDL2 -o /tmp/nuvio-relogiofim-tests \
+cc tests/relogiofim.c src/idioma.c -Isrc -DNV_LINUX_DESKTOP $(pkg-config --cflags sdl2 SDL2_image SDL2_ttf) \
+    -o /tmp/nuvio-relogiofim-tests \
    -Wall -Wno-macro-redefined -Wno-deprecated-declarations
 /tmp/nuvio-relogiofim-tests
 # Desde o Glass UI (03/10) a frase mora so na pilula da ilha do player

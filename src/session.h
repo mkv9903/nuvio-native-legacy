@@ -118,10 +118,8 @@ void sessao_passo(unsigned agoraMs);
 void sessao_cancelar(void);
 void sessao_login_email(const char *email, const char *senha);
 const char *sessao_erro_email(void);
-void sessao_email_erro_de(int status, const char *corpo, char *dst, unsigned tam);
 void sessao_sair(void);
 char *sessao_rpc(const char *funcao, const char *corpoJson, int *status);
-char *sessao_funcao(const char *nome, const char *corpoJson, int *status);
 char *sessao_tabela(const char *tabela, const char *consulta, int *status);
 
 #endif

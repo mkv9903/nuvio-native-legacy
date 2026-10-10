@@ -4,9 +4,10 @@
 #
 # Usage: bash tools/icones-lucide.sh            (download and rasterize)
 #      bash tools/icones-lucide.sh --offline  (rasterize cached SVGs only)
-# Requires: curl, sips (macOS), magick.
+# Requires: curl, ImageMagick (magick or convert).
 set -e
 cd "$(dirname "$0")/.."
+IMAGE_TOOL="$(command -v magick || command -v convert)"
 
 TAG="1.48.0"
 BASE="https://raw.githubusercontent.com/lucide-icons/lucide/$TAG/icons"
@@ -45,9 +46,9 @@ trap 'rm -rf "$TMP"' EXIT
 for n in $NOMES; do
   sed -e 's/currentColor/#ffffff/g' -e 's/width="24"/width="512"/' \
       -e 's/height="24"/height="512"/' "$SVG/$n.svg" > "$TMP/a.svg"
-  sips -s format png "$TMP/a.svg" --out "$TMP/a.png" >/dev/null
-  magick "$TMP/a.png" -alpha extract -filter Box -resize 128x128 "$TMP/m.png"
-  magick -size 128x128 xc:white "$TMP/m.png" -alpha off -compose CopyOpacity \
+  "$IMAGE_TOOL" -background none "$TMP/a.svg" "$TMP/a.png" >/dev/null
+  "$IMAGE_TOOL" "$TMP/a.png" -alpha extract -filter Box -resize 128x128 "$TMP/m.png"
+  "$IMAGE_TOOL" -size 128x128 xc:white "$TMP/m.png" -alpha off -compose CopyOpacity \
     -composite -strip -define png:color-type=6 "$DIR/aj_$n.png"
 done
 

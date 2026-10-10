@@ -6,8 +6,8 @@
 #   bash tests/addonurl.sh
 set -eu
 cd "$(dirname "$0")/.."
-flags=(-O1 -g -Isrc -ffunction-sections -fdata-sections -Wl,-dead_strip \
-       -I/opt/homebrew/include -I/opt/homebrew/include/SDL2 \
+flags=(-O1 -g -Isrc -ffunction-sections -fdata-sections -Wl,--gc-sections \
+       -DNV_LINUX_DESKTOP $(pkg-config --cflags sdl2 SDL2_image SDL2_ttf)  \
        -Wall -Wno-unused-function -Wno-deprecated-declarations -Wno-macro-redefined)
 if [ "${SANITIZE:-0}" = 1 ]; then flags+=(-fsanitize=address,undefined -fno-omit-frame-pointer); fi
 # SO addons.c e js.c, com a mesma receita de tests/addonslista.sh: -dead_strip

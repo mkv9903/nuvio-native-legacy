@@ -7,9 +7,6 @@
 #include <time.h>
 #include <unistd.h>
 
-#ifdef NV_TPK40
-void nv_tpk40_etapa(const char *s) { (void)s; }
-#endif
 static const char *base, *tlsBase, *ca;
 static char url[4096];
 static const char *cab[] = {"Authorization: Bearer synthetic", "Cookie: synthetic=1", "X-Private-Key: synthetic", NULL};
@@ -228,17 +225,6 @@ int main(int argc, char **argv) {
   assert(!rede_pedir(&p, &r) && r.erro == REDE_TRANSPORTE && !r.corpo); rede_resposta_limpar(&r);
   p.ca_arquivo = ca;
   assert(rede_pedir(&p, &r) && r.status == 200); rede_resposta_limpar(&r);
-  rede_discord_ca(ca); p.ca_arquivo = NULL;
-  assert(rede_pedir(&p, &r) && r.status == 200); rede_resposta_limpar(&r);
-  rede_discord_ca(NULL);
-  /* #290: personal server, self-signed: no CA, only its own origin skips verification. */
-  snprintf(url, sizeof url, "%s/ok", tlsBase); p = (RedePedido){0}; p.url = url; p.tls_pessoal = 1;
-  assert(rede_pedir(&p, &r) && r.status == 200); rede_resposta_limpar(&r);
-  snprintf(url, sizeof url, "%s/tlsother", tlsBase); p.seguir = 1;
-  assert(!rede_pedir(&p, &r) && r.erro == REDE_TRANSPORTE); rede_resposta_limpar(&r);
-  p.ca_arquivo = ca;
-  snprintf(url, sizeof url, "%s/downgrade", tlsBase); p.seguir = 1;
-  assert(!rede_pedir(&p, &r) && r.erro == REDE_REDIRECT); rede_resposta_limpar(&r);
   {
     int status, retry; char *b;
     p = pedido("/retry-date");

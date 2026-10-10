@@ -46,19 +46,6 @@
 #include "logotitulo.h"
 #include "corviva.h"
 
-// A CASCA DO TIZEN PRECISA SABER SE O PLAYER ESTA NA TELA. tools/tizen-shell.html
-// traduz as teclas de midia do controle Samsung (play/pause, stop, avancar,
-// voltar) para as teclas que este arquivo ja entende — e so pode fazer isso
-// enquanto o player existe. Fora dele, play/pause viraria "OK" em cima do que
-// estivesse em foco, inclusive um item de menu que marca coisa como vista. Um
-// OK perdido ja fez exatamente isso uma vez na conta do dono (#36). O aviso e
-// dado nas TRES transicoes de `aberto`, e so nelas: nada por quadro.
-#ifdef __EMSCRIPTEN__
-#include <emscripten.h>
-static void avisarCascaAberto(int v) { EM_ASM({ window.nvPlayerAberto = $0; }, v); }
-#else
-static void avisarCascaAberto(int v) { (void)v; }
-#endif
 #include "trakt.h"
 #include "traktscrobble.h"
 #include "sync.h"
@@ -101,7 +88,6 @@ static void avisarCascaAberto(int v) { (void)v; }
 #include "plrui.h"
 #include "escala.h"
 #include "plrilha.h"
-#include "cacheboost.h"
 #include "audioinfo.h"
 #include "legendasui.h"   /* F04: second subtitle band */
 #include <time.h>
@@ -441,17 +427,13 @@ static int marcaDtsAtual(void) {
 static const char *textoAudioAtual(void) {
   static char txt[56], chave[96];
   const VideoFaixa *f = video_audio(video_audio_atual());
-  int pt = cacheboost_ganho_estado() == CB_GANHO_PASSTHROUGH;
   char k[sizeof chave];
-  snprintf(k, sizeof k, "%d|%s|%d|%d|%s", video_audio_atual(), f ? f->codec : "", f ? f->canais : 0, pt,
+  snprintf(k, sizeof k, "%d|%s|%d|%s", video_audio_atual(), f ? f->codec : "", f ? f->canais : 0,
            f ? f->rotulo : "");
   if (strcmp(k, chave)) {
     memcpy(chave, k, sizeof chave);
     txt[0] = 0;
-    if (f && audioinfo_texto(f->codec, f->canais, strstr(f->rotulo, "Atmos") != NULL, txt, sizeof txt) && pt) {
-      size_t n = strlen(txt);
-      snprintf(txt + n, sizeof txt - n, " \xc2\xb7 %s", i18n("receptor"));
-    }
+    if (f) audioinfo_texto(f->codec, f->canais, strstr(f->rotulo, "Atmos") != NULL, txt, sizeof txt);
   }
   return txt;
 }
@@ -467,11 +449,6 @@ static int pAgora(int epgIdx, time_t t, EpgProg *p) {
   xtepg_querer(id);
   xtepg_passo();
   return xtepg_agora(id, t, p);
-}
-static int pProximo(int epgIdx, time_t t, int k, EpgProg *p) {
-  const char *id = player_id_canal();
-  if (epgIdx >= 0) return epg_proximo(epgIdx, t, k, p);
-  return xtream_e_id(id) && xtepg_proximo(id, t, k, p);
 }
 // Marcacao deterministica para quem JA SABE que e canal (o guia): cobre a
 // janela em que uma republicacao cai entre o cat_acrescentar e o player_abrir
@@ -535,10 +512,6 @@ static int duracaoReal, durCurtaAvisado, durPassouAvisado;
 static int concluiuAgora(double cred);
 static int introIdx=-1, introT=-1, introE=-1;
 static int retomadaAplicada, retomarPct;
-#ifdef NV_ANDROID
-static double retomarSeg;
-static int retomadaNaPreparacao;
-#endif
 // "Assistir do comeco" (issue #46): trava da sessao, armada por
 // player_do_inicio depois de player_abrir. Tem de sobreviver as CHAMADAS
 // REPETIDAS de player_definir_episodio — uma delas dispara quando o nome do
@@ -658,9 +631,6 @@ double player_regra_retomada_inicial(double posSalva, double durSalva,
 }
 void player_do_inicio(void) {
   semRetomada = 1; retomarPct = 0;
-#ifdef NV_ANDROID
-  retomarSeg = 0.0;
-#endif
 }
 void player_definir_episodio(int t, int e) {
   const CatItem *c = item();
@@ -670,17 +640,6 @@ void player_definir_episodio(int t, int e) {
   // "progresso" lido ali seria de outro titulo qualquer.
   if (c && !canalSessao && !semRetomada && c->progresso > 0 && c->progresso < ajustes_cw_concluido() &&
       (strcmp(c->tipo,"series") || (t==c->temporada && e==c->episodio))) retomarPct=c->progresso;
-#ifdef NV_ANDROID
-  retomarSeg = 0.0;
-  if (c && retomarPct > 0) {
-    char chave[48]; ProgRegistro r;
-    int serie = !strcmp(c->tipo, "series");
-    prog_chave(chave, sizeof chave, c->imdb, serie ? t : 0, serie ? e : 0);
-    if (prog_por_chave(chave, &r))
-      retomarSeg = player_regra_retomada_inicial(r.posSeg, r.durSeg,
-                                                retomarPct, ajustes_cw_concluido());
-  }
-#endif
   // FILME TAMBEM PEDE MARCADOR, e ate agora nao pedia: esta linha desligava o
   // modulo e voltava. Fazia sentido enquanto a fonte era o api.introdb.app, que
   // e indexado por episodio; o TheIntroDB responde por imdb sozinho e devolve os
@@ -775,22 +734,6 @@ static float duracaoDeMeta(const char *meta) {
 // Corta a sinopse na primeira frase, sem passar de `maxBytes`. O corte respeita
 // UTF-8: os titulos do catalogo sao em portugues e cortar no meio de um "ç" ou
 // "ã" produz um retangulo vazio na fonte, nao um acento faltando.
-static void frasePrimeira(char *dst, size_t n, const char *src, size_t maxBytes) {
-  if (!src || !*src) { dst[0] = 0; return; }
-  if (maxBytes > n - 4) maxBytes = n - 4;
-  size_t i = 0, corte = 0;
-  for (; src[i] && i < maxBytes; i++)
-    if (src[i] == '.') { corte = i; break; }
-  if (!corte) {
-    corte = i;
-    // volta ate o inicio de um caractere (bytes de continuacao sao 10xxxxxx)
-    while (corte > 0 && ((unsigned char)src[corte] & 0xC0) == 0x80) corte--;
-    while (corte > 0 && src[corte - 1] == ' ') corte--;
-  }
-  memcpy(dst, src, corte);
-  dst[corte] = 0;
-  if (src[i] && src[i] != '.') strncat(dst, "\xe2\x80\xa6", n - strlen(dst) - 1);
-}
 
 // --- MODOS DE PROPORCAO ------------------------------------------------------
 // A porta do web para o nativo. No web o modo mexe em duas coisas do elemento
@@ -848,7 +791,6 @@ const char *player_aspecto_rotulo(int modo) {
   if (modo < 0 || modo >= PLR_ASP_N) modo = PLR_ASP_ORIGINAL;
   return ASP_ROTULO[modo];
 }
-int player_aspecto(void) { return aspecto; }
 
 // Onde o modo escolhido fica gravado. ERA SDL_GetBasePath()+"art" direto — a
 // pasta de ARTE (cache de poster/backdrop), nao a de DADOS. No Mac as duas
@@ -929,7 +871,6 @@ static void prefsGravar(void) {
   fprintf(f, "leg_negrito %d\n", legEstilo.negrito);
   fprintf(f, "leg_tocado %d\n", legTocado);
   fclose(f);
-  dados_marcar_sujo(0);   // IDBFS (Samsung): ver o gravador de ajustes.c
 }
 
 // Lidos pela folha de faixas, que e quem desenha os controles.
@@ -1259,7 +1200,6 @@ void player_abrir(int indiceCatalogo, const char *url) {
     else if (mini || ficaMini) { mini = 0; miniGuia = 0; video_parar(); }
     else miniGuia = 0;
     janAtiva = 0;
-    avisarCascaAberto(aberto);
     if (ci && ci->imdb[0] && !canalSessao && ajustes_classif_player()) parental_pedir(ci->imdb);
     // A grade EPG comeca a baixar ja: o banner "agora/a seguir" do OSD e o
     // overlay do guia dependem dela. Idempotente.
@@ -1273,9 +1213,6 @@ void player_abrir(int indiceCatalogo, const char *url) {
   avLat0 = -1.0; avAtraso = 0.0; avPausaDesde = 0;
   retomadaAplicada=0; semRetomada=0;
   abertoEm = SDL_GetTicks(); medirAbertura = 1; tocouMedido = 0; loadEm = 0;
-#ifdef NV_ANDROID
-  retomarSeg = 0.0; retomadaNaPreparacao = 0;
-#endif
   botao = PLR_PLAY;
   memset(focoB, 0, sizeof focoB);
   posSeg = 0.0f; relogio_zerar(&relLeg); velmed_zerar(&velMed);
@@ -1284,7 +1221,6 @@ void player_abrir(int indiceCatalogo, const char *url) {
   // Legenda externa e da sessao que acabou, nao desta.
   faixas_reiniciar();
   // F07: volume back to 100% and the cache report of the last title forgotten.
-  cacheboost_sessao();
   // O modo de proporcao e do APARELHO, nao da sessao: reler aqui e o que faz
   // "Zoom cinema" continuar valendo no filme seguinte, como no web.
   prefsLer();
@@ -1298,7 +1234,6 @@ void player_abrir(int indiceCatalogo, const char *url) {
   video_definir_modo_live(ehCanal() ? ajustes_livetv_modo() : 0);
   // F07: seek cache for this open (live channels never; the backend also
   // refuses HLS/DASH). Arms only the next video_tocar: trailers stay uncached.
-  cacheboost_backend_cache(ehCanal() ? 0 : ajustes_cache_seek_mb());
   loadEm = SDL_GetTicks();
   { char px[96];
     comVideo = (url && *url && video_tocar(proxyts_resolver(url, px, sizeof px))); }
@@ -1348,7 +1283,6 @@ int player_quer_sair(void) { return pediuSair; }
 // de legenda ligada e a fonte DIZENDO que e .mkv (url, arquivo ou descricao).
 // MP4, HLS, canal, PiP e quem nao quer legenda nao esperam nada. Um MKV cuja
 // legenda no idioma nao e ASS custa um Range (o cabecalho) antes do video.
-#ifndef __EMSCRIPTEN__
 static int temMkv(const char *t) {
   const char *p;
   for (p = t ? t : ""; (p = strchr(p, '.')) != NULL; p++)
@@ -1373,25 +1307,14 @@ static int prebuscaCabe(const char *url) {
   if (s && s->mp4) return 0;
   return temMkv(url) || (s && (temMkv(s->arquivo) || temMkv(s->descricao) || temMkv(s->rotulo)));
 }
-#endif
 
 static void tocarFonte(const char *url) {
   marco("abrir: url ao pipeline");
   loadEm = SDL_GetTicks();   // #202: do pipeline ao primeiro quadro ("[player] load->1o quadro")
   video_definir_reconexao(!ehCanal());
   video_definir_modo_live(ehCanal() ? ajustes_livetv_modo() : 0);
-  cacheboost_backend_cache(ehCanal() ? 0 : ajustes_cache_seek_mb());   // F07, ver player_abrir
   { char px[96];
-#ifdef NV_ANDROID
-    // app.c define episodio e "do inicio" antes de entregar a fonte. O
-    // instante viaja junto da URL, nunca numa variavel pendente do Kotlin.
-    retomadaNaPreparacao = !ehCanal() && !semRetomada && retomarSeg > 0.0;
-    comVideo = video_tocar_posicao(proxyts_resolver(url, px, sizeof px),
-                                   retomadaNaPreparacao ? retomarSeg : 0.0);
-    if (!comVideo) retomadaNaPreparacao = 0;
-#else
     comVideo = video_tocar(proxyts_resolver(url, px, sizeof px));
-#endif
   }
   mkvass_video_aberto(comVideo);
   if (!comVideo) erroSemVideo();
@@ -1409,7 +1332,6 @@ void player_definir_fonte(const char *url) {
   if ((!aberto && !mini) || !url || !*url) return;
   esperandoFonte = 0;
   erroFonte = 0;
-#ifndef __EMSCRIPTEN__
   prebuscaUrl[0] = 0;
   if (prebuscaCabe(url) && mkvass_prebuscar(url, escolherLegendaPrebusca, retomarPct / 100.0)) {
     // O video espera (player_atualizar solta): a tela segue em "abrindo fonte".
@@ -1419,7 +1341,6 @@ void player_definir_fonte(const char *url) {
     esperandoFonte = 1;
     return;
   }
-#endif
   tocarFonte(url);
 }
 
@@ -1428,9 +1349,7 @@ void player_voltar_a_esperar(void) {
   if (comVideo) { video_parar(); comVideo = 0; }
   mkvass_parar();
   mkvass_video_aberto(0);
-#ifndef __EMSCRIPTEN__
   prebuscaUrl[0] = 0;
-#endif
   esperandoFonte = 1; erroFonte = 0; tocando = 1;
   erroTitulo[0] = erroDica[0] = 0;
   retomadaAplicada = 0; inicioImagem = 0;
@@ -1442,8 +1361,6 @@ int  player_pediu_faixas(void) { int v = pedFaixas; pedFaixas = 0; return v; }
 int  player_com_video(void) { return comVideo && !retido && video_pronto(); }
 // Para o Discord (discord.c), que so le: pausado, duracao e se e canal ao vivo.
 int   player_pausado(void) { return !tocando; }
-float player_duracao_seg(void) { return duracaoSeg; }
-int   player_eh_canal(void) { return ehCanal(); }
 // StreamFit (F03): the backend's REAL duration of this session's own source,
 // never duracaoSeg (which starts as PLR_DUR_PADRAO or a meta guess). Not a
 // channel, not while waiting for a source, not before the backend is ready;
@@ -1674,7 +1591,6 @@ static void fecharSessao(int manter) {
   prepararRetencao = 0; saidaIlhaDesde = 0;
   esperandoFonte = 0; aberto = 0; saindo = 0; pediuSair = 0;
   mini = 0; querMini = 0; miniGuia = 0; janAtiva = 0;
-  avisarCascaAberto(0);
   // Os DOIS relogios, e nao so o do primeiro quadro. `pgDesde` sobrevivendo ao
   // fechamento faria a proxima reproducao achar que a janela do aviso ja tinha
   // corrido — o aviso simplesmente nao entraria, sem nada no log dizendo por
@@ -1689,12 +1605,7 @@ void player_encerrar(void) {
 // So o voo (RETIDO SO PARA O VOO, acima): Android, saida para a ilha, com
 // animacao. Sem o ajuste de reter, a sessao vive so ate o pouso.
 static int reterSoVoo(void) {
-#ifdef NV_ANDROID
-  return !ajustes_manter_video() && ajustes_saida_player_home() &&
-         !ajustes_animacoes_reduzidas();
-#else
   return 0;
-#endif
 }
 
 static int podeReter(void) {
@@ -1716,9 +1627,6 @@ void player_preparar_retencao(void) {
   // player. Sem confirmacao na saida, o app usa o fechamento normal.
   if (prepararRetencao || retido || !podeReter()) return;
   prepararRetencao = 1;
-#ifdef NV_ANDROID
-  saidaIlhaDesde = SDL_GetTicks() | 1u;
-#endif
   video_pausar(1);
 }
 
@@ -1739,7 +1647,6 @@ int player_suspender(void) {
 }
 
 int player_retido(void) { return retido; }
-int player_retido_so_voo(void) { return retido && retidoVoo; }
 
 void player_descartar_retido(void) {
   if (!retido) return;
@@ -1779,7 +1686,7 @@ int player_retomar_retido(const char *imdb, int t, int e) {
   ultimoInput = agora; retomadaAplicada = 1; tocando = 1;
   medirAbertura = 0;   // a medida desta volta e a "retomada pronta" abaixo
   relogio_zerar(&relLeg);
-  avisarCascaAberto(1); aplicarAspecto();
+  aplicarAspecto();
   mkvass_video_aberto(1);
   if (retomarMkv) mkvass_retomar();
   retomarMkv = 0;
@@ -1897,7 +1804,6 @@ void player_minimizar_para_guia(float x, float y, float w, float h) {
   miniGuiaCaixa = (PlrRect){ x, y, w, h };
   miniGuia = 1;
   mini = 1; pediuSair = 0; visivel = 0; aberto = 0; saindo = 0;
-  avisarCascaAberto(0);
   pausao_fechar(); episodios_fechar(); posplay_fechar();
   janelaAnimar(de, miniDestino());
 }
@@ -1911,14 +1817,12 @@ void player_restaurar(void) {
     miniGuia = 0;
     mini = 0; aberto = 1; saindo = 0; entrada = 0.0f;
     visivel = 1; soBarra = 0; ultimoInput = SDL_GetTicks();
-    avisarCascaAberto(1);
     janelaAnimar(de, telaCheia());
     return;
   }
   miniGuia = 0;
   mini = 0; aberto = 1; saindo = 0; entrada = 0.0f;
   visivel = 1; soBarra = 0; ultimoInput = SDL_GetTicks();
-  avisarCascaAberto(1);
   aplicarAspecto();   // devolve o destino de tela cheia ao plano
 }
 
@@ -1979,11 +1883,7 @@ void player_mini_desenhar(Uint32 agora) {
     { TxtLinha nm = txt_linha_corta(TXT_G18M, rot, 243, 242, 239, 255, il.x + il.w - 20.0f - x);
       txt_desenhar_alpha(nm, x, yc - (float)nm.h * 0.5f, 1.0f); }
     { const char *k[2] = {
-#ifdef NV_ANDROID
-        "CH+",
-#else
         "Azul",
-#endif
         "Voltar" }, *rt[2] = { "Tela cheia", "Fechar" };
       plrui_dicas(k, rt, 2, il.x + 20.0f, yc + 14.0f + 8.0f + 15.0f, 0, 1.0f); } }
 }
@@ -2184,34 +2084,6 @@ static void acordar(void) { visivel = 1; ultimoInput = SDL_GetTicks(); }
 // AS DUAS LINHAS DO CANAL no OSD: "AGORA hh:mm–hh:mm · titulo" e "A SEGUIR
 // hh:mm · titulo", da grade EPG. Sem grade real o canal se mostra como
 // "AO VIVO" — a verdade, em vez de um programa inventado.
-static void linhasCanal(char *l1, size_t n1, char *l2, size_t n2) {
-  time_t agoraT = time(NULL);
-  EpgProg ag, px;
-  struct tm lt;
-  if (n1) l1[0] = 0;
-  if (n2) l2[0] = 0;
-  // item() ja devolve o canal congelado da sessao — o indice no catalogo pode
-  // ter sido remapeado por uma republicacao da descoberta.
-  if (!itemCanal.titulo[0]) { if (n1) snprintf(l1, n1, "%s", i18n("AO VIVO")); return; }
-  if (epgIdx == -1 && epg_estado() == EPG_PRONTO) {
-    epgIdx = epg_match(itemCanal.titulo);
-    if (epgIdx < 0) epgIdx = -2;
-  }
-  if (pAgora(epgIdx, agoraT, &ag)) {
-    char h1[12], h2[12];
-    localtime_r(&ag.ini, &lt); hora_tela(h1, sizeof h1, &lt);
-    localtime_r(&ag.fim, &lt); hora_tela(h2, sizeof h2, &lt);
-    snprintf(l1, n1, "%s  %s\xe2\x80\x93%s  \xc2\xb7  %s",
-             i18n("AGORA"), h1, h2, ag.titulo);
-    if (pProximo(epgIdx, agoraT, 0, &px)) {
-      char h3[12];
-      localtime_r(&px.ini, &lt); hora_tela(h3, sizeof h3, &lt);
-      snprintf(l2, n2, "%s %s  \xc2\xb7  %s", i18n("A seguir"), h3, px.titulo);
-    }
-  } else {
-    snprintf(l1, n1, "%s", i18n("AO VIVO"));
-  }
-}
 
 // A barra do CANAL mostra o progresso do PROGRAMA no ar, nao do fluxo — um
 // ao vivo nao tem fim, e a posSeg contra a duracao reserva diria "1h12 de
@@ -2731,8 +2603,6 @@ void player_atualizar(float dt, Uint32 agora) {
   }
   // F07: the seek cache turned itself off (no free space at open, or the disk
   // filled up mid-session). Playback goes on; one short notice per session.
-  if (comVideo) { const char *av = cacheboost_cache_aviso();
-    if (av) player_toast_ex(i18n(av), 5000, "aj_database", 1); }
   // REDE CAIU no meio do video (video_reconexao.h): um aviso por tentativa.
   { static int reconVisto;
     int t = comVideo ? video_reconectando() : 0;
@@ -2804,7 +2674,7 @@ void player_atualizar(float dt, Uint32 agora) {
     fflush(stdout);
     entrada = 0.0f;
   }
-  if (saindo && entrada < 0.02f) { aberto = 0; saindo = 0; entrada = 0.0f; saidaIlhaDesde = 0; avisarCascaAberto(0); return; }
+  if (saindo && entrada < 0.02f) { aberto = 0; saindo = 0; entrada = 0.0f; saidaIlhaDesde = 0; return; }
 
   // Havendo pipeline, posicao e duracao vem DELE; o dt so serve para as
   // animacoes. O relogio somado continua existindo para quando nao ha video
@@ -2859,7 +2729,6 @@ void player_atualizar(float dt, Uint32 agora) {
       mkvass_folga(bf > 0.5 ? bf - (double)posSeg : -1.0);
       // F05: troca de fonte, seek e buffer curto cancelam/pausam o AutoSync.
       // F06: o ajuste local decide se "Por audio" existe (padrao desligado).
-      legsync_audio_habilitar(ajustes_legenda_sync_audio());
       legsync_passo(video_url_atual(), posSeg, bf > 0.5 ? bf - (double)posSeg : -1.0,
                     scrubbing || video_bufferando_ms() > 0, agora); }
     if (d > 1.0) { duracaoSeg = (float)d; duracaoReal = 1; }
@@ -2872,21 +2741,8 @@ void player_atualizar(float dt, Uint32 agora) {
                     strcmp(cs->tipo, "series") ? 0 : epE, (long)(d * 1000.0));
     }
     if (!retomadaAplicada && video_pronto() && d>1.0) {
-#ifdef NV_ANDROID
-      // O ack chega antes do prepare. Se a ponte/Media3 recusou a posicao,
-      // recua ao seek de sempre; pendente nunca vira um segundo seek.
-      int estado = retomadaNaPreparacao ? video_retomada_inicial_estado() : -1;
-      if (estado != 0) {
-        retomadaAplicada = 1;
-        if (estado > 0) marco("abrir: ponto salvo na preparacao");
-        if (estado < 0 && retomarPct > 0) {
-          marco("abrir: seek para o ponto salvo"); video_buscar(d * retomarPct / 100.0);
-        }
-      }
-#else
       retomadaAplicada=1;
       if(retomarPct>0) { marco("abrir: seek para o ponto salvo"); video_buscar(d*retomarPct/100.0); }
-#endif
     }
     tocando = video_tocando();
     if (tocando && retomadaAplicada && medirAbertura && !tocouMedido && !ehCanal()) {
@@ -3960,31 +3816,6 @@ void player_desenhar(Uint32 agora) {
 #ifdef NV_SHOT_HOOKS
   if (shotSemFuro && encolhe > 0.999f) furar = 0;   // capturas: a arte faz de video
 #endif
-#ifdef NV_TPK
-  // O FURO SO COM IMAGEM (#188). O host manda `pronto` ANTES do Start (Video.cs,
-  // Abrir), e o primeiro quadro so vem depois do buffer: furo aberto nesse vao
-  // mostra o que esta atras do app, que no Tizen 9 e a tela inicial da
-  // Samsung (#185 viu o mesmo numa linha de 1 px). Espera a posicao andar; se
-  // ela nao andar (ao vivo sem posicao, host que nao le), abre em
-  // NV_PLR_TPK_FURO_PRAZO_MS de `tocando`, como antes. A janela que cresce do
-  // guia ja vem com video tocando e fica de fora.
-#define NV_PLR_TPK_FURO_PRAZO_MS 3000u
-  { static int vista; static Uint32 tocandoEm;
-    if (!furar) { vista = 0; tocandoEm = 0; }
-    else if (!vista && !janAtiva) {
-      if (video_tocando() && !tocandoEm) tocandoEm = SDL_GetTicks() | 1;
-      if (video_pos() >= 0.25 ||
-          (tocandoEm && SDL_GetTicks() - tocandoEm >= NV_PLR_TPK_FURO_PRAZO_MS)) {
-        vista = 1;
-        printf("[player] tpk: furo aberto (posicao %.2fs)\n", video_pos());
-        fflush(stdout);
-      } else furar = 0;
-    } }
-#endif
-#ifdef NV_ANDROID
-  // Video vivo por baixo: o vidro fosco (assado de 320x180) nao desenha ali.
-  if (furar) gfx_vidro_fosco_bloquear();
-#endif
   if (furar) {
     // O furo acompanha o MESMO retangulo que foi ao plano de hardware, cortado
     // na tela. Furar sempre a tela inteira, como antes, deixava faixa preta nos
@@ -4633,15 +4464,6 @@ static void desenharOsdCorpo(Uint32 agora, float a, float ac, const CatItem *c) 
     // (MEDIDO: um MKV anunciado como DV volta HDR10 nesta TV).
     if (video_tem_dolby_vision())                  selos[nSelos++] = FMT_DV;
     else if (!strcasecmp(video_hdr(), "HDR10"))    selos[nSelos++] = FMT_HDR10;
-#if defined(__EMSCRIPTEN__) || defined(NV_TPK)
-    else {
-      // AVPlay nao confirma HDR ativo: o selo e o da FONTE, nunca Dolby Vision
-      // (TV Samsung nao tem DV; badges_fonte_hdr so conhece HDR10+/HDR10/HDR).
-      const Stream *fonte = stream_item(stream_atual());
-      int hdr = fonte ? badges_fonte_hdr_marca(fonte->badges) : -1;
-      if (hdr >= 0) selos[nSelos++] = (FormatoMarca)hdr;
-    }
-#endif
     if (video_tem_atmos())        selos[nSelos++] = FMT_ATMOS;
     if (marcaDtsAtual() >= 0)     selos[nSelos++] = (FormatoMarca)marcaDtsAtual();
     // #293: o codec da faixa tocando vira texto na mesma fileira, depois dos

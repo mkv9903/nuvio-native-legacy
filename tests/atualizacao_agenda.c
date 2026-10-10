@@ -66,7 +66,6 @@ int main(void) {
   estado = AT_INSTALANDO; CONFERE(!podeReconsultar(), "instalando: nao");
   estado = AT_PRONTO;     CONFERE(!podeReconsultar(), "instalado, esperando reinicio: nao");
   estado = AT_PARADO;
-  soEncenada = 1; CONFERE(!podeReconsultar(), ".so encenada: nao"); soEncenada = 0;
 
   // O CARTAO AUTOMATICO VOLTA A CADA TAG NOVA. Antes `mostrado` valia o
   // processo inteiro: achou a 1.6.7, mostrou, e a 1.6.8 dias depois nunca mais.

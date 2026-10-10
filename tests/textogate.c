@@ -1,5 +1,5 @@
 // Portao do texto da pagina de titulo (src/textogate.h): funcao pura, sem GL.
-//   cc tests/textogate.c -Isrc -I/opt/homebrew/include/SDL2 -o /tmp/textogate && /tmp/textogate
+//   cc tests/textogate.c -Isrc $(pkg-config --cflags sdl2) -o /tmp/textogate && /tmp/textogate
 #include "textogate.h"
 #include <assert.h>
 #include <stdio.h>

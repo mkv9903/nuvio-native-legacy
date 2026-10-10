@@ -90,7 +90,6 @@
 // e o topo das fileiras cai nos mesmos 518,4 que NV_SHELF_TOP ja usa.
 #define NV_HERO_COPY_GAP        40.0f   // --modern-hero-copy-bottom-gap
 #define NV_HERO_COPY_LINHA      16.0f   // gap do flex column
-#define NV_AMIGOS_HERO_H        36.0f   // linha de amigos (rostos + frase) acima da meta do destaque
 
 // Scancode do BACK no SDL da LG (SDL_SCANCODE_WEBOS_BACK). Nao esta no
 // SDL_scancode.h padrao, por isso vem como numero.

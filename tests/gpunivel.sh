@@ -4,6 +4,6 @@
 set -eu
 cd "$(dirname "$0")/.."
 cc src/gpunivel.c src/perfiltv.c tests/gpunivel.c -Isrc -o /tmp/nuvio-gpunivel-teste \
-  -DNV_GPUN_TESTE -O1 -g -Wall -Wextra -framework OpenGL -Wno-deprecated-declarations \
-  -I/opt/homebrew/include -I/opt/homebrew/include/SDL2
+  -DNV_GPUN_TESTE -O1 -g -Wall -Wextra $(pkg-config --libs glesv2 egl) -ldl -pthread -lm -Wno-deprecated-declarations \
+  -DNV_LINUX_DESKTOP $(pkg-config --cflags sdl2 SDL2_image SDL2_ttf)
 /tmp/nuvio-gpunivel-teste

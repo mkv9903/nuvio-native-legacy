@@ -20,11 +20,9 @@ for source in src/*.c src/dts/*.c; do
   case "$source" in src/main.c|src/diagnostico.c) continue;; esac
   sources+=("$source")
 done
-# -DNV_DADOS_TRAVA_TESTE: a trava de arquivos do Tizen, que no Mac e no-op.
-# Trava dupla no mesmo fio aborta (issue #113: congelava a Samsung).
-cc "${sources[@]}" tests/diagnostico_fluxo.c -Isrc -o /tmp/nuvio-diagnostico-fluxo \
-  -DNV_DADOS_TRAVA_TESTE -O1 -g -I/opt/homebrew/include -I/opt/homebrew/include/SDL2 \
-  -L/opt/homebrew/lib -lSDL2 -lSDL2_image -lSDL2_ttf -lz -framework OpenGL \
+cc "${sources[@]}" tests/diagnostico_fluxo.c -Wl,--wrap=fopen -Isrc -o /tmp/nuvio-diagnostico-fluxo \
+   -O1 -g -DNV_LINUX_DESKTOP $(pkg-config --cflags sdl2 SDL2_image SDL2_ttf)  \
+   -lSDL2 -lSDL2_image -lSDL2_ttf -lz $(pkg-config --libs glesv2 egl) -ldl -pthread -lm \
   -Wno-deprecated-declarations -Wno-macro-redefined
 /tmp/nuvio-diagnostico-fluxo | grep '^ok'
 

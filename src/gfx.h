@@ -7,17 +7,17 @@
 #include "gl_compat.h"
 
 typedef enum {
-  GFX_CARD   = 0,  // textura com cantos, parallax e especular
+  GFX_CARD = 0,  // textura com cantos, parallax e especular
   GFX_SOMBRA = 1,  // mancha difusa (cor de uCor; `foco` = intensidade)
-  GFX_COR    = 2,  // retangulo/pill de cor solida
-  GFX_HERO   = 3,  // arte com gradiente para o fundo (aceita alpha p/ crossfade)
-  GFX_VEU    = 4,  // veu escuro na base do card, sob texto sobreposto
-  GFX_TEXTO  = 5,  // glifo: a forma vem do alpha da textura, nao do RGB
-  GFX_FUNDO  = 6,  // arte desfocada por mipmap; `foco` carrega o bias
+  GFX_COR = 2,  // retangulo/pill de cor solida
+  GFX_HERO = 3,  // arte com gradiente para o fundo (aceita alpha p/ crossfade)
+  GFX_VEU = 4,  // veu escuro na base do card, sob texto sobreposto
+  GFX_TEXTO = 5,  // glifo: a forma vem do alpha da textura, nao do RGB
+  GFX_FUNDO = 6,  // arte desfocada por mipmap; `foco` carrega o bias
   GFX_VEU_TOPO = 7,// degrade escuro do topo para baixo (barra de cabecalho)
-  GFX_SNAP   = 8,  // imagem ja pronta: sem SDF, sem efeito, so o quad
-  GFX_PLAY   = 9,  // triangulo de "reproduzir", apontando para a direita
-  GFX_BLUR   = 10, // uma passada de desfoque gaussiano; uPar da a direcao
+  GFX_SNAP = 8,  // imagem ja pronta: sem SDF, sem efeito, so o quad
+  GFX_PLAY = 9,  // triangulo de "reproduzir", apontando para a direita
+  GFX_BLUR = 10, // uma passada de desfoque gaussiano; uPar da a direcao
   // Fundo da tela de DETALHE: a arte em "cover" ja fundida na vinheta
   // horizontal do app web. Um modo so, e nao arte + veu por cima, porque sao
   // duas camadas de tela CHEIA — nesta GPU o custo e de preenchimento, e a
@@ -85,17 +85,16 @@ typedef enum {
   // deixa uma banda percebivel onde a rampa comeca, porque o olho enxerga a
   // segunda derivada. Ao quadrado o inicio e quase plano e a transicao some.
   GFX_VEU_BAIXO = 17,
-  GFX_SOCIAL = 18, // static wine/coral ambient background, no texture or blur
   // Foto circular sem o SDF de card. O disco tem sua propria mascara radial,
   // para a borda ficar uniforme e sem rebarbas em qualquer tamanho.
-  GFX_AVATAR = 19,
+  GFX_AVATAR = 18,
   // Retrato editorial: foto limpa ancorada a direita, dessaturada e dissolvida
   // no fundo. Feito para pessoas, nao para backdrops 16:9 com texto embutido.
-  GFX_RETRATO = 20,
+  GFX_RETRATO = 19,
   // Disco geometrico sólido. Usado como base do avatar e do foco para que o
   // contorno seja sempre concentrico, em vez de ser pintado sobre a foto.
-  GFX_DISCO = 21,
-  GFX_EDITORIAL = 22, // unmodified cinematic art, edge fade only; caller fits aspect
+  GFX_DISCO = 20,
+  GFX_EDITORIAL = 21, // unmodified cinematic art, edge fade only; caller fits aspect
   // GFX_VEU_CARD — o veu do card de episodio, com a rampa AVALIADA POR PIXEL e
   // respeitando os cantos arredondados.
   //
@@ -110,7 +109,7 @@ typedef enum {
   // A rampa e a MESMA de antes, a do `linear-gradient` do app web: alfa 0.06 no
   // topo, 0.18 a 22%, 0.62 a 52%, 0.86 a 82% e 0.95 na base — so que agora
   // interpolada no fragmento.
-  GFX_VEU_CARD = 23,
+  GFX_VEU_CARD = 22,
   // GFX_BRILHO_TOPO — realce CLARO no alto do card, com a rampa por pixel e
   // respeitando os cantos arredondados. E o par claro do GFX_VEU_CARD.
   //
@@ -125,7 +124,7 @@ typedef enum {
   // vem de uCor.rgb (branco para realce), o alfa de uCor.a.
   // uPar.y > 0 inverte o sentido: cheia da BASE ate uPar.y, zero em uPar.x
   // (medidos da base) — o veu escuro da legenda do cartao deitado.
-  GFX_BRILHO_TOPO = 24,
+  GFX_BRILHO_TOPO = 23,
   // GFX_ARTE — a imagem como ela e, so que com os CANTOS ARREDONDADOS.
   //
   // Existe por causa do logo de canal que traz fundo proprio (o quadrado preto
@@ -138,7 +137,7 @@ typedef enum {
   // (over-scan), o que num logo come a margem que o proprio arquivo reserva; o
   // GFX_MARCA joga fora o RGB e pinta de uma cor so. Aqui o RGB e o alpha vao
   // inteiros, multiplicados so pela mascara do SDF.
-  GFX_ARTE = 25,
+  GFX_ARTE = 24,
   // GFX_LUZ — luz difusa DENTRO de um retangulo arredondado: a queda radial
   // do GFX_SOMBRA, so que recortada pelos cantos do painel (uRaio) em vez de
   // pela tesoura. Existe para a "luz entrando pelo canto" dos paineis
@@ -154,15 +153,15 @@ typedef enum {
   //             e smoothstep cubico elevado ao quadrado para abrir a penumbra.
   //
   // Use gfx_luz_canto, que faz essa conta em pixels.
-  GFX_LUZ = 26,
+  GFX_LUZ = 25,
   // GFX_SINO — glifo vetorial do toast de avisos. O toast aparece antes que o
   // cache de texturas tenha necessariamente terminado de carregar, entao o
   // sino nao pode depender de PNG assincrono para existir no primeiro quadro.
-  GFX_SINO = 27,
+  GFX_SINO = 26,
   // GFX_ESQUELETO — superficie de card CARREGANDO com uma faixa de luz que
   // atravessa a tela (skeleton shimmer). Use gfx_esqueleto, que calcula a onda
   // e cai no GFX_COR parado com animacoes reduzidas.
-  GFX_ESQUELETO = 28,
+  GFX_ESQUELETO = 27,
   // GFX_LINHA — segmento de reta com nucleo e halo, resolvido no fragmento.
   // Existe para a constelacao da tela Explorar: nao havia primitiva de linha
   // (so retangulos alinhados), e pontilhar com dezenas de discos custava um
@@ -173,30 +172,30 @@ typedef enum {
   //   uRaio  = alcance do halo (e margem), na mesma unidade
   // O retangulo e o envelope do segmento: quem chama parte linhas longas em
   // pedacos para o envelope nao virar area de tela cheia (ver explorar.c).
-  GFX_LINHA = 29,
+  GFX_LINHA = 28,
   // GFX_CEU — ceu procedural da Explorar numa passada: base escura, nebulosa
   // tingida por uCor e estrelas por celula de grade com cintilacao.
   //   uPar  = deriva da grade (parallax), em celulas
   //   uFoco = tempo em segundos (0 = parado, para animacoes reduzidas)
   // Substitui o preenchimento de fundo da tela, entao nao soma camada cheia.
-  GFX_CEU = 30,
+  GFX_CEU = 29,
   // COR VIVA (corviva.h). Os dois primeiros NAO se pedem pelo nome: gfx_rect
   // troca GFX_COR e GFX_ANEL por eles quando a cor passada e exatamente o
   // destaque vivo e o tema e "Dinâmica gradiente" ou "imersiva" — e assim que
   // o botao, a linha em foco e o anel de ~40 arquivos viram degrade sem que
   // nenhum mude. As paradas vem de nv_grad_viva, e a luz anda devagar com
   // nv_tempo_viva (o degrade "respira"; parado com animacoes reduzidas).
-  GFX_COR_GRAD = 31,
-  GFX_ANEL_GRAD = 32,
+  GFX_COR_GRAD = 30,
+  GFX_ANEL_GRAD = 31,
   // GFX_AMBIENTE — a cor da arte VAZANDO na interface: quatro luzes grandes e
   // macias (esquerda, direita, topo, base) com as cores de regiao da arte,
   // numa passada so de tela cheia, com dither contra faixas. Use gfx_ambiente.
-  GFX_AMBIENTE = 33,
+  GFX_AMBIENTE = 32,
   // GFX_COPIA — a textura INTEIRA, RGB e ALPHA, sem SDF nem efeito. E a
   // ampliacao do alvo interno de 1280x720 (gpunivel.h, nivel 2): o alpha tem
   // de passar junto, senao o furo do plano de video some. uPar.y > 0.5 = a
   // fonte e um FBO (origem embaixo), como no GFX_SNAP.
-  GFX_COPIA = 36,
+  GFX_COPIA = 35,
   // GFX_VITRINE — a arte do destaque nos layouts PADRAO e DINAMICA da home
   // (ajustes_home_layout). Cover com ANCORAGEM vertical, cantos por SDF, o veu
   // de leitura (esquerda e base) ASSADO na propria passada, e um esvanecer
@@ -212,16 +211,16 @@ typedef enum {
   //   uFoco   = forca do veu de leitura, 0 a 1 (0 = arte pura, sobre o trailer)
   //   uRaio   = canto, como no GFX_CARD (fracao da altura)
   //   uTexAsp = w/h da textura (gfx_tex_aspect_atual)
-  GFX_VITRINE = 34,
+  GFX_VITRINE = 33,
   // GFX_FUNDO_DIN — o fundo da home DINAMICA: SO COR, um degrade vertical de
   // uma cor (a do titulo em foco). Sem textura e sem arte desfocada.
   //   uCor.rgb = cor do topo; uCor.a = alfa
   //   uFoco    = quanto da cor sobra na base (0..1)
-  GFX_FUNDO_DIN = 35,
+  GFX_FUNDO_DIN = 34,
   // GFX_HERO_CAM / GFX_HERO_CHEIO_CAM — as camadas do destaque numa passada
   // (o crossfade). So por gfx_hero_camadas.
-  GFX_HERO_CAM = 37,
-  GFX_HERO_CHEIO_CAM = 38,
+  GFX_HERO_CAM = 36,
+  GFX_HERO_CHEIO_CAM = 37,
   // GFX_JANELA — o CARTAO DO CARROSSEL da Dinamica (detail.c): a arte em
   // "cover" na TELA CHEIA, vista por uma janela arredondada. A arte nunca
   // escala: o rect e a abertura, e gfx_janela_atual diz onde ela fica no
@@ -233,7 +232,7 @@ typedef enum {
   // dois modos dao o mesmo pixel, e a troca entre eles nao se ve.
   // Cor com r < 0.5 = SO O VEU (cor do fundo com alpha, sem a arte): por cima
   // do furo do trailer que toca no cartao.
-  GFX_JANELA = 39,
+  GFX_JANELA = 38,
   // VEU EM DEGRADE DE CSS (Glass UI do player, 03/10): o preto (ou uCor.rgb)
   // cheio numa borda do rect e zero na outra, pelo dither de nv_dither. Os
   // veus do mockup sao linear-gradient de varias paradas; aqui viram uma curva
@@ -241,25 +240,25 @@ typedef enum {
   // distancia da borda cheia, em fracao do rect, dividida por uPar.y (o ponto
   // em que o veu zera; 1 = a borda oposta). uPar.x escolhe a borda cheia:
   // 0 = baixo, 1 = cima, 2 = esquerda, 3 = direita. Use por gfx_veu_css.
-  GFX_VEU_CSS = 40,
+  GFX_VEU_CSS = 39,
   // GFX_MINI — o alvo de uma miniatura (gfx_mini_desenhar): FBO lido de cabeca
   // para cima, cantos por SDF.
-  GFX_MINI = 41,
+  GFX_MINI = 40,
   // GFX_TEXTURA — o recorte do titulo numa pilula/barra (cor de destaque
   // "Textura"). Nao se pede direto: gfx_rect troca para ele todo GFX_COR
   // cheio na cor exata do destaque enquanto gfx_textura_definir tem textura.
-  GFX_TEXTURA = 42,
+  GFX_TEXTURA = 41,
   // GFX_FOSCO — a luz assada (320x180, a arte borrada do fundo) lida em
   // COORDENADA DE TELA (vAmb) e recortada pelos cantos do painel: o vidro
   // fosco. uTex = o assado; uCor.a = alfa. Use gfx_vidro_fosco.
-  GFX_FOSCO = 43,
+  GFX_FOSCO = 42,
   // GFX_VITRINE_DIN — o GFX_VITRINE OPACO sobre o fundo da Dinamica
   // (GFX_FUNDO_DIN) calculado no proprio fragmento: o destaque e o fundo numa
   // passada so. Nao se pede direto: gfx_rect troca o GFX_VITRINE por ele
   // quando o fundo da Dinamica esta pendente e o destaque cobre o topo da tela
   // (ver gfx_fundo_din_desenhar). uDin = cor do topo e queda.
-  GFX_VITRINE_DIN = 44,
-  GFX_NMODOS = 45
+  GFX_VITRINE_DIN = 43,
+  GFX_NMODOS = 44
 } GfxModo;
 
 typedef struct {
@@ -272,7 +271,6 @@ typedef struct {
 // `veuBranco` 1 quando a tinta e escura. tex 0 desliga.
 void gfx_textura_definir(GLuint tex, const float janela[4], float aspecto,
                          float forca, float veu, int veuBranco);
-int  gfx_textura_ativa(void);
 // O matiz da Imersiva por cima de um miolo de vidro (16% da luz do destaque,
 // com a forca da luz ambiente). gfx_vidro_painel/folha ja o chamam.
 void gfx_vidro_matiz(GfxRect r, float raio, float a);
@@ -359,7 +357,7 @@ void gfx_recorte(float x, float y, float w, float h);
 //
 // Agora sao os ARQUIVOS DE VERDADE. Os .svg do app web foram rasterizados a
 // 128px para deploy/app/art/icones/ (script /tmp/svg2png.py: injeta
-// width/height, troca currentColor por branco e chama sips). O PNG guarda a
+// width/height, troca currentColor por branco e converte com ImageMagick). O PNG guarda a
 // forma no ALPHA, entao gfx_icone desenha com GFX_MARCA e a COR vem do
 // chamador — o mesmo arquivo serve preto sobre pilula branca e branco sobre
 // circulo escuro.
@@ -387,8 +385,6 @@ int  gfx_snap_iniciar(int w, int h);
 // desenhada por tras dele, e um alvo so faria as duas brigarem pela mesma
 // textura a cada quadro.
 int  gfx_borrao_iniciar(int w, int h);
-void gfx_borrao_gerar(int via, unsigned int tex, float texAspecto);
-void gfx_borrao_desenhar(int via, GfxRect r, float alpha);
 void gfx_borrao_encerrar(void);
 // Copia DESFOCADA e pequena (96x54) de uma textura de arte, para o ajuste
 // "Desfocar nao assistidos" (#133). Gerada na primeira chamada e guardada; as
@@ -632,8 +628,6 @@ void gfx_anel_fora(GfxRect peca, float raio, float folga, float esp,
 // Cartao focado com material tipo vidro: mancha de accent atras, base escura
 // translucida, lavagem em degrade por pixel e reflexo de topo muito leve.
 // A area extra fica limitada a um unico item focado, nunca a tela inteira.
-void gfx_cartao_foco_vidro(GfxRect r, float raio, float foco, float alfa,
-                           float cr, float cg, float cb);
 // --- INTERFACE DE VIDRO (Ajustes > Aparencia; ajustes_vidro()) ---------------
 // O miolo comum do visual "vidro" (referencia: outro fork do app, em video):
 // superficie translucida que deixa a arte de tras passar, borda de fio de
@@ -654,7 +648,6 @@ void gfx_cartao_foco_vidro(GfxRect r, float raio, float foco, float alfa,
 // contraste). Em repouso 0,16 x 0,55 sobre o fundo #0D0D0D da 0,11 — o cinza
 // das pilulas do video de referencia.
 void gfx_vidro_folha(GfxRect r, float raio, float a);
-void gfx_vidro_superficie(GfxRect r, float raio, float a);
 // Fio de REPOUSO de um cartao/painel de vidro. Obedece a "Contorno do vidro";
 // o anel de FOCO (gfx_vidro_foco) nunca passa por aqui.
 void gfx_vidro_aro(GfxRect r, float raio, float esp, float cr, float cg, float cb, float ca);
@@ -689,7 +682,6 @@ void gfx_furo(GfxRect r);
 // gfx_cor): o que fica fora do SDF mantem a alpha da superficie e o plano de
 // video so aparece pela area arredondada.
 void gfx_furo_raio(GfxRect r, float raio);
-void gfx_textura(GfxRect r, GLuint tex);
 // Esmaece o quadro inteiro ja desenhado para `a` (0 = transparente, mostra o
 // plano de video de baixo). Usado no dissolve do voo da ilha.
 void gfx_dissolver_tela(float a);

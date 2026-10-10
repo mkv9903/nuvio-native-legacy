@@ -49,7 +49,6 @@ int  posplay_evento(const SDL_Event *e);
 int  posplay_desfocar_thumb(int idxCatalogo, int temporada, int episodio);
 void posplay_desenhar(Uint32 agora, float baseY);
 // O topo do que o painel ocupa (baseY quando ele nao esta no ar).
-float posplay_topo(float baseY);
 // Fecha e zera. Chamado quando o player abre outra coisa.
 void posplay_fechar(void);
 // O titulo do cartao, ja conferido pelo id (-1 = nenhum). Para teste (#190).

@@ -204,7 +204,7 @@ static int nLinhas(void) {
 //
 // O catalogo (Cinemeta `videos`) lista os episodios que existem; o mapa
 // acrescenta o que o Trakt conhece e o catalogo nao (especiais). Episodio que
-// AINDA NAO FOI AO AR fica fora (a agenda do TMDB da visita, a mesma regra de
+// AINDA NAO FOI AO AR fica fora (os metadados do TMDB da visita, a mesma regra de
 // epNaoExibido em detail.c): marcar como visto o que nao saiu e o erro que o
 // Trakt aceita calado. Temporada 0 do catalogo fica fora do "ate aqui" — o
 // especial so entra se o mapa o trouxer, como ja era.
@@ -228,7 +228,7 @@ static int montarLote(int idx, int modo, int t, int e, VistoPar *saida, int max)
     nc++;
   }
   return vistoep_lote(ci->imdb, modo == VM_ATE, t, e, cat, nc,
-                      extras_agenda_temporada(), extras_agenda_episodio(),
+                      extras_next_episode_season(), extras_next_episode_number(),
                       saida, max);
 }
 
@@ -826,10 +826,6 @@ void episodios_menu_visto(int idxCat, int temporada, int episodio,
 void episodios_menu_temporada(int idxCat, int temporada) {
   menuAbrirTemporada(idxCat, temporada, 1);
 }
-int  episodios_lote(int idxCat, int temporada, VistoPar *saida, int max) {
-  return montarLote(idxCat, VM_TEMP, temporada, 0, saida, max);
-}
-int  episodios_menu_modo_temporada(void) { return vmAberto && vmModoTemp; }
 int  episodios_menu_aberto(void) { return vmAberto && vmSo; }
 int  episodios_menu_aberto_qualquer(void) { return vmAberto; }
 void episodios_menu_evento(const SDL_Event *e) {

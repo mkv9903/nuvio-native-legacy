@@ -35,14 +35,12 @@
 #define LEGSYNC_ACAO_DESFAZER 4
 #define LEGSYNC_ACAO_OUTRA    8
 #define LEGSYNC_ACAO_PARAR    16
-#define LEGSYNC_ACAO_AUDIO    32   // F06: reference = speech heard in the playing audio
 
 typedef enum {
   LEGSYNC_INDISPONIVEL = 0, LEGSYNC_AGUARDANDO, LEGSYNC_PRONTA, LEGSYNC_LENDO,
   LEGSYNC_ANALISANDO, LEGSYNC_ACEITA, LEGSYNC_RECUSADA, LEGSYNC_PAUSADA,
   LEGSYNC_DESFEITA, LEGSYNC_DEPOIS,
-  LEGSYNC_OUVINDO              // F06: listening to the playing audio (progresso)
-} LegSyncFase;
+  } LegSyncFase;
 
 // Por que (para INDISPONIVEL/RECUSADA). Mapeado a texto traduzido por
 // legsync_texto (legsyncui.c).
@@ -51,8 +49,6 @@ typedef enum {
   LEGSYNC_M_EXTERNA_INCOMPLETA, LEGSYNC_M_SEM_REFERENCIA, LEGSYNC_M_SEM_RANGE,
   LEGSYNC_M_REDE, LEGSYNC_M_ORCAMENTO, LEGSYNC_M_SEM_OUTRA, LEGSYNC_M_CONFIANCA,
   // F06 (Por audio): why the audio reference is not offered / was refused.
-  LEGSYNC_M_AUD_PLATAFORMA, LEGSYNC_M_AUD_PASSTHROUGH, LEGSYNC_M_AUD_SEM_AUDIO,
-  LEGSYNC_M_AUD_SEM_FALA
 } LegSyncMotivo;
 
 typedef struct {
@@ -63,9 +59,6 @@ typedef struct {
   int offsetTotalMs;     // manual + automatico, o que o overlay usa
   int progresso;         // 0..100 lendo a referencia
   char idiomaRef[24];    // idioma da faixa embutida usada/lida
-  int audio;             // F06: o estado/resultado atual veio da referencia de AUDIO
-  LegSyncMotivo motivoAudio;  // F06: Sincronia por audio ligada mas "Por audio" nao
-                              // oferecido agora (plataforma/passthrough/sem audio)
   // R4 (automatico): 0 sem plano, 1 trabalhando, 2 sincronizou, 3 nao deu.
   int autoFase;
   int autoTrocou;             // 1 = a escolhida nao sincronizou e outra legenda entrou no lugar
@@ -91,9 +84,7 @@ void legsync_primaria_outra(int embutida);
 
 // F06: Ajustes > Sincronia por audio (local, padrao desligado). Barato; o
 // player chama a cada quadro. Desligar no meio cancela a escuta.
-void legsync_audio_habilitar(int ligado);
 // F06: a pessoa trocou a faixa de AUDIO: a escuta em curso nao vale mais.
-void legsync_audio_trocou(void);
 
 // R4: SINCRONIA AUTOMATICA. Toda legenda externa que entra como principal
 // (escolha da pessoa ou a automatica de idioma) e sincronizada sozinha contra a

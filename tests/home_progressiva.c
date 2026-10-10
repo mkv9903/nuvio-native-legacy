@@ -9,7 +9,7 @@ static int modo, mudou;
 static void conferirProntas(void) {
   CatItem c; CatFileira f;
   if (modo == 1) {
-    assert(cat_n_fileiras() == 5);
+    assert(cat_n_fileiras() == 4);
     assert(cat_copiar_por_id("ttOlda", "movie", &c));
     assert(cat_copiar_por_id("ttOldb", "movie", &c));
     assert(cat_copiar_por_id("ttOldc", "movie", &c));
@@ -61,17 +61,15 @@ static void item(CatItem *c, const char *id, int lista) {
 }
 int main(int argc, char **argv) {
   static CatItem seed[8]; static CatFileira f[8];
-  int n = 2, nf = 2, k;
+  int n = 1, nf = 1, k;
   const char *tmp = getenv("TMPDIR");
   assert(argc == 2); modo = atoi(argv[1]);
   snprintf(dirDados, sizeof dirDados, "%snuvio-home-progressiva-%d",
            tmp && *tmp ? tmp : "/tmp/", (int)getpid());
   assert(!mkdir(dirDados, 0700)); desc_tmdb(dirDados); homeestado_iniciar();
-  fixtureCW = fixtureSocial = 1;
+  fixtureCW = 1;
   item(&seed[0], "ttCW", 0); seed[0].progresso = 20;
-  item(&seed[1], "ttSocial", 0);
   snprintf(f[0].chave, sizeof f[0].chave, "continue_watching"); f[0].ini = 0; f[0].n = 1;
-  snprintf(f[1].chave, sizeof f[1].chave, "social_activity"); f[1].ini = 1; f[1].n = 1; f[1].socialGeracao = 1;
   if (modo == 1) { /* warm catalogue: old rows must never shrink */
     for (k = 0; k < 3; k++) {
       char id[32]; snprintf(id, sizeof id, "ttOld%c", 'a' + k);
@@ -99,11 +97,11 @@ int main(int argc, char **argv) {
   fflush(stdout);
   if (modo == 0) {
     assert(primeiraPublicada < __atomic_load_n(&lentaAcabou, __ATOMIC_ACQUIRE));
-    assert(cat_n_fileiras() == 5); /* 3 catalogue quota + 2 fixed */
-    assert(imdbNaTela("ttCW", NULL) == 1 && imdbNaTela("ttSocial", NULL) == 1);
+    assert(cat_n_fileiras() == 4); /* 3 catalogue quota + Continue Watching */
+    assert(imdbNaTela("ttCW", NULL) == 1);
   } else if (modo == 4) {
     assert(mudou && montagens == 2 && !strcmp(sessao_usuario(), "dono-new"));
-    assert(cat_n_fileiras() == 5);
+    assert(cat_n_fileiras() == 4);
   } else {
     assert(primeiraPublicada >= __atomic_load_n(&lentaAcabou, __ATOMIC_ACQUIRE));
     if (modo == 2) assert(imdbNaTela("ttWReady", ehNaLista) == 1);

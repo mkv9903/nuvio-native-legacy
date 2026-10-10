@@ -13,7 +13,6 @@ typedef enum {
   FILEIRA_TOP10,       // ranking usa poster retrato no legacy
   FILEIRA_COLECAO,     // premiações / coleções: landscape intermediário
   FILEIRA_SERVICO,     // catálogo por serviço: landscape compacto
-  FILEIRA_SOCIAL,      // atividade dos amigos: editorial largo com autoria
   FILEIRA_RETORNO,     // sessão recém-interrompida: faixa compacta de retomar
   FILEIRA_CATALOGOS,   // atalhos para catálogos existentes, não títulos
   // SO NO LAYOUT DINAMICA (ajustes_home_layout): formas que a Apple TV usa e a
@@ -40,12 +39,11 @@ typedef struct {
 int  home_iniciar(const char *dirArte);
 int  home_cartao_foco_por_cima(int indice); // repinta o cartao focado (menu do cartaz)
 int  home_item_focado(HomeItem *out);      // 0 se o foco ainda nao foi desenhado
-int  home_n_artes(void);                   // acervo de backdrops, usado pelo detalhe
+                   // acervo de backdrops, usado pelo detalhe
 // Ha fileira montada? Serve para o app saber que o catalogo CHEGOU depois do
 // arranque, e nao so que existia na hora de abrir.
 int  home_tem_fileiras(void);
-const char *home_arte(int i);
-const char *home_backdrop(int i);   // arte do titulo i do catalogo
+   // arte do titulo i do catalogo
 void home_evento(const SDL_Event *e);
 void home_atualizar(float dt, Uint32 agora);
 // Poe a home no topo (destaque, fileira 0, sem rolagem) e esquece a posicao
@@ -86,8 +84,6 @@ int  home_quer_sair(void);
 int  home_pediu_abrir(void);   // OK pressionado: consome o pedido
 int  home_pediu_tocar(void);   // OK num card de retomada com "OK no card" = Retomar
 int  home_pediu_menu(void);    // ESQUERDA na primeira coluna: chama o menu
-int home_pediu_social(void);
-int home_pediu_pessoa_social(CatItem *saida);
 // OK numa fileira de canal ("Ver tudo" dela, ou num cartao de canal — que ai
 // recebe o id para o guia ja abrir focado nele). `id` pode ser NULL.
 int  home_pediu_guia(char *id, int tam);

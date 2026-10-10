@@ -285,9 +285,6 @@ const ContaLibItem *contalib_item(int i) {
 }
 int contalib_n_vistos(void) { return nVistos; }
 unsigned contalib_vistos_revisao(void) { return vistosRev; }
-const ContaVisto *contalib_visto(int i) {
-  return (i >= 0 && i < nVistos) ? &vistos[i] : NULL;
-}
 int contalib_tem_conta(void) { return temConta && nItens > 0; }
 
 // ---------------------------------------------------------------- catalogo

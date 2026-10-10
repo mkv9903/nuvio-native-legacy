@@ -19,27 +19,4 @@ SDL_Surface *webp_carregar_larg(const char *caminho, int largMax, int *ow, int *
 SDL_Surface *webp_carregar_larg_mem(const unsigned char *dados, size_t n, int largMax,
                                     int *ow, int *oh);
 
-#ifdef __EMSCRIPTEN__
-// A PONTE PARA O DECODIFICADOR DO NAVEGADOR, para qualquer formato que ele
-// leia (`mime`: image/png, image/webp, image/gif — o tamanho sai do
-// cabecalho, entao so esses tres; do GIF sai o primeiro quadro; JPEG devolve
-// NULL). Bloqueia o fio chamador
-// (nunca o principal). Devolve RGBA de malloc com largura <= largMax quando
-// largMax > 0 — a reducao acontece no canvas, com o bitmap inteiro FORA do
-// heap do WASM; `ow`/`oh` recebem o tamanho original. Ver jpegrapido.c para
-// o porque: no Tizen o IMG_Load em software de um 3840x2160 levava 10-17 s e
-// 33 MB do heap de 256 MiB (logs do #69/#68).
-#include <stdint.h>
-#include <stddef.h>
-// Cria o Worker de decode e o canal direto (fio de decode -> Worker, sem o
-// fio principal; ver webp.c). Chamar no fio principal, no arranque, antes de
-// o primeiro fio de decode existir. Idempotente; de um pthread, so agenda.
-void navegador_iniciar(void);
-uint8_t *navegador_decodificar(const unsigned char *dados, size_t n, const char *mime,
-                               int largMax, int *lw, int *lh, int *ow, int *oh);
-// Pedidos que passaram do prazo e cujo Worker ainda nao terminou: o C nao
-// libera nada deles ate la. Libera os ja largados e devolve quantos sobram
-// (tests/decodefila-tizen.sh confere que chega a zero).
-int navegador_abandonados_vivos(void);
-#endif
 #endif

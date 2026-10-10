@@ -2,15 +2,6 @@
 #include "celular.h"
 #include <string.h>
 
-#ifdef __EMSCRIPTEN__
-int  celular_disponivel(void) { return 0; }
-int  celular_abrir(const char *t) { (void)t; return 0; }
-void celular_fechar(void) {}
-int  celular_estado(void) { return CEL_PARADO; }
-const char *celular_url(void) { return ""; }
-int  celular_pegar(char *d, size_t n) { (void)d; (void)n; return 0; }
-int  celular_porta(void) { return 0; }
-#else
 
 #include "idioma.h"
 int ajustes_idioma(void);   // ajustes.h puxa SDL; so o idioma interessa aqui
@@ -517,4 +508,3 @@ int celular_abrir(const char *titulo) {
   printf("[celular] servidor no ar (porta %d)\n", porta);
   return 1;
 }
-#endif

@@ -38,7 +38,6 @@ const char *i18n(const char *s) { return s; }
 const char *idioma_mes_data(int mes, const char *nomePt) { (void)mes; return nomePt; }
 int  tex_falhou(const char *u) { (void)u; return 0; }
 char *dados_ler(const char *nome) { (void)nome; return NULL; }
-void dados_marcar_sujo(int leve) { (void)leve; }
 const char *ling_legenda(void) { return ""; }
 const char *ling_audio(void) { return ""; }
 void ling_conta_legenda(const char *v) { (void)v; }

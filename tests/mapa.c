@@ -105,7 +105,6 @@ static void testarVizinhanca(void) {
   static MapaSemente foco;
   static MapaVizinhos v;
   MapaVizCand pool[8];
-  MapaVizAmigo amg[2];
   MapaVizEntrada e;
   MapaObra lista[4];
   unsigned visto;
@@ -138,13 +137,10 @@ static void testarVizinhanca(void) {
   pool[3] = cand("Heat", 1995, "Crime", NULL, NULL, 4);
   pool[4] = cand("Logan", 2017, "Action", NULL, "Hugh Jackman", 5);
   pool[5] = cand("Prisoners", 2013, "Crime", NULL, NULL, 6);   // o proprio foco nunca volta
-  amg[0].obra = pool[2].obra; snprintf(amg[0].quem, sizeof amg[0].quem, "Ana");   // ja usado acima
-  amg[1].obra = pool[3].obra; snprintf(amg[1].quem, sizeof amg[1].quem, "Bia");
   visto = mapa_hash_titulo("Sicario");
   memset(&e, 0, sizeof e);
   e.foco = &foco;
   e.pool = pool; e.nPool = 6;
-  e.amigos = amg; e.nAmigos = 2;
   e.vistos = &visto; e.nVistos = 1;
   v.revisao = 42;
   mapa_vizinhos_montar(&e, &v);
@@ -160,7 +156,6 @@ static void testarVizinhanca(void) {
   assert(v.g[MAPA_VIZ_TEMA].tipo == MAPA_GR_GENERO && !strcmp(v.g[MAPA_VIZ_TEMA].sub, "Crime"));
   assert(temTitulo(&v.g[MAPA_VIZ_TEMA], "Zodiac"));    // divide os DOIS generos: primeiro
   assert(!strcmp(v.g[MAPA_VIZ_TEMA].itens[0].obra.titulo, "Zodiac"));
-  assert(v.g[MAPA_VIZ_AMIGOS].n == 0 || !temTitulo(&v.g[MAPA_VIZ_AMIGOS], "Zodiac"));
   // Nenhum titulo em dois grupos, e o foco em nenhum.
   for (gi = 0; gi < MAPA_VIZ_GRUPOS; gi++)
     for (i = 0; i < v.g[gi].n; i++) {
@@ -259,8 +254,7 @@ static void testarClimas(void) {
 int main(void) {
   static MapaSemente s[3];
   static MapaCreditos cred[1];
-  static Mapa m;
-  int i, achouOrigem = 0;
+  int i;
 
   memset(s, 0, sizeof s);
   assert(mapa_ler_detalhe(FILME_A, 0, &s[0]));
@@ -287,43 +281,6 @@ int main(void) {
   assert(mapa_ler_creditos(CREDITOS, 1, &cred[0]) == 2);
   assert(cred[0].obras[0].votos >= cred[0].obras[1].votos);
   cred[0].pessoa = 525;
-
-  mapa_cruzar(s, 3, cred, 1, NULL, 0, &m);
-  assert(m.estado == MAPA_CRUZADO && m.nSem == 3);
-  assert(m.nPontes >= 2);
-  // A Origem e recomendada pelas duas de Nolan: e a ponte mais forte.
-  assert(!strcmp(m.pontes[0].obra.titulo, "A Origem"));
-  assert((m.pontes[0].a == 0 && m.pontes[0].b == 1));
-  assert(m.pontes[0].elo == MAPA_ELO_TEMA);
-  assert(!strcmp(m.pontes[0].motivo, "viagem no tempo"));
-  for (i = 0; i < m.nPontes; i++) {
-    int j;
-    for (j = i + 1; j < m.nPontes; j++)
-      assert(m.pontes[i].obra.tmdb != m.pontes[j].obra.tmdb);
-    if (!strcmp(m.pontes[i].obra.titulo, "Interestelar")) achouOrigem = 1;
-  }
-  assert(!achouOrigem);    // semente nunca volta como sugestao
-  assert(m.nFios == 1 && !strcmp(m.fios[0].nome, "Christopher Nolan"));
-  assert(m.fios[0].n == 2 && m.fios[0].direcao == 1);
-  // Interestelar ja foi visto: a proxima do fio e o Batman.
-  assert(m.fios[0].temProxima && m.fios[0].proxima.tmdb == 155);
-  assert(m.nTemas >= 1 && !strcmp(m.temas[0].nome, "viagem no tempo") && m.temas[0].n == 3);
-  assert(m.anoMin == 2000 && m.anoMax >= 2017);
-  assert(mapa_tema_nome("wormhole") == NULL);   // sem traducao: nao vira tema
-
-  // Titulo ja comecado fora das sementes nao vira ponte.
-  { unsigned v = mapa_hash_titulo("A Origem");
-    mapa_cruzar(s, 3, cred, 1, &v, 1, &m);
-    for (i = 0; i < m.nPontes; i++) assert(strcmp(m.pontes[i].obra.titulo, "A Origem"));
-    for (i = 0; i < m.nSorte; i++) assert(strcmp(m.sorte[i].titulo, "A Origem")); }
-
-  // Uma semente so: ainda ha o que sugerir (a == b).
-  mapa_cruzar(s, 1, NULL, 0, NULL, 0, &m);
-  assert(m.nPontes >= 1 && m.pontes[0].a == 0 && m.pontes[0].b == 0);
-
-  // Nada: mapa vazio, sem estourar.
-  mapa_cruzar(s, 0, NULL, 0, NULL, 0, &m);
-  assert(m.estado == MAPA_VAZIO && m.nPontes == 0);
 
   testarVizinhanca();
   testarClimas();

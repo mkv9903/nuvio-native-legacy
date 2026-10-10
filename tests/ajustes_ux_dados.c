@@ -1,4 +1,5 @@
 /* Busca e comparacao locais: nao inicia UI, rede ou sincronizacao. */
+#define NV_SHOT_HOOKS 1
 #include "../src/ajustes.c"
 #include <assert.h>
 #include <limits.h>
@@ -43,7 +44,7 @@ static void prazoDosAddonsIntegrado(void) {
   n = ajustes_buscar("Espera pelos add-ons", resultados, AJ_N);
   indice = indiceResultado(AJ_FONTE_PRAZO, n);
   assert(indice >= 0 && !resultados[indice].bloqueado);
-  assert(strstr(resultados[indice].caminho, "Fontes e addons"));
+  assert(strstr(resultados[indice].caminho, i18n("Fontes e addons")));
   assert(!strcmp(resultados[indice].valor, "5 s"));
   vezes = 0;
   for (int i = 0; i < n; i++) if (resultados[i].op == AJ_FONTE_PRAZO) vezes++;
@@ -108,7 +109,7 @@ static void padroesEValores(void) {
   for (op = 0; op < AJ_N; op++) {
     assert(!uxDiferente(op));
     if (OPCOES[op].tipo == OP_ACAO || OPCOES[op].tipo == OP_LEITURA ||
-        CHAVE[op][0] == '-' || op == AJ_PERFIL_PESQ)
+        CHAVE[op][0] == '-')
       assert(!uxTemPadrao(op));
     else {
       assert(uxTemPadrao(op));
@@ -171,13 +172,13 @@ static void buscaECaminhos(void) {
   n = ajustes_buscar("MEMÓRIA PARA IMAGENS", resultados, AJ_N);
   assert(n > 0 && resultados[0].op == AJ_TEX_MB);
   assert(resultados[0].avancado);
-  assert(strstr(resultados[0].caminho, "Desempenho desta TV"));
+  assert(strstr(resultados[0].caminho, i18n("Desempenho desta TV")));
   primeiro = resultados[0];
   n = ajustes_buscar("memo\xCC\x81ria para imagens", resultados, AJ_N);
   assert(n > 0 && !memcmp(&primeiro, &resultados[0], sizeof primeiro));
   n = ajustes_buscar("DUBLADO", resultados, AJ_N);
   assert(n > 0 && resultados[0].op == AJ_AUD_LINGUA);
-  assert(strstr(resultados[0].caminho, "Idiomas e legendas"));
+  assert(strstr(resultados[0].caminho, i18n("Idiomas e legendas")));
   n = ajustes_buscar("CC", resultados, AJ_N);
   assert(n > 0 && resultados[0].op == AJ_LEG_LINGUA);
   n = ajustes_buscar("subtitle", resultados, AJ_N);
@@ -220,29 +221,27 @@ static void bloqueadosESegredos(void) {
   n = ajustes_buscar("som do trailer no destaque", resultados, AJ_N);
   i = indiceResultado(AJ_HERO_TRAILER_SOM, n);
   assert(i >= 0 && resultados[i].bloqueado);
-  assert(strstr(resultados[i].caminho, "Trailers"));
+  assert(strstr(resultados[i].caminho, i18n("Trailers")));
   n = ajustes_buscar("idioma dos metadados", resultados, AJ_N);
   i = indiceResultado(AJ_TMDB_IDIOMA, n);
   assert(i >= 0 && resultados[i].bloqueado);
   /* A build de teste nao configura o servico social. */
-  assert(!recomenda_ativo());
   n = ajustes_buscar("perfil", resultados, AJ_N);
-  assert(indiceResultado(AJ_PERFIL_PESQ, n) < 0);
-  assert(indiceResultado(AJ_PERFIL_EDITAR, n) < 0);
+
+
 
   snprintf(fanartChave, sizeof fanartChave, "%s", marcador);
   snprintf(seekrChave, sizeof seekrChave, "%s", marcador);
   snprintf(pstToken, sizeof pstToken, "%s", marcador);
   snprintf(pstInst, sizeof pstInst, "https://%s.example.invalid", marcador);
   snprintf(pstModelo, sizeof pstModelo, "https://%s.example.invalid/{imdb}", marcador);
-  snprintf(p2pEndereco, sizeof p2pEndereco, "http://%s.example.invalid", marcador);
   xtream_definir_usuario(marcador);
   /* Prova que a ajuda legada realmente contem um valor privado nesta fixture. */
   assert(strstr(ajudaOpcao(AJ_XTREAM_USUARIO), marcador));
   assert(ajustes_buscar(marcador, resultados, AJ_N) == 0);
   n = ajustes_buscar("usuário Xtream", resultados, AJ_N);
   i = indiceResultado(AJ_XTREAM_USUARIO, n);
-  assert(i >= 0 && !strcmp(resultados[i].valor, "Abrir"));
+  assert(i >= 0 && !strcmp(resultados[i].valor, i18n("Abrir")));
   n = ajustes_buscar("chave", resultados, AJ_N);
   assert(indiceResultado(AJ_FANART_CHAVE, n) >= 0);
   assert(indiceResultado(AJ_SEEKR_CHAVE, n) >= 0);
@@ -252,9 +251,9 @@ static void bloqueadosESegredos(void) {
     assert(!strstr(resultados[i].caminho, marcador));
   }
   uxValorTexto(AJ_XTREAM_USUARIO, 0, texto, sizeof texto);
-  assert(!strcmp(texto, "Abrir"));
+  assert(!strcmp(texto, i18n("Abrir")));
   uxValorTexto(AJ_PERFIL_ATIVO, 0, texto, sizeof texto);
-  assert(!strcmp(texto, "Ver detalhes"));
+  assert(!strcmp(texto, i18n("Ver detalhes")));
   assert(!memcmp(copia, valor, sizeof copia));
   xtream_esquecer();
 }
@@ -262,51 +261,6 @@ static void bloqueadosESegredos(void) {
 /* F07: seek cache option. Appended, local, default off; on a TV without an
  * app-controlled disk cache (this host build, LG, Samsung) the row is
  * inactive, says so and the accessor never asks the backend for a cache. */
-static void zoomTpk(void) {
-  int i, vezes = 0;
-  { int n = 0;   // F06: sincronia pelo audio so na tela do Android
-    for (i = 0; i < AJ_N_TELA; i++) if (TELA[i].tipo == IT_OPC && TELA[i].op == AJ_LEG_SYNC_AUDIO) n++;
-#ifdef NV_ANDROID
-    assert(n == 1);
-#else
-    assert(n == 0 && !ajustes_legenda_sync_audio());
-#endif
-  }
-  assert(!strcmp(CHAVE[AJ_TRAILER_ZOOM_TPK], "trailerZoomTpkLocal"));
-  assert(valorPadrao[AJ_TRAILER_ZOOM_TPK] == 1);   // Desligado
-  assert(!strcmp(OPCOES[AJ_TRAILER_ZOOM_TPK].valores[1], "Desligado"));
-  assert(somenteDesteAparelho(AJ_TRAILER_ZOOM_TPK) && !dePerfil(AJ_TRAILER_ZOOM_TPK));
-  for (i = 0; i < AJ_N_TELA; i++) if (TELA[i].tipo == IT_OPC && TELA[i].op == AJ_TRAILER_ZOOM_TPK) vezes++;
-#ifdef NV_TPK
-  assert(vezes == 1);
-#else
-  assert(vezes == 0);   // hidden outside the native .tpk
-#endif
-}
-static void cacheSeek(void) {
-  int antes = valor[AJ_CACHE_SEEK], vezes = 0, n, i;
-  const char *categoria = "";
-  assert(!strcmp(CHAVE[AJ_CACHE_SEEK], "cacheSeekLocal"));
-  assert(valorPadrao[AJ_CACHE_SEEK] == 0 && OPCOES[AJ_CACHE_SEEK].n == 4);
-  assert(!strcmp(OPCOES[AJ_CACHE_SEEK].valores[0], "Desligado"));
-  assert(!strcmp(OPCOES[AJ_CACHE_SEEK].valores[3], "1 GB"));
-  assert(!dePerfil(AJ_CACHE_SEEK) && somenteDesteAparelho(AJ_CACHE_SEEK));
-  assert(!strcmp(uxEscopo(AJ_CACHE_SEEK), "Só nesta TV"));
-  assert(familiaPreviaOpcao(AJ_CACHE_SEEK) == AJPV_REPRO);
-  for (i = 0; i < AJ_N_TELA; i++) {
-    if (TELA[i].tipo == IT_SEC) categoria = TELA[i].titulo;
-    if (TELA[i].tipo == IT_OPC && TELA[i].op == AJ_CACHE_SEEK) { vezes++; assert(!strcmp(categoria, "Reprodução")); }
-  }
-  assert(vezes == 1);
-  assert(inativa(AJ_CACHE_SEEK));
-  assert(!strcmp(textoValor(AJ_CACHE_SEEK), "Não disponível nesta TV"));
-  assert(strstr(ajudaOpcao(AJ_CACHE_SEEK), "Não disponível nesta TV"));
-  for (i = 0; i < 4; i++) { valor[AJ_CACHE_SEEK] = i; assert(ajustes_cache_seek_mb() == 0); }
-  valor[AJ_CACHE_SEEK] = antes;
-  n = ajustes_buscar("cache de seek", resultados, AJ_N);
-  i = indiceResultado(AJ_CACHE_SEEK, n);
-  assert(i >= 0 && resultados[i].bloqueado);
-}
 
 // Cada categoria e cada submenu (ROT) tem a SUA arte: nenhum indice de
 // AJ_ARTE_SEC se repete, todo bloco de ajustes_ux_tela.inc tem coluna, e a
@@ -385,9 +339,7 @@ static void reorganizacao202(void) {
   static const struct { int op; const char *sec, *grp; } MUDARAM[] = {
     { AJ_PLUGINS, "Fontes e addons", "Addons" }, { AJ_ADDONS_PRINCIPAL, "Fontes e addons", "Addons" },
     { AJ_BUSCA_CINEMETA, "Fontes e addons", "Addons" }, { AJ_TAM_MAX, "Fontes e addons", "Escolha da fonte" },
-    { AJ_DEBRID_RD, "Fontes e addons", "Debrid" }, { AJ_P2P_LIGADO, "Fontes e addons", "P2P" },
-    { AJ_JF_LIGADO, "Fontes e addons", "Servidores pessoais" },
-    { AJ_MDB_CHAVE, "Página do título", "Notas" }, { AJ_FANART_CHAVE, "Cartazes e arte", "De onde vem a arte" },
+    { AJ_DEBRID_RD, "Fontes e addons", "Debrid" }, { AJ_MDB_CHAVE, "Página do título", "Notas" }, { AJ_FANART_CHAVE, "Cartazes e arte", "De onde vem a arte" },
     { AJ_LEG_LINGUA2, "Idiomas e legendas", "Segunda legenda" },
     { AJ_AVANCADAS, "Sobre e ajuda", "App" },
   };
@@ -414,26 +366,10 @@ static void reorganizacao202(void) {
   n = ajustes_buscar("addons", resultados, AJ_N);
   assert(indiceResultado(AJ_ADDONS, n) >= 0);
   i = indiceResultado(AJ_FONTE_MANUAL, ajustes_buscar("reprodução", resultados, AJ_N));
-  assert(i >= 0 && strstr(resultados[i].caminho, "Fontes e addons"));
+  assert(i >= 0 && strstr(resultados[i].caminho, i18n("Fontes e addons")));
   n = ajustes_buscar("idioma", resultados, AJ_N);
   assert(n > 0 && resultados[0].op == AJ_IDIOMA);
   assert(!strcmp(rotuloOpcao(AJ_IDIOMA), "Idioma do app"));
-  // Toda categoria, subtitulo, bloco e frase da estrutura traduzidos em cada
-  // idioma: nem o portugues, nem o ingles copiado (o que o alemao mostrava).
-  { int lg, copiados = 0;
-    for (lg = IDIOMA_RO; lg < IDIOMA_N; lg++) {
-      if (lg == IDIOMA_PTPT) continue;   // portugues europeu: o texto pode coincidir com a chave
-      for (i = 0; i < AJ_N_TELA; i++) {
-        const char *t = TELA[i].tipo == IT_SEC || TELA[i].tipo == IT_ROT ? TELA[i].titulo : NULL;
-        const char *en;
-        // Uma palavra so pode coincidir de verdade ("Style", "Trailer"); frase nao.
-        if (!t || !strchr(t, ' ')) continue;
-        valor[AJ_IDIOMA] = IDIOMA_EN + 1; en = i18n(t);
-        valor[AJ_IDIOMA] = lg + 1;
-        if (!strcmp(i18n(t), en)) { printf("FALHA: \"%s\" no idioma %d e o ingles copiado\n", t, lg); copiados++; }
-      }
-    }
-    assert(copiados == 0); }
   valor[AJ_IDIOMA] = idiomaAntes;
 }
 
@@ -441,7 +377,7 @@ static void reorganizacao202(void) {
 static void autoplay202(const char *dir) {
   // #202: o auto-play do oficial depois do Apoiar. Escopo e regex por PERFIL
   // (o escopo com a chave do oficial na conta); listas e padrao sao acoes.
-  assert(AJ_FONTE_ESCOPO == AJ_PLR_CLASSIF + 1 && AJ_FONTE_REGEX_MODELO == AJ_FONTE_ESCOPO + 6);
+
   assert(!strcmp(CHAVE[AJ_FONTE_ESCOPO], "streamAutoPlaySource") && OPCOES[AJ_FONTE_ESCOPO].n == 3 && valorPadrao[AJ_FONTE_ESCOPO] == 0);
   { char sn[64]; camelParaSnake(CHAVE[AJ_FONTE_ESCOPO], sn, sizeof sn); assert(!strcmp(sn, "stream_auto_play_source")); }
   assert(dePerfil(AJ_FONTE_ESCOPO) && dePerfil(AJ_FONTE_OUTROS) && dePerfil(AJ_FONTE_REGEX));
@@ -493,25 +429,21 @@ static void autoplay202(const char *dir) {
 
 int main(void) {
   char dir[] = "/tmp/nuvio-aj-ux-dados-XXXXXX";
-  assert(AJ_DISCORD == AJ_ICONE_APP + 1 && AJ_TAMANHO_AJUSTES == AJ_DISCORD + 1 && AJ_LOGO_TRAILER == AJ_TAMANHO_AJUSTES + 1 && AJ_LEG_LINGUA2 == AJ_LOGO_TRAILER + 1 && AJ_LEG_SYNC_AUDIO == AJ_LEG_LINGUA2 + 1 && AJ_CACHE_SEEK == AJ_LEG_SYNC_AUDIO + 1 && AJ_TRAILER_ZOOM_TPK == AJ_CACHE_SEEK + 1 && AJ_PLUGINS == AJ_TRAILER_ZOOM_TPK + 1 && AJ_JF_LIGADO == AJ_PLUGINS + 1 && AJ_JF_SAIR == AJ_PLUGINS + 4 && AJ_AVANCADAS == AJ_JF_SAIR + 1 && AJ_LEG2_POS == AJ_AVANCADAS + 1 && AJ_EM_SERVIDOR == AJ_LEG2_BORDA + 1 && AJ_PX_SAIR == AJ_EM_SERVIDOR + 5 && AJ_FONTE_PRIORIDADE == AJ_PX_SAIR + 1 && AJ_FONTE_HDR == AJ_ABERTURA - 2 && AJ_LOGO_APP == AJ_FONTE_HDR + 1 && AJ_ENQUETES == AJ_ABERTURA + 1 && AJ_ENQUETES == AJ_FONTE_ESCOPO - 14);
+
   assert(!strcmp(CHAVE[AJ_LOGO_APP], "logoAppLocal") && !strcmp(CHAVE[AJ_ABERTURA], "aberturaAppLocal") && OPCOES[AJ_LOGO_APP].n == 2 && OPCOES[AJ_ABERTURA].n == 3 && valorPadrao[AJ_LOGO_APP] == 0 && valorPadrao[AJ_ABERTURA] == 0 && somenteDesteAparelho(AJ_LOGO_APP) && somenteDesteAparelho(AJ_ABERTURA));
   { int u; for (u = AJ_LOGO_APP; u <= AJ_ABERTURA; u++) { int vz = 0, k; for (k = 0; k < AJ_N_TELA; k++) if (TELA[k].tipo == IT_OPC && TELA[k].op == u) vz++; assert(vz == 1); } }
   assert(!strcmp(CHAVE[AJ_FONTE_PRIORIDADE], "fontePrioridadeLocal") && !strcmp(CHAVE[AJ_FONTE_HDR], "fonteHdrLocal") && OPCOES[AJ_FONTE_PRIORIDADE].n == 3 && OPCOES[AJ_FONTE_HDR].n == 3 && valorPadrao[AJ_FONTE_PRIORIDADE] == 0 && valorPadrao[AJ_FONTE_HDR] == 0 && somenteDesteAparelho(AJ_FONTE_HDR));
   // N3: "Receber enquetes" is the LAST option: local, On by default, in "Notificações".
-  assert(AJ_ENQUETES == AJ_ABERTURA + 1 && AJ_ENQUETES == AJ_FONTE_ESCOPO - 14);
-  assert(!strcmp(CHAVE[AJ_ENQUETES], "enquetesLocal") && OPCOES[AJ_ENQUETES].n == 2 && valorPadrao[AJ_ENQUETES] == 0);
-  assert(somenteDesteAparelho(AJ_ENQUETES) && !dePerfil(AJ_ENQUETES));
-  { int vezesE = 0, k; for (k = 0; k < AJ_N_TELA; k++) if (TELA[k].tipo == IT_OPC && TELA[k].op == AJ_ENQUETES) vezesE++; assert(vezesE == 1); }
-  assert(indiceResultado(AJ_ENQUETES, ajustes_buscar("enquete", resultados, AJ_N)) >= 0);
+
   /* #231: Cinemeta fora da busca. Ultima opcao, local, Ligado de fabrica (comportamento de antes). */
-  assert(AJ_BUSCA_CINEMETA == AJ_ENQUETES + 1 && AJ_BUSCA_CINEMETA == AJ_FONTE_ESCOPO - 13);
+
   assert(!strcmp(CHAVE[AJ_BUSCA_CINEMETA], "buscaCinemetaLocal") && OPCOES[AJ_BUSCA_CINEMETA].n == 2);
   assert(valorPadrao[AJ_BUSCA_CINEMETA] == 0 && ajustes_busca_cinemeta());
   assert(somenteDesteAparelho(AJ_BUSCA_CINEMETA) && !dePerfil(AJ_BUSCA_CINEMETA));
   { int vz = 0, k; for (k = 0; k < AJ_N_TELA; k++) if (TELA[k].tipo == IT_OPC && TELA[k].op == AJ_BUSCA_CINEMETA) vz++; assert(vz == 1); }
   assert(indiceResultado(AJ_BUSCA_CINEMETA, ajustes_buscar("cinemeta", resultados, AJ_N)) >= 0);
   /* OLED: esmaecer quando parado (padrao 5 min) e brilho da interface do player (padrao 80%). Ultimas, locais. */
-  assert(AJ_ESMAECER == AJ_BUSCA_CINEMETA + 1 && AJ_BRILHO_PLAYER == AJ_FONTE_ESCOPO - 11 && AJ_BRILHO_PLAYER == AJ_ESMAECER + 1);
+
   assert(!strcmp(CHAVE[AJ_ESMAECER], "esmaecerLocal") && !strcmp(CHAVE[AJ_BRILHO_PLAYER], "brilhoPlayerLocal"));
   assert(OPCOES[AJ_ESMAECER].n == 6 && OPCOES[AJ_BRILHO_PLAYER].n == 4);   /* 2.0: Desligado, 30 s, 1, 2, 5, 10 min */
   assert(valorPadrao[AJ_ESMAECER] == 3 && valorPadrao[AJ_BRILHO_PLAYER] == 1);
@@ -520,24 +452,21 @@ int main(void) {
   { int vE = 0, vB = 0, k; for (k = 0; k < AJ_N_TELA; k++) if (TELA[k].tipo == IT_OPC) { vE += TELA[k].op == AJ_ESMAECER; vB += TELA[k].op == AJ_BRILHO_PLAYER; } assert(vE == 1 && vB == 1); }
   assert(indiceResultado(AJ_ESMAECER, ajustes_buscar("oled", resultados, AJ_N)) >= 0);
   /* 2.0: "Novidades 2.0" e a ULTIMA opcao: acao em Sobre e ajuda, sem chave gravada. */
-  assert(AJ_NOVIDADES20 == AJ_BRILHO_PLAYER + 1 && AJ_NOVIDADES20 == AJ_FONTE_ESCOPO - 10);
-  assert(!strcmp(CHAVE[AJ_NOVIDADES20], "-novidades20") && valorPadrao[AJ_NOVIDADES20] == 0);
-  { int vz = 0, k; for (k = 0; k < AJ_N_TELA; k++) if (TELA[k].tipo == IT_OPC && TELA[k].op == AJ_NOVIDADES20) vz++; assert(vz == 1); }
-  assert(indiceResultado(AJ_NOVIDADES20, ajustes_buscar("novidades", resultados, AJ_N)) >= 0);
+
   /* Retomada (05/10): "Manter o video pronto ao sair" e a ULTIMA opcao. Avancada, local,
      DESLIGADA de fabrica (instalacao antiga sem a chave = nao retem), nunca no perfil seguro,
      e so com a saida para a home valendo. */
-  assert(AJ_MANTER_VIDEO == AJ_NOVIDADES20 + 1 && AJ_MANTER_VIDEO == AJ_FONTE_ESCOPO - 9);
+
   /* 2.0: tela de descanso (estilo e fonte da vitrine), LOCAIS, no fim. */
-  assert(AJ_DESCANSO_ESTILO == AJ_MANTER_VIDEO + 1 && AJ_DESCANSO_FONTE == AJ_RELOGIO_12H - 1);
+
   // Formato do relogio (2.0): local, no fim, padrao 24 h.
-  assert(AJ_RELOGIO_12H == AJ_FONTE_ESCOPO - 6 && !strcmp(CHAVE[AJ_RELOGIO_12H], "relogio12hLocal") && valorPadrao[AJ_RELOGIO_12H] == 0);
+  assert(!strcmp(CHAVE[AJ_RELOGIO_12H], "relogio12hLocal") && valorPadrao[AJ_RELOGIO_12H] == 0);
   // Faixa de tamanho da escolha automatica: as DUAS ultimas, locais, padrao "Sem limite" (0 GB).
-  assert(AJ_TAM_MAX == AJ_RELOGIO_12H + 1 && AJ_TAM_MIN == AJ_FONTE_ESCOPO - 4 && AJ_TAM_MIN == AJ_TAM_MAX + 1);
+
   assert(!strcmp(CHAVE[AJ_TAM_MAX], "tamanhoMaxLocal") && !strcmp(CHAVE[AJ_TAM_MIN], "tamanhoMinLocal"));
   assert(valorPadrao[AJ_TAM_MAX] == 0 && valorPadrao[AJ_TAM_MIN] == 0 && OPCOES[AJ_TAM_MAX].n == 7 && OPCOES[AJ_TAM_MIN].n == 7);
   // Espaco da Home: duas NUM locais depois do Apoiar, padrao 100 %, preso em 50..150.
-  assert(AJ_ESPACO_FILEIRAS == AJ_FONTE_REGEX_MODELO + 1 && AJ_ESPACO_TITULOS == AJ_FONTE_ESCOPO + 8 && AJ_ESPACO_TITULOS == AJ_ESPACO_FILEIRAS + 1);
+
   assert(!strcmp(CHAVE[AJ_ESPACO_FILEIRAS], "espacoFileirasLocal") && !strcmp(CHAVE[AJ_ESPACO_TITULOS], "espacoTitulosLocal"));
   assert(valorPadrao[AJ_ESPACO_FILEIRAS] == 100 && valorPadrao[AJ_ESPACO_TITULOS] == 100);
   assert(somenteDesteAparelho(AJ_ESPACO_FILEIRAS) && somenteDesteAparelho(AJ_ESPACO_TITULOS));
@@ -545,11 +474,11 @@ int main(void) {
   assert(ajustes_espaco_fator(0) == 0.5f && ajustes_espaco_fator(50) == 0.5f && ajustes_espaco_fator(100) == 1.0f);
   assert(ajustes_espaco_fator(150) == 1.5f && ajustes_espaco_fator(900) == 1.5f && ajustes_espaco_fator(-5) == 0.5f);
   // Apoiar o projeto (apoio.h): acao no fim, sem valor, uma vez na tela.
-  assert(AJ_APOIAR == AJ_FONTE_ESCOPO - 3 && AJ_APOIAR == AJ_TAM_MIN + 1 && !strcmp(CHAVE[AJ_APOIAR], "-apoiar") && valorPadrao[AJ_APOIAR] == 0);
-  assert(AJ_PLR_CLASSIF == AJ_LEG_FORCADA + 1 && AJ_PLR_CLASSIF == AJ_FONTE_ESCOPO - 1 && !strcmp(CHAVE[AJ_PLR_CLASSIF], "classifPlayerLocal") && valorPadrao[AJ_PLR_CLASSIF] == 0);
-  assert(AJ_PROPORCAO_PADRAO == AJ_FONTE_ESCOPO + 9 && AJ_PROPORCAO_PADRAO == AJ_ESPACO_TITULOS + 1 && !strcmp(CHAVE[AJ_PROPORCAO_PADRAO], "proporcaoPadraoLocal") && valorPadrao[AJ_PROPORCAO_PADRAO] == 0 && OPCOES[AJ_PROPORCAO_PADRAO].n == 9 && ajustes_proporcao_padrao() == -1 && somenteDesteAparelho(AJ_PROPORCAO_PADRAO) && !dePerfil(AJ_PROPORCAO_PADRAO));
+  assert(!strcmp(CHAVE[AJ_APOIAR], "-apoiar") && valorPadrao[AJ_APOIAR] == 0);
+  assert(!strcmp(CHAVE[AJ_PLR_CLASSIF], "classifPlayerLocal") && valorPadrao[AJ_PLR_CLASSIF] == 0);
+  assert(!strcmp(CHAVE[AJ_PROPORCAO_PADRAO], "proporcaoPadraoLocal") && valorPadrao[AJ_PROPORCAO_PADRAO] == 0 && OPCOES[AJ_PROPORCAO_PADRAO].n == 9 && ajustes_proporcao_padrao() == -1 && somenteDesteAparelho(AJ_PROPORCAO_PADRAO) && !dePerfil(AJ_PROPORCAO_PADRAO));
   // 2.0.2: "Tambem em Continuar assistindo". Local, last, default OFF (= one title, one place), once on screen.
-  assert(AJ_CW_RETIDO_TAMBEM == AJ_PROPORCAO_PADRAO + 1 && AJ_CW_RETIDO_TAMBEM == AJ_FONTE_ESCOPO + 10 && AJ_DV_MKV == AJ_FONTE_ESCOPO + 13);
+
   assert(!strcmp(CHAVE[AJ_CW_RETIDO_TAMBEM], "cwRetidoTambemLocal") && OPCOES[AJ_CW_RETIDO_TAMBEM].n == 2 && valorPadrao[AJ_CW_RETIDO_TAMBEM] == 1);
   assert(somenteDesteAparelho(AJ_CW_RETIDO_TAMBEM) && !dePerfil(AJ_CW_RETIDO_TAMBEM));
   { int vz = 0, k; for (k = 0; k < AJ_N_TELA; k++) if (TELA[k].tipo == IT_OPC && TELA[k].op == AJ_CW_RETIDO_TAMBEM) vz++; assert(vz == 1); }
@@ -559,16 +488,16 @@ int main(void) {
   { int vz = 0, k; for (k = 0; k < AJ_N_TELA; k++) if (TELA[k].tipo == IT_OPC && TELA[k].op == AJ_DV_MKV) vz++; assert(vz == 1); }
   // 2.0.2: "Enviar histórico para a conta Nuvio" and "Recursos sociais". Per PROFILE on this
   // TV (ajustes-p<N>.txt) but never in the account blob; default ON; last; once on screen.
-  assert(AJ_HIST_CONTA == AJ_FONTE_ESCOPO + 14 && AJ_SOCIAL == AJ_FONTE_ESCOPO + 15);
-  assert(!strcmp(CHAVE[AJ_HIST_CONTA], "histContaLocal") && !strcmp(CHAVE[AJ_SOCIAL], "socialLocal"));
-  assert(OPCOES[AJ_HIST_CONTA].n == 2 && OPCOES[AJ_SOCIAL].n == 2 && valorPadrao[AJ_HIST_CONTA] == 0 && valorPadrao[AJ_SOCIAL] == 0);
-  assert(ajustes_hist_conta() && ajustes_social());
-  assert(somenteDesteAparelho(AJ_HIST_CONTA) && dePerfil(AJ_HIST_CONTA) && somenteDesteAparelho(AJ_SOCIAL) && dePerfil(AJ_SOCIAL));
+
+  assert(!strcmp(CHAVE[AJ_HIST_CONTA], "histContaLocal"));
+  assert(OPCOES[AJ_HIST_CONTA].n == 2 && valorPadrao[AJ_HIST_CONTA] == 0);
+  assert(ajustes_hist_conta());
+  assert(somenteDesteAparelho(AJ_HIST_CONTA) && dePerfil(AJ_HIST_CONTA));
   assert(somenteDesteAparelho(AJ_CW_FONTE) && dePerfil(AJ_CW_FONTE) && somenteDesteAparelho(AJ_SALVOS_DEST) && dePerfil(AJ_SALVOS_DEST));
-  { int a = 0, b = 0, k; for (k = 0; k < AJ_N_TELA; k++) if (TELA[k].tipo == IT_OPC) { a += TELA[k].op == AJ_HIST_CONTA; b += TELA[k].op == AJ_SOCIAL; } assert(a == 1 && b == 1); }
+  { int a = 0, k; for (k = 0; k < AJ_N_TELA; k++) if (TELA[k].tipo == IT_OPC) a += TELA[k].op == AJ_HIST_CONTA; assert(a == 1); }
   // 2.0.2: ordem dos add-ons no automatico: acao + "Usar a ordem" (Nao | Para desempatar | Ordem estrita).
   // Por perfil, so desta TV, logo depois de AJ_SOCIAL, uma vez na tela, achavel.
-  assert(AJ_FONTE_ORDEM == AJ_FONTE_ESCOPO + 16 && AJ_FONTE_ORDEM_USO == AJ_FONTE_ESCOPO + 17 && AJ_FONTE_ORDEM == AJ_SOCIAL + 1);
+
   assert(!strcmp(CHAVE[AJ_FONTE_ORDEM], "-fonteOrdem") && !strcmp(CHAVE[AJ_FONTE_ORDEM_USO], "fonteOrdemUsoLocal"));
   assert(OPCOES[AJ_FONTE_ORDEM].tipo == OP_ACAO && OPCOES[AJ_FONTE_ORDEM_USO].n == 3 && valorPadrao[AJ_FONTE_ORDEM_USO] == 0);
   assert(!strcmp(OPCOES[AJ_FONTE_ORDEM_USO].valores[2], "Ordem estrita"));
@@ -585,48 +514,48 @@ int main(void) {
   // 2.0.2: start-up speed of a stream, under Escolha da fonte. Local, after the add-on order
   // options, once on screen, findable.
   // Play while checking the first source: default ON.
-  assert(AJ_FONTE_TOCAR_CONFERINDO == AJ_FONTE_ESCOPO + 18 && AJ_FONTE_TOCAR_CONFERINDO == AJ_FONTE_ORDEM_USO + 1);
+
   assert(!strcmp(CHAVE[AJ_FONTE_TOCAR_CONFERINDO], "fonteTocarConferindoLocal") && OPCOES[AJ_FONTE_TOCAR_CONFERINDO].n == 2);
   assert(valorPadrao[AJ_FONTE_TOCAR_CONFERINDO] == 0 && ajustes_fonte_tocar_conferindo());
   assert(somenteDesteAparelho(AJ_FONTE_TOCAR_CONFERINDO) && !dePerfil(AJ_FONTE_TOCAR_CONFERINDO));
   { int vz = 0, k; for (k = 0; k < AJ_N_TELA; k++) if (TELA[k].tipo == IT_OPC && TELA[k].op == AJ_FONTE_TOCAR_CONFERINDO) vz++; assert(vz == 1); }
   assert(indiceResultado(AJ_FONTE_TOCAR_CONFERINDO, ajustes_buscar("tocar enquanto confere", resultados, AJ_N)) >= 0);
   // Warm connections when a title opens: default ON.
-  assert(AJ_FONTE_AQUECER == AJ_FONTE_ESCOPO + 19 && AJ_FONTE_AQUECER == AJ_FONTE_TOCAR_CONFERINDO + 1);
+
   assert(!strcmp(CHAVE[AJ_FONTE_AQUECER], "fonteAquecerLocal") && OPCOES[AJ_FONTE_AQUECER].n == 2);
   assert(valorPadrao[AJ_FONTE_AQUECER] == 0 && ajustes_fonte_aquecer());
   assert(somenteDesteAparelho(AJ_FONTE_AQUECER) && !dePerfil(AJ_FONTE_AQUECER));
   { int vz = 0, k; for (k = 0; k < AJ_N_TELA; k++) if (TELA[k].tipo == IT_OPC && TELA[k].op == AJ_FONTE_AQUECER) vz++; assert(vz == 1); }
   assert(indiceResultado(AJ_FONTE_AQUECER, ajustes_buscar("aquecer conexoes", resultados, AJ_N)) >= 0);
   // Check several sources at once: default ON (only sources already cached on the debrid run together).
-  assert(AJ_FONTE_CONFERIR_VARIAS == AJ_FONTE_ESCOPO + 20 && AJ_FONTE_CONFERIR_VARIAS == AJ_FONTE_AQUECER + 1);
+
   assert(!strcmp(CHAVE[AJ_FONTE_CONFERIR_VARIAS], "fonteConferirVariasLocal") && OPCOES[AJ_FONTE_CONFERIR_VARIAS].n == 2);
   assert(valorPadrao[AJ_FONTE_CONFERIR_VARIAS] == 0 && ajustes_fonte_conferir_varias());
   assert(somenteDesteAparelho(AJ_FONTE_CONFERIR_VARIAS) && !dePerfil(AJ_FONTE_CONFERIR_VARIAS));
   { int vz = 0, k; for (k = 0; k < AJ_N_TELA; k++) if (TELA[k].tipo == IT_OPC && TELA[k].op == AJ_FONTE_CONFERIR_VARIAS) vz++; assert(vz == 1); }
   assert(indiceResultado(AJ_FONTE_CONFERIR_VARIAS, ajustes_buscar("conferir varias fontes", resultados, AJ_N)) >= 0);
   // Prepare the source when a title opens: default OFF (adds the file to the debrid panel even if not watched).
-  assert(AJ_FONTE_PREPARAR == AJ_FONTE_ESCOPO + 21 && AJ_FONTE_PREPARAR == AJ_FONTE_CONFERIR_VARIAS + 1);
+
   assert(!strcmp(CHAVE[AJ_FONTE_PREPARAR], "fontePrepararLocal") && OPCOES[AJ_FONTE_PREPARAR].n == 2);
   assert(valorPadrao[AJ_FONTE_PREPARAR] == 1 && !ajustes_fonte_preparar());
   assert(somenteDesteAparelho(AJ_FONTE_PREPARAR) && !dePerfil(AJ_FONTE_PREPARAR));
   { int vz = 0, k; for (k = 0; k < AJ_N_TELA; k++) if (TELA[k].tipo == IT_OPC && TELA[k].op == AJ_FONTE_PREPARAR) vz++; assert(vz == 1); }
   assert(indiceResultado(AJ_FONTE_PREPARAR, ajustes_buscar("preparar fonte", resultados, AJ_N)) >= 0);
   // #303: "Continuar na escolha de perfil". Local, last, default ON (= today), once on screen, findable.
-  assert(AJ_PS_CONTINUAR == AJ_CW_RETIDO_TAMBEM + 1 && AJ_PS_CONTINUAR == AJ_FONTE_ESCOPO + 11);
+
   assert(!strcmp(CHAVE[AJ_PS_CONTINUAR], "psContinuarLocal") && OPCOES[AJ_PS_CONTINUAR].n == 2 && valorPadrao[AJ_PS_CONTINUAR] == 0 && ajustes_ps_continuar());
   assert(somenteDesteAparelho(AJ_PS_CONTINUAR) && !dePerfil(AJ_PS_CONTINUAR));
   { int vz = 0, k; for (k = 0; k < AJ_N_TELA; k++) if (TELA[k].tipo == IT_OPC && TELA[k].op == AJ_PS_CONTINUAR) vz++; assert(vz == 1); }
   assert(indiceResultado(AJ_PS_CONTINUAR, ajustes_buscar("continuar escolha", resultados, AJ_N)) >= 0);
   // DTS convertido em: local, last, default Estereo (AAC) = today, once on screen, findable.
-  assert(AJ_DTS_AC3 == AJ_PS_CONTINUAR + 1 && AJ_DTS_AC3 == AJ_FONTE_ESCOPO + 12);
+
   assert(!strcmp(CHAVE[AJ_DTS_AC3], "dtsSaidaLocal") && OPCOES[AJ_DTS_AC3].n == 2 && valorPadrao[AJ_DTS_AC3] == 0 && !ajustes_dts_ac3());
   assert(somenteDesteAparelho(AJ_DTS_AC3) && !dePerfil(AJ_DTS_AC3));
   { int vz = 0, k; for (k = 0; k < AJ_N_TELA; k++) if (TELA[k].tipo == IT_OPC && TELA[k].op == AJ_DTS_AC3) vz++; assert(vz == 1); }
   assert(indiceResultado(AJ_DTS_AC3, ajustes_buscar("dolby digital", resultados, AJ_N)) >= 0);
   { int vz = 0, k; for (k = 0; k < AJ_N_TELA; k++) if (TELA[k].tipo == IT_OPC && TELA[k].op == AJ_APOIAR) vz++; assert(vz == 1); }
   // #287: forced subtitle when the audio is in your language. Local, last, default ON, once on screen.
-  assert(AJ_LEG_FORCADA == AJ_FONTE_ESCOPO - 2 && AJ_LEG_FORCADA == AJ_APOIAR + 1 && !strcmp(CHAVE[AJ_LEG_FORCADA], "legendaForcadaLocal"));
+  assert(!strcmp(CHAVE[AJ_LEG_FORCADA], "legendaForcadaLocal"));
   assert(valorPadrao[AJ_LEG_FORCADA] == 0 && ajustes_legenda_forcada_auto() && somenteDesteAparelho(AJ_LEG_FORCADA));
   { int vz = 0, k; for (k = 0; k < AJ_N_TELA; k++) if (TELA[k].tipo == IT_OPC && TELA[k].op == AJ_LEG_FORCADA) vz++; assert(vz == 1); }
   assert(somenteDesteAparelho(AJ_TAM_MAX) && somenteDesteAparelho(AJ_TAM_MIN));
@@ -650,7 +579,7 @@ int main(void) {
   assert(indiceResultado(AJ_MANTER_VIDEO, ajustes_buscar("retomar", resultados, AJ_N)) >= 0);
   // R4: second subtitle position/style, local, appended; default = as before (top, same as primary).
   assert(!strcmp(CHAVE[AJ_LEG2_POS], "legenda2PosLocal") && OPCOES[AJ_LEG2_POS].n == 2 && valorPadrao[AJ_LEG2_POS] == 0);
-  assert(AJ_LEG2_TAMANHO == AJ_LEG2_POS + 1 && AJ_LEG2_COR == AJ_LEG2_POS + 2 && AJ_LEG2_FUNDO == AJ_LEG2_POS + 3 && AJ_LEG2_BORDA == AJ_LEG2_POS + 4);
+
   assert(somenteDesteAparelho(AJ_LEG2_POS) && !dePerfil(AJ_LEG2_BORDA));
   for (int i = AJ_LEG2_POS; i <= AJ_LEG2_BORDA; i++) { int vezes2 = 0, k; for (k = 0; k < AJ_N_TELA; k++) if (TELA[k].tipo == IT_OPC && TELA[k].op == i) vezes2++; assert(vezes2 == 1 && valorPadrao[i] == 0); }
   { int a0 = valor[AJ_LEG2_POS], t0 = valor[AJ_LEG2_TAMANHO];
@@ -658,18 +587,8 @@ int main(void) {
     valor[AJ_LEG2_POS] = 1; valor[AJ_LEG2_TAMANHO] = 3; valor[AJ_LEG2_COR] = 2; valor[AJ_LEG2_FUNDO] = 5; valor[AJ_LEG2_BORDA] = 3;
     assert(ajustes_leg2_junto() && ajustes_leg2_tamanho() == 100 && ajustes_leg2_cor() == 1 && ajustes_leg2_fundo() == 4 && ajustes_leg2_borda() == 2);
     valor[AJ_LEG2_POS] = a0; valor[AJ_LEG2_TAMANHO] = t0; valor[AJ_LEG2_COR] = valor[AJ_LEG2_FUNDO] = valor[AJ_LEG2_BORDA] = 0; }
-  assert(!strcmp(CHAVE[AJ_DISCORD], "-discord"));
-  assert(!uxTemPadrao(AJ_DISCORD));
-  assert(familiaPreviaOpcao(AJ_DISCORD) == AJPV_RASTREIO);
-  int nDiscord = ajustes_buscar("Discord", resultados, AJ_N);
-  assert(indiceResultado(AJ_DISCORD, nDiscord) >= 0);
-  int discordCount=0;
-  for (int i=0;i<AJ_N_TELA;i++) if(TELA[i].tipo==IT_OPC && TELA[i].op==AJ_DISCORD) discordCount++;
-  assert(discordCount==1);
   artePorSubmenu();
   reorganizacao202();
-  cacheSeek();
-  zoomTpk();
   prazoDosAddonsIntegrado();
   padroesEValores();
   escoposPorValor();

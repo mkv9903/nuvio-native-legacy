@@ -6,7 +6,6 @@
 #include "idioma.h"
 #include "idiomacod.h"
 #include "tex_cache.h"
-#include "cacheboost.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -126,7 +125,7 @@ static TxtLinha compact_line(void) {
 #define GR_PAD  28.0f
 #define GR_STAT (1 + 11 + 20.6f + 11)
 // F07: one more stat line ("Cache de seek") where player has cache.
-#define GR_H    (18 + 22 + 14 + 96 + 30 + (4 + (cacheboost_suportado() ? 1 : 0)) * GR_STAT + 12 + 29 + 8 + 24)
+#define GR_H    (18 + 22 + 14 + 96 + 30 + 4 * GR_STAT + 12 + 29 + 8 + 24)
 
 static float stat(const char *k, const char *v, float x, float y, float w, float a) {
   TxtLinha lk = perf_t(TXT_AJ_ESTADO, k), lv = perf_t(TXT_AJ_ESTADO, v);
@@ -197,11 +196,6 @@ static void panel(GfxRect r, float a) {
   snprintf(v, sizeof v, i18n("%d · %d da tela"), last_dumps, last_screen_dumps);
   y += stat(i18n("Despejadas"), v, x, y, cw, a);
   // F07: what seek cache holds now / limit.
-  if (cacheboost_suportado()) {
-    char c[48];
-    cacheboost_cache_texto(c, sizeof c);
-    y += stat(i18n("Cache de seek"), i18n(c), x, y, cw, a);
-  }
   gfx_cor((GfxRect){ x, y, cw, 1 }, 0, 1, 1, 1, 0.07f * a);
   y += 12;
   {

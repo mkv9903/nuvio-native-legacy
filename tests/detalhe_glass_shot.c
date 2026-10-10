@@ -67,10 +67,9 @@
 #define extras_progresso_pronto fx_progresso_pronto
 #define extras_progresso_serie  fx_progresso_serie
 #define extras_proximo_episodio fx_proximo_episodio
-#define extras_agenda_temporada fx_agenda_temporada
-#define extras_agenda_episodio  fx_agenda_episodio
-#define extras_agenda_data      fx_agenda_data
-#define extras_agenda_status    fx_agenda_status
+#define extras_next_episode_season fx_next_season
+#define extras_next_episode_number  fx_next_episode
+#define extras_series_status    fx_series_status
 #define extras_ficha_status       fx_ficha_status
 #define extras_ficha_lancamento   fx_ficha_lancamento
 #define extras_ficha_duracao      fx_ficha_duracao
@@ -169,10 +168,9 @@ int fx_ep_visto(int t, int e) { (void)t; (void)e; return 0; }
 int fx_progresso_pronto(void) { return 0; }
 int fx_proximo_episodio(int *t, int *e) { (void)t; (void)e; return 0; }
 int fx_progresso_serie(int *v, int *x) { (void)v; (void)x; return 0; }
-int fx_agenda_temporada(void) { return 0; }
-int fx_agenda_episodio(void)  { return 0; }
-const char *fx_agenda_data(void) { return ""; }
-const char *fx_agenda_status(void) { return ehSerieDeEnsaio() ? "returning series" : "Released"; }
+int fx_next_season(void) { return 0; }
+int fx_next_episode(void)  { return 0; }
+const char *fx_series_status(void) { return ehSerieDeEnsaio() ? "returning series" : "Released"; }
 
 // --- FRASES (cache de disco, o formato de seriefrases.c; sem rede) ---------
 static void cacheFrases(void) {
@@ -355,8 +353,9 @@ int main(int argc, char **argv) {
   saida = argc > 1 ? argv[1] : "/tmp/nuvio-detglass";
   assert(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) == 0);
   IMG_Init(IMG_INIT_PNG | IMG_INIT_JPG);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
   SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
-  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
   janela = SDL_CreateWindow("Nuvio: detalhe glass", SDL_WINDOWPOS_CENTERED,
                             SDL_WINDOWPOS_CENTERED, 1920, 1080,
                             SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN);

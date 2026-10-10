@@ -72,7 +72,6 @@ const char *guia_canal_origem(void);
 
 // O id do canal em foco, ou "" — o player usa para saber se o overlay esta
 // apontando para o canal que esta no ar.
-const char *guia_id_focado(void);
 
 // --- o preview e o canal no ar (25/09/2026) --------------------------------
 // O preview do guia e uma sessao "mini no guia" do player (player.h). O guia

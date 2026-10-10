@@ -62,10 +62,9 @@
 #define extras_progresso_pronto  fx_progresso_pronto
 #define extras_progresso_serie   fx_progresso_serie
 #define extras_proximo_episodio  fx_proximo_episodio
-#define extras_agenda_temporada  fx_agenda_temporada
-#define extras_agenda_episodio   fx_agenda_episodio
-#define extras_agenda_data       fx_agenda_data
-#define extras_agenda_status     fx_agenda_status
+#define extras_next_episode_season  fx_next_season
+#define extras_next_episode_number   fx_next_episode
+#define extras_series_status     fx_series_status
 
 // --- ESPIAO DO DESFOQUE (#133) ---------------------------------------------
 // gfx_desfocado e trocado so dentro de detail.c: o espiao anota QUAL arte a
@@ -162,18 +161,6 @@ static int fxDesfPediu(const char *chave) {
 #define IMDB_SERIE "tt0903747"
 #define IMDB_FILME "tt0133093"
 
-static int fxRecomendacaoLigada;
-int fx_recomenda_ativo(void) { return fxRecomendacaoLigada; }
-int fx_recomenda_n(void) { return fxRecomendacaoLigada; }
-int fx_recomenda_item(int i, RecItem *item) {
-  if (!fxRecomendacaoLigada || i != 0) return 0;
-  memset(item, 0, sizeof *item);
-  snprintf(item->imdb, sizeof item->imdb, "%s", IMDB_FILME);
-  snprintf(item->deNome, sizeof item->deNome, "Marina");
-  snprintf(item->de, sizeof item->de, "nuvio:fixture");
-  return 1;
-}
-
 #define T1_N 10
 #define T2_N 12
 #define T3_N 24
@@ -183,7 +170,7 @@ static const int TEMP_NUM[3] = { 1, 2, 3 };
 static const int TEMP_N[3]   = { T1_N, T2_N, T3_N };
 
 // Estado do duble, trocado entre capturas.
-static int agendaLigada = 1;   // o TMDB respondeu com next_episode_to_air?
+static int nextEpisodeKnown = 1;   // o TMDB respondeu com next_episode_to_air?
 static int progVis, progExib;  // extras_progresso_serie
 
 void fx_pedir(const char *imdb, int serie, long tmdbId) {
@@ -229,7 +216,7 @@ int fx_ep_numero(int t, int i) { (void)t; return i + 1; }
 // inventar 7.8 para um episodio que nao foi ao ar seria o defeito que a
 // captura existe para pegar.
 int fx_ep_nota(int t, int i) {
-  if (t == 2 && i + 1 >= T3_PROX_EP && agendaLigada) return 0;
+  if (t == 2 && i + 1 >= T3_PROX_EP && nextEpisodeKnown) return 0;
   return 74 + ((i * 3 + t * 5) % 16);
 }
 
@@ -248,12 +235,9 @@ int fx_progresso_serie(int *vistosEp, int *exibidos) {
 // A AGENDA: o TMDB diz qual e o PROXIMO episodio a estrear. E o unico sinal de
 // "ainda nao foi ao ar" que a pagina tem sem gastar pedido nenhum — ver a nota
 // em desenhaEpisodio.
-int fx_agenda_temporada(void) { return agendaLigada && ehSerieDeEnsaio() ? 3 : 0; }
-int fx_agenda_episodio(void)  { return agendaLigada && ehSerieDeEnsaio() ? T3_PROX_EP : 0; }
-const char *fx_agenda_data(void) {
-  return agendaLigada && ehSerieDeEnsaio() ? "2026-09-23" : "";
-}
-const char *fx_agenda_status(void) {
+int fx_next_season(void) { return nextEpisodeKnown && ehSerieDeEnsaio() ? 3 : 0; }
+int fx_next_episode(void)  { return nextEpisodeKnown && ehSerieDeEnsaio() ? T3_PROX_EP : 0; }
+const char *fx_series_status(void) {
   return ehSerieDeEnsaio() ? "returning series" : "Released";
 }
 
@@ -482,11 +466,11 @@ int main(int argc, char **argv) {
   char nome[600];
   SDL_GLContext gl;
 
-  SDL_SetHint("SDL_MAC_BACKGROUND_APP", "1");
   assert(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) == 0);
   IMG_Init(IMG_INIT_PNG | IMG_INIT_JPG);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
   SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
-  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
   janela = SDL_CreateWindow("Nuvio: temporadas e episodios", 0, 0, 64, 64,
                             SDL_WINDOW_OPENGL | SDL_WINDOW_HIDDEN);
   assert(janela);
@@ -551,7 +535,7 @@ int main(int argc, char **argv) {
     carro=1; carCheia=0; nivel=0; botao=0; maisAcoes=0;
     carN=2; carIdx[0]=0; carIdx[1]=1; carPos=carAplicado=0; carOff=0;
     carEsperaRect=0; cartao=carTxt=1; cartaoVel=carTxtVel=0;
-    assert(epTempY() == 1160 && epRowY() == 1286);
+    assert(epRowY() == 1286);
     assert(epCardW()==420 && epCardH()==500 && epThumbH()==236);
     for (int step=0;step<25;step++) {SDL_Delay(16);quadros(1);}
     snprintf(nome,sizeof nome,"%s-actions-closed.png",saida); gravar(nome);
@@ -612,7 +596,6 @@ int main(int argc, char **argv) {
     snprintf(itens[1].direcao,sizeof itens[1].direcao,"Diretor de Ensaio");
     itens[1].progresso=45; itens[1].restanteMin=92;
     cat_definir_tudo(itens,2,&filEnsaio,1);
-    fxRecomendacaoLigada=1;
     detail_abrir(&replacement);
     carro=1; carCheia=1; nivel=0; botao=0; maisAcoes=0;
     cartao=carTxt=0; cartaoVel=carTxtVel=0;
@@ -661,7 +644,7 @@ int main(int argc, char **argv) {
   // --- MENU OVER THE TITLE PAGE (owner 03/10, "pode abrir por cima"): Left
   //     on the first episode of S1 asks for the side menu; it opens ON TOP and
   //     the page keeps its focus/scroll; Right hands the focus back.
-  //     NV_MENU_SOBRE=1 bash tests/detail_eps_shot.sh /Volumes/ExternalSSD/nv-ui-w14-shots/det
+  //     NV_MENU_SOBRE=1 bash tests/detail_eps_shot.sh /tmp/nv-ui-w14-shots/det
   if (getenv("NV_MENU_SOBRE")) {
     SDL_Event ev = {0};
     int f0, c0; float s0;
@@ -740,12 +723,12 @@ int main(int argc, char **argv) {
   //        episodio publicado). A pagina NAO pode adivinhar: os mesmos cards
   //        voltam a ser episodios comuns, e e o certo — afirmar "nao exibido"
   //        sem fonte e o defeito que PRODUCT.md proibe.
-  agendaLigada = 0;
+  nextEpisodeKnown = 0;
   abrir(0, 2);
   nosEpisodios(T3_PROX_EP - 2);
-  snprintf(nome, sizeof nome, "%s-7-t3-sem-agenda.png", saida);
+  snprintf(nome, sizeof nome, "%s-7-t3-no-next-episode.png", saida);
   gravar(nome);
-  agendaLigada = 1;
+  nextEpisodeKnown = 1;
 
   // --- 8. T2, temporada INTEIRA no ar e vista pela metade: o caso comum, sem
   //        nenhuma clausula de "nao exibido".

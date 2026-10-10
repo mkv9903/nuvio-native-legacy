@@ -16,7 +16,6 @@ char *dados_caminho(char *dst, unsigned tam, const char *nome) {
   (void)dst; (void)tam; (void)nome; return NULL;
 }
 int   dados_apagar(const char *nome) { (void)nome; return 1; }
-void  dados_marcar_sujo(int leve) { (void)leve; }
 // ajustes_aplicar_blob (abaixo) fala com linguas.c; nada disso entra na regra.
 const char *ling_legenda(void) { return ""; }
 const char *ling_audio(void) { return ""; }

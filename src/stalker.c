@@ -193,15 +193,6 @@ void stalker_definir_mac(const char *m) {
   pthread_mutex_lock(&travaTabela); nTabela = 0; pthread_mutex_unlock(&travaTabela);
 }
 
-void stalker_definir_aparelho(const char *d, const char *ser) {
-  pthread_mutex_lock(&travaSessao);
-  carregarTravado();
-  snprintf(deviceId, sizeof deviceId, "%s", d ? d : "");
-  snprintf(serial, sizeof serial, "%s", ser ? ser : "");
-  limparSessao();
-  gravar();
-  pthread_mutex_unlock(&travaSessao);
-}
 
 void stalker_esquecer(void) {
   pthread_mutex_lock(&travaSessao);

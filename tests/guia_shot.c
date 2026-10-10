@@ -252,8 +252,9 @@ int main(int argc, char **argv) {
 
   assert(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) == 0);
   IMG_Init(IMG_INIT_PNG | IMG_INIT_JPG);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
   SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
-  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
   w = SDL_CreateWindow("Nuvio: cartao de canal", SDL_WINDOWPOS_CENTERED,
                        SDL_WINDOWPOS_CENTERED, 1920, 1080,
                        SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN);
@@ -357,11 +358,11 @@ int main(int argc, char **argv) {
   aberta = 1; entrada = 1.0f; estado = G_PRONTO; heroA = 1.0f;
   previewLigado = 1; previewLido = 1;
   modoLista = 1; modoLido = 1;
-  focoLin = 0; focoCol = 0; focoTopo = 0; focoAnelOk = 0;
+  focoLin = 0; focoCol = 0; focoTopo = 0;
   snprintf(nome, sizeof nome, "%s-lista-epg.bmp", saida);
   capturaTela(nome, w, 1);
 
-  focoLin = 1; focoCol = 1; focoAnelOk = 0;      // GE TV, sem grade
+  focoLin = 1; focoCol = 1;      // GE TV, sem grade
   // A mesma conta de rolagem de guia_atualizar, ja assentada.
   { float maxY = listaAltura() + G_L_FADE - (G_L_BASE - G_L_TOPO);
     rolL = listaYDe(focoLin, focoCol) - G_L_HEAD - G_L_ROW;
@@ -370,7 +371,7 @@ int main(int argc, char **argv) {
   snprintf(nome, sizeof nome, "%s-lista-sem-epg.bmp", saida);
   capturaTela(nome, w, 1);
 
-  focoLin = 0; focoCol = 1; rolL = 0.0f; focoAnelOk = 0;
+  focoLin = 0; focoCol = 1; rolL = 0.0f;
   focoTopo = 1; topoCol = G_TOPO_PREVIEW; animTopo[G_TOPO_PREVIEW] = 1.0f;
   snprintf(nome, sizeof nome, "%s-lista-topo.bmp", saida);
   capturaTela(nome, w, 1);
@@ -383,7 +384,7 @@ int main(int argc, char **argv) {
     for (k = 0; k < G_TOPO_N; k++) {
       int j;
       for (j = 0; j < G_TOPO_N; j++) animTopo[j] = 0.0f;
-      focoTopo = 1; topoCol = k; animTopo[k] = 1.0f; focoAnelOk = 0;
+      focoTopo = 1; topoCol = k; animTopo[k] = 1.0f;
       snprintf(nome, sizeof nome, "%s-topo-%d.bmp", saida, k);
       capturaTela(nome, w, 1);
     }
@@ -392,12 +393,12 @@ int main(int argc, char **argv) {
     return 0;
   }
 
-  janelaDesl = 60; focoAnelOk = 0;
+  janelaDesl = 60;
   snprintf(nome, sizeof nome, "%s-lista-adiante.bmp", saida);
   capturaTela(nome, w, 1);
   janelaDesl = 0;
 
-  modoLista = 0; focoLin = 0; focoCol = 0; focoAnelOk = 0;
+  modoLista = 0; focoLin = 0; focoCol = 0;
   snprintf(nome, sizeof nome, "%s-tela.bmp", saida);
   capturaTela(nome, w, 1);
   // A DICA DE PRIMEIRA VEZ da ESQUERDA (dicaTalvez), por cima da mesma tela.
@@ -419,7 +420,7 @@ int main(int argc, char **argv) {
   // O CARTAO DO LEMBRETE por cima da tela (o que aparece em qualquer lugar
   // do app quando o programa comeca), e o aviso curto de quem ja esta no
   // canal.
-  modoLista = 1; focoLin = 0; focoCol = 0; focoAnelOk = 0;
+  modoLista = 1; focoLin = 0; focoCol = 0;
   glem_teste_cartao("Novela das Nove", "Globo RJ", 0);
   snprintf(nome, sizeof nome, "%s-lembrete-cartao.bmp", saida);
   capturaTela(nome, w, 1);
@@ -432,7 +433,7 @@ int main(int argc, char **argv) {
   // A FAIXA DO MINI GUIA por cima do video em tela cheia: cinco canais com o
   // focado no meio, regua, linha agora. Aqui o "video" e o fundo liso da
   // captura — o plano de hardware nao aparece em glReadPixels.
-  aberta = 0; overlay = 1; focoLin = 0; focoCol = 3; focoAnelOk = 0; bandaUlt = SDL_GetTicks();
+  aberta = 0; overlay = 1; focoLin = 0; focoCol = 3; bandaUlt = SDL_GetTicks();
   snprintf(nome, sizeof nome, "%s-faixa.bmp", saida);
   capturaTela(nome, w, 1);
   overlay = 0; aberta = 1; focoCol = 0;
@@ -453,7 +454,7 @@ int main(int argc, char **argv) {
     }
     // So o painel le catN; a grade nao e desenhada com foco nela.
     nCats = nc; }
-  modoLista = 1; focoLin = 0; focoCol = 0; focoAnelOk = 0;
+  modoLista = 1; focoLin = 0; focoCol = 0;
   catAberto = 2; catFoco = 14; catAnim = 1.0f;
   { float areaH = G_CAT_BASE - G_CAT_TOPO;
     catRol = (float)catFoco * G_CAT_ROW - (areaH - G_CAT_ROW) * 0.5f;

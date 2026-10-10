@@ -1,6 +1,3 @@
-#ifdef NV_ANDROID
-#include <unistd.h>   // access (fontes de /system/fonts)
-#endif
 #include "text.h"
 #include "dobra.h"
 #include "idioma.h"
@@ -896,11 +893,7 @@ static TTF_Font *fonteLegendaDe(TxtEstilo estilo, const char *s,
     int i = estilo - TXT_LEG_50;
     if (!fontesLegendaLG[i] && !tentouLegendaLG[i]) {
       tentouLegendaLG[i] = 1;
-#ifdef NV_ANDROID
-      fontesLegendaLG[i] = TTF_OpenFont("/system/fonts/Roboto-Regular.ttf",
-#else
       fontesLegendaLG[i] = TTF_OpenFont("/usr/share/fonts/LG_Display-Regular.ttf",
-#endif
           (int)(ESTILOS[estilo].corpo * ESC_T + 0.5f));
       if (!fontesLegendaLG[i] && !avisoFallback[TXT_FAMILIA_LG]) {
         printf("fonte de legenda LG Display indisponivel; usando fallback\n");
@@ -1181,23 +1174,11 @@ int txt_iniciar(const char *dirRecursos, float escala) {
   snprintf(caminhoMono[0], 512, "%sfonts/JetBrainsMonoNL-Regular.ttf", base);
   snprintf(caminhoMono[1], 512, "%sfonts/JetBrainsMonoNL-SemiBold.ttf", base);
   snprintf(caminhoMono[2], 512, "%sfonts/Montserrat-ExtraLight-Relogio.ttf", base);
-#ifdef NV_ANDROID
-  // Android: nao ha LG_Display nem /usr/share/fonts. A "LG" vira Roboto do
-  // sistema e a "Droid" a DroidSans (so nas versoes antigas) ou Roboto.
-  snprintf(caminhoPeso[TXT_FAMILIA_LG][0], 512, "%s", "/system/fonts/Roboto-Light.ttf");
-  snprintf(caminhoPeso[TXT_FAMILIA_LG][1], 512, "%s", "/system/fonts/Roboto-Regular.ttf");
-  snprintf(caminhoPeso[TXT_FAMILIA_LG][2], 512, "%s", "/system/fonts/Roboto-Regular.ttf");
-  for (int p = 0; p < 3; p++)
-    snprintf(caminhoPeso[TXT_FAMILIA_DROID][p], 512, "%s",
-             access("/system/fonts/DroidSans.ttf", R_OK) == 0 ? "/system/fonts/DroidSans.ttf"
-                                                              : "/system/fonts/Roboto-Regular.ttf");
-#else
   snprintf(caminhoPeso[TXT_FAMILIA_LG][0], 512, "%s", "/usr/share/fonts/LG_Display-Light.ttf");
   snprintf(caminhoPeso[TXT_FAMILIA_LG][1], 512, "%s", "/usr/share/fonts/LG_Display-Regular.ttf");
   snprintf(caminhoPeso[TXT_FAMILIA_LG][2], 512, "%s", "/usr/share/fonts/LG_Display-Regular.ttf");
   for (int p = 0; p < 3; p++)
     snprintf(caminhoPeso[TXT_FAMILIA_DROID][p], 512, "%s", "/usr/share/fonts/DroidSans.ttf");
-#endif
 
   // Fontes de RESERVA (ver Escrita), em ordem de preferencia por escrita. Na TV
   // sao as de sistema (LG e Droid, medidas no cmap de uma C9); no Mac, as do
@@ -1862,7 +1843,7 @@ static void desenhaBlocoLinha(TxtEstilo estilo, const char *s, int r, int g, int
 
 // QUEBRA DE LINHA EM ESCRITA SEM ESPACO. Japones e chines nao separam palavras
 // por espaco, entao um paragrafo inteiro era UMA "palavra" para as quebras deste
-// arquivo (e de agendaui.c) e saia por cima da borda da coluna. Aqui o
+// arquivo  e saia por cima da borda da coluna. Aqui o
 // paragrafo e cortado em TOKENS: uma palavra de escrita com espaco (latim,
 // cirilico, grego, hangul) continua sendo a corrida ate o espaco, e cada
 // caractere CJK e um token so — com duas regras de tipografia que valem nas duas

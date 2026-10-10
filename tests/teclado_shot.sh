@@ -18,7 +18,7 @@ for source in src/*.c src/dts/*.c; do
 done
 cc "${sources[@]}" tests/teclado_shot.c -Isrc -o "$tmp/shot" \
   -DNV_TRAKT_CLIENT_ID='"chave-de-teste"' -DAJUSTES_TESTE -O1 -g \
-  -I/opt/homebrew/include -I/opt/homebrew/include/SDL2 -L/opt/homebrew/lib \
-  -lSDL2 -lSDL2_image -lSDL2_ttf -lz -framework OpenGL \
+  -DNV_LINUX_DESKTOP $(pkg-config --cflags sdl2 SDL2_image SDL2_ttf)   \
+  -lSDL2 -lSDL2_image -lSDL2_ttf -lz $(pkg-config --libs glesv2 egl) -ldl -pthread -lm \
   -Wno-deprecated-declarations -Wno-macro-redefined
 NUVIO_DADOS="$dados" "$tmp/shot" "${1:-/tmp/nuvio-teclado}"

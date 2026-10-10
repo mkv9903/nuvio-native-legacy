@@ -27,7 +27,7 @@
 // o numero de retangulos do quadro — o que da para medir no Mac do custo de
 // desenho; o custo em ms de GPU so existe na TV.
 #include "ajustes.h"
-#include "agenda.h"
+#include "releaseinfo.h"
 #include "artehero.h"
 #include "catalogo.h"
 #include "colecoes.h"
@@ -201,8 +201,9 @@ int main(int argc, char **argv) {
   (void)argc;
   assert(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) == 0);
   IMG_Init(IMG_INIT_PNG | IMG_INIT_JPG);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
   SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
-  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
   janela = SDL_CreateWindow("Nuvio: layouts da home", SDL_WINDOWPOS_CENTERED,
                             SDL_WINDOWPOS_CENTERED, 1920, 1080,
                             SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN);
@@ -313,11 +314,10 @@ int main(int argc, char **argv) {
     }
     assert(col_definir_json(js) == 4);
   }
-  if (getenv("NV_AGENDA")) {
-    agenda_iniciar(); agenda_definir_hoje("2026-10-03");
+  if (getenv("NV_RELEASEINFO")) {
+    releaseinfo_init();
     for (int j = 0; j < total; j++) if (!strcmp(itens[j].tipo, "series"))
-      agenda_registrar(itens[j].imdb, itens[j].titulo, itens[j].poster,
-                        "Returning Series", 2, 5, "Episódio de ensaio",
+      releaseinfo_record(itens[j].imdb, "Returning Series", 2, 5,
                         "2026-10-07", "2026-09-30");
   }
   cat_definir_tudo(itens, total, fils, NF);

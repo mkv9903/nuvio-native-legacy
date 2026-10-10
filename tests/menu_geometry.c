@@ -9,7 +9,6 @@ float gfx_card_forcar_cover_atual;
 int ajustes_home_layout(void) { return layoutTeste; }
 int ajustes_menu_explorar(void) { return 1; }
 int ajustes_menu_guia(void) { return 1; }
-int ajustes_menu_agenda(void) { return 1; }
 int ajustes_menu_perfil(void) { return 1; }
 int ajustes_rail_recolhida(void) { return 0; }
 

@@ -66,7 +66,6 @@ char *dados_caminho(char *dst, unsigned tam, const char *nome) {
   (void)dst; (void)tam; (void)nome; return NULL;
 }
 int   dados_apagar(const char *nome) { (void)nome; return 1; }
-void  dados_marcar_sujo(int leve) { (void)leve; }
 void  sync_proteger_ajustes_locais(void) {}
 int   perfis_ativo(void) { return 1; }
 const char *addons_base_por_id(const char *id) { (void)id; return ""; }

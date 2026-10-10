@@ -67,7 +67,6 @@ int main(int argc, char **argv) {
   SDL_Window *w;
   int pt = getenv("NUVIO_SHOT_PT") && *getenv("NUVIO_SHOT_PT") == '1', i;
   assert(dir && *dir);
-  SDL_SetHint("SDL_MAC_BACKGROUND_APP", "1");
   assert(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) == 0);
   IMG_Init(IMG_INIT_PNG | IMG_INIT_JPG);
   dados_iniciar(dir);
@@ -119,8 +118,9 @@ int main(int argc, char **argv) {
   puts("ok  rede: conta, .ts e .m3u8, codec, 10 bits, vazao e recomendacao contra o servidor falso");
 
   // --- capturas ---
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
   SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
-  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
   w = SDL_CreateWindow("Nuvio: diagnostico da Live TV", 0, 0, 64, 64, SDL_WINDOW_OPENGL | SDL_WINDOW_HIDDEN);
   assert(w && SDL_GL_CreateContext(w));
   glGenTextures(1, &fboTex);

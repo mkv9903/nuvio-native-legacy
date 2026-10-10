@@ -21,7 +21,8 @@
 #include <unistd.h>
 #include <dlfcn.h>
 #include <assert.h>
-#undef __APPLE__
+#undef NV_LINUX_DESKTOP
+#define NV_WEBOS
 #include "../src/video.c"
 
 static int pedidos, aceita = 1, assinaturas, respostas;
@@ -95,6 +96,7 @@ int main(void) {
   assert(respostas == 1 && strstr(resposta, "\"ack\":false") &&
          strstr(resposta, "\"timestamp\":1700000000123456}"));
   pausaPedida = 1;
+  esmaecer_escolha(0);
   screensaverCallback(NULL, (LSMessage *)active, NULL);
   assert(strstr(resposta, "\"ack\":true"));
   pausaPedida = 0; tocando = 0; // pausa enviada pelo pipeline

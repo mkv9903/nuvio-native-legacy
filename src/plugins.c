@@ -28,7 +28,7 @@
 #define PLUG_TETO_MS       30000
 #define PLUG_REDE_S        15                 // por fetch
 #ifndef PLUG_PARALELOS
-#if defined(__EMSCRIPTEN__) || defined(NV_WEBOS) || defined(NV_TPK40)
+#if defined(NV_WEBOS)
 #define PLUG_PARALELOS     2
 #else
 #define PLUG_PARALELOS     3

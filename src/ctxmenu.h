@@ -63,7 +63,7 @@ typedef struct {
   // (serie fora do catalogo, sem IMDb) ela e so a propria extra.
   int juntaAssistido;
 } CtxExtra;
-void ctx_abrir_social(const CatItem *titulo, const CtxExtra *extras, int n);
+void ctx_abrir_extras(const CatItem *titulo, const CtxExtra *extras, int n);
 int  ctx_pediu_extra(void);
 // A LINHA EXPANDIDA DO PAINEL DE SALVOS (dono, 06/10): o menu da lista de Salvos
 // nao flutua — a linha em foco se abre DENTRO do painel (acordeao). ctx_inline_t

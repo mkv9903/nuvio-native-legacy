@@ -1,3 +1,4 @@
+#include "gles_test.h"
 // CAPTURA DO PAINEL "Carregamento da Home" da ilha (ilha_atividade_detalhes +
 // ilha_atividade_carga). Nao entra na suite: precisa de janela GL e de olho.
 // Compila com -DANTES contra a ilha antiga (texto corrido) para o "antes".
@@ -31,9 +32,7 @@ static void fundo(void) {
   glBindTexture(GL_TEXTURE_2D, fundoTex);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  glPixelStorei(GL_UNPACK_ROW_LENGTH, t->pitch / 4);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, t->w, t->h, 0, GL_RGBA, GL_UNSIGNED_BYTE, t->pixels);
-  glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+  gles_test_upload_surface(t);
   SDL_FreeSurface(t);
 }
 static void captura(const char *nome, int h) {
@@ -87,8 +86,9 @@ int main(int argc, char **argv) {
   dados_iniciar("deploy/app");
   assert(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) == 0);
   IMG_Init(IMG_INIT_PNG | IMG_INIT_JPG);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
   SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
-  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
   win = SDL_CreateWindow("Nuvio: homecarga painel", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1920, 1080, SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN);
   assert(win);
   gl = SDL_GL_CreateContext(win); assert(gl);

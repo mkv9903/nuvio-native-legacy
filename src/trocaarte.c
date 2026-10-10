@@ -722,17 +722,6 @@ void trocaarte_teste_candidato(int a, const char *url, const char *rotulo) {
   pthread_mutex_unlock(&trava);
 }
 
-void trocaarte_teste_foco(int a, int pos) {
-  int v[TA_MAX], n;
-  if (a < 0 || a > 1) return;
-  pthread_mutex_lock(&trava);
-  if (aba != a) previa[0] = 0;
-  aba = a; naAba = 0;
-  n = visiveis(a, v);
-  if (pos >= 0 && pos < n) foco[a] = v[pos];
-  focoDesde = SDL_GetTicks() - 1000;   // a previa nao espera o repouso
-  pthread_mutex_unlock(&trava);
-}
 
 int trocaarte_n(int a) { return a >= 0 && a <= 1 ? nCand[a] : 0; }
 

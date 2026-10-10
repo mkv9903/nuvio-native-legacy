@@ -4,7 +4,7 @@
 // servido por tests/legref_rangesrv.py, analise pela engine (autosync.c).
 // Fora da suite (janela GL e olho humano):
 //
-//   bash tests/legsync_shot.sh /Volumes/ExternalSSD/nv-f05-shots
+//   bash tests/legsync_shot.sh /tmp/nv-f05-shots
 //
 // NUVIO_SHOT_IDIOMA=N troca o idioma (2 = romeno). Fonte da interface: Montserrat (a TV
 // do dono).
@@ -110,10 +110,10 @@ int main(int argc, char **argv) {
   snprintf(srt, sizeof srt, "%s/ext_mais2500.srt", base);
   snprintf(srtBom, sizeof srtBom, "%s", srt);
   snprintf(ruim, sizeof ruim, "%s/ext_ruim.srt", base);
-  SDL_SetHint("SDL_MAC_BACKGROUND_APP", "1");
   assert(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) == 0);
   IMG_Init(IMG_INIT_PNG | IMG_INIT_JPG);
-  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2); SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2); SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
   SDL_Window *w = SDL_CreateWindow("Nuvio: autosync", 0, 0, 64, 64, SDL_WINDOW_OPENGL | SDL_WINDOW_HIDDEN); assert(w);
   SDL_GLContext gl = SDL_GL_CreateContext(w); assert(gl); SDL_GL_SetSwapInterval(0);
   glGenTextures(1, &fboTex); glBindTexture(GL_TEXTURE_2D, fboTex);

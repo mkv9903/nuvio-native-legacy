@@ -62,7 +62,7 @@ void detail_volta_notar(int novo);
 // detail_pediu_marcar, que e "adicionar a lista" — o olho caia no mesmo `else`
 // do botao de fontes e nunca marcou nada.
 int  detail_pediu_assistido(void);
-int  detail_pediu_amigos(char *imdb, size_t tam); // OK na ilha de amigos: o imdb do titulo, uma vez
+ // OK na ilha de amigos: o imdb do titulo, uma vez
 int  detail_pediu_marcar(void);       // botao "+"
 int  detail_pediu_fontes(void);       // OK segurado, ou o botao "..."
 int  detail_pediu_explorar(void);     // circular "Explorar": abrir a toca (explorar.h) neste titulo, uma vez

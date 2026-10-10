@@ -21,11 +21,6 @@
 #define NV_MAPA_H
 #include <stddef.h>
 
-#define MAPA_SEM_MAX    8
-#define MAPA_PONTE_MAX  6
-#define MAPA_FIO_MAX    2
-#define MAPA_TEMA_MAX   5
-#define MAPA_SORTE_MAX  16
 
 #define MAPA_KW_MAX     20
 #define MAPA_GEN_MAX    6
@@ -47,16 +42,6 @@ typedef struct {
   int  catIndice;       // indice em cat_item no momento da montagem; -1 = fora
 } MapaObra;
 
-// O que liga duas sementes, do mais especifico ao mais vago.
-enum {
-  MAPA_ELO_NADA = 0,
-  MAPA_ELO_TEMA,        // palavra-chave do TMDB em comum ("viagem no tempo")
-  MAPA_ELO_PESSOA,      // mesma pessoa na direcao ou no elenco
-  MAPA_ELO_GENERO,      // mesmo genero
-  MAPA_ELO_DUPLA,       // o TMDB recomenda Z a partir das DUAS
-  MAPA_ELO_DECADA       // so a mesma decada
-};
-
 enum {
   MAPA_ORIGEM_VISTO = 0,  // progresso >= 90%
   MAPA_ORIGEM_ANDAMENTO,
@@ -64,68 +49,13 @@ enum {
   MAPA_ORIGEM_ALTA        // sem historico: o melhor do catalogo
 };
 
-typedef struct {
-  int a, b;             // sementes; a == b quando so ha uma
-  MapaObra obra;        // a historia que cruza as duas
-  int elo;              // MAPA_ELO_*
-  char motivo[64];      // o valor do elo: tema, nome, genero, decada
-  int forca;
-} MapaPonte;
-
-typedef struct {
-  long id;              // TMDB da pessoa; negativo = so nome (reserva local)
-  char nome[64];
-  char foto[200];
-  int  direcao;         // 1 = direcao/criacao, 0 = atuacao
-  int  sementes[MAPA_SEM_MAX];
-  int  n;
-  MapaObra proxima;     // o proximo titulo DELA que a pessoa ainda nao viu
-  int  temProxima;
-} MapaFio;
-
-typedef struct {
-  char nome[48];
-  int  n;
-  unsigned mascara;     // bit i = semente i
-} MapaTema;
-
-enum { MAPA_VAZIO = 0, MAPA_LOCAL, MAPA_CRUZADO };
-
-typedef struct {
-  unsigned revisao;
-  int estado;           // MAPA_VAZIO | MAPA_LOCAL | MAPA_CRUZADO
-  int carregando;       // 1 enquanto o fio do TMDB trabalha
-  int nSem;
-  MapaObra sem[MAPA_SEM_MAX];
-  int semOrigem[MAPA_SEM_MAX];
-  int nPontes;          // pontes[0] e a "proxima historia" do centro
-  MapaPonte pontes[MAPA_PONTE_MAX];
-  int nFios;
-  MapaFio fios[MAPA_FIO_MAX];
-  int nTemas;
-  MapaTema temas[MAPA_TEMA_MAX];
-  int nSorte;
-  MapaObra sorte[MAPA_SORTE_MAX];
-  int anoMin, anoMax;
-} Mapa;
-
-// Monta o mapa local na hora (fio principal) e, havendo chave do TMDB, dispara
-// o fio que cruza de verdade. Chamar ao abrir a tela. Repetir com as mesmas
-// sementes nao refaz rede.
-void mapa_pedir(void);
-
-// Copia o retrato publicado quando a revisao e diferente de `*revisao`.
-// 1 quando copiou (e atualiza `*revisao`).
-int  mapa_copiar(Mapa *dst, unsigned *revisao);
-
 // Logout: apaga o cache em disco e o retrato em memoria.
 void mapa_esquecer(void);
 
 // ---------------------------------------------------------------------------
 // VIZINHANCA DE UM TITULO (Explorar 2.0, a "toca do coelho").
 //
-// O mapa acima e um retrato de 8 sementes. A vizinhanca e a mesma ideia para
-// QUALQUER titulo, sob demanda: quatro grupos de elo, cada um com ate
+// A vizinhanca de qualquer titulo, sob demanda: tres grupos de elo, cada um com ate
 // MAPA_VIZ_ITENS titulos, e nenhum titulo repetido entre grupos.
 //
 //   posicao           com TMDB                         sem chave / sem rede
@@ -135,7 +65,6 @@ void mapa_esquecer(void);
 //   MAPA_VIZ_TEMA     /discover com a palavra-chave    genero em comum do catalogo
 //                                                      (MAPA_GR_GENERO)
 //   MAPA_VIZ_REC      recommendations do titulo        generos + ano do catalogo
-//   MAPA_VIZ_AMIGOS   o que os amigos gostaram (amigostitulo.h), nos dois casos
 //
 // CUSTO. mapa_vizinhos_pedir roda no fio principal e publica NA HORA o retrato
 // local (catalogo, sem arquivo, sem rede); com chave do TMDB um fio proprio
@@ -143,23 +72,23 @@ void mapa_esquecer(void);
 // (dados_dir()/explorar-viz.txt, 7 dias, e os ultimos em memoria: subir um
 // degrau da trilha nao faz rede nem disco). Quem desenha so copia o retrato
 // quando a revisao muda.
-#define MAPA_VIZ_GRUPOS 4
+#define MAPA_VIZ_GRUPOS 3
 #define MAPA_VIZ_ITENS  5
-enum { MAPA_VIZ_PESSOA = 0, MAPA_VIZ_TEMA, MAPA_VIZ_REC, MAPA_VIZ_AMIGOS };
+enum { MAPA_VIZ_PESSOA = 0, MAPA_VIZ_TEMA, MAPA_VIZ_REC };
 enum { MAPA_GR_PESSOA = 0, MAPA_GR_EPOCA, MAPA_GR_TEMA, MAPA_GR_GENERO,
-       MAPA_GR_REC, MAPA_GR_AMIGOS };
+       MAPA_GR_REC };
 
 typedef struct {
   MapaObra obra;
-  char motivo[64];      // o "porque" deste titulo: pessoa, tema, genero, decada, amigo
+  char motivo[64];      // o "porque" deste titulo: pessoa, tema, genero, decada
   int  visto;           // a pessoa ja comecou este titulo
 } MapaVizItem;
 
 typedef struct {
   int  tipo;            // MAPA_GR_*
-  char sub[64];         // rotulo do grupo: nome da pessoa, tema (chave pt), "2000", amigos
+  char sub[64];         // rotulo do grupo: nome da pessoa, tema (chave pt), "2000"
   char kw[48];          // MAPA_GR_TEMA: a palavra-chave do TMDB (ingles), para manter o fio
-  long ref;             // id da pessoa / da palavra-chave no TMDB; amigos: quantos
+  long ref;             // id da pessoa / da palavra-chave no TMDB
   int  n;               // 0 = o grupo nao existe para este titulo
   MapaVizItem itens[MAPA_VIZ_ITENS];
 } MapaVizGrupo;
@@ -249,8 +178,6 @@ int  mapa_ler_detalhe(const char *json, int serie, MapaSemente *s);
 int  mapa_ler_creditos(const char *json, int direcao, MapaCreditos *c);
 // O cruzamento. `vistos` sao hashes de titulo (mapa_hash_titulo) que nunca
 // podem virar sugestao — o que a pessoa ja comecou fora das sementes.
-void mapa_cruzar(const MapaSemente *s, int n, const MapaCreditos *cred,
-                 int nCred, const unsigned *vistos, int nVistos, Mapa *m);
 unsigned mapa_hash_titulo(const char *titulo);
 // Palavra-chave do TMDB (sempre em ingles) em portugues, que e a chave de
 // i18n(). NULL quando a palavra nao esta na tabela: melhor nao mostrar do que
@@ -259,7 +186,6 @@ const char *mapa_tema_nome(const char *kw);
 
 // So para capturas (tests/explorar_shot.c): publica um cruzamento pronto, sem
 // rede, como se o fio do TMDB tivesse terminado.
-void mapa_publicar_teste(const MapaSemente *s, int n, const MapaCreditos *c, int nc);
 
 // --- vizinhanca e climas: as partes puras --------------------------------------
 
@@ -271,7 +197,6 @@ typedef struct {
   unsigned gen[MAPA_GEN_MAX];     int nGen;
   unsigned gente[MAPA_GENTE_MAX]; int nGente;
 } MapaVizCand;
-typedef struct { MapaObra obra; char quem[32]; } MapaVizAmigo;
 
 typedef struct {
   const MapaSemente *foco;
@@ -282,12 +207,11 @@ typedef struct {
   const char *temaKw;             // a mesma palavra em ingles
   long temaId;
   const MapaVizCand *pool; int nPool;
-  const MapaVizAmigo *amigos; int nAmigos;
   const unsigned *vistos; int nVistos;   // hashes de titulo ja comecados
   unsigned pessoaPref;            // hash do nome preferido na reserva local (0 = nenhum)
   unsigned generoPref;            // hash do genero preferido na reserva local (0 = nenhum)
 } MapaVizEntrada;
-// Monta os quatro grupos. Preserva v->revisao.
+// Monta os tres grupos. Preserva v->revisao.
 void mapa_vizinhos_montar(const MapaVizEntrada *e, MapaVizinhos *v);
 
 // {"results":[...],"total_results":N} de /discover e afins. `serie` fixa o

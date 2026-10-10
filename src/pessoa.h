@@ -13,7 +13,6 @@
 void pessoa_pedir(long tmdbId, const char *nomeConhecido, const char *foto);
 
 // 1 quando ja ha o que desenhar.
-int  pessoa_pronta(void);
 const char *pessoa_nome(void);
 const char *pessoa_foto(void);
 const char *pessoa_bio(void);

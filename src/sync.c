@@ -3,7 +3,7 @@
 #include "sessao.h"
 #include "nuvem.h"
 #include "perfis.h"
-#include "agenda.h"
+#include "releaseinfo.h"
 #include "lembrete.h"
 #include "dados.h"
 #include "addons.h"
@@ -1970,10 +1970,8 @@ void sync_esquecer_usuario(void) {
   sorg_esquecer();
   // O mapa do gosto da Explorar e derivado do historico de quem saiu.
   mapa_esquecer();
-  // E A AGENDA: o calendario e os lembretes sao a lista de series de quem
-  // saiu, com o dia em que cada uma volta. Mesmo argumento dos salvos, e com o
-  // agravante de a tela Agenda mostrar essa lista inteira de uma vez.
-  agenda_esquecer();
+  // Release metadata belongs to the account that is signing out.
+  releaseinfo_forget();
   // E os lembretes de programa do guia, pelo mesmo motivo.
   lembrete_esquecer_todos();
   // E A FONTE LEMBRADA DE CADA TITULO. Ela nao chega a ser um segredo, mas diz
@@ -2039,5 +2037,3 @@ void sync_esquecer_usuario(void) {
   snprintf(resumo, sizeof resumo, "sem conta");
   printf("[sync] dados do usuario apagados deste aparelho\n");
 }
-
-void        sync_encerrar(void)    { }

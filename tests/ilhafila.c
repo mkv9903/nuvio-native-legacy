@@ -3,8 +3,8 @@
 // avisos da central que esperam viram um "N avisos novos", mesma chave troca
 // no lugar, retirar a central limpa so os dela.
 //
-// Sem janela e sem GL: so a fila. ilha.c e ligado com -undefined
-// dynamic_lookup (o desenho nunca e chamado aqui) e i18n devolve o portugues.
+// Sem janela e sem GL: so a fila. Secoes de desenho nao usadas sao removidas
+// pelo linker, e i18n devolve o portugues.
 #include "ilha.h"
 #include <assert.h>
 #include <stdio.h>

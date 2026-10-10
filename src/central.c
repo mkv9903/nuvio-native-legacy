@@ -228,7 +228,6 @@ void central_desenhar(Uint32 agora) {
 }
 
 // --- A TECLA CH+ ---------------------------------------------------------------
-int central_tecla_ocupada(void) { return chs_ocupado(&chs); }
 
 int central_tecla(const SDL_Event *e, int pode) {
   Uint32 t;
@@ -547,35 +546,6 @@ static void corpo(GfxRect r, float a, void *u) {
 // A PREVIA (novidades201.c): o mesmo desenho da central aberta, com os
 // atalhos de fabrica, sem ler nem gravar a lista da pessoa, sem alvo de
 // ponteiro e sem mexer no foco dela.
-static void previaEntrar(CentralLista *salva, int *est) {
-  *salva = lista;
-  est[0] = foco; est[1] = aberta; est[2] = editando;
-  centrallista_padrao(&lista);
-  aberta = 0; editando = 0; previa = 1;
-}
-static void previaSair(const CentralLista *salva, const int *est) {
-  lista = *salva;
-  foco = est[0]; aberta = est[1]; editando = est[2];
-  previa = 0; previaInverte = -1;
-}
-float central_previa_altura(void) {
-  CentralLista s;
-  int e[3];
-  float h;
-  previaEntrar(&s, e);
-  h = altura(1);
-  previaSair(&s, e);
-  return h;
-}
-void central_previa_desenhar(float x, float y, float a, int f, int inverte) {
-  CentralLista s;
-  int e[3];
-  previaEntrar(&s, e);
-  foco = f;
-  previaInverte = inverte;
-  corpo((GfxRect){ x, y, CC_W, altura(1) }, a, NULL);
-  previaSair(&s, e);
-}
 
 float central_rotulo_w(void) {
   return (CC_W - 2.0f * CC_PAD - CC_GAP * (CC_COLS - 1)) / CC_COLS - 24.0f;   // o `w` de botao()

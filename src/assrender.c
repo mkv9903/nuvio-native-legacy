@@ -273,11 +273,6 @@ static void ass_iniciar_locked(int sistema) {
   /* Fontes anexadas continuam tendo prioridade. A pasta da plataforma ajuda
    * o libass a resolver familias instaladas; Inter, distribuida com o app,
    * evita texto vazio quando a familia pedida nao existe. */
-#ifdef __EMSCRIPTEN__
-  snprintf(fontDir, sizeof fontDir, "%s", "/usr/share/fonts");
-  snprintf(fallbackFont, sizeof fallbackFont, "%s", "/app/fonts/InterDisplay-Regular.ttf");
-  if (access(fontDir, R_OK) != 0) snprintf(fontDir, sizeof fontDir, "%s", "/app/fonts");
-#else
   {
     char *base = SDL_GetBasePath();
     if (base) {
@@ -289,56 +284,17 @@ static void ass_iniciar_locked(int sistema) {
       snprintf(fontDir, sizeof fontDir, "%s", "deploy/app/fonts");
     if (access(fallbackFont, R_OK) != 0)
       snprintf(fallbackFont, sizeof fallbackFont, "%s", "deploy/app/fonts/InterDisplay-Regular.ttf");
-#ifdef NV_ANDROID
-    /* Android: a pasta de fontes e a que o NuvioActivity extraiu (<arte>/../fonts,
-     * ja achada acima). Nao ha /usr/share/fonts; o sistema entra so como
-     * ultimo recurso para a fonte de reserva. */
-    {
-      const char *env = getenv("NUVIO_ARTE");
-      if (env && env[0]) {
-        char r[512];
-        snprintf(r, sizeof r, "%s/../fonts", env);
-        if (access(r, R_OK) == 0) {
-          snprintf(fontDir, sizeof fontDir, "%s", r);
-          snprintf(fallbackFont, sizeof fallbackFont, "%s/InterDisplay-Regular.ttf", r);
-        }
-      }
-    }
-    if (access(fallbackFont, R_OK) != 0 && access("/system/fonts/Roboto-Regular.ttf", R_OK) == 0)
-      snprintf(fallbackFont, sizeof fallbackFont, "%s", "/system/fonts/Roboto-Regular.ttf");
-#elif defined(NV_TPK)
-    /* .tpk (Samsung): SDL_GetBasePath e o diretorio do host .NET, nao o do
-     * pacote. O host passa a arte em NUVIO_TPK_ARTE (src/tpk.c) e fonts/ fica
-     * ao lado de art/ (a mesma conta do txt_iniciar). Sem fontconfig e sem
-     * pasta de sistema: as fontes sao as do app, entregues ao libass em memoria. */
-    {
-      const char *env = getenv("NUVIO_TPK_ARTE");
-      if (env && env[0]) {
-        char r[640];
-        snprintf(r, sizeof r, "%s/../fonts", env);
-        if (access(r, R_OK) == 0) {
-          snprintf(fontDir, sizeof fontDir, "%s", r);
-          snprintf(fallbackFont, sizeof fallbackFont, "%s/InterDisplay-Regular.ttf", r);
-        }
-      }
-    }
-#else
     if (access("/usr/share/fonts", R_OK) == 0)
       snprintf(fontDir, sizeof fontDir, "%s", "/usr/share/fonts");
     if (access(fallbackFont, R_OK) != 0 && access("/usr/share/fonts/LG_Display-Regular.ttf", R_OK) == 0)
       snprintf(fallbackFont, sizeof fallbackFont, "%s", "/usr/share/fonts/LG_Display-Regular.ttf");
     if (access(fallbackFont, R_OK) != 0 && access("/usr/share/fonts/DroidSans.ttf", R_OK) == 0)
       snprintf(fallbackFont, sizeof fallbackFont, "%s", "/usr/share/fonts/DroidSans.ttf");
-#endif
   }
-#endif
   { char *base = SDL_GetBasePath();
     if (base) { snprintf(assPastaFontesApp, sizeof assPastaFontesApp, "%sfonts", base); SDL_free(base); }
     if (access(assPastaFontesApp, R_OK))
       snprintf(assPastaFontesApp, sizeof assPastaFontesApp, "%s", "deploy/app/fonts");
-#ifdef NV_TPK
-    if (fontDir[0] && strstr(fontDir, "/../fonts")) snprintf(assPastaFontesApp, sizeof assPastaFontesApp, "%s", fontDir);
-#endif
   }
   snprintf(assPastaFontes, sizeof assPastaFontes, "%s", fontDir);
   ass_carregar_pasta_locked();

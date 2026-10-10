@@ -6,7 +6,6 @@
 #include <assert.h>
 
 char *dados_caminho(char *dst, unsigned tam, const char *nome) { (void)nome; if (tam) dst[0] = 0; return NULL; }
-void dados_marcar_sujo(int leve) { (void)leve; }
 int ajustes_trailer_qualidade(void) { return 0; }
 char *rede_baixar_com(const char *u, int s, const char *const *c) { (void)u; (void)s; (void)c; return NULL; }
 

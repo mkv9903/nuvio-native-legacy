@@ -90,8 +90,9 @@ int main(int argc, char **argv) {
 
   assert(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) == 0);
   IMG_Init(IMG_INIT_PNG | IMG_INIT_JPG);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
   SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
-  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
   win = SDL_CreateWindow("Nuvio: barra Apple TV", SDL_WINDOWPOS_CENTERED,
                          SDL_WINDOWPOS_CENTERED, 1920, 1080,
                          SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN);
@@ -133,7 +134,7 @@ int main(int argc, char **argv) {
   snprintf(nome, sizeof nome, "%s-8-fechada-ajustes.bmp", saida); quadros(60, nome);
 
   // Tema colorido (Ocean = 2) e itens escondidos (Guia e Agenda).
-  ajusta(2, "menuGuiaLocal 1\nmenuAgendaLocal 1\n");
+  ajusta(2, "menuGuiaLocal 1\n");
   menu_definir_destino(MENU_INICIO);
   menu_abrir();
   tecla(SDLK_DOWN);

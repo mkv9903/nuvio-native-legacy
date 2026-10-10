@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Regenerates deploy/app/fonts/NotoNaskhArabic-Subset.ttf, the embedded Arabic font.
 
-WHY IT EXISTS: text.c routes Arabic to a FALLBACK font. On LG, Android,
-and Mac it comes from the system; on Samsung there is no Arabic font and text
-rendered as missing glyph boxes (#253, #258). See docs/fonts/README.md.
+WHY IT EXISTS: text.c routes Arabic to a fallback font. The embedded subset
+keeps Arabic subtitles and metadata readable when no system font is available.
+See docs/fonts/README.md.
 
 REQUIREMENTS: Without HarfBuzz, src/bidi.c shapes Arabic by swapping each letter
 to its PRESENTATION FORM (U+FE70-FEFF, and U+FB50-FDFF for Persian/Urdu). The

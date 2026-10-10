@@ -38,34 +38,6 @@ static CatItem item(const char *backdrop, const char *poster, const char *imdb) 
 }
 
 int main(void) {
-  // SAMSUNG: NUNCA `original` NEM /full/ no fundo, em fonte nenhuma, nem na
-  // Alta (fundoOriginal(), OOM do registro 1450). tests/artehero.sh roda este
-  // mesmo arquivo uma segunda vez com -D__EMSCRIPTEN__.
-#ifdef __EMSCRIPTEN__
-  { CatItem c = item("https://image.tmdb.org/t/p/w1280/abc.jpg", "", "tt7");
-    int f, d;
-    snprintf(c.backdropTrakt, sizeof c.backdropTrakt, "%s",
-             "https://media.trakt.tv/images/movies/000/1/fanarts/medium/x.jpg.webp");
-    artehero_qualidade(2);
-    for (f = 0; f <= ARTEHERO_TRAKT; f++)
-      for (d = 0; d <= 1; d++) {
-        const char *u1 = artehero_url_fonte(&c, f);
-        const char *u2 = artehero_url_destaque(&c, f, d);
-        assert(!u1 || (!strstr(u1, "original") && !strstr(u1, "/full/")));
-        assert(u2 && !strstr(u2, "original") && !strstr(u2, "/full/"));
-      }
-    c.backdropTrakt[0] = 0;
-    assert(!strcmp(artehero_url_fonte(&c, ARTEHERO_TRAKT),
-                   "https://nuvio.invalid/arte/trakt/medium/tt7"));
-    c = item("https://images.metahub.space/background/medium/tt9/img", "", "tt9");
-    assert(!strcmp(artehero_url_fonte(&c, ARTEHERO_TMDB),
-                   "https://nuvio.invalid/arte/tmdb/w1280/tt9"));
-    artehero_qualidade(1); }
-  puts("ok  Tizen: nenhuma fonte pede original/full, nem na Alta");
-  puts("artehero (tizen): tudo ok");
-  return 0;
-#endif
-
   // A MESMA IMAGEM DO CARD (19/09): com fundo guardado, o heroi e esse
   // arquivo — nem metahub por id, nem `original` — no padrao e na baixa.
   { CatItem c = item("https://image.tmdb.org/t/p/w1280/abc.jpg", "", "tt1");
@@ -112,7 +84,6 @@ int main(void) {
     assert(!strcmp(artehero_url_fonte(&c, 4), "https://media.trakt.tv/fanart.jpg")); }
   puts("ok  fontes reais do hero: catalogo, IMDb, TMDB e Trakt");
 
-#ifndef __EMSCRIPTEN__
   // O AJUSTE QUE NAO FAZIA NADA (22/09). Item do Cinemeta como ele chega de
   // verdade (curl no top de filmes): `background` = metahub pelo id, e so. No
   // catalogo gravado do Mac (~/.nuvio/catalogo-rede.bin, 285 titulos) 222
@@ -239,7 +210,6 @@ int main(void) {
     snprintf(c.pais, sizeof c.pais, "Japan");
     assert(artehero_url_fonte(&c, ARTEHERO_ANIME) != NULL); }
   puts("ok  anime: id de addon de anime, ou Animacao + Japao");
-#endif
 
 
   // SEM FUNDO E COM ID: monta a url do metahub em vez de cair no cartaz — e a

@@ -5,8 +5,7 @@
 static int uxTemPadrao(int op) {
   return op >= 0 && op < AJ_N &&
     (OPCOES[op].tipo == OP_ESCOLHA || OPCOES[op].tipo == OP_NUMERO) &&
-    CHAVE[op] && CHAVE[op][0] && CHAVE[op][0] != '-' &&
-    op != AJ_PERFIL_PESQ;
+    CHAVE[op] && CHAVE[op][0] && CHAVE[op][0] != '-';
 }
 
 static int uxValorPadrao(int op) {
@@ -162,19 +161,15 @@ static const char *uxSinonimos(int op) {
     case AJ_DESCANSO_FONTE: return "descanso vitrine titulos lista continuar catalogo filmes series";
     case AJ_PROPORCAO_PADRAO: return "proporcao padrao aspecto aspect ratio zoom original recortar esticar preencher cinema tarja barras pretas formato tela tamanho imagem player";
     case AJ_BRILHO_PLAYER: return "brilho interface player controles barra escurecer forte claro oled hdr osd luz";
-    case AJ_NOVIDADES20: return "novidades novo versao 2.0 tour guia o que mudou mudancas whats new";
     case AJ_DTS_AC3: return "dts convertido ac3 aac dolby digital 5.1 surround estereo audio som barra de som receiver arc earc conversao lg converted stereo";
     case AJ_PS_CONTINUAR: return "continuar escolha perfil cartao card tela abertura inicial assistindo retomar remover esconder desligar quem esta assistindo continue watching profile picker";
     case AJ_DV_MKV: return "dolby vision dv dovi mkv matroska perfil 8 5 hdr hdr10 experimental imagem cores";
     case AJ_CW_RETIDO_TAMBEM: return "continuar assistindo tambem ilha retomar agora fileira duplicar repetir aparecer dois lugares titulo continue watching also island resume";
     case AJ_HIST_CONTA: return "historico historico vistos progresso conta nuvio enviar scrobble simkl trakt perfil sincronizar sync history watched";
-    case AJ_SOCIAL: return "social amigos amigo atividade recomendar recomendacoes friends activity recommend presenca desligar remover";
     case AJ_PLR_CLASSIF: return "classificacao indicativa idade faixa etaria 16 12 18 livre guia parental avisos violencia nudez player content rating age parental guide";
     case AJ_APOIAR: return "apoiar apoio doar doacao patreon kofi ko-fi cafe contribuir ajudar projeto qr support donate";
     case AJ_BUSCA_CINEMETA: return "busca pesquisa cinemeta catalogo nuvio addon excluir desligar resultados procurar search";
-    case AJ_ENQUETES: return "enquete enquetes votacao votar pesquisa opiniao notificacao notificacoes aviso convite ilha relogio poll";
     case AJ_LEG_LINGUA2: return "idioma legenda secundaria segunda dupla dual second subtitle subtitles";
-    case AJ_TRAILER_ZOOM_TPK: return "trailer zoom barras pretas tarja ampliar recorte tela preta samsung experimental";
     case AJ_FONTE_ORDEM: case AJ_FONTE_ORDEM_USO:
       return "ordem ordenar subir descer prioridade add-on addon plugin primeiro desempate estrita auto-play autoplay automatico order priority tie strict";
     case AJ_FONTE_PREPARAR: return "preparar fonte ao abrir titulo antecipar resolver antecipado play instantaneo inicio rapido debrid painel arquivo prepare source ahead instant start";
@@ -186,7 +181,6 @@ static const char *uxSinonimos(int op) {
     case AJ_FONTE_REGEX: case AJ_FONTE_REGEX_PADRAO: case AJ_FONTE_REGEX_MODELO:
       return "regex expressao regular padrao filtro nome idioma espanhol latino castellano multi dual remux auto-play autoplay regex match pattern";
     case AJ_TAM_MAX: case AJ_TAM_MIN: return "tamanho maximo minimo gb gigabyte arquivo franquia dados internet limite cota plano economizar fonte automatica size quota data cap";
-    case AJ_CACHE_SEEK: return "cache seek buffer disco armazenamento voltar avancar travando carregando";
     case AJ_TMDB_IDIOMA: return "idioma metadados titulo sinopse traducao tmdb";
     case AJ_HERO_TRAILER: return "trailer trailers destaque topo hero autoplay automatico";
     case AJ_FOCO_TRAILER: return "trailer trailers cartaz poster foco autoplay";
@@ -196,7 +190,6 @@ static const char *uxSinonimos(int op) {
       return "trailer trailers som audio mudo silencio volume";
     case AJ_HERO_TRAILER_ESPERA: return "trailer trailers espera tempo demora atraso";
     case AJ_LEG_FORCADA: return "legenda forcada forcadas forced letreiros placas audio idioma automatica subtitle";
-    case AJ_LEG_SYNC_AUDIO: return "sincronia sincronizar legenda audio fala falas atraso automatico sync subtitle speech";
     case AJ_AVANCADAS: return "avancado avancada avancados avancadas tecnico tecnica opcoes ocultas mostrar esconder advanced";
     case AJ_LOGO_TRAILER: return "trailer trailers logo marca titulo oled queimar burn-in esconder canto";
     case AJ_TRAILER_FONTE: return "trailer trailers fonte origem provedor apple imdb youtube";
@@ -227,13 +220,13 @@ static const char *uxCaminhoAntigo(int op) {
     case AJ_DEBRID_RD: case AJ_DEBRID_TB: case AJ_DEBRID_PM: case AJ_DEBRID_AD: case AJ_DEBRID_AD_TESTAR:
     case AJ_MDB_CHAVE: case AJ_FANART_CHAVE:
       return "Chaves";
-    case AJ_P2P_LIGADO: case AJ_P2P_URL: case AJ_P2P_TESTAR:
-    case AJ_JF_LIGADO: case AJ_JF_SERVIDOR: case AJ_JF_ENTRAR: case AJ_JF_SAIR:
-    case AJ_EM_SERVIDOR: case AJ_EM_ENTRAR: case AJ_EM_SAIR:
-    case AJ_PX_ENTRAR: case AJ_PX_SERVIDOR: case AJ_PX_SAIR:
-    case AJ_PERFIL_ATIVO: case AJ_SYNC: case AJ_PERFIL_PESQ: case AJ_PERFIL_EDITAR: case AJ_SAIR:
-    case AJ_TRAKT: case AJ_SIMKL: case AJ_DISCORD: case AJ_SALVOS_DEST: case AJ_CW_FONTE: case AJ_ENQUETES:
-    case AJ_HIST_CONTA: case AJ_SOCIAL:
+
+
+
+
+    case AJ_PERFIL_ATIVO: case AJ_SYNC:   case AJ_SAIR:
+    case AJ_TRAKT: case AJ_SIMKL:  case AJ_SALVOS_DEST: case AJ_CW_FONTE:
+    case AJ_HIST_CONTA:
       return "Contas e serviços";
     case AJ_FONTE_MANUAL: case AJ_FONTE_AUTO: case AJ_FONTE_REPOR: case AJ_FONTE_PRIORIDADE: case AJ_FONTE_TOCAR_CONFERINDO: case AJ_FONTE_AQUECER: case AJ_FONTE_CONFERIR_VARIAS: case AJ_FONTE_PREPARAR:
     case AJ_FONTE_HDR: case AJ_FONTE_PRAZO: case AJ_FONTE_TEXTO: case AJ_TAM_MAX: case AJ_TAM_MIN:
@@ -305,7 +298,6 @@ int ajustes_buscar(const char *consulta, AjusteBuscaResultado *resultados, int c
     if (op < 0 || op >= AJ_N || visto[op]) continue;
     visto[op] = 1;
     if (op == AJ_ICONE_APP && !apoiador_ativo()) continue;
-    if (op == AJ_PERFIL_PESQ || op == AJ_PERFIL_EDITAR || op == AJ_SOCIAL) continue;
     uxNormalizar(i18n(rotuloOpcao(op)), titulo, sizeof titulo);
     uxNormalizar(rotuloOpcao(op), tituloPt, sizeof tituloPt);
     uxNormalizar(uxSinonimos(op), aliases, sizeof aliases);

@@ -1,3 +1,4 @@
+#include "gles_test.h"
 // ARTE DE VERDADE ATRAS DAS CAPTURAS DO GLASS UI (tests/*_shot.c).
 //
 // O vidro e um miolo translucido: sobre o fundo liso de glClearColor ele sai
@@ -40,9 +41,7 @@ static GLuint shot_arte_carregar(void) {
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-  glPixelStorei(GL_UNPACK_ROW_LENGTH, t->pitch / 4);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, t->w, t->h, 0, GL_RGBA, GL_UNSIGNED_BYTE, t->pixels);
-  glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+  gles_test_upload_surface(t);
   SDL_FreeSurface(t);
   return shotArteTex;
 }

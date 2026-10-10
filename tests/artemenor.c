@@ -3,7 +3,7 @@
 // Os sitios de arte pequena pediam tex_obter — teto unico de 640, dimensionado
 // pela maior arte de card — e desenhavam a 40-220 px: logo de servico (40),
 // avatar do menu (44), capa de pasta em circulo (48), mini de salvos (84),
-// logo de estudio (204), poster do cartao de amigo (220) e foto de pessoa
+// logo de estudio (204), poster do arte intermediaria (220) e foto de pessoa
 // (280). Um avatar natural de 640 sao 1,6 MB de textura (mais 33% de
 // piramide, que bytesUsados nao conta) para um circulo de 44. Na C9 o
 // gpu-cache vive encostado no teto (293,5 de ~300 MB) e cada textura dessa
@@ -22,7 +22,7 @@
 //   1. O CAP de cada classe de sitio, e o 640 do caminho antigo.
 //   2. A MESMA ARTE natural de 640x360 (tests/amostra.jpg): 921600 bytes
 //      decodificada a 640x360 pelo teto antigo, 36864 a 128x72 pelo do avatar.
-//   3. O cartao de amigo (220): a mesma arte a 288x162 — e a promocao de volta
+//   3. O arte intermediaria (220): a mesma arte a 288x162 — e a promocao de volta
 //      a 640 quando um canto maior pede, sem rebaixar quando um menor pede.
 //   4. A ESCADA da URL (artetamanho.h): poster w780 do TMDB pedido a 220 vira
 //      w300 no download; pedido a 640 continua w780; host sem escada intacto.
@@ -52,7 +52,6 @@ static const struct { float larg; int cap, w, h; const char *nome; } PAR[] = {
   {  48.0f, 128, 128, 192, "deploy/app/art/poster/03.jpg" },  // menu.c, TV_LOGO
   {  84.0f, 128, 128, 192, "deploy/app/art/poster/04.jpg" },  // salvosintro.c, SI_MINI_W
   { 204.0f, 256, 256, 384, "deploy/app/art/poster/05.jpg" },  // detail.c, EST_CARD_W-36
-  { 220.0f, 288, 288, 432, "deploy/app/art/poster/06.jpg" },  // recomenda.c, RC_POSTER_W
   { 280.0f, 352, 288, 432, "deploy/app/art/poster/07.jpg" },  // detail.c, PES_FOTO_W
 };
 #define N_PAR ((int)(sizeof PAR / sizeof *PAR))
@@ -130,15 +129,45 @@ static void conferir(const char *nome, int limite, int w, int h) {
 // sao os que o upload real deixou na textura.
 #define QUAD 44
 static GLuint fbo, fboTex;
+static GLuint quadProgram, quadBuffer;
+static GLuint quadShader(GLenum type, const char *source) {
+  GLuint shader = glCreateShader(type);
+  GLint ok;
+  glShaderSource(shader, 1, &source, NULL);
+  glCompileShader(shader);
+  glGetShaderiv(shader, GL_COMPILE_STATUS, &ok);
+  assert(ok);
+  return shader;
+}
 static void desenhar44(GLuint tex) {
-  glBindTexture(GL_TEXTURE_2D, tex);
-  glEnable(GL_TEXTURE_2D);
-  glBegin(GL_QUADS);
-  glTexCoord2f(0.21875f, 0.0f); glVertex2f(0.0f, 0.0f);
-  glTexCoord2f(0.78125f, 0.0f); glVertex2f((float)QUAD, 0.0f);
-  glTexCoord2f(0.78125f, 1.0f); glVertex2f((float)QUAD, (float)QUAD);
-  glTexCoord2f(0.21875f, 1.0f); glVertex2f(0.0f, (float)QUAD);
-  glEnd();
+  if (!quadProgram) {
+    static const GLfloat vertices[] = {
+      -1, -1, .21875f, 0,  1, -1, .78125f, 0,
+      -1,  1, .21875f, 1,  1,  1, .78125f, 1
+    };
+    GLuint vs = quadShader(GL_VERTEX_SHADER,
+      "attribute vec4 vertex; varying vec2 uv; void main() {"
+      "gl_Position=vec4(vertex.xy,0.0,1.0); uv=vertex.zw; }");
+    GLuint fs = quadShader(GL_FRAGMENT_SHADER,
+      "precision mediump float; varying vec2 uv; uniform sampler2D image;"
+      "void main() { gl_FragColor=texture2D(image,uv); }");
+    GLint ok;
+    quadProgram = glCreateProgram();
+    glAttachShader(quadProgram, vs); glAttachShader(quadProgram, fs);
+    glBindAttribLocation(quadProgram, 0, "vertex");
+    glLinkProgram(quadProgram);
+    glGetProgramiv(quadProgram, GL_LINK_STATUS, &ok); assert(ok);
+    glDeleteShader(vs); glDeleteShader(fs);
+    glGenBuffers(1, &quadBuffer); glBindBuffer(GL_ARRAY_BUFFER, quadBuffer);
+    glBufferData(GL_ARRAY_BUFFER, sizeof vertices, vertices, GL_STATIC_DRAW);
+  }
+  glUseProgram(quadProgram);
+  glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, tex);
+  glUniform1i(glGetUniformLocation(quadProgram, "image"), 0);
+  glBindBuffer(GL_ARRAY_BUFFER, quadBuffer);
+  glEnableVertexAttribArray(0);
+  glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(GLfloat), NULL);
+  glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 }
 
 int main(int argc, char **argv) {
@@ -153,8 +182,9 @@ int main(int argc, char **argv) {
   assert(copia && copia[0]);
   assert(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) == 0);
   IMG_Init(IMG_INIT_PNG | IMG_INIT_JPG);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
   SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
-  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
   w = SDL_CreateWindow("artemenor", 0, 0, 64, 64, SDL_WINDOW_OPENGL | SDL_WINDOW_HIDDEN);
   assert(w);
   gl = SDL_GL_CreateContext(w);
@@ -181,12 +211,12 @@ int main(int argc, char **argv) {
   fflush(stdout);
 
   // 2. A reducao de verdade: a mesma arte natural 640x360 no teto do cartao
-  //    de amigo (220 -> cap 288) e no do avatar (40 -> cap 128).
+  //    de 220 px (cap 288) e no do avatar (40 -> cap 128).
   b0 = bytesAgora();
   pedidoEBomba(copia, 220.0f);
   b1 = bytesAgora();
   conferir(copia, 288, 288, 162);
-  printf("[artemenor] cartao de amigo (cap 288): 640x360 -> 288x162, %ld bytes (teto antigo: 921600)\n", b1 - b0);
+  printf("[artemenor] arte intermediaria (cap 288): 640x360 -> 288x162, %ld bytes (teto antigo: 921600)\n", b1 - b0);
   fflush(stdout);
 
   b0 = bytesAgora();
@@ -237,8 +267,6 @@ int main(int argc, char **argv) {
   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, fboTex, 0);
   assert(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
   glViewport(0, 0, QUAD, QUAD);
-  glMatrixMode(GL_PROJECTION); glLoadIdentity(); glOrtho(0, QUAD, 0, QUAD, -1, 1);
-  glMatrixMode(GL_MODELVIEW); glLoadIdentity();
   glDisable(GL_BLEND);
   glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
   glClear(GL_COLOR_BUFFER_BIT);

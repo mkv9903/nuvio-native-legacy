@@ -450,12 +450,8 @@ int  serieaud_n(void)          { return nEps; }
 int  serieaud_temporada(void)  { return temporadaAtual; }
 static int dentro(int i) { return i >= 0 && i < nEps; }
 int  serieaud_ep(int i)        { return dentro(i) ? eps[i].ep : 0; }
-int  serieaud_nota(int i)      { return dentro(i) ? eps[i].nota : 0; }
 int  serieaud_tem_stats(int i) { return dentro(i) ? eps[i].tem : 0; }
 long serieaud_watchers(int i)  { return dentro(i) ? eps[i].watchers : 0; }
-long serieaud_plays(int i)     { return dentro(i) ? eps[i].plays : 0; }
-int  serieaud_comentarios(int i){ return dentro(i) ? eps[i].comentarios : 0; }
-int  serieaud_votos(int i)     { return dentro(i) ? eps[i].votos : 0; }
 
 int serieaud_retencao(int i) {
   if (!dentro(i) || !eps[i].tem) return -1;
@@ -501,7 +497,6 @@ void serieaud_selecionar(int i) {
   if (i >= nEps) i = nEps - 1;
   selecionado = i < 0 ? 0 : i;
 }
-int serieaud_selecionado(void) { return selecionado; }
 
 // --- PRIMITIVAS DE GRAFICO ---------------------------------------------------
 //

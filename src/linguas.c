@@ -244,7 +244,6 @@ void ling_definir_original(const char *cod) {
   if (!cod || !*cod) { origAtual[0] = 0; return; }
   snprintf(origAtual, sizeof origAtual, "%s", cod);
 }
-const char *ling_original(void) { return origAtual; }
 
 static const char *emVigor(const char *local, const char *conta) {
   if (!local[0]) return conta;      // sem escolha local: a conta manda

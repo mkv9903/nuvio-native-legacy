@@ -5,7 +5,7 @@
 // A linha de acoes do detalhe chegava a DEZ pecas num filme (Reproduzir, +,
 // olho, fontes, recomendar, trocar arte, trailer, explorar...). Agora ela
 // guarda so o que se usa a cada visita — reproduzir/retomar, salvar, assistido,
-// fontes (e o lembrete da serie) — e o resto mora num circular "..." no fim
+// fontes — e o resto mora num circular "..." no fim
 // dela. O OK nele ABRE ESTA ILHA ancorada no proprio botao: o circular cresce
 // ate virar o cartao (mesmo material e mesma linha do menu do cartaz, ctxmenu.c
 // e plrui.h), com icone + nome em cada linha.
@@ -23,7 +23,7 @@
 #include "gfx.h"
 
 // Ordem FIXA das linhas (a do uso: o trailer e o que mais se procura).
-enum { DMAIS_TRAILER = 0, DMAIS_EXPLORAR, DMAIS_ARTE, DMAIS_RECOMENDAR, DMAIS_N };
+enum { DMAIS_TRAILER = 0, DMAIS_EXPLORAR, DMAIS_ARTE, DMAIS_N };
 
 // Abre com as acoes que existem neste titulo (`disp[i]` != 0), foco na
 // primeira. Sem nenhuma disponivel, nao abre.
@@ -32,7 +32,7 @@ void detmais_fechar(void);
 // Fecha sem animar (a pagina abriu outro titulo).
 void detmais_zerar(void);
 int  detmais_aberto(void);      // tem o teclado
-float detmais_visivel(void);    // 0..1, segue animando depois de fechar
+    // 0..1, segue animando depois de fechar
 int  detmais_n(void);
 int  detmais_acao(int linha);   // DMAIS_* da linha, -1 fora
 int  detmais_foco(void);

@@ -4,9 +4,7 @@
 #include "gfx.h"
 #include "jpegrapido.h"
 #include <SDL2/SDL.h>
-#ifndef __EMSCRIPTEN__
 #include <SDL2/SDL_image.h>
-#endif
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -350,9 +348,7 @@ static SDL_Surface *decodificar(const unsigned char *b, long n) {
   // Largura pedida enorme = sem reducao de DCT: o recorte precisa do pixel
   // inteiro (o quadro ja e pequeno, 320x180).
   s = jpeg_rapido_carregar_mem(b, (size_t)n, 1 << 20, &w0, &h0);
-#ifndef __EMSCRIPTEN__
   if (!s) { SDL_RWops *rw = SDL_RWFromConstMem(b, (int)n); s = rw ? IMG_Load_RW(rw, 1) : NULL; }
-#endif
   if (!s) return NULL;
   if (s->format->format == SDL_PIXELFORMAT_ABGR8888) return s;
   c = SDL_ConvertSurfaceFormat(s, SDL_PIXELFORMAT_ABGR8888, 0);

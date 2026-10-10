@@ -1,15 +1,13 @@
 # Installing on another TV
 
-Download the `.ipk` (**~47 MB**) from the
-[releases page](https://github.com/iqui27/nuvio-native-legacy/releases/latest),
-or build it yourself:
+Build your personal fork without deploying it:
 
 ```bash
-bash tools/arm.sh --ipk
+bash tools/arm.sh --ipk --build
 ```
 
-The package contains **no credentials**. `tools/testa-ipk.sh` proves it, and
-`arm.sh` aborts and deletes the package if one appears.
+The package excludes saved account credentials. `tools/test-ipk.sh` checks the
+package, and `arm.sh` verifies its contents during packaging.
 
 ---
 
@@ -18,7 +16,7 @@ The package contains **no credentials**. `tools/testa-ipk.sh` proves it, and
 | | Developer Mode | Homebrew Channel | Root |
 |---|---|---|---|
 | Root required | no | no, to install the channel | yes |
-| Lifetime | **50 h session**, renewable | permanent | permanent |
+| Lifetime | renewable session | permanent | permanent |
 | LG developer account | required | only to install the channel | no |
 | Install with | `ares-install` | from the TV itself | `bash tools/arm.sh` |
 
@@ -96,14 +94,3 @@ here — this TV has no Developer Mode app installed and port 9922 is closed
    to type on a phone.
 5. **Simkl** can be linked too, but no screen in this app consumes Simkl yet —
    it exists so the credential reaches the account and from there the web app.
-
-## What still bothers me
-
-- **~47 MB**, nearly all prebaked artwork, so the home screen has something to
-  show before you sign in. It used to be 175 MB and to carry the packager's own
-  catalogue and addon keys; `arm.sh` now excludes every personal file and
-  verifies the exclusion against the finished package, deleting it if one
-  appears.
-- **50 h** sessions in Developer Mode. LG's limit, not the app's.
-- The package uses the id `space.nuvio.native.legacy` so it can coexist with the
-  web app (`space.nuvio.webos`) on the same TV. See PORT-LEGACY.md.

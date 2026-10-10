@@ -5,7 +5,8 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 const root = path.resolve(import.meta.dirname, '..');
 const art = path.join(root, 'deploy/app/art');
-const source = process.argv[2] || '/Users/hrocha/Library/Application Support/Nuvio';
+const source = process.argv[2];
+if (!source || source.startsWith('--')) throw Error('Usage: node tools/import-collections.mjs <profile-directory> [--no-animation]');
 function property(file, key) {
   const line = fs.readFileSync(path.join(source, file+'.properties'), 'utf8').split('\n').find(l=>l.startsWith(key+'='));
   if (!line) throw Error('Profile property missing: '+key);

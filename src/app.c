@@ -61,9 +61,7 @@
 #include "spotlight.h"
 #include "biblioteca.h"
 #include "explorar.h"
-#include "agendaui.h"
-#include "agenda.h"
-#include "agendaviso.h"
+#include "releaseinfo.h"
 #include "perfil.h"
 #include "salvos.h"
 #include "contapend.h"
@@ -478,7 +476,7 @@ static int sair = 0;
 const char *app_tela_nome(void) {
   static const char *const NOMES[] = {
     "login", "escolha-perfil", "home", "explorar", "guia", "busca", "biblioteca", "perfil",
-    "ajustes", "diagnostico", "player", "addons", "agenda", "livetv-diag", "plugins"
+    "ajustes", "diagnostico", "player", "addons", "livetv-diag", "plugins"
   };
   if (stream_folha_aberta()) return "fontes";
   if (episodios_aberto()) return "episodios";
@@ -593,7 +591,6 @@ static void trocarTela(Tela nova) {
     case TELA_GUIA:       guia_abrir();         break;
     case TELA_BUSCA:      busca_iniciar();      break;
     case TELA_BIBLIOTECA: biblioteca_iniciar(); break;
-    case TELA_AGENDA:     agendaui_iniciar();   break;
     case TELA_PERFIL:     perfil_abrir(); pedirPerfil(); break;
     case TELA_AJUSTES:    ajustes_iniciar();    break;
     case TELA_DIAGNOSTICO: diagnostico_iniciar(); break;
@@ -678,11 +675,6 @@ static void fitDuracaoMidia(void) {
 // player's real source may feed StreamFit. Trailer, channel, warning clip,
 // paused-in-mini or idle pipeline: generation 0, every window is stale.
 static void fitPassivaPermitir(void) {
-#ifdef NV_ANDROID
-  int ok = player_aberto() && !player_id_canal()[0] && player_com_video() &&
-           !vazao_url_aviso(video_url_atual());
-  streamfitpassiva_permitir(ok ? video_android_sessao() : 0);
-#endif
 }
 
 static void buscarParaPlayerModo(int renovar) {
@@ -1410,16 +1402,13 @@ static void prepararAoAbrir(void) {
 // Na pagina do titulo: a API do debrid; quando a lista de fontes chega ou cresce:
 // o host de cada uma das primeiras. Nunca resolve link nem cria arquivo.
 static void aquecerAoAbrirTitulo(void) {
-#ifndef __EMSCRIPTEN__
   const char *api[4];
   int n;
   if (!ajustes_fonte_aquecer()) return;
   n = debrid_origens(api, 4);
   if (n > 0) aquecer_pedir(api, n);
-#endif
 }
 static void aquecerQuandoChegarem(void) {
-#ifndef __EMSCRIPTEN__
   static int visto = -1;
   int sn;
   if (!detail_aberto() || player_aberto() || aguardandoFonte || !ajustes_fonte_aquecer()) { visto = -1; return; }
@@ -1433,7 +1422,6 @@ static void aquecerQuandoChegarem(void) {
     for (k = 0; k < q; k++) p[k] = u[k];
     if (q > 0) aquecer_pedir(p, q);
   }
-#endif
 }
 // TOCAR ENQUANTO CONFERE. O fio que confere publica a primeira candidata da
 // fila (streams.c); aqui ela entra no player na hora, SEM esperar o veredito.
@@ -1823,7 +1811,7 @@ int app_iniciar(const char *dirArte) {
   // reinjeta a pasta dela em colecoes.c; chamando isto so ao ABRIR a Biblioteca,
   // a fileira sumiria da home a cada reinicio ate a pessoa passar por la.
   lst_iniciar();
-  agenda_iniciar();
+  releaseinfo_init();
   // A FONTE LEMBRADA, do mesmo jeito e pelo mesmo motivo: ela e lida antes do
   // primeiro Reproduzir, que pode acontecer segundos depois do arranque quando
   // a pessoa abre direto no "Continuar assistindo".
@@ -1963,7 +1951,7 @@ static void spotAtender(void) {
       trocarTela(TELA_ADDONS);
       break;
     case SPOT_GUIA:
-      if (tela != TELA_AJUSTES) { ajustes_abrir_no_guia(0); trocarTela(TELA_AJUSTES); menu_definir_destino(MENU_AJUSTES); }
+      if (tela != TELA_AJUSTES) { ajustes_abrir_no_guia(); trocarTela(TELA_AJUSTES); menu_definir_destino(MENU_AJUSTES); }
       ajustes_guia_ir(p.indice);
       break;
     case SPOT_AJUSTE:
@@ -1993,7 +1981,7 @@ int app_na_home(void) {
 // para abrir as notificacoes e a sidebar social da parte de titulos tambem e em
 // outros lugares"). Antes so na Home. Agora tambem na pagina do titulo (e a
 // ficha da pessoa, que vive nela), "Ver tudo"/colecao e nas telas de menu
-// (Explorar, Busca, Biblioteca, Perfil, Social, Add-ons, Plugins, Agenda).
+// (Explorar, Busca, Biblioteca, Perfil, Add-ons, Plugins).
 // Nunca sobre o player, o guia, Ajustes ou diagnosticos, e nunca com uma
 // folha/menu do cartaz por cima: elas tem a tecla. A tecla "S" de teclado de
 // Mac nao vale com um campo de texto ativo (e a letra, nao a AZUL).
@@ -2005,14 +1993,11 @@ static int azulPodeAbrirSalvos(const SDL_Event *e) {
   // So no teclado de verdade (Mac/desktop). No Android a AZUL, o CH+ e o
   // MENU/BOOKMARK CHEGAM como "s" (NuvioActivity/main.c) e o SDL pode deixar o
   // text input ligado: a regra recusava o atalho e o CH+ parou de abrir a ilha.
-#ifndef NV_ANDROID
   if (e->key.keysym.sym == SDLK_s && e->key.keysym.scancode != NV_SCANCODE_BLUE &&
       SDL_IsTextInputActive()) return 0;
-#endif
   switch (tela) {
     case TELA_HOME: case TELA_EXPLORAR: case TELA_BUSCA: case TELA_BIBLIOTECA:
-    case TELA_PERFIL: case TELA_ADDONS: case TELA_PLUGINS:
-    case TELA_AGENDA: return 1;
+    case TELA_PERFIL: case TELA_ADDONS: case TELA_PLUGINS: return 1;
     default: return 0;
   }
 }
@@ -2162,7 +2147,6 @@ void app_evento(const SDL_Event *e) {
   if (pipintro_aberto()) { pipintro_evento(e); return; }
   if (telemetria_aberto()) { telemetria_evento(e); return; }
   if (atualizacao_aberta()) { atualizacao_evento(e); return; }
-  if (agendaviso_aberto()) { agendaviso_evento(e); return; }
 
   // A folha de fontes fica acima de tudo: ela e uma pergunta, e enquanto ela
   // esta em pe nada mais deve responder ao D-pad.
@@ -2272,7 +2256,6 @@ void app_evento(const SDL_Event *e) {
     case TELA_GUIA:       guia_evento(e);       break;
     case TELA_BUSCA:      busca_evento(e);      break;
     case TELA_BIBLIOTECA: biblioteca_evento(e); break;
-    case TELA_AGENDA:     agendaui_evento(e);   break;
     case TELA_PERFIL:     perfil_evento(e);     break;
     case TELA_ADDONS:     addonsui_evento(e);   break;
     case TELA_PLUGINS:    pluginsui_evento(e);  break;
@@ -2413,7 +2396,7 @@ static const char *homeTrailerBloqueio(void) {
   if (vertudo_aberta()) return "see-all";
   if (avisos_aberto() || avisos_cartao_aberto()) return "notices";
   if (sintro_aberto() || pipintro_aberto() || telemetria_aberto()) return "intro";
-  if (atualizacao_aberta() || agendaviso_aberto()) return "update-notice";
+  if (atualizacao_aberta()) return "update-notice";
   if (faixas_aberta() || episodios_aberto() || stream_folha_aberta()) return "sheet";
   if (guia_overlay_aberta()) return "guide";
   if (registro_aberto()) return "log";
@@ -2714,9 +2697,6 @@ void app_atualizar(float dt, Uint32 agora) {
       if (!registro_aberto() && !sintro_aberto() && !telemetria_aberto() && !pipintro_aberto())
         atualizacao_mostrar_se_houver();
       if (!registro_aberto() && !sintro_aberto() && !telemetria_aberto() && !pipintro_aberto() && !atualizacao_aberta())
-        agendaviso_mostrar_se_houver();
-      if (!registro_aberto() && !sintro_aberto() && !telemetria_aberto() && !pipintro_aberto() && !atualizacao_aberta() &&
-          !agendaviso_aberto())
         avisos_mostrar_se_houver();
     }
   }
@@ -2783,15 +2763,14 @@ void app_atualizar(float dt, Uint32 agora) {
   // catalogo, pede o titulo a descoberta — o mesmo caminho que perfil.c e
   // social.c ja usam para um id que so eles conhecem.
   // Acoes pedidas pela central de avisos: abrir Salvos (recomendacao) ou o
-  // cartao de atualizacao. O titulo (agenda) segue pelo contrato de baixo.
+  // cartao de atualizacao. O titulo escolhido nos Salvos segue pelo contrato de baixo.
   { int c = avisos_pediu();
     if (c == AVISOS_ABRIR_SALVOS && !spainel_aberto()) spainel_abrir();
     else if (c == AVISOS_ABRIR_ATUALIZACAO) atualizacao_abrir(); }
   // A ILHA: cartoes (ilhacart.c) e o que o modal pediu.
-  { const CatItem *ab = detail_aberto() ? cat_item(detail_indice()) : NULL;
-    IlhaCartao ic;
+  { IlhaCartao ic;
     int qual = 0, o;
-    ilhacart_atualizar(agora, ab && ab->imdb[0] ? ab->imdb : NULL);
+    ilhacart_atualizar(agora);
     ilhasinais_passo(agora);
     // O "Reconectar" do Trakt (modal da ilha): Ajustes, na linha do Trakt.
     if (ilhasinais_pediu_trakt() && !player_aberto()) {
@@ -2812,7 +2791,6 @@ void app_atualizar(float dt, Uint32 agora) {
       ilha_modal_fechar(1);
     } else if ((o == ILHA_PEDIU_TOCAR || o == ILHA_PEDIU_DETALHES) && !player_aberto()) {
       int idx = cat_indice_por_imdb(ic.imdb);
-      if (qual == ILHA_ESTREIA) avisos_marcar_visto(ic.avisoId);
       if (o == ILHA_PEDIU_TOCAR && qual == ILHA_VIVO &&
           player_retomar_retido(ic.imdb, ic.serie ? ic.t : 0, ic.serie ? ic.e : 0)) {
         if (detail_aberto()) detail_fechar_seco();
@@ -2830,7 +2808,7 @@ void app_atualizar(float dt, Uint32 agora) {
     } else if (o == ILHA_PEDIU_DISPENSAR) {
       if (qual == ILHA_VIVO) player_descartar_retido();
       ilhacart_dispensar(qual);
-    } else if (o == ILHA_PEDIU_DEPOIS) ilhacart_adiar(qual);
+    }
   }
   // Da pagina do titulo, um titulo escolhido no painel de Salvos/avisos TROCA a
   // pagina (a de baixo fecha seca). So esse pedido: os demais seguem de fora.
@@ -2844,24 +2822,6 @@ void app_atualizar(float dt, Uint32 agora) {
   }
   if (!detail_aberto() && !player_aberto()) {
     const char *alvo = spainel_pediu_abrir();
-    if (!alvo) alvo = avisos_pediu_abrir();
-    if (!alvo && tela == TELA_AGENDA) alvo = agendaui_pediu_abrir();
-    // "ASSISTIR T<n>E<n>" DO MODAL DA AGENDA: abre o titulo e pede a
-    // reproducao do episodio no mesmo passe — o caminho do cartao de Continuar
-    // assistindo (issue #93): cwTocarT/E valem sobre o episodio que o detalhe
-    // adivinharia. Titulo fora do catalogo so abre (a descoberta o busca num
-    // fio e o episodio ja nao tem para onde ir); tocar la e um OK a mais.
-    if (!alvo && tela == TELA_AGENDA) {
-      int tt = 0, te = 0;
-      const char *tc = agendaui_pediu_tocar(&tt, &te);
-      if (tc && tc[0]) {
-        int k = cat_indice_por_imdb(tc);
-        if (k >= 0) {
-          abrirPorIndice(k);
-          if (detail_aberto()) { cwTocarT = tt; cwTocarE = te; detail_pedir_reproduzir(); }
-        } else desc_pedir_titulo(tc);
-      }
-    }
     if (!alvo && abrirTeste[0]) { alvo = abrirTeste; abrirTeste[0] = 0; }
     if (alvo && alvo[0]) {
       int k = cat_indice_por_imdb(alvo);
@@ -2869,11 +2829,6 @@ void app_atualizar(float dt, Uint32 agora) {
     }
   }
 
-  // "ABRIR A AGENDA COMPLETA" da aba Agenda do painel de Salvos/Avisos.
-  if (spainel_pediu_agenda()) {
-    if (spainel_aberto()) spainel_fechar();
-    trocarTela(TELA_AGENDA); menu_definir_destino(MENU_AGENDA);
-  }
   // "Ver tudo" de uma fileira de canais (ou OK num cartao de canal) abre o
   // GUIA — o canal nao tem grade de cartazes para mostrar; tem programacao.
   { char gid[80] = "";
@@ -2904,7 +2859,6 @@ void app_atualizar(float dt, Uint32 agora) {
     switch (ajustes_pediu_tela()) {
       case AJ_TELA_GUIA_TV:    trocarTela(TELA_GUIA);       menu_definir_destino(MENU_GUIA);       break;
       case AJ_TELA_BIBLIOTECA: trocarTela(TELA_BIBLIOTECA); menu_definir_destino(MENU_BIBLIOTECA); break;
-      case AJ_TELA_AGENDA:     trocarTela(TELA_AGENDA);     menu_definir_destino(MENU_AGENDA);     break;
       case AJ_TELA_EXPLORAR:   trocarTela(TELA_EXPLORAR);   menu_definir_destino(MENU_EXPLORAR);   break;
       case AJ_TELA_PERFIL:     trocarTela(TELA_PERFIL);     menu_definir_destino(MENU_PERFIL);     break;
       default: break;
@@ -2970,7 +2924,6 @@ void app_atualizar(float dt, Uint32 agora) {
               || (tela == TELA_GUIA       && guia_quer_sair())
               || (tela == TELA_BUSCA      && busca_quer_sair())
               || (tela == TELA_BIBLIOTECA && biblioteca_quer_sair())
-              || (tela == TELA_AGENDA     && agendaui_quer_sair())
               || (tela == TELA_PERFIL      && perfil_quer_sair())
               || (tela == TELA_AJUSTES    && ajustes_quer_sair())
               || (tela == TELA_DIAGNOSTICO && diagnostico_quer_sair());
@@ -3028,7 +2981,6 @@ void app_atualizar(float dt, Uint32 agora) {
       case MENU_EXPLORAR:   trocarTela(TELA_EXPLORAR);   break;
       case MENU_BUSCAR:     trocarTela(TELA_BUSCA);      break;
       case MENU_BIBLIOTECA: trocarTela(TELA_BIBLIOTECA); break;
-      case MENU_AGENDA:     trocarTela(TELA_AGENDA);     break;
       // DIRETO PARA A TELA, e nao mais para o painel lateral. O item do menu
       // se chama "Perfil e Stats" e abria um resumo de tres botoes por cima da
       // home — para ver as estatisticas de verdade era preciso descer ate "Ver
@@ -3951,11 +3903,6 @@ void app_atualizar(float dt, Uint32 agora) {
         trocarTela(TELA_HOME);
         menu_definir_destino(MENU_INICIO);
         ilha_minimizar(fundoVoo[0] ? fundoVoo : NULL);
-#ifdef NV_ANDROID
-        // A sessao ficou pausada atras da home: o voo comeca DISSOLVENDO a
-        // partir do proprio video parado (ilha_minimizar_dissolver).
-        ilha_minimizar_dissolver(player_retido());
-#endif
       } }
     }
   }
@@ -4053,7 +4000,6 @@ void app_atualizar(float dt, Uint32 agora) {
     case TELA_EXPLORAR:   explorar_atualizar(dt, agora);   break;
     case TELA_BUSCA:      busca_atualizar(dt, agora);      break;
     case TELA_BIBLIOTECA: biblioteca_atualizar(dt, agora); break;
-    case TELA_AGENDA:     agendaui_atualizar(dt, agora);   break;
     case TELA_PERFIL:     break;
     case TELA_AJUSTES:    ajustes_atualizar(dt, agora);    break;
     case TELA_DIAGNOSTICO: diagnostico_atualizar(dt, agora); break;
@@ -4072,7 +4018,6 @@ void app_atualizar(float dt, Uint32 agora) {
   sintro_atualizar(dt, agora);
   telemetria_atualizar(dt, agora);
   atualizacao_atualizar(dt, agora);
-  agendaviso_atualizar(dt, agora);
   avisos_atualizar(dt, agora);
   // Lembretes de programa: so com alguem dentro do app (nao no login nem na
   // escolha de perfil), uma conferencia por segundo no maximo.
@@ -4117,7 +4062,6 @@ static void desenharAtrasDoPainel(void *ctx) {
       case TELA_GUIA:       guia_desenhar(agora);       break;
       case TELA_BUSCA:      busca_desenhar(agora);      break;
       case TELA_BIBLIOTECA: biblioteca_desenhar(agora); break;
-      case TELA_AGENDA:     agendaui_desenhar(agora);   break;
       case TELA_PERFIL:     perfil_desenhar(agora);     break;
       case TELA_ADDONS:     addonsui_desenhar(agora);   break;
       case TELA_PLUGINS:    pluginsui_desenhar(agora);  break;
@@ -4173,7 +4117,7 @@ static void desenharAtrasDoPainel(void *ctx) {
     menu_pilula_mostrar(vertudo_aberta() || detail_aberto() ? -1.0f   // "Ver tudo"/colecao/pagina tem cabecalho proprio
                         : tela == TELA_HOME ? home_topo_fracao()
                         : (tela == TELA_EXPLORAR || tela == TELA_BUSCA ||
-                           tela == TELA_BIBLIOTECA || tela == TELA_AGENDA ||
+                           tela == TELA_BIBLIOTECA ||
                            tela == TELA_PERFIL || tela == TELA_AJUSTES) ? 1.0f : -1.0f);
     CAMADA_SE(menu_aberto());
     menu_desenhar(agora);
@@ -4290,13 +4234,13 @@ static int relogioCabe(void) {
   if (tela == TELA_HOME) { if (!homePronta) return 0; }
   else if (tela != TELA_EXPLORAR && tela != TELA_BUSCA &&
            tela != TELA_BIBLIOTECA && tela != TELA_PERFIL &&
-           tela != TELA_ADDONS && tela != TELA_PLUGINS && tela != TELA_AGENDA) return 0;
+           tela != TELA_ADDONS && tela != TELA_PLUGINS) return 0;
   // O MENU ABERTO NAO ESCONDE MAIS O RELOGIO (Glass UI, mockup "ilha" tela 1):
   // a ilha do menu nasce logo abaixo da do relogio, na mesma margem
   // (ilha_posicionar), e as duas formam a coluna da esquerda.
   if (ctx_aberto() || stream_folha_aberta() || faixas_aberta() || episodios_aberto()) return 0;
   if (sintro_aberto() || telemetria_aberto() ||
-      atualizacao_aberta() || agendaviso_aberto() || avisos_cartao_aberto() ||
+      atualizacao_aberta() || avisos_cartao_aberto() ||
       glem_cartao_aberto() || pipintro_aberto() || diagnostico_intro_aberto())
     return 0;
   return 1;
@@ -4377,8 +4321,6 @@ void app_desenhar(Uint32 agora) {
   if (!registro_aberto()) telemetria_desenhar(agora);
   CAMADA_SE(atualizacao_aberta());
   if (!registro_aberto()) atualizacao_desenhar(agora);
-  CAMADA_SE(agendaviso_aberto());
-  if (!registro_aberto()) agendaviso_desenhar(agora);
   // A central so aparece com a pessoa DENTRO do app: no login e na escolha de
   // perfil nao ha para quem avisar, e o relogio do toast so comeca a contar
   // no primeiro quadro em que ele pode ser visto (ver avisos.c).

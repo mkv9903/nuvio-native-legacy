@@ -10,7 +10,7 @@
 //     Trakt... as fontes que a pessoa escolheu em Ajustes);
 //   - a sinopse em ate quatro linhas;
 //   - onde a pessoa parou (serie: "T2E5 · 24 min restantes"), os amigos que
-//     viram/gostaram (amigostitulo.h), a agenda da serie (agenda.h) e os selos
+//     metadados de lançamento da serie (releaseinfo.h) e os selos
 //     "Salvo"/"Assistido".
 //
 // NADA BLOQUEIA O MENU: o que o titulo ja traz aparece no primeiro quadro; o

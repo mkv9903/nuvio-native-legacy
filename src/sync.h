@@ -177,6 +177,5 @@ long sync_copia_quando(void);
 // (servidor fora); 2 = o servidor falhou e nao ha copia neste aparelho.
 int  sync_addons_fora(void);
 
-void sync_encerrar(void);
 
 #endif

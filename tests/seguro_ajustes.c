@@ -82,7 +82,6 @@ int main(int argc, char **argv) {
     OK(valor[AJ_VIDRO] == 0 && valor[AJ_RESOLUCAO] == RES_4K && fil_limite_gravado() == 30);
     OK(avisos_n_novos() == 1);
     // Editar durante o perfil seguro mostra e grava o valor REAL, nunca o teto.
-    ajustes_definir_p2p_ligado(0);
     { char *t = dados_ler("ajustes.txt"); OK(t && strstr(t, "vidroLocal 0")); free(t); }
     _exit(0);                                         // cai de novo, ainda no perfil seguro
   }

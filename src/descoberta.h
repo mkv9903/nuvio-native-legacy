@@ -234,7 +234,6 @@ int  desc_vertudo_item(int i, CatItem *dst);
 int  desc_vertudo_carregando(void);
 // 1 quando a ultima pagina veio curta: nao ha mais o que pedir.
 int  desc_vertudo_fim(void);
-void desc_vertudo_fechar(void);
 
 void desc_episodios(int indiceItem, int temporada);
 // Solta o pedido de episodios que chegou enquanto outro carregava. Chame por

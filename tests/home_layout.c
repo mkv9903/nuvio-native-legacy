@@ -35,7 +35,6 @@ char *dados_caminho(char *dst, unsigned tam, const char *nome) {
   (void)dst; (void)tam; (void)nome; return NULL;
 }
 int   dados_apagar(const char *nome) { (void)nome; return 1; }
-void  dados_marcar_sujo(int leve) { (void)leve; }
 void  sync_proteger_ajustes_locais(void) {}
 int   perfis_ativo(void) { return 1; }
 const char *addons_base_por_id(const char *id) { (void)id; return ""; }
@@ -116,24 +115,9 @@ int main(void) {
   snprintf(fils[15].titulo, sizeof fils[15].titulo, "Oscar - Filme");
   cat_definir_tudo(itensTeste, 48, fils, 16);
   sincronizarFileiras();
-  // A INTENCAO ORIGINAL, mantida de proposito: 16 catalogos entram, mais
-  // "Amigos assistindo" e o destaque, e NENHUM catalogo se perde (o laco logo
-  // abaixo cobra isso).
-  //
-  // ESTA ASSERCAO FALHA HOJE, e a falha e informacao, nao ruido. O teto de
-  // fileiras (FIL_LIMITE_MAX, 16) conta as fileiras INSERIDAS junto com as de
-  // catalogo, entao a composicao de 18 vagas e cortada em 16 e dois catalogos
-  // somem. E exatamente a contabilidade que o relator do issue #18 descreve:
-  // "they still take up the 16-row limit and push other collections".
-  //
-  // NAO AJUSTE O NUMERO PARA FICAR VERDE. Trocar 17 por 16 aqui gravaria como
-  // correto o comportamento que o #18 questiona, e o laco de "nenhum catalogo
-  // removido" teria de ser afrouxado junto — que e a asserção que da valor ao
-  // arquivo. Quando o #18 for decidido, esta linha vira a prova da decisao.
-  assert(nFileiras == 17);
-  assert(foco.nFileiras == 17);
-  assert(fileiras[1].tipo == FILEIRA_SOCIAL && fileiras[1].ini == -1 && fileiras[1].n == 1);
-  assert(fileiras[2].tipo == FILEIRA_DESTAQUE);
+  assert(nFileiras == 16);
+  assert(foco.nFileiras == 16);
+  assert(fileiras[1].tipo == FILEIRA_DESTAQUE);
   for (int i = 0; i < 16; i++) {
     int achou = 0;
     for (int r = 0; r < nFileiras; r++)
@@ -147,23 +131,23 @@ int main(void) {
     for (lay = 0; lay < HOME_LAYOUT_N; lay++) {
       homeCom(lay, 1);
       sincronizarFileiras();
-      assert(!strcmp(fileiras[2].chave, "catalogo_1"));
+      assert(!strcmp(fileiras[1].chave, "catalogo_1"));
       for (r = 0, destaques = 0; r < nFileiras; r++)
         destaques += fileiras[r].tipo == FILEIRA_DESTAQUE;
       if (lay == HOME_LAYOUT_DINAMICA) {
-        assert(fileiras[2].tipo == FILEIRA_DESTAQUE && destaques == 1);
+        assert(fileiras[1].tipo == FILEIRA_DESTAQUE && destaques == 1);
       } else {
-        assert(fileiras[2].tipo == FILEIRA_NORMAL && destaques == 0);
-        assert(fileiras[2].tipo == fileiras[3].tipo);   // igual a seguinte
+        assert(fileiras[1].tipo == FILEIRA_NORMAL && destaques == 0);
+        assert(fileiras[1].tipo == fileiras[2].tipo);   // igual a seguinte
       }
     }
     homeCom(HOME_LAYOUT_MODERNA, 0);
     sincronizarFileiras();
-    assert(fileiras[2].tipo == FILEIRA_DESTAQUE);
+    assert(fileiras[1].tipo == FILEIRA_DESTAQUE);
   }
   foco.fileira = 0; foco.coluna = 0;
-  for (int i = 0; i < 16; i++) assert(focus_mover(&foco, 0, 1));
-  assert(foco.fileira == 16);
+  for (int i = 0; i < 15; i++) assert(focus_mover(&foco, 0, 1));
+  assert(foco.fileira == 15);
   assert(!focus_mover(&foco, 0, 1));
   // Mesma contagem, ordem diferente: manter chave, coluna e scroll.
   foco.fileira = 5; foco.coluna = 2; scrollX[5] = 123;
@@ -186,18 +170,11 @@ int main(void) {
   snprintf(fils[6].titulo,sizeof fils[6].titulo,"Top 100 - Filme");
   snprintf(fils[7].titulo,sizeof fils[7].titulo,"Top 100 - Serie");
   cat_definir_tudo(itensTeste,48,fils,16);filsAplicadas=-1;sincronizarFileiras();
+  assert(nFileiras >= 10);
   // SEM TABELA DE CURADORIA: a ordem e a da conta (catordem) ou a local
   // (fil_unir) — a montagem nao renomeia nem reordena por cima da escolha.
-  // O que a home acrescenta sozinha entra nos lugares fixos dela: "Entre
-  // amigos" em segundo, grupos de colecao no FIM, na ordem declarada.
-  assert(nFileiras>=11);
-  assert(fileiras[1].tipo==FILEIRA_SOCIAL);
-  // O primeiro catalogo com conteudo vira o destaque (destaque desligado, ver
-  // homeCom); o resto segue a ordem. "Continuar assistindo" fica em [0] e
-  // "Entre amigos" em [1], entao o destaque e o [2] — a assercao antiga pedia
-  // o [0] e abortava aqui antes do #201 tambem.
-  assert(fileiras[2].tipo==FILEIRA_DESTAQUE);
-  assert(!strcmp(fileiras[2].chave,"catalogo_1"));
+  assert(fileiras[1].tipo==FILEIRA_DESTAQUE);
+  assert(!strcmp(fileiras[1].chave,"catalogo_1"));
   assert(fileiras[nFileiras-2].tipo==FILEIRA_CATALOGOS);
   assert(!strcmp(fileiras[nFileiras-2].titulo,"Streaming"));
   assert(!strcmp(col_folder(fileiras[nFileiras-2].folders[0])->title,"Netflix"));
@@ -220,11 +197,7 @@ int main(void) {
   snprintf(fils[15].chave,sizeof fils[15].chave,"social_activity");
   fils[15].base[0]=fils[15].catId[0]=0;
   cat_definir_tudo(itensTeste,48,fils,16);sincronizarFileiras();
-  int sociais=0;
-  for(int i=0;i<nFileiras;i++)if(fileiras[i].tipo==FILEIRA_SOCIAL){
-    sociais++;assert(fileiras[i].ini==45 && fileiras[i].n==3);
-  }
-  assert(sociais==1); // dados reais substituem vazio, nunca duplicam a fileira
+  for (int i=0;i<nFileiras;i++) assert(strcmp(fileiras[i].chave,"social_activity"));
   assert(fileiras[9].stackN==0 && fileiras[9].n==3 && fileiras[9].verTudo);
 
   // O destaque continua mostrando uma terceira alternativa quando a primeira

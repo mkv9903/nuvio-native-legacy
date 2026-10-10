@@ -971,7 +971,7 @@ static void spotAbrirBase(int voz, int tecladoAuto) {
   // O corpo das recentes ja nasce aberto: crescer de zero a cada abertura
   // seria a barra "pulando" antes de a pessoa fazer qualquer coisa.
   printf("[spotlight] aberto (%s)\n", voz ? "voz" : "tecla");
-#if defined(__linux__) && !defined(NV_TPK) && !defined(NV_ANDROID) && !defined(__EMSCRIPTEN__)
+#if defined(__linux__)
   // LG: o teclado do SISTEMA por SDL_StartTextInput nao esta ligado (ver
   // spotlight.h, "LG E O TECLADO DO SISTEMA"). Uma linha por sessao para o
   // D1 dizer o que o SDL do aparelho responde, sem chamar nada que mude a tela.

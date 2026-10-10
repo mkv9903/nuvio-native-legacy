@@ -78,12 +78,9 @@ int  serieaud_pronto(void);
 int  serieaud_n(void);
 int  serieaud_temporada(void);
 int  serieaud_ep(int i);            // numero do episodio
-int  serieaud_nota(int i);          // decimos (83 = 8.3); 0 = sem nota
+          // decimos (83 = 8.3); 0 = sem nota
 int  serieaud_tem_stats(int i);     // 0 quando o /stats nao veio ou falhou
 long serieaud_watchers(int i);
-long serieaud_plays(int i);
-int  serieaud_comentarios(int i);
-int  serieaud_votos(int i);
 
 // RETENCAO em MILESIMOS de E1 (1000 = 100%). -1 quando falta o dado.
 //
@@ -115,7 +112,6 @@ int  serieaud_pior(void);
 // SUPERFICIE CLARA PREENCHIDA com texto ESCURO, sem contorno (layout.h,
 // NV_COR_FOCO).
 void serieaud_selecionar(int i);
-int  serieaud_selecionado(void);
 
 // --- DESENHO -----------------------------------------------------------------
 // Glass UI 1.8: os tres graficos viraram UM bloco, "Numeros da temporada N",

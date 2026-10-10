@@ -42,5 +42,4 @@ void apoio_dir(const char *dirArte);
 float apoio_rotulo(int qual, float x, float y, float h, int centro, float a);
 
 // Libera as texturas (ao trocar de contexto GL; o app nao precisa chamar).
-void apoio_soltar(void);
 #endif

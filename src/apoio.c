@@ -141,11 +141,3 @@ float apoio_rotulo(int q, float x, float y, float h, int centro, float a) {
     return w;
   }
 }
-
-void apoio_soltar(void) {
-  int q;
-  for (q = 0; q < APOIO_N; q++) {
-    if (tex[q]) { gfx_tex_esquecer(tex[q]); glDeleteTextures(1, &tex[q]); }
-    tex[q] = 0; tentou[q] = 0;
-  }
-}

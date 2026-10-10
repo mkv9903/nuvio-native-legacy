@@ -96,87 +96,18 @@ NetError net_job_state(NetJob *j) {
   return e;
 }
 
-#ifndef __EMSCRIPTEN__
 static uint64_t net_now_ms(void) {
   struct timespec t;
   if (clock_gettime(CLOCK_MONOTONIC, &t)) return 0;
   return (uint64_t)t.tv_sec * 1000u + (unsigned long)t.tv_nsec / 1000000u;
 }
-#endif
 
 void net_response_clear(NetResponse *r) {
   if (!r) return;
   free(r->body); free(r->headers); memset(r, 0, sizeof *r);
 }
 
-#if defined(NV_TPK40) && defined(__EMSCRIPTEN__)
-#error "NV_TPK40 is only for Tizen 4/5 libnuvio.so; never combined with Emscripten"
-#endif
 
-#ifdef NV_TPK40
-// PER-THREAD STATE WITHOUT _Thread_local (Tizen 4/5, #137/#180).
-//
-// The libnuvio.so on these TVs can be loaded by the host's custom ELF loader
-// (tizen-tpk/NuvioTpk40/Program40.cs) when UEP rejects memfd dlopen.
-// That loader does not set up compiler TLS: a `_Thread_local` becomes a
-// PT_TLS segment with R_ARM_TLS_DTPMOD32 relocations it cannot handle, and
-// first access — the first HTTPS request on a new thread — crashes the process.
-// It was the only compiler TLS in the entire library (this module).
-//
-// Here the same state lives in a per-thread struct allocated on first use via
-// pthread_key and freed by the key destructor when the thread terminates.
-// Each legacy name becomes a macro that is an lvalue: `net_cap = x`,
-// `sizeof host_usage`, and `&net_cancel_local` remain valid.
-#define NET_HOSTS_PER_THREAD 16
-typedef struct { char h[96]; unsigned long ms; } HostUsage;
-typedef struct {
-  long limit_local;
-  volatile int *cancel_local;
-  int limited_local;
-  int cancelled_local;
-  long bytes_local;
-  int curl_local;
-  char *final_dst;
-  unsigned final_size;
-  int partial_ok;
-  HostUsage host_usage[NET_HOSTS_PER_THREAD];
-  long cap;
-  int tail_refused;
-  char err_txt[200];
-  char err_buf[256];
-} NetThread;
-
-static pthread_key_t thread_key;
-static pthread_once_t thread_once = PTHREAD_ONCE_INIT;
-// If calloc fails (OOM), thread uses this SHARED fallback instead of dereferencing NULL:
-// degrades measurement of that request rather than crashing app.
-static NetThread thread_fallback;
-static void thread_release(void *p) { if (p != &thread_fallback) free(p); }
-static void thread_create_key(void) { pthread_key_create(&thread_key, thread_release); }
-static NetThread *net_thread(void) {
-  NetThread *f;
-  pthread_once(&thread_once, thread_create_key);
-  f = (NetThread *)pthread_getspecific(thread_key);
-  if (!f) {
-    f = (NetThread *)calloc(1, sizeof *f);
-    if (!f) return &thread_fallback;
-    pthread_setspecific(thread_key, f);
-  }
-  return f;
-}
-long *net_cap_ptr(void) { return &net_thread()->cap; }
-#define net_limit_local     (net_thread()->limit_local)
-#define net_cancel_local    (net_thread()->cancel_local)
-#define net_limited_local   (net_thread()->limited_local)
-#define net_cancelled_local (net_thread()->cancelled_local)
-#define net_bytes_local     (net_thread()->bytes_local)
-#define net_curl_local      (net_thread()->curl_local)
-#define net_final_dst       (net_thread()->final_dst)
-#define net_final_size      (net_thread()->final_size)
-#define net_partial_ok      (net_thread()->partial_ok)
-#define host_usage          (net_thread()->host_usage)
-#define net_tail_refused_st (net_thread()->tail_refused)
-#else
 /* Local control of the current request. State is never shared between probes:
  * each thread receives its cap and cancel token. */
 static _Thread_local long net_limit_local;
@@ -184,7 +115,6 @@ static _Thread_local volatile int *net_cancel_local;
 static _Thread_local int net_limited_local;
 static _Thread_local int net_cancelled_local;
 static _Thread_local long net_bytes_local;
-#endif
 
 static unsigned long net_now_ms_local(void);
 
@@ -193,456 +123,15 @@ static long net_current_limit(void) {
   return net_cap > 0 ? net_cap : 0;
 }
 
-#ifdef __EMSCRIPTEN__
-// ---------------------------------------------------------------- EMSCRIPTEN
-// Network path for Tizen (WASM) target.
-//
-// WHY WE CANNOT REUSE NATIVE BELOW: native code does dlopen on the device's libcurl.
-// WebAssembly has no dlopen, and there is no libcurl to open. emcc compiles
-// that code without complaint (dlfcn.h has stubs), and the only symptom is
-// login screen saying "no thread to talk to server".
-//
-// WHY SYNCHRONOUS XHR AND NOT emscripten_fetch: net_url_final requires the
-// FINAL ADDRESS after redirects to distinguish debrid links leading to files
-// from those leading to "downloading.mp4". emscripten_fetch does not expose this;
-// XHR exposes responseURL. A single mechanism with headers, status, Range,
-// and final URL is simpler than two.
-//
-// Synchronous XHR BLOCKS calling thread, matching net_download contract.
-// Fully supported on worker threads; on main thread browser still serves it with console warning.
-//
-// CORS: In standard browsers this does not work and is not a bug: addon hosts,
-// TMDB, and Supabase do not send Access-Control-Allow-Origin to file:// origins.
-// Inside .wgt, Tizen exempts access declared in <access origin="*"> in config.xml.
-//
-// timeout NOT HONORED: Synchronous XHR forbids xhr.timeout (throws InvalidAccessError).
-// `seconds` parameter accepted and ignored; browser cuts off wait.
 
-#include <emscripten.h>
-
-// Performs request and returns malloc'd buffer with body (extra NUL at end for text).
-// Writes length into *size and HTTP status into *status. Returns 0 if request never went out.
-EM_JS(char *, nv_http, (const char *metodo, const char *url, const char *cabs,
-                        const char *corpo, int *tam, int *status,
-                        char *urlFinal, int urlFinalTam,
-                        char *etag, int etagTam, int *retryAfter), {
-  var m = UTF8ToString(metodo), u = UTF8ToString(url);
-  var xhr = new XMLHttpRequest();
-  try {
-    xhr.open(m, u, false); // false = synchronous
-  } catch (e) { return 0; }
-  try { xhr.overrideMimeType("text/plain; charset=x-user-defined"); } catch (e) {}
-  if (cabs) {
-    UTF8ToString(cabs).split("\n").forEach(function (linha) {
-      var i = linha.indexOf(":");
-      if (i <= 0) return;
-      try {
-        xhr.setRequestHeader(linha.slice(0, i).trim(), linha.slice(i + 1).trim());
-      } catch (e) {}
-    });
-  }
-  try {
-    xhr.send(corpo ? UTF8ToString(corpo) : null);
-  } catch (e) { return 0; }
-
-  if (status) HEAP32[status >> 2] = xhr.status;
-  if (urlFinal && urlFinalTam > 0) {
-    stringToUTF8(xhr.responseURL || "", urlFinal, urlFinalTam);
-  }
-  if (etag && etagTam > 0) {
-    stringToUTF8(xhr.getResponseHeader("etag") || "", etag, etagTam);
-  }
-  if (retryAfter) {
-    var raw = "", wait = 0;
-    try { raw = (xhr.getResponseHeader("retry-after") || "").trim(); } catch (e) {}
-    if (/^[0-9]+$/.test(raw)) {
-      wait = Math.min(2147483647, Number(raw));
-    } else if (/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun)/i.test(raw)) {
-      var until = Date.parse(raw);
-      if (isFinite(until)) wait = Math.max(0, Math.ceil((until - Date.now()) / 1000));
-    }
-    HEAP32[retryAfter >> 2] = Math.min(2147483647, wait);
-  }
-
-  var s = xhr.responseText || "";
-  var n = s.length;
-  var p = _malloc(n + 1);
-  if (!p) return 0;
-  for (var i = 0; i < n; i++) HEAPU8[p + i] = s.charCodeAt(i) & 0xff;
-  HEAPU8[p + n] = 0;
-  if (tam) HEAP32[tam >> 2] = n;
-  return p;
-});
-
-_Thread_local long net_cap = 0;
-static _Thread_local char *net_final_dst;
-static _Thread_local unsigned net_final_size;
-
-void net_prepare(void) { }
-unsigned net_request_capabilities(void) { return 0; }
-int net_request(const NetRequest *p, NetResponse *r) {
-  (void)p;
-  if (!r) return 0;
-  memset(r, 0, sizeof *r);
-  r->erro = REDE_INDISPONIVEL;
-  return 0; /* nenhum XHR: nao prometer teto, timeout ou cancel inexistentes */
-}
-
-// Joins array of headers into newline-separated string.
-static char *join_headers(const char *const *hdrs, const char *extra) {
-  size_t total = 1;
-  int k;
-  char *s;
-  if (!hdrs && !extra) return NULL;
-  for (k = 0; hdrs && hdrs[k]; k++) total += strlen(hdrs[k]) + 1;
-  if (extra) total += strlen(extra) + 1;
-  s = (char *)malloc(total);
-  if (!s) return NULL;
-  s[0] = 0;
-  if (extra) { strcat(s, extra); strcat(s, "\n"); }
-  for (k = 0; hdrs && hdrs[k]; k++) { strcat(s, hdrs[k]); strcat(s, "\n"); }
-  return s;
-}
-
-static void (*notify_401)(const char *url);
-void net_notify_401(void (*f)(const char *url)) { notify_401 = f; }
-static void (*notify_health)(int code, const char *url);
-void net_notify_health(void (*f)(int code, const char *url)) { notify_health = f; }
-static void (*notify_host)(const char *url, int code, int http, unsigned ms);
-void net_notify_host(void (*f)(const char *url, int code, int http, unsigned ms)) { notify_host = f; }
-
-static char *request2(const char *method, const char *url, const char *const *hdrs,
-                      const char *extra_hdrs, const char *body,
-                      long *size, int *status, char *etag, unsigned etag_size,
-                      int *retry_after) {
-  char *all_hdrs, *resp_body;
-  int n = 0, http = 0;
-  if (etag && etag_size) etag[0] = 0;
-  if (status) *status = 0;
-  if (retry_after) *retry_after = 0;
-  if (!url || !*url) return NULL;
-  if (!status && (!method || !strcmp(method, "GET")) && negcache_barra(url, (long)time(NULL))) return NULL;
-  all_hdrs = join_headers(hdrs, extra_hdrs);
-  resp_body = nv_http(method, url, all_hdrs, body, &n, &http,
-                      net_final_dst, (int)net_final_size, etag, (int)etag_size, retry_after);
-  free(all_hdrs);
-  if (status) *status = http;
-  if (notify_health) notify_health(resp_body || http ? 0 : 6, url);
-  if (notify_host) notify_host(url, resp_body || http ? 0 : 6, http, 0);
-  if (http == 401 && notify_401) notify_401(url);
-  negcache_nota(url, resp_body || http ? 0 : 6, http, (long)time(NULL));
-  if (!resp_body) {
-    char safe[120];
-    printf("[rede] falhou em %s\n", net_url_public(url, safe, sizeof safe));
-    return NULL;
-  }
-
-  if (net_cancel_local && *net_cancel_local) {
-    net_cancelled_local = 1;
-    free(resp_body);
-    return NULL;
-  }
-
-  if (net_cap > 0 && (long)n > net_cap) {
-    n = (int)net_cap;
-    resp_body[n] = 0;
-  }
-  if (net_current_limit() > 0 && (long)n > net_current_limit()) {
-    n = (int)net_current_limit();
-    resp_body[n] = 0;
-    net_limited_local = 1;
-  }
-  net_bytes_local = n;
-
-  if (http >= 400 && !status) {
-    free(resp_body);
-    { char safe[120];
-      printf("[rede] HTTP %d em %s\n", http, net_url_public(url, safe, sizeof safe)); }
-    fflush(stdout);
-    return NULL;
-  }
-  if (size) *size = n;
-  return resp_body;
-}
-
-static char *request(const char *method, const char *url, const char *const *hdrs,
-                     const char *extra_hdrs, const char *body,
-                     long *size, int *status) {
-  return request2(method, url, hdrs, extra_hdrs, body, size, status, NULL, 0, NULL);
-}
-
-char *net_download_etag(const char *url, int seconds, const char *const *headers,
-                        int *status, char *etag, unsigned etag_size) {
-  (void)seconds;
-  return request2("GET", url, headers, NULL, NULL, NULL, status, etag, etag_size, NULL);
-}
-
-char *net_download(const char *url, int seconds) {
-  (void)seconds;
-  return request("GET", url, NULL, NULL, NULL, NULL, NULL);
-}
-
-char *net_download_bin(const char *url, int seconds, long *size) {
-  (void)seconds;
-  return request("GET", url, NULL, NULL, NULL, size, NULL);
-}
-
-char *net_download_with(const char *url, int seconds, const char *const *headers) {
-  (void)seconds;
-  return request("GET", url, headers, NULL, NULL, NULL, NULL);
-}
-
-char *net_post_bin(const char *url, int seconds, const char *body, long *size) {
-  (void)seconds;
-  return request("POST", url, NULL, "Content-Type: text/plain", body ? body : "", size, NULL);
-}
-
-char *net_download_st(const char *url, int seconds, const char *const *headers,
-                      int *status) {
-  (void)seconds;
-  return request("GET", url, headers, NULL, NULL, NULL, status);
-}
-
-char *net_download_st_retry(const char *url, int seconds, const char *const *headers,
-                            int *status, int *retry_after) {
-  (void)seconds;
-  return request2("GET", url, headers, NULL, NULL, NULL, status, NULL, 0, retry_after);
-}
-
-static char *chunk_once(const char *url, int seconds, long long start, long long end,
-                        long *size, int *status, int *error,
-                        char *final, unsigned final_size) {
-  char range_hdr[80];
-  const char *hdrs[2];
-  char *r;
-  int st = 0;
-  (void)seconds;
-  if (error) *error = 0;
-  if (final && final_size) final[0] = 0;
-  snprintf(range_hdr, sizeof range_hdr, "Range: bytes=%lld-%lld", start, end);
-  hdrs[0] = range_hdr; hdrs[1] = NULL;
-  net_cap = (long)(end - start + 1);
-  net_final_dst = final; net_final_size = final ? final_size : 0;
-  r = request("GET", url, hdrs, NULL, NULL, size, &st);
-  net_final_dst = NULL; net_final_size = 0;
-  net_cap = 0;
-  if (status) *status = st;
-  if (r && (st < 200 || st >= 300)) {
-    char safe[120];
-    printf("[rede] HTTP %d em %s\n", st, net_url_public(url, safe, sizeof safe));
-    fflush(stdout);
-    free(r); r = NULL;
-    if (size) *size = 0;
-  }
-  return r;
-}
-
-char *net_post(const char *url, int seconds, const char *const *headers,
-               const char *body) {
-  return net_post_st(url, seconds, headers, body, NULL);
-}
-
-char *net_delete(const char *url, int seconds, const char *const *headers,
-                 int *status) {
-  char *r;
-  (void)seconds;
-  r = request("DELETE", url, headers, NULL, NULL, NULL, status);
-  if (!r && status && *status > 0) return strdup("");
-  return r;
-}
-
-char *net_post_st(const char *url, int seconds, const char *const *headers,
-                  const char *body, int *status) {
-  int has_ct = 0, k;
-  char *r;
-  (void)seconds;
-  for (k = 0; headers && headers[k]; k++)
-    if (!strncasecmp(headers[k], "Content-Type:", 13)) has_ct = 1;
-  r = request("POST", url, headers, has_ct ? NULL : "Content-Type: application/json",
-              body ? body : "", NULL, status);
-  if (!r && status && *status > 0) return strdup("");
-  return r;
-const char *net_last_error(void) { return ""; }
-
-
-
-EM_JS(int, nv_url_sonda, (const char *url, const char *cabs, char *dst,
-                          int tam, int *status, char *mime, int mimeTam, long *corpo), {
-  var xhr = new XMLHttpRequest();
-  if (status) HEAP32[status >> 2] = 0;
-  try {
-    xhr.open("GET", UTF8ToString(url), false);
-    if (cabs) UTF8ToString(cabs).split("\n").forEach(function (linha) {
-      var i = linha.indexOf(":");
-      if (i <= 0) return;
-      try { xhr.setRequestHeader(linha.slice(0, i).trim(), linha.slice(i + 1).trim()); } catch (e) {}
-    });
-    xhr.setRequestHeader("Range", "bytes=0-63");
-    xhr.send(null);
-  } catch (e) { return 0; }
-  if (status) HEAP32[status >> 2] = xhr.status;
-  if (mime && mimeTam > 0) {
-    var ct = (xhr.getResponseHeader("Content-Type") || "").split(";")[0].trim().toLowerCase();
-    stringToUTF8(ct, mime, mimeTam);
-  }
-  if (corpo) {
-    var cl = xhr.getResponseHeader("Content-Length");
-    var len = (xhr.status === 200 && cl !== null && /^\d+$/.test(cl.trim())) ? parseInt(cl, 10) : -1;
-    HEAP32[corpo >> 2] = len > 64 ? -1 : len;
-  }
-  var finalUrl = xhr.responseURL || "";
-  var bytes = 0;
-  for (var k = 0; k < finalUrl.length; k++) {
-    var code = finalUrl.charCodeAt(k);
-    if (code >= 0xD800 && code <= 0xDBFF && k + 1 < finalUrl.length) { bytes += 4; k++; }
-    else bytes += code < 0x80 ? 1 : code < 0x800 ? 2 : 3;
-  }
-  if (xhr.status < 200 || xhr.status >= 300 || !finalUrl || bytes >= tam) return 0;
-  stringToUTF8(finalUrl, dst, tam);
-  return 1;
-});
-
-int net_url_final_headers(const char *url, int seconds, const char *const *headers,
-                          char *dst, unsigned size, int *status) {
-  return net_url_final_type(url, seconds, headers, dst, size, status, NULL, 0, NULL);
-}
-
-int net_url_final_type(const char *url, int seconds, const char *const *headers,
-                       char *dst, unsigned size, int *status,
-                       char *mime, unsigned mime_size, long *body) {
-  char *hdrs;
-  int ok, http = 0;
-  long c32 = -1;
-  (void)seconds;
-  if (status) *status = 0;
-  if (mime && mime_size) mime[0] = 0;
-  if (body) *body = -1;
-  if (dst && size) dst[0] = 0;
-  if (!url || !*url || !dst || !size || size > INT_MAX) return 0;
-  hdrs = join_headers(headers, NULL);
-  if (headers && headers[0] && !hdrs) return 0;
-  ok = nv_url_sonda(url, hdrs, dst, (int)size, &http, mime,
-                    mime && mime_size < INT_MAX ? (int)mime_size : 0, &c32);
-  free(hdrs);
-  if (body) *body = c32;
-  if (status) *status = http;
-  return ok;
-}
-
-int net_url_final(const char *url, int seconds, char *dst, unsigned size) {
-  return net_url_final_headers(url, seconds, NULL, dst, size, NULL);
-}
-
-EM_JS(int, nv_http_contar, (const char *url, const char *hdrs, double start,
-                            double end, int *status, char *final_url,
-                            int final_url_size), {
-  var xhr = new XMLHttpRequest();
-  HEAP32[status >> 2] = 0;
-  try { xhr.open("GET", UTF8ToString(url), false); } catch (e) { return -1; }
-  try { xhr.overrideMimeType("text/plain; charset=x-user-defined"); } catch (e) {}
-  if (hdrs) {
-    UTF8ToString(hdrs).split("\n").forEach(function (line) {
-      var i = line.indexOf(":");
-      if (i <= 0) return;
-      try {
-        xhr.setRequestHeader(line.slice(0, i).trim(), line.slice(i + 1).trim());
-      } catch (e) {}
-    });
-  }
-  try { xhr.setRequestHeader("Range", "bytes=" + start + "-" + end); } catch (e) {}
-  try { xhr.send(null); } catch (e) { return -1; }
-  HEAP32[status >> 2] = xhr.status;
-  if (final_url && final_url_size > 0) stringToUTF8(xhr.responseURL || "", final_url, final_url_size);
-  var s = xhr.responseText || "";
-  return s.length;
-});
-
-void net_throughput_wait(unsigned long ms) { (void)ms; }
-
-int net_measure_throughput(const char *url, const char *const *headers, int seconds,
-                           long start, long long max_bytes, volatile int *cancelled,
-                           int *kbps_per_second, int n_max, NetThroughput *res,
-                           char *final, unsigned final_size) {
-  char *hdrs;
-  char current[4096];
-  unsigned long t0, window, elapsed = 0;
-  long long pos = start > 0 ? start : 0, total = 0, chunk = 1024LL * 1024LL;
-  int n_sec = 0, first = 1;
-  if (res) memset(res, 0, sizeof *res);
-  if (final && final_size) final[0] = 0;
-  if (!url || !*url) { if (res) res->error = 2; return 0; }
-  if (seconds < 1) seconds = 1;
-  window = (unsigned long)seconds * 1000UL;
-  snprintf(current, sizeof current, "%s", url);
-  hdrs = join_headers(headers, NULL);
-  t0 = net_now_ms_local();
-  while (elapsed < window && (max_bytes <= 0 || total < max_bytes)) {
-    unsigned long a = net_now_ms_local(), dt;
-    int st = 0, n, k, reps;
-    char fin[4096];
-    if (cancelled && *cancelled) { if (res) res->cancelled = 1; break; }
-    fin[0] = 0;
-    n = nv_http_contar(current, hdrs, (double)pos, (double)(pos + chunk - 1), &st,
-                       fin, (int)sizeof fin);
-    dt = net_now_ms_local() - a;
-    if (res) res->status = st;
-    if (first && final && final_size) snprintf(final, final_size, "%s", fin);
-    if (n < 0 || st == 0) { if (res) res->error = -1; break; }
-    if (st < 200 || st >= 300 || n == 0) break;
-    if (first && res) res->wait_ms = dt;
-    first = 0;
-    if (fin[0]) snprintf(current, sizeof current, "%s", fin);
-    total += n;
-    pos += n;
-    elapsed = net_now_ms_local() - t0;
-    reps = (int)(dt / 1000UL);
-    if (reps < 1) reps = 1;
-    for (k = 0; k < reps && kbps_per_second && n_sec < n_max; k++)
-      kbps_per_second[n_sec++] = (int)((long long)n * 8 / (long long)(dt > 0 ? dt : 1));
-    if (st == 200) break;
-    if ((long long)n < chunk) break;
-    if (dt < 700UL && chunk < 8LL * 1024LL * 1024LL) chunk *= 2;
-  }
-  free(hdrs);
-  if (res) {
-    res->bytes = total;
-    res->ms = elapsed;
-    if (cancelled && *cancelled) res->cancelled = 1;
-  }
-  if (res && res->cancelled) return 0;
-  return n_sec;
-}
-
-int rede_aquecer_lote(const char *const *origens, int n, unsigned *ms) {
-  (void)origens; (void)n; (void)ms;
-  return 0;
-}
-
-int net_warmup_batch(const char *const *origins, int n, unsigned *ms) {
-  return rede_aquecer_lote(origins, n, ms);
-}
-
-
-
-#else
-
-#ifndef NV_TPK40
 static _Thread_local int net_curl_local;
-#endif
 
-#ifdef NV_TPK40
-#define net_err_txt (net_thread()->err_txt)
-#define net_err_buf (net_thread()->err_buf)
-#else
 static _Thread_local char net_err_txt[200];
 static _Thread_local char net_err_buf[256]; /* CURLOPT_ERRORBUFFER (>= 256 bytes) */
-#endif
 
-#ifndef NV_TPK40
 static _Thread_local char *net_final_dst;
 static _Thread_local unsigned net_final_size;
 static _Thread_local int net_partial_ok;
-#endif
 
 // Hand-written libcurl constants: SDK does not ship curl.h.
 #define OPT_URL             10002
@@ -733,11 +222,9 @@ static void handle_create_key(void) { pthread_key_create(&handle_key, handle_rel
 
 #define NET_IDLE_DEFAULT_MS 20000UL
 static unsigned long idle_max_ms = NET_IDLE_DEFAULT_MS;
-#ifndef NV_TPK40
 #define NET_HOSTS_PER_THREAD 16
 typedef struct { char h[96]; unsigned long ms; } HostUsage;
 static _Thread_local HostUsage host_usage[NET_HOSTS_PER_THREAD];
-#endif
 
 static void host_from_url(const char *u, char *h, size_t n) {
   const char *p = u ? strstr(u, "://") : NULL;
@@ -979,9 +466,7 @@ static size_t receive_header(void *data, size_t size, size_t count, void *u) {
   return size * count;
 }
 
-#ifndef NV_TPK40
 _Thread_local long net_cap = 0;
-#endif
 
 static size_t receive_body(void *data, size_t size, size_t count, void *u) {
   Bucket *b = (Bucket *)u;
@@ -1074,24 +559,8 @@ static int net_curl_open(void) {
   r = __atomic_load_n(&curl_ready, __ATOMIC_ACQUIRE);
   if (r == 1 || r == -1) { pthread_mutex_unlock(&open_lock); return r > 0; }
   __atomic_store_n(&curl_ready, -2, __ATOMIC_RELEASE);
-#ifdef NV_TPK40
-  nv_tpk40_etapa("begin libcurl-dlopen");
-  h = dlopen("libcurl.so.5", RTLD_NOW);
-  if (h) nv_tpk40_etapa("ok libcurl-dlopen libcurl.so.5");
-  if (!h) { h = dlopen("libcurl.so.4", RTLD_NOW); if (h) nv_tpk40_etapa("ok libcurl-dlopen libcurl.so.4"); }
-  if (!h) { char m[300]; const char *e = dlerror();
-            snprintf(m, sizeof m, "fail libcurl-dlopen %s", e ? e : "sem mensagem");
-            nv_tpk40_etapa(m); }
-#else
-#ifdef NV_ANDROID
-  h = dlopen("libcurl.so", RTLD_NOW);
-  if (!h)
-#endif
   h = dlopen("libcurl.so.5", RTLD_NOW);
   if (!h) h = dlopen("libcurl.so.4", RTLD_NOW);
-#endif
-  if (!h) h = dlopen("libcurl.4.dylib", RTLD_NOW); // Mac
-  if (!h) h = dlopen("libcurl.dylib", RTLD_NOW);
   if (!h) {
     printf("[rede] sem libcurl: %s\n", dlerror());
     __atomic_store_n(&curl_ready, -1, __ATOMIC_RELEASE);
@@ -1120,9 +589,7 @@ static int net_curl_open(void) {
     return 0;
   }
   if (curl_global) curl_global(3 /* CURL_GLOBAL_DEFAULT */);
-#ifndef NV_ANDROID
   prepare_openssl();
-#endif
   __atomic_store_n(&curl_ready, 1, __ATOMIC_RELEASE);
   pthread_mutex_unlock(&open_lock);
   return 1;
@@ -1248,20 +715,7 @@ static char *net_download_internal3(const char *url, int seconds, long *size,
       for (k = 0; headers[k]; k++) list = slist_append(list, headers[k]);
       if (list) curl_setopt(c, OPT_HTTPHEADER, list);
     }
-#ifdef NV_TPK40
-    { static int first_req = 1;
-      if (first_req) { char safe[120], m[200];
-        first_req = 0;
-        snprintf(m, sizeof m, "begin https-1 %s", net_url_public(url, safe, sizeof safe));
-        nv_tpk40_etapa(m);
-        r = curl_perform(c);
-        { long http = 0; if (curl_getinfo) curl_getinfo(c, INFO_RESPONSE_CODE, &http);
-          snprintf(m, sizeof m, "ok https-1 curl=%d http=%ld", r, http); }
-        nv_tpk40_etapa(m);
-      } else r = curl_perform(c); }
-#else
     r = curl_perform(c);
-#endif
     { long new_conn = -1;
       if (curl_getinfo) curl_getinfo(c, INFO_NUM_CONNECTS, &new_conn);
       reused = new_conn == 0; }
@@ -1458,9 +912,6 @@ int rede_aquecer_lote(const char *const *origens, int n, unsigned *ms) {
   return opened;
 }
 
-int net_warmup_batch(const char *const *origins, int n, unsigned *ms) {
-  return rede_aquecer_lote(origins, n, ms);
-}
 
 char *net_post(const char *url, int seconds, const char *const *headers,
                const char *body) {
@@ -1600,62 +1051,10 @@ static int counter_watchdog(void *u, long long dt, long long dn, long long ut, l
   return 0;
 }
 
-#ifdef NV_ANDROID
-static int measure_one(const char *url, const char *const *headers, int seconds,
-                       long start, long long max_bytes, volatile int *cancelled,
-                       int *kbps, int n_max, NetThroughput *res,
-                       char *final, unsigned final_size);
-#define VAZ_ANDROID_CONEXOES 4
-#define VAZ_ANDROID_SALTO (256L * 1024L * 1024L)
-typedef struct {
-  const char *url; const char *const *headers; int seconds; long start;
-  long long max_bytes; volatile int *cancelled;
-  int kbps[VAZ_SEG_BALDES]; int n; NetThroughput res;
-} VazExtra;
-static void *vaz_extra_thread(void *a) {
-  VazExtra *x = (VazExtra *)a;
-  x->n = measure_one(x->url, x->headers, x->seconds, x->start, x->max_bytes, x->cancelled,
-                     x->kbps, VAZ_SEG_BALDES, &x->res, NULL, 0);
-  return NULL;
-}
 int net_measure_throughput(const char *url, const char *const *headers, int seconds,
                            long start, long long max_bytes, volatile int *cancelled,
                            int *kbps, int n_max, NetThroughput *res,
                            char *final, unsigned final_size) {
-  VazExtra ex[VAZ_ANDROID_CONEXOES - 1];
-  pthread_t threads[VAZ_ANDROID_CONEXOES - 1];
-  int alive[VAZ_ANDROID_CONEXOES - 1];
-  int k, i, n;
-  for (k = 0; k < VAZ_ANDROID_CONEXOES - 1; k++) {
-    memset(&ex[k], 0, sizeof ex[k]);
-    ex[k].url = url; ex[k].headers = headers; ex[k].seconds = seconds;
-    ex[k].start = start + (long)(k + 1) * VAZ_ANDROID_SALTO;
-    ex[k].max_bytes = max_bytes; ex[k].cancelled = cancelled;
-    alive[k] = pthread_create(&threads[k], NULL, vaz_extra_thread, &ex[k]) == 0;
-  }
-  n = measure_one(url, headers, seconds, start, max_bytes, cancelled, kbps, n_max, res, final, final_size);
-  for (k = 0; k < VAZ_ANDROID_CONEXOES - 1; k++) {
-    if (!alive[k]) continue;
-    pthread_join(threads[k], NULL);
-    if (ex[k].n <= 0 || !kbps) continue;
-    for (i = 0; i < ex[k].n && i < n_max; i++) {
-      kbps[i] += ex[k].kbps[i];
-      if (i >= n) n = i + 1;
-    }
-    if (res) res->bytes += ex[k].res.bytes;
-  }
-  return n;
-}
-static int measure_one(const char *url, const char *const *headers, int seconds,
-                       long start, long long max_bytes, volatile int *cancelled,
-                       int *kbps, int n_max, NetThroughput *res,
-                       char *final, unsigned final_size) {
-#else
-int net_measure_throughput(const char *url, const char *const *headers, int seconds,
-                           long start, long long max_bytes, volatile int *cancelled,
-                           int *kbps, int n_max, NetThroughput *res,
-                           char *final, unsigned final_size) {
-#endif
   static const ThroughputCounter empty_counter;
   ThroughputCounter ct = empty_counter;
   char range_buf[40];
@@ -1947,17 +1346,7 @@ char *net_download_range64_headers(const char *url, const char *headers,
   return net_download_range64_final(url, headers, start, end, size, total, status, cancelled, NULL, NULL);
 }
 
-#endif /* __EMSCRIPTEN__ */
 
-#ifdef __EMSCRIPTEN__
-char *net_download_range64_headers(const char *u, const char *h, int64_t s, int64_t e, long *n, int64_t *t, int *st, volatile int *c) {
-  (void)u; (void)h; (void)s; (void)e; (void)c;
-  if (n) *n = 0;
-  if (t) *t = -1;
-  if (st) *st = 0;
-  return NULL;
-}
-#endif
 
 static unsigned long net_now_ms_local(void) {
   struct timespec ts;
@@ -1969,9 +1358,7 @@ static unsigned long net_now_ms_local(void) {
 #define NET_CUTOFF_HOSTS  8
 #define NET_CHUNKS_MAX    32
 
-#ifndef NV_TPK40
 static _Thread_local int net_tail_refused_st;
-#endif
 int net_tail_refused(void) { return net_tail_refused_st; }
 
 typedef struct { char h[96]; long cap; } HostCutoff;
@@ -2196,9 +1583,6 @@ char *rede_baixar_trecho64_cab(const char *url, const char *headers,
 }
 char *rede_baixar(const char *url, int s) { return net_download(url, s); }
 char *rede_baixar_bin(const char *url, int s, long *n) { return net_download_bin(url, s, n); }
-#ifdef __EMSCRIPTEN__
-char *rede_postar_bin(const char *u, int s, const char *c, long *n) { return net_post_bin(u, s, c, n); }
-#endif
 char *rede_baixar_com(const char *u, int s, const char *const *h) { return net_download_with(u, s, h); }
 char *rede_baixar_trecho(const char *u, int s, long ini, long fim, long *tam) {
   return net_download_range(u, s, ini, fim, tam);
@@ -2232,9 +1616,6 @@ char *rede_baixar_st(const char *u, int s, const char *const *h, int *st) {
 char *rede_baixar_st_retry(const char *u, int s, const char *const *h, int *st, int *ra) {
   return net_download_st_retry(u, s, h, st, ra);
 }
-char *rede_baixar_medido(const char *u, int s, const char *const *h, RedeMedida *m) {
-  return net_download_measured(u, s, h, m);
-}
 char *rede_baixar_medido_controle(const char *u, int s, const char *const *h,
                                   const RedeControle *c, RedeMedida *m) {
   return net_download_measured_control(u, s, h, c, m);
@@ -2242,9 +1623,6 @@ char *rede_baixar_medido_controle(const char *u, int s, const char *const *h,
 char *rede_baixar_bin_medido_controle(const char *u, int s, const char *const *h,
                                       const RedeControle *c, long *t, RedeMedida *m) {
   return net_download_bin_measured_control(u, s, h, c, t, m);
-}
-char *rede_baixar_etag(const char *u, int s, const char *const *h, int *st, char *e, unsigned te) {
-  return net_download_etag(u, s, h, st, e, te);
 }
 int rede_medir_vazao(const char *u, const char *const *h, int s, long ini, long long mb,
                      volatile int *c, int *kps, int nm, RedeVazao *r, char *f, unsigned tf) {
@@ -2258,4 +1636,3 @@ void rede_avisar_host(void (*f)(const char *url, int codigo, int http, unsigned 
 }
 void rede_preparar(void) { net_prepare(); }
 const char *rede_ultimo_erro(void) { return net_last_error(); }
-

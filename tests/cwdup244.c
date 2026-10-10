@@ -3,7 +3,6 @@
 // assistido tira a obra de vez.
 #include "../src/homeestado.h"
 unsigned homeestado_geracao(void) { return 1; }
-unsigned recomenda_geracao(void) { return 1; }
 int homeestado_contexto_valido(void) { return 0; }
 int homeestado_tem_fileira(const char *chave) { (void)chave; return 0; }
 int homeestado_ordem_fileira(const char *chave) { (void)chave; return -1; }
@@ -12,7 +11,6 @@ int homeestado_identidade_geracao(unsigned g, char *dono, unsigned tamDono, int 
   (void)g; if (dono && tamDono) dono[0] = 0; if (perfil) *perfil = 0; return 0; }
 int arte_reserva_episodios(const char *imdb, const char *corpo) { (void)imdb; (void)corpo; return 0; }
 
-int ajustes_social(void) { return 1; }
 int ajustes_hist_conta(void) { return 1; }
 int ajustes_busca_cinemeta(void) { return 1; }
 #include "../src/descoberta.c"
@@ -104,7 +102,6 @@ int   simkl_plantowatch(CatItem *s, int m) { (void)s; (void)m; return 0; }
 int   ajustes_salvos_no_simkl(void)        { return 0; }
 int   trakt_enfeitar_lote(CatItem *s, int n) { (void)s; return n; }
 int   trakt_lista(const char *q, CatItem *s, int m) { (void)q; (void)s; (void)m; return 0; }
-// O servico social proprio (recomenda.c) fica fora deste teste: a uniao e so o que o Trakt trouxe.
 int   trakt_e_a_seguir(const char *id)     { (void)id; return 0; }
 // "A seguir" da conta (#199): sem vistos aqui, e com o Trakt "no ar" o caminho
 // nem roda. So para linkar.

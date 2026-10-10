@@ -22,8 +22,7 @@ int main(void) {
   colfileiras_sincronizar();
   catordem_ler("{\"items\":[{\"is_collection\":true,\"collection_id\":\"c2\",\"order\":0},{\"is_collection\":true,\"collection_id\":\"c1\",\"order\":1}]}");
   sincronizarFileiras();
-  assert(nFileiras == 3 && posicao("collection_c2") < posicao("collection_c1"));
-  assert(naHome("social_activity")); // synthetic app row is free
+  assert(nFileiras == 2 && posicao("collection_c2") < posicao("collection_c1"));
   assert(naHome("collection_c2")->n == 1 && naHome("collection_c1")->n == 1);
   assert(naHome("collection_c2")->folders[0] != naHome("collection_c1")->folders[0]);
   assert(fil_n_na_home() == nFileiras && fil_n_capacidade() == 0);
@@ -31,13 +30,13 @@ int main(void) {
   // Changing just account visibility/order must invalidate the Home fast path.
   catordem_ler("{\"items\":[{\"is_collection\":true,\"collection_id\":\"c1\",\"enabled\":false}]}");
   sincronizarFileiras();
-  assert(nFileiras == 2 && !naHome("collection_c1") && naHome("collection_c2"));
+  assert(nFileiras == 1 && !naHome("collection_c1") && naHome("collection_c2"));
   assert(fil_estado_chave("collection_c1") == FIL_FORA && fil_n_na_home() == nFileiras);
 
-  // A last deletion clears every collection; the synthetic app row remains.
+  // A last deletion clears every collection.
   colfileiras_receber("{\"collections\":[]}"); colfileiras_sincronizar();
   sincronizarFileiras();
-  assert(nFileiras == 1 && fil_n_na_home() == 1 && naHome("social_activity"));
+  assert(nFileiras == 0 && fil_n_na_home() == 0);
   for (int i = 0; i < fil_n(); i++) assert(strncmp(fil_chave(i), "collection_", 11));
   assert(!naHome("collection_c1") && !naHome("collection_c2"));
   catordem_esquecer();
@@ -59,14 +58,14 @@ int main(void) {
   }
   cat_definir_tudo(items, 5, rows, 5);
   colfileiras_receber(duas); colfileiras_sincronizar(); sincronizarFileiras();
-  assert(nFileiras == 7 && fil_n_capacidade() == 3 && fil_n_na_home() == 7);
-  for (int i = 0; i < 5; i++) assert(naHome(keys[i]));
+  assert(nFileiras == 6 && fil_n_capacidade() == 3 && fil_n_na_home() == 6);
+  for (int i = 0; i < 5; i++) assert((naHome(keys[i]) != NULL) == (i != 1));
   assert(naHome("collection_c1") && naHome("collection_c2"));
   assert(fil_estado_chave("https://collection.invalid_movie_f2") == FIL_FORA);
   sincronizarFileiras(); sincronizarFileiras();
   unsigned filaRev = fil_revisao(), colecaoRev = col_revisao();
   for (int i = 0; i < 10; i++) sincronizarFileiras();
-  assert(fil_revisao() == filaRev && col_revisao() == colecaoRev && nFileiras == 7);
+  assert(fil_revisao() == filaRev && col_revisao() == colecaoRev && nFileiras == 6);
   puts("ok #233: real Home/editor order, hidden collection, empty snapshot, equal titles and catalogue-only quota");
   return 0;
 }

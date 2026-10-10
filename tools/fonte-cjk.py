@@ -1,16 +1,13 @@
 #!/usr/bin/env python3
 """Regenerates deploy/app/fonts/DroidSansFallback-Subset.ttf, the embedded CJK font.
 
-WHY IT EXISTS: text.c routes Japanese and Chinese to a FALLBACK font. On LG and
-Mac it comes from system fonts; on Samsung WASM there are no system fonts, and
-without this file ja/zh render as missing glyph boxes. See docs/fonts/README.md.
+WHY IT EXISTS: text.c routes Japanese and Chinese to a FALLBACK font. The embedded font covers CJK titles and metadata on LG and Linux. See docs/fonts/README.md.
 
 INPUT: Droid Sans Fallback 2.54 (Apache 2.0, Google 2006) shipped on LG TVs
 in /usr/share/fonts/DroidSansFallback.ttf:
     scp root@<tv>:/usr/share/fonts/DroidSansFallback.ttf /tmp/
 OUTPUT: ~7,900 glyphs, unhinted, ~1.2 MB:
   - ASCII, Latin-1, general punctuation, arrows, CJK punctuation, kana, fullwidth;
-  - every character used in ja/zhcn/zhtw translation tables;
   - GB2312 level 1 and 2 partial (common simplified hanzi), JIS X 0208
     level 1 (everyday kanji), and common Big5 (traditional hanzi):
     most common characters in TMDB titles and synopses, preventing tofu glyphs
@@ -41,9 +38,6 @@ def main():
         raise SystemExit(__doc__)
     source = pathlib.Path(sys.argv[1])
     used = set()
-    for cod in ("ja", "zhcn", "zhtw"):
-        for _n, _k, val in I.ler_irma(cod):
-            used |= set(I.decodificar(val).decode("utf-8"))
     gb = decode_pairs(range(0xB0, 0xD8), range(0xA1, 0xFF), "gb2312")
     jis = decode_pairs(range(0x88, 0x99), range(0x40, 0xFD), "shift_jis")
     b5 = decode_pairs(range(0xA4, 0xC7), list(range(0x40, 0x7F)) + list(range(0xA1, 0xFF)), "big5")

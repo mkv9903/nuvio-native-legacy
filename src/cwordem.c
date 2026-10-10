@@ -129,7 +129,7 @@ int cwo_data_curta(long long estreiaMs, long long agoraMs, int idioma, int maius
   if (!dst || cap < 1) return 0;
   dst[0] = 0;
   if (estreiaMs == CWO_SEM_DATA) return 0;
-  // Pelo calendario UTC, como o `released` do Cinemeta (ver agenda.h, ponto
+  // Pelo calendario UTC, como o `released` do Cinemeta (data de lançamento, ponto
   // 3): o fuso de uma TV nem sempre esta certo, e com ele a estreia andaria
   // um dia de aparelho para aparelho.
   te = (time_t)(estreiaMs / 1000LL);

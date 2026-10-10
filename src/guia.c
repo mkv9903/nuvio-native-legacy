@@ -469,9 +469,6 @@ static GCanal *linhaItem(int l, int c) {
   if (linhaEhFav(l)) return &canais[favOrd[c]];
   return &canais[catIni[l - (nFavOrd > 0 ? 1 : 0)] + c];
 }
-static int linhaCatDe(int l) {  // indice em cats[], -1 = favoritos
-  return linhaEhFav(l) ? -1 : l - (nFavOrd > 0 ? 1 : 0);
-}
 
 // --- carga --------------------------------------------------------------------
 // Tipos de catalogo que os addons de canal usam no manifesto Stremio:
@@ -1008,9 +1005,6 @@ static void cacheGravar(void) {
   cab.tamSabe = (unsigned)sizeof(GSabe);
   cab.nCanais = nCanais; cab.nCats = nCats; cab.nFontes = nFontes; cab.nSabe = nSabe;
   cab.perfil = perfis_ativo();
-#ifdef __EMSCRIPTEN__
-  dados_fs_travar();
-#endif
   f = fopen(tmp, "wb");
   if (f) {
     int ok = fwrite(&cab, sizeof cab, 1, f) == 1 &&
@@ -1022,10 +1016,6 @@ static void cacheGravar(void) {
     if (!ok || rename(tmp, caminho) != 0) remove(tmp);
     else { printf("[guia] cache gravado: %d canais\n", nCanais); fflush(stdout); }
   }
-#ifdef __EMSCRIPTEN__
-  dados_fs_liberar();
-  dados_marcar_sujo(0);
-#endif
 }
 
 // Le o cache direto para os vetores PUBLICADOS (roda no fio de desenho, antes
@@ -1226,15 +1216,6 @@ static float animTopo[G_TOPO_N];
 // ficaria apagado o tempo todo.
 static char  heroId[80];
 static float heroA = 1.0f;
-
-// ANEL DE FOCO DA GRADE, que DESLIZA de celula a celula em vez de saltar. O
-// alvo e medido no desenho (e la que se sabe onde cada celula caiu) em
-// coordenadas de CONTEUDO (y sem a rolagem), e a mola persegue o alvo no
-// proprio desenho, com o dt tirado do relogio que guia_desenhar recebe. Um
-// alvo longe demais (troca de modo, salto de secao) e assumido de uma vez.
-static GfxRect focoAnel, focoAnelAlvo;
-static int     focoAnelOk, focoAnelTem;
-static Uint32  focoAnelTick;
 
 // Modo lista: deslocamento da janela de tempo (min, multiplo de 30) e a
 // rolagem vertical propria — a de cartoes anda em fileiras, esta em linhas de
@@ -1462,7 +1443,7 @@ void guia_overlay_abrir(void) {
   overlay = 1; entrada = 0.0f;
   overlayDesde = bandaUlt = SDL_GetTicks();
   focoTopo = 0; painel = 0; catAberto = 0;
-  janelaDesl = 0; focoAnelOk = 0;
+  janelaDesl = 0;
   focoValido();
 }
 
@@ -1483,10 +1464,6 @@ void guia_focar_id(const char *id) {
       if (!strcmp(linhaItem(l, c)->id, id)) { focoLin = l; focoCol = c; return; }
 }
 
-const char *guia_id_focado(void) {
-  GCanal *c = linhaItem(focoLin, focoCol);
-  return c ? c->id : "";
-}
 
 int guia_pediu_canal(CatItem *saida) {
   if (!pediuCanal || !saida) return 0;
@@ -3336,7 +3313,7 @@ static float gCel = G_L_CEL;
 static const char *gIdNoAr = "";
 static void desenharLinhaLista(GCanal *c, float y, int focada, float a,
                                time_t agoraT, time_t ini, time_t tFoco,
-                               int passo, float agoraX, GfxRect *alvo) {
+                               int passo, float agoraX) {
   float h = gCel;
   float raioB = 10.0f / h;
   time_t fimJ = ini + (time_t)G_L_JANELA_MIN * 60;
@@ -3377,7 +3354,6 @@ static void desenharLinhaLista(GCanal *c, float y, int focada, float a,
                            y + (h - (float)st.h) * 0.5f, a);
       } }
   }
-  if (alvo) *alvo = col;
 
   if (epg >= 0) {
     EpgProg ps[16];
@@ -3393,7 +3369,6 @@ static void desenharLinhaLista(GCanal *c, float y, int focada, float a,
       GfxRect b = { x1 + 3.0f, y, x2 - x1 - 6.0f, h };
       if (b.w < 6.0f) continue;
       desenhou = 1;
-      if (foc && alvo) *alvo = b;
       if (passo == 0) {
         // Superficie branca em alfa: foco 18%, no ar 8%, futuro 4%.
         float l = foc ? 0.18f : atual ? 0.08f : 0.04f;
@@ -3456,7 +3431,6 @@ static void desenharLinhaLista(GCanal *c, float y, int focada, float a,
   // faixa inteira, com a frase comecando na linha "agora" — e nao a fileira
   // de barras cinza vazias que parecia defeito.
   { GfxRect b = { G_L_FAIXA_X + 3.0f, y, G_L_FAIXA_W - 6.0f, h };
-    if (focada && alvo) *alvo = b;
     if (passo == 0) {
       if (epg == -1) gfx_esqueleto(b, raioB, 0.095f, 0.097f, 0.105f, a);
       else {
@@ -3626,31 +3600,6 @@ static void desenharPainelAddons(float a) {
 // O anel que desliza. `alvo` em coordenadas de CONTEUDO (y + rolagem): a mola
 // persegue o alvo com o dt do relogio do desenho, e a rolagem e subtraida so
 // na hora de pintar — rolar a grade nao faz o anel "correr atras" da celula.
-__attribute__((unused)) static void desenharAnelFoco(float a, Uint32 agora, float rol) {
-  float dt, ar, ag, ab;
-  GfxRect r;
-  if (!focoAnelTem) { focoAnelOk = 0; return; }
-  dt = focoAnelTick ? (float)(agora - focoAnelTick) / 1000.0f : 0.0f;
-  if (dt < 0.0f) dt = 0.0f;
-  if (dt > 0.05f) dt = 0.05f;
-  focoAnelTick = agora;
-  if (!focoAnelOk || fabsf(focoAnelAlvo.y - focoAnel.y) > 3.0f * G_L_ROW) {
-    focoAnel = focoAnelAlvo; focoAnelOk = 1;
-  } else {
-    // 20/s: ~150 ms para 95% — um pouco mais lento que o anel de cartaz, que
-    // SALTA; aqui o deslize e o que diz de que celula o foco veio.
-    focoAnel.x = anim_mola(focoAnel.x, focoAnelAlvo.x, dt, 20.0f);
-    focoAnel.y = anim_mola(focoAnel.y, focoAnelAlvo.y, dt, 20.0f);
-    focoAnel.w = anim_mola(focoAnel.w, focoAnelAlvo.w, dt, 20.0f);
-    focoAnel.h = anim_mola(focoAnel.h, focoAnelAlvo.h, dt, 20.0f);
-  }
-  ajustes_acento(&ar, &ag, &ab);
-  // Anel POR FORA da celula, encostado nela: 3 px de traco (3/4 de
-  // NV_ANEL_FOCO), concentrico com o canto de 10 px da celula (raioB).
-  r = (GfxRect){ focoAnel.x, focoAnel.y - rol, focoAnel.w, focoAnel.h };
-  if (r.h > 0.0f)
-    gfx_anel_fora(r, 10.0f / r.h, 0.0f, NV_ANEL_FOCO * 0.75f, ar, ag, ab, a);
-}
 
 // --- a faixa do mini guia ------------------------------------------------------
 #define G_B_LINHAS   5
@@ -3718,11 +3667,7 @@ static void desenharBanda(float a, Uint32 agora) {
 
   { TxtLinha t = txt_linha(TXT_G30B, "Guia de canais", 243, 242, 239, 255);
     const char *k[3] = { "OK",
-#ifdef NV_ANDROID
-      "CH+",
-#else
       "Azul",
-#endif
       "Voltar" }, *r[3] = { "Troca de canal", "Guia completo", "Fechar" };
     txt_desenhar_alpha(t, G_AREA_X, topo - 2.0f, a);
     plrui_dicas(k, r, 3, G_AREA_DIR, topo - 2.0f + (float)t.h * 0.5f, 1, a); }
@@ -3730,7 +3675,6 @@ static void desenharBanda(float a, Uint32 agora) {
 
   gCel = G_B_CEL;
   gIdNoAr = player_id_canal();
-  focoAnelTem = 0;
   for (k = 0; k < n; k++)
     if (ll[k] == focoLin && cc[k] == focoCol)
       plrui_linha_foco((GfxRect){ G_AREA_X - 14.0f, y0 + (float)k * G_B_ROW - 5.0f,
@@ -3738,11 +3682,9 @@ static void desenharBanda(float a, Uint32 agora) {
   for (passo = 0; passo < 2; passo++) {
     for (k = 0; k < n; k++) {
       int foc = ll[k] == focoLin && cc[k] == focoCol;
-      GfxRect alvo;
       float y = y0 + (float)k * G_B_ROW;
       desenharLinhaLista(linhaItem(ll[k], cc[k]), y, foc, a, agoraT, ini, tFoco,
-                         passo, agoraX, foc ? &alvo : NULL);
-      if (foc && passo == 0) { focoAnelAlvo = alvo; focoAnelTem = 1; }
+                         passo, agoraX);
     }
     if (passo == 0 && agoraVis) {
       if (agoraX > G_L_FAIXA_X)
@@ -3755,7 +3697,6 @@ static void desenharBanda(float a, Uint32 agora) {
   gCel = G_L_CEL;
   gIdNoAr = "";
   (void)agora;
-  focoAnelOk = 0;   // na banda o foco e a superficie da linha, sem anel
   if (agoraVis) {
     char hora[12];
     int tf = ajustes_tinta_foco();
@@ -4062,7 +4003,6 @@ void guia_desenhar(Uint32 agora) {
   // Fileiras de canais. G_BAIXANDO com linhas publicadas e a RECARGA pedida
   // pelo painel de addons: a lista antiga fica na tela ate a nova chegar, em
   // vez de sumir por segundos (o subtitulo ja diz "Carregando canais…").
-  focoAnelTem = 0;
   if (modoLista && temLinhas) {
     time_t ini = janelaIni(agoraT);
     int agoraVis = agoraT >= ini && agoraT < ini + (time_t)G_L_JANELA_MIN * 60;
@@ -4105,16 +4045,12 @@ void guia_desenhar(Uint32 agora) {
         y += G_L_HEAD;
         for (i = 0; i < n; i++, y += G_L_ROW) {
           int foc = l == focoLin && i == focoCol && !focoTopo;
-          GfxRect alvo;
-          if (y + G_L_ROW < G_L_TOPO - 8.0f || y > G_L_BASE) continue;
+              if (y + G_L_ROW < G_L_TOPO - 8.0f || y > G_L_BASE) continue;
           if (foc && passo == 0)
             plrui_linha_foco((GfxRect){ G_AREA_X - 14.0f, y - 4.0f, G_AREA_W + 28.0f, G_L_CEL + 8.0f },
                              22.0f, a * dim);
           desenharLinhaLista(linhaItem(l, i), y, foc, a * dim, agoraT, ini, tFoco,
-                             passo, agoraX, foc ? &alvo : NULL);
-          if (foc && passo == 0) {
-            focoAnelAlvo = alvo; focoAnelAlvo.y += rolL; focoAnelTem = 1;
-          }
+                             passo, agoraX);
         }
       }
       // O PASSADO, entre as duas passadas: um veu da cor do fundo da borda da
@@ -4127,7 +4063,6 @@ void guia_desenhar(Uint32 agora) {
                 0.0f, ar, ag, ab, 0.85f * a);
       }
     }
-    focoAnelOk = 0;   // Glass UI: foco e superficie, sem anel
     (void)agora;
     // A grade SOME nas bordas em vez de ser cortada a faca, e so do lado em
     // que ha mais canal: tres faixas da cor do fundo, 12 px cada. Sao tres
@@ -4235,13 +4170,8 @@ void guia_desenhar(Uint32 agora) {
   // No modo lista ESQUERDA/DIREITA ganharam funcao (a janela de tempo) e a
   // barra tem de dizer. O amarelo nao aparece aqui de proposito: o controle
   // segmentado do cabecalho e o caminho que se ve, e a barra ja esta longa.
-#ifdef NV_ANDROID
-#define GUIA_FECHA_L i18n("OK troca de canal  ·  segure OK = favorito  ·  \xe2\x86\x90\xe2\x86\x92 adianta a grade  ·  segure \xe2\x86\x91\xe2\x86\x93 pula seção  ·  Voltar ou CH+ fecha")
-#define GUIA_FECHA_G i18n("OK troca de canal  ·  segure OK = favorito  ·  segure \xe2\x86\x91\xe2\x86\x93 pula seção  ·  Voltar ou CH+ fecha")
-#else
 #define GUIA_FECHA_L i18n("OK troca de canal  ·  segure OK = favorito  ·  \xe2\x86\x90\xe2\x86\x92 adianta a grade  ·  segure \xe2\x86\x91\xe2\x86\x93 pula seção  ·  Voltar ou Azul fecha")
 #define GUIA_FECHA_G i18n("OK troca de canal  ·  segure OK = favorito  ·  segure \xe2\x86\x91\xe2\x86\x93 pula seção  ·  Voltar ou Azul fecha")
-#endif
   { const char *dica = modoLista
       ? (overlay
          ? GUIA_FECHA_L
@@ -4255,13 +4185,11 @@ void guia_desenhar(Uint32 agora) {
     // O VERDE do diagnostico da Live TV, na ponta direita quando cabe — so na
     // LG, que tem a tecla. No Android e no navegador o caminho e o botao
     // Diagnostico da barra de cima.
-#if !defined(NV_ANDROID) && !defined(__EMSCRIPTEN__) && !defined(NV_TPK)
     if (!overlay) {
       TxtLinha v = txt_linha(TXT_CAPTION, i18n("Verde: diagnóstico da Live TV"), 128, 130, 138, 255);
       if ((float)t.w + 48.0f + (float)v.w <= G_AREA_W)
         txt_desenhar_alpha(v, G_AREA_X + G_AREA_W - (float)v.w, NV_TELA_H - 48.0f, a);
     }
-#endif
     }
 
   desenharDica();

@@ -7,8 +7,8 @@ cd "$(dirname "$0")/.."
 fontes=()
 for f in src/*.c src/dts/*.c; do [ "$f" != src/main.c ] && fontes+=("$f"); done
 cc "${fontes[@]}" tests/descanso_shot.c -Isrc -o /tmp/nuvio-descanso-shot \
-  -O1 -g -I/opt/homebrew/include -I/opt/homebrew/include/SDL2 \
-  -L/opt/homebrew/lib -lSDL2 -lSDL2_image -lSDL2_ttf -lz -framework OpenGL \
+  -O1 -g -DNV_LINUX_DESKTOP $(pkg-config --cflags sdl2 SDL2_image SDL2_ttf)  \
+   -lSDL2 -lSDL2_image -lSDL2_ttf -lz $(pkg-config --libs glesv2 egl) -ldl -pthread -lm \
   -Wno-deprecated-declarations -Wno-macro-redefined
 D=$(mktemp -d); trap 'rm -rf "$D"' EXIT
 NUVIO_DADOS="$D" NUVIO_TESTE_DIR="$D" NUVIO_SHOT_FONTE="${NUVIO_SHOT_FONTE:-3}" \

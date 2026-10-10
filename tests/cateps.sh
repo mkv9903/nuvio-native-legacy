@@ -14,7 +14,7 @@ if [ "${SANITIZE:-0}" = 1 ]; then flags+=(-fsanitize=address,undefined -fno-omit
 # catalogo.c de verdade — que e o objeto do teste original.
 cc ${flags[@]+"${flags[@]}"} src/catalogo.c src/cwordem.c tests/cateps.c src/cotacat.c \
   src/js.c src/metaprov.c src/colecoes.c src/net_url.c src/catordem.c \
-  -Isrc -I/opt/homebrew/include -I/opt/homebrew/include/SDL2 \
+  -Isrc -DNV_LINUX_DESKTOP $(pkg-config --cflags sdl2 SDL2_image SDL2_ttf)  \
   -o /tmp/nuvio-cateps-tests -O1 -g \
   -Wall -Wno-deprecated-declarations -Wno-macro-redefined
 /tmp/nuvio-cateps-tests

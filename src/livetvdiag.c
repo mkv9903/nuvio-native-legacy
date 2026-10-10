@@ -46,7 +46,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#if defined(__APPLE__) || defined(NV_LINUX_DESKTOP)
+#if defined(NV_LINUX_DESKTOP)
 #define LTD_TEM_PLAYER 0   // o Mac nao tem pipeline (video.c: stubs)
 #else
 #define LTD_TEM_PLAYER 1
@@ -714,8 +714,6 @@ void livetvdiag_evento(const SDL_Event *e) {
 }
 
 // --- desenho -------------------------------------------------------------------
-static float areaX(void) { float x; ajustes_area_conteudo(NV_MARGEM_X, NV_MARGEM_X, &x, NULL); return x; }
-static float areaW(void) { float w; ajustes_area_conteudo(NV_MARGEM_X, NV_MARGEM_X, NULL, &w); return w; }
 static char sepDec(void) { return idioma_ponto_decimal(ajustes_idioma()) ? '.' : ','; }
 
 // GLASS UI (mockup de Ajustes, quadros "livetv-diag"): cada painel e uma

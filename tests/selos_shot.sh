@@ -11,8 +11,8 @@ for source in src/*.c src/dts/*.c; do
 done
 bin="${TMPDIR:-/tmp}/nuvio-selos-shot"
 cc "${sources[@]}" tests/selos_shot.c -Isrc -o "$bin" \
-  -O1 -g -I/opt/homebrew/include -I/opt/homebrew/include/SDL2 \
-  -L/opt/homebrew/lib -lSDL2 -lSDL2_image -lSDL2_ttf -lz -framework OpenGL \
+  -O1 -g -DNV_LINUX_DESKTOP $(pkg-config --cflags sdl2 SDL2_image SDL2_ttf)  \
+   -lSDL2 -lSDL2_image -lSDL2_ttf -lz $(pkg-config --libs glesv2 egl) -ldl -pthread -lm \
   -Wno-deprecated-declarations -Wno-macro-redefined
 out="${1:-/tmp/nuvio-selos}"
 for modo in padrao colorido; do

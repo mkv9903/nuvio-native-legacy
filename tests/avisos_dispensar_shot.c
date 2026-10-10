@@ -1,11 +1,4 @@
-// CAPTURAS DO DISPENSAR (06/10): o modal da estreia na ilha com o foco no
-// ultimo botao, e a aba Avisos do painel de Salvos com a linha em foco. Com
-// -DDEPOIS (o codigo novo) tambem o menu do OK longo, a lista depois de
-// dispensar um e a linha "Dispensar todos". Sem -DDEPOIS compila contra o
-// codigo de antes (tests/avisos_dispensar_shot.sh monta os dois), para o
-// antes/depois com o mesmo roteiro. Itens da demonstracao (NUVIO_AVISOS_DEMO).
-//
-// NAO ENTRA NA SUITE (*_shot.sh): precisa de janela GL e de olho humano.
+// Dismiss notices from the Saved panel; captures before and after dismissal.
 #include "ilha.h"
 #include "salvospainel.h"
 #include "avisos.h"
@@ -84,7 +77,6 @@ int main(int argc, char **argv) {
   char ajustes[700];
   SDL_GLContext gl;
   FILE *f;
-  IlhaCartao est;
   int k;
   base = argc > 1 ? argv[1] : "/tmp/nuvio-dispensar";
   assert(dir && *dir);
@@ -97,8 +89,9 @@ int main(int argc, char **argv) {
 
   assert(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) == 0);
   IMG_Init(IMG_INIT_PNG | IMG_INIT_JPG);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
   SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
-  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
   win = SDL_CreateWindow("Nuvio: dispensar", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
                          1920, 1080, SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN);
   assert(win);
@@ -114,38 +107,13 @@ int main(int argc, char **argv) {
   gfx_icones_dir("deploy/app/art");
   ajustes_definir_vidro(1);
 
-  // --- 1. o modal da estreia, foco no ultimo botao ---
-  memset(&est, 0, sizeof est);
-  snprintf(est.chave, sizeof est.chave, "estreia:demo:agenda");
-  snprintf(est.avisoId, sizeof est.avisoId, "demo:agenda");
-  snprintf(est.imdb, sizeof est.imdb, "tt3006802");
-  est.serie = 1; est.t = 7; est.e = 9; est.progresso = -1.0f;
-  snprintf(est.titulo, sizeof est.titulo, "Outlander");
-  snprintf(est.epNome, sizeof est.epNome, "Unfinished Business");
-  snprintf(est.sinopse, sizeof est.sinopse, "Claire and Jamie face a reckoning as the war reaches Fraser's Ridge.");
-  snprintf(est.poster, sizeof est.poster, "deploy/app/art/poster/01.jpg");
-  snprintf(est.logo, sizeof est.logo, "deploy/app/art/logo/01.png");
-  snprintf(est.arte, sizeof est.arte, "deploy/app/art/01.jpg");
-  snprintf(est.quando, sizeof est.quando, "hoje");
-  ilha_cartao(ILHA_ESTREIA, &est);
-  quadros(60, "1-pilula-estreia");
-  tecla(SDLK_s, SDL_KEYDOWN);
-  quadros(50, NULL);
-  for (k = 0; k < 3; k++) tecla(SDLK_RIGHT, SDL_KEYDOWN);
-  quadros(30, "2-modal-estreia");
-  tecla(SDLK_ESCAPE, SDL_KEYDOWN);   // Voltar: recolhe, nao dispensa
-  quadros(40, "3-voltar-cartao-fica");
-  assert(ilha_cartao_na_tela());
-  ilha_cartao(ILHA_ESTREIA, NULL);
-  quadros(30, NULL);
-
   // --- 2. a aba Avisos do painel de Salvos ---
   setenv("NUVIO_AVISOS_DEMO", "1", 1);
   avisos_iniciar();
   spainel_abrir();
   spainel_ir_aba(3);   // SP_ABA_AVISOS
   quadros(60, NULL);
-  tecla(SDLK_DOWN, SDL_KEYDOWN);     // a estreia (segunda linha)
+  tecla(SDLK_DOWN, SDL_KEYDOWN);     // the second notice
   quadros(40, "4-aba-avisos");
 #ifdef DEPOIS
   tecla(SDLK_RETURN, SDL_KEYDOWN);   // segura OK

@@ -5,7 +5,7 @@
 //            entering one at a time: title (logo when available),
 //            year/duration/genre and a line of synopsis. Every SCREENSAVER_ITEM_S
 //            screen breathes in dark and transitions. OK opens title (Home only).
-//   CLOCK    large time in thin numerals, date, next premiere from Schedule and
+//   CLOCK    large time in thin numerals, date and
 //            a line that fills across the minute. The block moves slowly across
 //            the screen (OLED: nothing stays on same pixel).
 //
@@ -53,6 +53,5 @@ int  descanso_indice_em_tela(void);
 void descanso_pedir_abrir(void);
 int  descanso_pedido_abrir(void);
 int  descanso_item_serve(int temFundo, int temTitulo, int naLista, int progresso, int fonte);
-void descanso_rota(float s, float *px, float *py);
 
 #endif

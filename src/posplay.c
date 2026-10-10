@@ -543,10 +543,6 @@ static void posplay_desenharCorpo_(Uint32 agora, float baseY) {
 
 // O TOPO do que o painel ocupa, para quem empilha acima dele (o cartao de
 // reacao, reacao.h). As contas sao as de posplay_desenhar, sem a mola.
-float posplay_topo(float baseY) {
-  if (anim < 0.01f) return baseY;
-  return serie ? NV_TELA_H - 420.0f - 16.0f : NV_TELA_H - 444.0f - 16.0f;
-}
 
 #ifdef NV_SHOT_HOOKS
 // Capturas: o cartao de proximo episodio (serie) ou os relacionados (filme)

@@ -796,9 +796,6 @@ int seriefrases_n(void) { return nFrases; }
 const char *seriefrases_quem(int i) {
   return (i >= 0 && i < nFrases) ? frases[i].quem : "";
 }
-const char *seriefrases_texto(int i) {
-  return (i >= 0 && i < nFrases) ? frases[i].texto : "";
-}
 const char *seriefrases_pagina(void) { return paginaWq; }
 int seriefrases_em_portugues(void) { return emPortugues; }
 int seriefrases_n_fatos(void) { return nFatos; }
@@ -903,7 +900,7 @@ int seriefrases_selecionado(void) { return selecionado; }
 #define SF_GAP     30.0f   // vao entre uma citacao e a proxima
 // 16, e nao 22, por DUAS medidas que deram no mesmo numero. (a) E o mesmo
 // avanco que a linha da Agenda usa (o `x - 16.0f` de desenhaConteudo em
-// agendaui.c) — as duas telas passam a recortar o foco na mesma distancia. (b)
+// salvospainel.c) — as duas telas passam a recortar o foco na mesma distancia. (b)
 // A safe area lateral e NV_MARGEM_X = 80 e o painel comeca em NV_CONTENT_PAD =
 // 104: com 22 a superficie de foco caia em x = 82, dois pixeis DENTRO da faixa
 // de overscan, e o canto arredondado do item selecionado seria a primeira coisa
@@ -916,12 +913,12 @@ int seriefrases_selecionado(void) { return selecionado; }
 // so mede.
 //
 // POR QUE NAO txt_bloco. Ele corta NO SECO no limite de linhas, sem reticencia
-// — defeito real desta base, ja anotado em agendaui.h. Numa citacao isso e pior
+// — defeito real desta base, com caracteres invisiveis. Numa citacao isso e pior
 // do que numa sinopse: a frase acaba no meio e quem le nao tem como saber se
 // foi o Wikiquote que aparou (o cabecalho AVISA que isso acontece) ou se foi o
 // app. Com "…" a resposta e nossa e esta dita.
 //
-// POR QUE NAO agendaui_sinopse(). E a mesma forma — preencher palavra a palavra
+// POR QUE NAO o formatador de sinopse. E a mesma forma — preencher palavra a palavra
 // medindo com o PROPRIO txt_linha e entregar o resto a txt_linha_corta, que ja
 // sabe fechar com "…" — mas ela e fixa em DUAS linhas e nao devolve altura, e
 // aqui a caixa de foco precisa da altura que saiu desta mesma quebra.
@@ -991,21 +988,7 @@ static float sfBloco(TxtEstilo est, const char *s, int r, int g, int b,
 
 // O FILETE que separa duas citacoes (e dois campos da ficha).
 //
-// DE ONDE SAI CADA NUMERO, conferido no arquivo e nao de memoria. A referencia
-// e a `regua()` da Agenda (agendaui.c), que e a linha horizontal neutra
-// daquela tela: `regua(xEixo, xDir, yl, 0.62f, 0.14f)`, 1 px de altura. NAO e o
-// eixo vertical — esse e 3 px a 0,30 de alfa, mobilia estrutural, forte demais
-// para um separador. Uma versao anterior deste comentario dizia "mesma alfa do
-// eixo" e estava errada nos dois valores; quem fosse casar as duas telas por
-// esse texto erraria por mais que o dobro.
-//
-// A DIFERENCA QUE SOBRA e a altura, 2 px aqui contra 1 px la, e ela e
-// deliberada: a linha da Agenda corre ao lado de um eixo de 3 px que ja da
-// estrutura a tela, e aqui o filete e a UNICA linha desenhada entre duas
-// citacoes. A alfa desce de 0,14 para 0,13 na mesma conta — o dobro de altura
-// com a mesma massa de tinta aproximada. Na captura a 1920 ele aparece de
-// perto e some a distancia, que e o que um filete tem de fazer: quem separa as
-// citacoes a 3 m e o vao branco, nao o traco.
+// A neutral separator between quotations: 2 px tall, alpha 0.13.
 static void sfFilete(float x, float y, float larg) {
   GfxRect f;
   f.x = x; f.y = y; f.w = larg; f.h = 2.0f;
@@ -1124,7 +1107,7 @@ float seriefrases_desenhar(GfxRect r) {
     // onde esta seria a unica superficie de foco do aplicativo inteiro que
     // ignora a escolha. layout.h diz a regra com todas as letras no comentario
     // de NV_COR_FOCO ("FOCO = preenchimento na COR DE REALCE (ajustes_acento,
-    // branco por padrao) com texto escuro, SEM anel"), e streams.c, agendaui.c,
+    // branco por padrao) com texto escuro, SEM anel"), e streams.c,
     // salvospainel.c e ajustes.c todos chamam ajustes_acento aqui.
     if (sel) {
       GfxRect caixa;

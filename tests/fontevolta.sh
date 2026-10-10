@@ -9,7 +9,7 @@ trap 'rm -rf "$dir"' EXIT
 cat > "$dir/sonda.c" <<'C'
 int stream_url_serve(const char *u, const char *c) { (void)u; (void)c; return 0; }
 C
-cc -O1 -g -Wall -Isrc -I/opt/homebrew/include -I/opt/homebrew/include/SDL2 \
+cc -O1 -g -Wall -Isrc -DNV_LINUX_DESKTOP $(pkg-config --cflags sdl2 SDL2_image SDL2_ttf)  \
   ${SANITIZE:+-fsanitize=address,undefined} \
   src/fontevolta.c "$dir/sonda.c" tests/fontevolta.c -o "$dir/t" -lpthread
 "$dir/t"

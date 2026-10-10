@@ -821,62 +821,12 @@ static void caminhoCache(const char *dirArte, char *dst, size_t tam) {
   snprintf(dst, tam, "%s/catalogo-rede.bin", d);
 }
 
-// GRAVAR BINARIO POR FORA DE dados_gravar, DE PROPOSITO E COM AS CONTAS FEITAS.
-//
-// dados_gravar mede o conteudo com strlen (ver src/dados.h) e portanto para no
-// primeiro zero — inutil para um despejo de struct. Mas ela nao e so um fwrite:
-// ela tambem toma a trava do sistema de arquivos e marca a descarga. Quem grava
-// por fora fica devendo as duas, e as duas importam justamente no alvo para
-// onde este arquivo esta se mudando:
-//
-//   TRAVA — cat_gravar_cache roda no FIO DA DESCOBERTA. No WASM o sistema de
-//   arquivos e uma estrutura JavaScript compartilhada entre os workers e NAO e
-//   segura entre fios; o sintoma medido em dados.c de ignorar isso foi o app
-//   inteiro CONGELAR, sem erro nenhum, com o fio de sync escrevendo enquanto o
-//   laco principal descarregava. Despejar 1,7 MB de catalogo e esse cenario.
-//
-//   DESCARGA — no Emscripten o fclose so mexe no IDBFS em RAM. Quem leva o
-//   arquivo ao IndexedDB e dados_sincronizar(), no laco principal, e ela so faz
-//   algo quando alguem marcou sujo. Sem dados_marcar_sujo aqui, trocar de pasta
-//   nao resolveria nada: o cache continuaria morrendo ao fechar, so que numa
-//   pasta diferente.
-//
-// Estas tres funcoes publicas de dados.h nao tinham NENHUM chamador ate agora
-// (tex_cache.c grava sem elas); as travas internas equivalentes ja rodam dentro
-// de dados_gravar e de dados_sincronizar, entao o mecanismo esta vivo — o que
-// faltava era alguem de fora usa-lo.
-//
-// SUJO PESADO (0) e nao leve (1), ao contrario do cache de imagens: este
-// arquivo e escrito UMA vez por sessao, quando o catalogo completo chega
-// (~14,5 s depois de abrir), e nao a cada quadro. O atraso do leve e de 15 s —
-// o bastante para o dono fechar o app logo depois de a home assentar e perder
-// exatamente o que este cache existe para guardar. Uma descarga a mais por
-// sessao e o preco, e ela ainda pega carona na proxima escrita do sync.
-//
-// Fora do Emscripten as tres sao no-op dentro de dados.c; mante-las fora do
-// build nativo evita arrastar dados.c para testes que so querem o catalogo.
-#ifdef __EMSCRIPTEN__
-#define CACHE_FS_TRAVAR()   dados_fs_travar()
-#define CACHE_FS_LIBERAR()  dados_fs_liberar()
-#define CACHE_MARCAR_SUJO() dados_marcar_sujo(0)
-#else
-#define CACHE_FS_TRAVAR()   ((void)0)
-#define CACHE_FS_LIBERAR()  ((void)0)
-#define CACHE_MARCAR_SUJO() ((void)0)
-#endif
-
 int cat_apagar_cache(void) {
   char caminho[600];
   int foi;
   caminhoCache(NULL, caminho, sizeof caminho);
-  CACHE_FS_TRAVAR();
   foi = (remove(caminho) == 0);
-  CACHE_FS_LIBERAR();
-  // A REMOCAO TAMBEM PRECISA SER DESCARREGADA. No Tizen apagar so do IDBFS em
-  // RAM deixa o arquivo intacto no IndexedDB, e ele volta inteiro na proxima
-  // abertura — um logout que nao apagou nada, com a aparencia de ter apagado.
   if (foi) {
-    CACHE_MARCAR_SUJO();
     printf("[cat] cache do catalogo apagado\n");
     fflush(stdout);
   }
@@ -948,15 +898,14 @@ int cat_gravar_cache_se_identidade(const char *dirArte, const char *donoEsperado
     c.magia = CACHE_MAGIA_RLE;
     encN64 = encN;
     t1 = cat_relogio_ms();
-    CACHE_FS_TRAVAR();
     f = fopen(tmp, "wb");
-    if (!f) { CACHE_FS_LIBERAR(); free(enc); free(copiaFils); return 0; }
+    if (!f) { free(enc); free(copiaFils); return 0; }
     if (fwrite(&c, sizeof c, 1, f) != 1 ||
         fwrite(&encN64, sizeof encN64, 1, f) != 1 ||
         fwrite(enc, 1, encN, f) != encN ||
         (qf > 0 &&
          fwrite(copiaFils, sizeof(CatFileira), (size_t)qf, f) != (size_t)qf)) {
-      fclose(f); remove(tmp); CACHE_FS_LIBERAR(); free(enc); free(copiaFils); return 0;
+      fclose(f); remove(tmp); free(enc); free(copiaFils); return 0;
     }
     free(enc);
     free(copiaFils);
@@ -971,12 +920,10 @@ int cat_gravar_cache_se_identidade(const char *dirArte, const char *donoEsperado
   { char donoAgora[sizeof c.usuario]; int perfilAgora;
     identidadeAtual(donoAgora, sizeof donoAgora, &perfilAgora);
     if (strcmp(donoAgora, donoEsperado) || perfilAgora != perfilEsperado) {
-      remove(tmp); CACHE_FS_LIBERAR(); return 0;
+      remove(tmp); return 0;
     }
   }
-  if (rename(tmp, caminho) != 0) { remove(tmp); CACHE_FS_LIBERAR(); return 0; }
-  CACHE_FS_LIBERAR();
-  CACHE_MARCAR_SUJO();
+  if (rename(tmp, caminho) != 0) { remove(tmp); return 0; }
   printf("[cat] cache gravado em %s: %d titulos, %d fileiras\n",
          caminho, qtd, qf);
   fflush(stdout);
@@ -1036,10 +983,7 @@ int cat_ler_cache(const char *dirArte) {
     fclose(f);
     printf("[cat] cache descartado (era de outro usuario/perfil/idioma)\n");
     fflush(stdout);
-    CACHE_FS_TRAVAR();
     remove(caminho);
-    CACHE_FS_LIBERAR();
-    CACHE_MARCAR_SUJO();
     return 0;
   }
   novo = malloc(sizeof(CatItem) * (size_t)(c.nItens > 0 ? c.nItens : 1));
@@ -1099,7 +1043,6 @@ unsigned long cat_assinatura_de(const CatItem *lista, int qtd,
     MIX(fl[i].base); MIX(fl[i].catId);
     h ^= (unsigned long)fl[i].ini * 31UL + (unsigned long)fl[i].n; h *= 16777619UL;
     h ^= (unsigned long)fl[i].estado; h *= 16777619UL;
-    h ^= (unsigned long)fl[i].socialGeracao; h *= 16777619UL;
   }
   for (i = 0; i < qtd; i++) {
     MIX(lista[i].imdb); MIX(lista[i].tipo); MIX(lista[i].titulo);
@@ -1888,8 +1831,7 @@ void cat_republicar_fileiras(const CatFileira *novasFils, int nNovas) {
           strcmp(novasFils[k].base, fils[k].base) ||
           strcmp(novasFils[k].catId, fils[k].catId) ||
           novasFils[k].ini != fils[k].ini || novasFils[k].n != fils[k].n ||
-          novasFils[k].estado != fils[k].estado ||
-          novasFils[k].socialGeracao != fils[k].socialGeracao) igual = 0;
+          novasFils[k].estado != fils[k].estado) igual = 0;
     if (igual) { pthread_mutex_unlock(&pubTrava); return; }
   }
   nFils = 0;                 // ver a nota em catalogo.h: zera antes de mexer
@@ -2102,59 +2044,3 @@ void cat_definir_episodios(int indiceItem, const CatEp *lista, int qtd) {
 
 // Generos de um item, como uma lista de trechos separados por " · ". O primeiro
 // campo e sempre "Filme"/"Programa de TV" e nao conta como genero.
-static int compartilhaGenero(const CatItem *a, const CatItem *b) {
-  const char *p = a->genero;
-  int primeiro = 1;
-  while (p && *p) {
-    const char *sep = strstr(p, "\xc2\xb7");
-    char termo[64];
-    size_t n;
-    if (!sep) break;
-    p = sep + 2;
-    while (*p == ' ') p++;
-    sep = strstr(p, "\xc2\xb7");
-    n = sep ? (size_t)(sep - p) : strlen(p);
-    while (n && (p[n - 1] == ' ')) n--;
-    if (n && n < sizeof termo) {
-      memcpy(termo, p, n);
-      termo[n] = 0;
-      if (strstr(b->genero, termo)) return 1;
-    }
-    primeiro = 0;
-    if (!sep) break;
-  }
-  (void)primeiro;
-  return 0;
-}
-
-int cat_similares(int indice, int *saida, int max) {
-  int m = cat_n(), i, k = 0;
-  const CatItem *base;
-  if (m < 1 || !saida || max < 1) return 0;
-  indice = ((indice % m) + m) % m;
-  base = &itens[indice];
-  for (i = 0; i < m && k < max; i++) {
-    if (i == indice) continue;
-    if (base->tipo[0] && itens[i].tipo[0] && strcmp(base->tipo, itens[i].tipo)) continue;
-    if (!compartilhaGenero(base, &itens[i])) continue;
-    saida[k++] = i;
-  }
-  // Sem nenhum genero em comum a fileira ficaria vazia; ai vale mais mostrar os
-  // vizinhos do mesmo tipo que sumir com a secao.
-  for (i = 0; i < m && k < max; i++) {
-    int j, ja = 0;
-    if (i == indice) continue;
-    for (j = 0; j < k; j++) if (saida[j] == i) { ja = 1; break; }
-    if (ja) continue;
-    if (base->tipo[0] && itens[i].tipo[0] && strcmp(base->tipo, itens[i].tipo)) continue;
-    saida[k++] = i;
-  }
-  // Nota alta primeiro.
-  { int a, b, t;
-    for (a = 0; a < k; a++)
-      for (b = a + 1; b < k; b++)
-        if (itens[saida[b]].nota > itens[saida[a]].nota) {
-          t = saida[a]; saida[a] = saida[b]; saida[b] = t;
-        } }
-  return k;
-}

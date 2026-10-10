@@ -687,14 +687,11 @@ static int gravarBin(const char *nome, const char *nomeTs, const char *gz, long 
   char cam[640], tbuf[24]; FILE *f;
   int ok = 0;
   if (!dados_caminho(cam, sizeof cam, nome)) return 0;
-  dados_fs_travar();
   f = fopen(cam, "wb");
   if (f) { ok = fwrite(gz, 1, (size_t)n, f) == (size_t)n; ok = (fclose(f) == 0) && ok; }
-  dados_fs_liberar();
   if (!ok) return 0;
   snprintf(tbuf, sizeof tbuf, "%ld", (long)time(NULL));
   dados_gravar_leve(nomeTs, tbuf);
-  dados_marcar_sujo(1);
   return 1;
 }
 
@@ -703,7 +700,6 @@ static char *lerBin(const char *nome, long *n) {
   char cam[640]; FILE *f; char *b = NULL; long t;
   *n = 0;
   if (!dados_caminho(cam, sizeof cam, nome)) return NULL;
-  dados_fs_travar();
   f = fopen(cam, "rb");
   if (f) {
     fseek(f, 0, SEEK_END); t = ftell(f); fseek(f, 0, SEEK_SET);
@@ -713,7 +709,6 @@ static char *lerBin(const char *nome, long *n) {
     }
     fclose(f);
   }
-  dados_fs_liberar();
   return b;
 }
 
@@ -849,13 +844,8 @@ int epg_pais_existe(const char *pais) {
 // TAMANHO: um provedor grande entrega dezenas de MB. Acima do teto a grade e
 // ignorada com uma linha de log — melhor sem grade do provedor que o app
 // fechando por memoria (no Tizen o heap inteiro e 256 MiB).
-#ifdef __EMSCRIPTEN__
-#define EPG_EXTRA_TETO_REDE (12L << 20)
-#define EPG_EXTRA_TETO_XML  (48L << 20)
-#else
 #define EPG_EXTRA_TETO_REDE (32L << 20)
 #define EPG_EXTRA_TETO_XML  (128L << 20)
-#endif
 static const char *EXTRA_BIN = "epg-extra.bin";
 static const char *EXTRA_TS  = "epg-extra.ts";
 static const char *EXTRA_ID  = "epg-extra.id";
@@ -1273,10 +1263,6 @@ int epg_janela_total(time_t *ini, time_t *fim) {
   return ok;
 }
 
-int epg_total(int epg) {
-  if (epg < 0 || epg >= P.nCanais) return 0;
-  return (int)P.canais[epg].evN;
-}
 
 int epg_faixa(int epg, time_t de, time_t ate, EpgProg *out, int cap) {
   long m, topo;

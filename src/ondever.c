@@ -12,9 +12,6 @@
 #include <string.h>
 #include <ctype.h>
 #include <time.h>
-#ifdef __EMSCRIPTEN__
-#include <emscripten.h>
-#endif
 
 #define TMDB "https://api.themoviedb.org/3"
 // Uma semana: o pais muda quando a TV muda de casa, nao a cada arranque.
@@ -408,55 +405,14 @@ static const char *idNaLoja(const char *servico) {
   ondever_chave(servico, ch, sizeof ch);
   for (size_t k = 0; k < sizeof LOJA / sizeof LOJA[0]; k++)
     if (!strcmp(ch, LOJA[k].chave)) {
-#if defined(__ANDROID__)
-      return LOJA[k].android;
-#elif defined(__EMSCRIPTEN__) || defined(NV_TPK)
-      return LOJA[k].samsung;
-#else
       return LOJA[k].lg;
-#endif
     }
   return "";
 }
 
-#if defined(NV_TPK)
-// Ponte com o host .NET (tizen-tpk/Apps.cs): C pede, C# responde chamando
-// nv_tpk_app() por app instalado (de outro fio — por isso a trava acima).
-typedef void (*FnSemArg)(void);
-typedef void (*FnTexto)(const char *);
-static FnSemArg tpkListar;
-static FnTexto tpkAbrir, tpkLoja;
-// visibility("default") e OBRIGATORIO: tools/tpk.sh compila tudo com
-// -fvisibility=hidden, e sem isto o simbolo nao sai da .so — o host .NET
-// (Apps.cs) levava EntryPointNotFoundException em "apps-init" (8 TVs na 1.7.4).
-__attribute__((visibility("default")))
-void nv_tpk_apps_registrar(FnSemArg listar, FnTexto abrir, FnTexto loja) {
-  tpkListar = listar; tpkAbrir = abrir; tpkLoja = loja;
-}
-__attribute__((visibility("default")))
-void nv_tpk_app(const char *id, const char *nome) { ondever_app_visto(id, nome); }
-#endif
 
-#if defined(__EMSCRIPTEN__)
-// "id\tnome" por linha, como o .wgt e o Android devolvem. Consome `l`.
-static void lerListaTab(char *l) {
-  char *s = l, *nl;
-  int n = 0;
-  if (!l) return;
-  ondever_apps_limpar();
-  for (; s && *s; s = nl ? nl + 1 : NULL) {
-    char *tab;
-    nl = strchr(s, '\n');
-    if (nl) *nl = 0;
-    tab = strchr(s, '\t');
-    if (tab) { *tab = 0; ondever_app_visto(s, tab + 1); n++; }
-  }
-  free(l);
-  printf("[ondever] installed apps=%d\n", n);
-}
-#endif
 
-#if !defined(__EMSCRIPTEN__) && !defined(NV_TPK) && !defined(__APPLE__) && !defined(NV_LINUX_DESKTOP) && !defined(__ANDROID__)
+#if !(defined(NV_LINUX_DESKTOP))
 #define ONDE_WEBOS 1
 #include "video.h"
 // webOS: pelo barramento LS2 do player (video_luna), e nao por luna-send — o
@@ -517,90 +473,9 @@ static void respostaLaunch(const char *payload, void *u) {
 }
 #endif
 
-#ifdef __ANDROID__
-// One detached query at a time. Repeated sheet openings coalesce while the
-// PackageManager is busy; readers retain the complete previous snapshot.
-static int appsAndroidBuscando, appsAndroidPronto;
-static void *fioAppsAndroid(void *unused) {
-  struct timespec inicio, fim;
-  clock_gettime(CLOCK_MONOTONIC, &inicio);
-  AppInstalado novo[APPS_MAX];
-  char *lista = android_listar_apps(), *linha = lista;
-  int count = 0;
-  (void)unused;
-  while (linha && *linha && count < APPS_MAX) {
-    char *nl = strchr(linha, '\n'), *tab;
-    if (nl) *nl = 0;
-    tab = strchr(linha, '\t');
-    if (tab) {
-      int valido = 1;
-      *tab++ = 0;
-      for (const char *p = linha; *p; p++)
-        if (!isalnum((unsigned char)*p) && *p != '.' && *p != '_' && *p != '-') valido = 0;
-      if (valido && linha[0] && tab[0]) {
-        snprintf(novo[count].id, sizeof novo[count].id, "%s", linha);
-        snprintf(novo[count].nome, sizeof novo[count].nome, "%s", tab);
-        count++;
-      }
-    }
-    linha = nl ? nl + 1 : NULL;
-  }
-  pthread_mutex_lock(&appsTrava);
-  if (lista) {
-    memcpy(apps, novo, (size_t)count * sizeof *apps);
-    nApps = count; appsAndroidPronto = 1;
-  }
-  appsAndroidBuscando = 0;
-  pthread_mutex_unlock(&appsTrava);
-  clock_gettime(CLOCK_MONOTONIC, &fim);
-  long ms = (fim.tv_sec - inicio.tv_sec) * 1000 + (fim.tv_nsec - inicio.tv_nsec) / 1000000;
-  printf("[ondever] installed apps query %s count=%d elapsed_ms=%ld\n", lista ? "completed" : "failed", count, ms);
-  fflush(stdout);
-  free(lista);
-  return NULL;
-}
-#endif
 
 void ondever_apps_atualizar(void) {
-#if defined(__EMSCRIPTEN__)
-  // O .wgt pede ao tizen.application (assincrono) e le o que a resposta
-  // ANTERIOR deixou em Module.nvApps ("id\tnome\n..."): a lista e de ha
-  // segundos, e a seguinte chega para o proximo pedido.
-  char *l = (char *)EM_ASM_PTR({
-    try {
-      if (typeof tizen !== 'undefined' && tizen.application) {
-        tizen.application.getAppsInfo(function(v) {
-          Module.nvApps = v.map(function(a) { return a.id + '\t' + a.name; }).join('\n');
-        }, function() {});
-      }
-      var t = Module.nvApps || "";
-      if (!t) return 0;
-      var b = new TextEncoder().encode(t);
-      var p = _malloc(b.length + 1);
-      if (!p) return 0;
-      HEAPU8.set(b, p); HEAPU8[p + b.length] = 0;
-      return p;
-    } catch (e) { return 0; }
-  });
-  lerListaTab(l);
-#elif defined(__ANDROID__)
-  pthread_t fio;
-  pthread_mutex_lock(&appsTrava);
-  if (!appsAndroidBuscando) {
-    appsAndroidBuscando = 1;
-    if (!pthread_create(&fio, NULL, fioAppsAndroid, NULL)) {
-      pthread_detach(fio);
-      printf("[ondever] installed apps query dispatched\n");
-    } else {
-      appsAndroidBuscando = 0;
-      printf("[ondever] installed apps query dispatch failed\n");
-    }
-    fflush(stdout);
-  }
-  pthread_mutex_unlock(&appsTrava);
-#elif defined(NV_TPK)
-  if (tpkListar) { ondever_apps_limpar(); tpkListar(); }
-#elif defined(ONDE_WEBOS)
+#if defined(ONDE_WEBOS)
   video_luna("luna://com.webos.applicationManager/listApps", "{}", respostaApps, NULL);
 #endif
 }
@@ -611,19 +486,10 @@ int ondever_estado(const char *nome) {
   // Channel subscriptions belong to the host service, not the standalone
   // app. Keep availability information without an inaccurate launch/store action.
   if(strstr(key,"amazonchannel") || strstr(key,"appletvchannel")) return ONDE_INFO;
-#if defined(__ANDROID__)
-  pthread_mutex_lock(&appsTrava);
-  int pronto = appsAndroidPronto;
-  pthread_mutex_unlock(&appsTrava);
-  if (!pronto) return ONDE_INFO;
-#endif
-#if (defined(__APPLE__) || defined(NV_LINUX_DESKTOP)) && !defined(NV_TPK) && !defined(__ANDROID__)
+#if defined(NV_LINUX_DESKTOP)
   (void)id; (void)nome;
   return ONDE_INFO;         // desktop preview has no TV application launcher
 #else
-#if defined(NV_TPK)
-  if (!tpkAbrir) return ONDE_INFO;   // host antigo, sem a ponte
-#endif
   if (appDo(nome, id, sizeof id)) return ONDE_ABRIR;
 #if defined(ONDE_WEBOS)
   // Sem a lista (listApps recusado ou ainda a caminho): tenta abrir pelo id
@@ -644,44 +510,8 @@ int ondever_abrir(const char *nome) {
          e == ONDE_ABRIR ? id : loja);
   fflush(stdout);
   if (e == ONDE_INFO) return ONDE_INFO;
-#if defined(__ANDROID__)
-  pthread_mutex_lock(&appsTrava);
-  int pronto = appsAndroidPronto;
-  pthread_mutex_unlock(&appsTrava);
-  if (!pronto) return ONDE_INFO;
-#endif
-#if (defined(__APPLE__) || defined(NV_LINUX_DESKTOP)) && !defined(NV_TPK) && !defined(__ANDROID__)
+#if defined(NV_LINUX_DESKTOP)
   return ONDE_INFO;
-#elif defined(__EMSCRIPTEN__)
-  if (e == ONDE_ABRIR) {
-    EM_ASM({ try { tizen.application.launch(UTF8ToString($0)); } catch (e) { console.log("[ondever] " + e); } }, id);
-  } else {
-    // A loja da Samsung (org.volt.apps) abre na pagina do app com Sub_Menu
-    // "detail"; sem id, abre na vitrine e a folha diz o que procurar.
-    // Sem virgula solta no JS: EM_ASM e macro, e a virgula fora de parenteses
-    // vira outro argumento dela.
-    EM_ASM({
-      try {
-        var id = UTF8ToString($0);
-        var dados = [];
-        if (id) {
-          dados.push(new tizen.ApplicationControlData("Sub_Menu", ["detail"]));
-          dados.push(new tizen.ApplicationControlData("widget_id", [id]));
-        }
-        var ctl = new tizen.ApplicationControl("http://tizen.org/appcontrol/operation/default");
-        ctl.data = dados;
-        tizen.application.launchAppControl(ctl, "org.volt.apps", null, null);
-      } catch (e) { console.log("[ondever] store " + e); }
-    }, e == ONDE_LOJA ? loja : "");
-  }
-#elif defined(__ANDROID__)
-  if (e == ONDE_INFO) return ONDE_INFO;
-  if (e == ONDE_ABRIR) {
-    if(!android_abrir_app(id)) return ONDE_INFO;
-  } else if(!android_abrir_loja(e == ONDE_LOJA ? loja : "", nome)) return ONDE_INFO;
-#elif defined(NV_TPK)
-  if (e == ONDE_ABRIR && tpkAbrir) tpkAbrir(id);
-  else if (e != ONDE_INFO && tpkLoja) tpkLoja(e == ONDE_LOJA ? loja : "");
 #elif defined(ONDE_WEBOS)
   if (e == ONDE_ABRIR) {
     char carga[200];

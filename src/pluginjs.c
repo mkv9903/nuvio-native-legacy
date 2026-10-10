@@ -34,10 +34,7 @@
 
 // Orcamento global padrao por alvo. O WGT tem heap fixo de 256 MiB e malloc
 // que ABORTA (ABORTING_MALLOC, tools/tizen.sh): o teto aqui tem de pegar antes.
-#if defined(__EMSCRIPTEN__)
-#define PJ_HEAP_GLOBAL  (40u * 1024 * 1024)
-#define PJ_REDE_GLOBAL  (12u * 1024 * 1024)
-#elif defined(NV_WEBOS) || defined(NV_TPK40)
+#if defined(NV_WEBOS)
 #define PJ_HEAP_GLOBAL  (64u * 1024 * 1024)
 #define PJ_REDE_GLOBAL  (16u * 1024 * 1024)
 #else

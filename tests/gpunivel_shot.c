@@ -6,8 +6,8 @@
 // laco de main.c — gpun_quadro_inicio, clear, home_desenhar, gpun_quadro_fim
 // — nos niveis 0, 1 e 2, e grava um BMP de cada. Tambem imprime o que a GPU
 // recebe por quadro: preenchimento total e por modo (gfx_fill_modo, em telas
-// 1920x1080) e, se o GL do Mac tiver GL_EXT_timer_query, o tempo de GPU medio
-// de cada nivel. O M4 nao e a Mali da TV: o tempo absoluto nao vale nada, a
+// 1920x1080) e, se o GLES tiver GL_EXT_disjoint_timer_query, o tempo de GPU medio
+// de cada nivel. A GPU do preview difere da TV: o tempo absoluto nao vale nada, a
 // PROPORCAO entre os niveis (as duas sao GPUs de ladrilhos) e uma pista.
 //
 // Nao entra na suite (precisa de janela GL, de rede e de olho humano):
@@ -27,6 +27,7 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
 #include "gl_compat.h"
+#include <GLES2/gl2ext.h>
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -47,14 +48,58 @@ static const struct { const char *tt, *nome; } TITULOS[] = {
 #define NT (int)(sizeof TITULOS / sizeof *TITULOS)
 
 static const char *NOMES[GFX_NMODOS] = {
-  "CARD", "SOMBRA", "COR", "HERO", "VEU", "TEXTO", "FUNDO", "VEU_TOPO", "SNAP", "PLAY",
-  "BLUR", "DETALHE", "HERO_CHEIO", "ANEL", "OLHO", "FONTES", "MARCA", "VEU_BAIXO", "SOCIAL",
-  "AVATAR", "RETRATO", "DISCO", "EDITORIAL", "VEU_CARD", "BRILHO_TOPO", "ARTE", "LUZ", "SINO",
-  "ESQUELETO", "LINHA", "CEU", "COR_GRAD", "ANEL_GRAD", "AMBIENTE", "VITRINE", "FUNDO_DIN", "COPIA",
+  [GFX_CARD] = "CARD",
+  [GFX_SOMBRA] = "SOMBRA",
+  [GFX_COR] = "COR",
+  [GFX_HERO] = "HERO",
+  [GFX_VEU] = "VEU",
+  [GFX_TEXTO] = "TEXTO",
+  [GFX_FUNDO] = "FUNDO",
+  [GFX_VEU_TOPO] = "VEU_TOPO",
+  [GFX_SNAP] = "SNAP",
+  [GFX_PLAY] = "PLAY",
+  [GFX_BLUR] = "BLUR",
+  [GFX_DETALHE] = "DETALHE",
+  [GFX_HERO_CHEIO] = "HERO_CHEIO",
+  [GFX_ANEL] = "ANEL",
+  [GFX_OLHO] = "OLHO",
+  [GFX_FONTES] = "FONTES",
+  [GFX_MARCA] = "MARCA",
+  [GFX_VEU_BAIXO] = "VEU_BAIXO",
+  [GFX_AVATAR] = "AVATAR",
+  [GFX_RETRATO] = "RETRATO",
+  [GFX_DISCO] = "DISCO",
+  [GFX_EDITORIAL] = "EDITORIAL",
+  [GFX_VEU_CARD] = "VEU_CARD",
+  [GFX_BRILHO_TOPO] = "BRILHO_TOPO",
+  [GFX_ARTE] = "ARTE",
+  [GFX_LUZ] = "LUZ",
+  [GFX_SINO] = "SINO",
+  [GFX_ESQUELETO] = "ESQUELETO",
+  [GFX_LINHA] = "LINHA",
+  [GFX_CEU] = "CEU",
+  [GFX_COR_GRAD] = "COR_GRAD",
+  [GFX_ANEL_GRAD] = "ANEL_GRAD",
+  [GFX_AMBIENTE] = "AMBIENTE",
+  [GFX_COPIA] = "COPIA",
+  [GFX_VITRINE] = "VITRINE",
+  [GFX_FUNDO_DIN] = "FUNDO_DIN",
+  [GFX_HERO_CAM] = "HERO_CAM",
+  [GFX_HERO_CHEIO_CAM] = "HERO_CHEIO_CAM",
+  [GFX_JANELA] = "JANELA",
+  [GFX_VEU_CSS] = "VEU_CSS",
+  [GFX_MINI] = "MINI",
+  [GFX_TEXTURA] = "TEXTURA",
+  [GFX_FOSCO] = "FOSCO",
+  [GFX_VITRINE_DIN] = "VITRINE_DIN",
 };
 
 static GLuint consulta;
 static int temTimer;
+static PFNGLGENQUERIESEXTPROC timerGen;
+static PFNGLBEGINQUERYEXTPROC timerBegin;
+static PFNGLENDQUERYEXTPROC timerEnd;
+static PFNGLGETQUERYOBJECTUI64VEXTPROC timerResult;
 
 static void capturar(const char *bmp);
 
@@ -63,14 +108,14 @@ static void capturar(const char *bmp);
 static double quadroCap(SDL_Window *w, int medir, const char *bmp);
 static double quadro(SDL_Window *w, int medir) { return quadroCap(w, medir, NULL); }
 static double quadroCap(SDL_Window *w, int medir, const char *bmp) {
-  GLuint64 ns = 0;
+  GLuint64EXT ns = 0;
   SDL_PumpEvents();
   txt_novo_quadro();
   tex_novo_quadro();
   tex_bombear(8);
   gfx_novo_quadro();
   gfx_sem_recorte();
-  if (medir && temTimer) glBeginQuery(GL_TIME_ELAPSED_EXT, consulta);
+  if (medir && temTimer) timerBegin(GL_TIME_ELAPSED_EXT, consulta);
   gpun_quadro_inicio();
   glClearColor(0.051f, 0.051f, 0.051f, 1.0f);
   glClear(GL_COLOR_BUFFER_BIT);
@@ -78,8 +123,11 @@ static double quadroCap(SDL_Window *w, int medir, const char *bmp) {
   home_desenhar(SDL_GetTicks());
   gpun_quadro_fim();
   if (medir && temTimer) {
-    glEndQuery(GL_TIME_ELAPSED_EXT);
-    glGetQueryObjectui64vEXT(consulta, GL_QUERY_RESULT, &ns);
+    timerEnd(GL_TIME_ELAPSED_EXT);
+    timerResult(consulta, GL_QUERY_RESULT_EXT, &ns);
+    GLint disjoint = 0;
+    glGetIntegerv(GL_GPU_DISJOINT_EXT, &disjoint);
+    if (disjoint) ns = 0;
   }
   if (bmp) capturar(bmp);
   SDL_GL_SwapWindow(w);
@@ -114,10 +162,11 @@ int main(int argc, char **argv) {
   dados_iniciar("deploy/app/art");
   assert(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) == 0);
   IMG_Init(IMG_INIT_PNG | IMG_INIT_JPG);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
   SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
-  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
   SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, 8);
-  // SEM ALLOW_HIGHDPI: drawable de 1920x1080 tambem no Mac retina, que e o
+  // SEM ALLOW_HIGHDPI: drawable de 1920x1080 no preview, que e o
   // tamanho da janela da TV (e o do texto rasterizado la, escala 1).
   w = SDL_CreateWindow("Nuvio: niveis de GPU", SDL_WINDOWPOS_CENTERED,
                        SDL_WINDOWPOS_CENTERED, 1920, 1080,
@@ -144,9 +193,15 @@ int main(int argc, char **argv) {
   gfx_icones_dir("deploy/app/art");
   ajustes_dir(dir);
   assert(home_iniciar("deploy/app/art"));
-  temTimer = strstr((const char *)glGetString(GL_EXTENSIONS), "GL_EXT_timer_query") != NULL;
-  if (temTimer) glGenQueries(1, &consulta);
-  printf("GL_EXT_timer_query: %s\n", temTimer ? "sim" : "nao");
+  timerGen = (PFNGLGENQUERIESEXTPROC)SDL_GL_GetProcAddress("glGenQueriesEXT");
+  timerBegin = (PFNGLBEGINQUERYEXTPROC)SDL_GL_GetProcAddress("glBeginQueryEXT");
+  timerEnd = (PFNGLENDQUERYEXTPROC)SDL_GL_GetProcAddress("glEndQueryEXT");
+  timerResult = (PFNGLGETQUERYOBJECTUI64VEXTPROC)SDL_GL_GetProcAddress("glGetQueryObjectui64vEXT");
+  const char *extensions = (const char *)glGetString(GL_EXTENSIONS);
+  temTimer = extensions && strstr(extensions, "GL_EXT_disjoint_timer_query") &&
+             timerGen && timerBegin && timerEnd && timerResult;
+  if (temTimer) timerGen(1, &consulta);
+  printf("GL_EXT_disjoint_timer_query: %s\n", temTimer ? "sim" : "nao");
 
   memset(itens, 0, sizeof itens);
   for (i = 0; i < NT; i++) {

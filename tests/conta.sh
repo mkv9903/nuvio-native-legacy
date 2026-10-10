@@ -15,17 +15,17 @@ TMP=$(mktemp -d); trap 'rm -rf "$TMP"' EXIT
 
 echo "==> logout apaga o usuario anterior"
 eval cc tests/conta_logout.c $FONTES -o "$TMP/logout" "$ENV_D" -Isrc \
-  -I/opt/homebrew/include -I/opt/homebrew/include/SDL2 \
-  -L/opt/homebrew/lib -lSDL2 -lSDL2_image -lSDL2_ttf -lz \
-  -framework OpenGL -Wno-deprecated-declarations -Wno-macro-redefined
+  -DNV_LINUX_DESKTOP $(pkg-config --cflags sdl2 SDL2_image SDL2_ttf)  \
+   -lSDL2 -lSDL2_image -lSDL2_ttf -lz \
+  $(pkg-config --libs glesv2 egl) -ldl -pthread -lm -Wno-deprecated-declarations -Wno-macro-redefined
 NUVIO_DADOS="$TMP/dados" "$TMP/logout"
 
 echo
 echo "==> ajustes da conta chegam com o sentido certo"
 eval cc tests/conta_ajustes.c $FONTES -o "$TMP/ajustes" "$ENV_D" -Isrc \
-  -I/opt/homebrew/include -I/opt/homebrew/include/SDL2 \
-  -L/opt/homebrew/lib -lSDL2 -lSDL2_image -lSDL2_ttf -lz \
-  -framework OpenGL -Wno-deprecated-declarations -Wno-macro-redefined
+  -DNV_LINUX_DESKTOP $(pkg-config --cflags sdl2 SDL2_image SDL2_ttf)  \
+   -lSDL2 -lSDL2_image -lSDL2_ttf -lz \
+  $(pkg-config --libs glesv2 egl) -ldl -pthread -lm -Wno-deprecated-declarations -Wno-macro-redefined
 "$TMP/ajustes"
 
 echo

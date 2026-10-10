@@ -11,7 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-// A inclusao deixa o teste acionar o mesmo evento interno que chega de agenda,
+// A inclusao deixa o teste acionar o mesmo evento interno que chega dos avisos,
 // atualizacao ou recomendacao, sem criar API publica so para fotografia.
 #include "../src/avisos.c"
 
@@ -50,8 +50,9 @@ int main(int argc, char **argv) {
 
   assert(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) == 0);
   IMG_Init(IMG_INIT_PNG | IMG_INIT_JPG);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
   SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
-  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
   w = SDL_CreateWindow("Nuvio: toast de avisos", SDL_WINDOWPOS_CENTERED,
                        SDL_WINDOWPOS_CENTERED, 1920, 1080,
                        SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN);

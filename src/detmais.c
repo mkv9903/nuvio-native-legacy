@@ -37,7 +37,6 @@ void detmais_abrir(const int disp[DMAIS_N]) {
 void detmais_fechar(void) { aberto = 0; okArmado = 0; }
 void detmais_zerar(void) { detmais_fechar(); vis = visV = 0.0f; }
 int detmais_aberto(void) { return aberto; }
-float detmais_visivel(void) { return vis; }
 int detmais_n(void) { return n; }
 int detmais_acao(int l) { return l >= 0 && l < n ? linhas[l] : -1; }
 int detmais_foco(void) { return foco; }
@@ -47,8 +46,7 @@ const char *detmais_rotulo(int acao) {
     case DMAIS_TRAILER:    return "Assistir trailer";
     case DMAIS_EXPLORAR:   return "Explorar a partir daqui";
     case DMAIS_ARTE:       return "Trocar arte";
-    case DMAIS_RECOMENDAR: return "Recomendar a um amigo";
-  }
+    }
   return "";
 }
 // Os mesmos glifos que os circulares tinham na linha: quem ja conhecia o
@@ -58,8 +56,7 @@ const char *detmais_icone(int acao) {
     case DMAIS_TRAILER:    return "aj_clapperboard";
     case DMAIS_EXPLORAR:   return "aj_compass";
     case DMAIS_ARTE:       return "arte";
-    case DMAIS_RECOMENDAR: return "recomendar";
-  }
+    }
   return "";
 }
 

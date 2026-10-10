@@ -19,7 +19,6 @@
 //   5. id que nao e do IMDb (kitsu:) nao vai ao Cinemeta.
 //
 //   bash tests/detalheanime.sh
-int ajustes_social(void) { return 1; }
 int ajustes_hist_conta(void) { return 1; }
 int ajustes_busca_cinemeta(void) { return 1; }
 #include "../src/descoberta.c"
@@ -35,7 +34,6 @@ Uint32 SDL_GetTicks(void) { return 0; }
 int         ajustes_idioma_ingles(void) { return 0; }
 int ajustes_idioma(void) { return 0; }
 int   ajustes_cw_concluido(void)         { return 90; }  // factory "watched" threshold
-unsigned recomenda_geracao(void)         { return 0; }   // social generation: no social layer here
 int   ajustes_cw_ordem(void)               { return 0; }   // Padrao (issue #127)
 int   ajustes_cw_mostrar_nao_exibidos(void) { return 1; }
 const char *i18n(const char *s)         { return s; }
@@ -139,7 +137,6 @@ int   simkl_plantowatch(CatItem *s, int m) { (void)s; (void)m; return 0; }
 int   ajustes_salvos_no_simkl(void)        { return 0; }
 int   trakt_enfeitar_lote(CatItem *s, int n) { (void)s; (void)n; return 0; }
 int   trakt_lista(const char *q, CatItem *s, int m) { (void)q; (void)s; (void)m; return 0; }
-// O servico social proprio (recomenda.c) fica fora deste teste: a uniao e so o que o Trakt trouxe.
 const char *nuvem_trakt_cliente(void)      { return ""; }
 // Um addon de metadados, ligado so no caso 7 (o resto do teste roda sem addon).
 static int addonMeta;

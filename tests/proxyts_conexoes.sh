@@ -7,5 +7,5 @@ flags=()
 if [ "${SANITIZE:-0}" = 1 ]; then flags+=(-fsanitize=address,undefined -fno-omit-frame-pointer); fi
 cc ${flags[@]+"${flags[@]}"} tests/proxyts_conexoes.c -Isrc \
   -o "$dir/teste" -O1 -g -Wall -Wextra -ffunction-sections -fdata-sections \
-  -Wl,-dead_strip -lpthread
+  -Wl,--gc-sections -lpthread
 "$dir/teste"

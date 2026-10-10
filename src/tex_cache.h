@@ -86,21 +86,9 @@ GLuint tex_obter_passageira(const char *caminho, float largLayout);
 // caminho que ja e local volta como veio. Nunca bloqueia: quando o arquivo
 // ainda nao esta no cache de disco, pede o download pela MESMA fila de rede das
 // imagens e devolve NULL — chamar de novo no quadro seguinte e o esperado.
-//
-// Existe para o GIF de foco das colecoes (#29): gif_textura() precisa do
-// ARQUIVO para montar o blob que a <img> anima, e nao de uma textura. tex_obter
-// nao serve porque devolve UM quadro decodificado e nenhum caminho de volta.
-//
 // Devolve ponteiro para buffer ESTATICO: use antes da proxima chamada, e so da
 // thread de desenho.
 const char *tex_arquivo(const char *url);
-
-// Os 4 PRIMEIROS BYTES do que a rede entregou para `caminho` (1), ou 0 quando
-// o item nao existe ou ainda nao baixou. Nao pede nada. Existe para o cartaz
-// de colecao (#141): decidir se a CAPA e um GIF animavel e dizer no log em
-// que formato um "GIF" chegou. No Tizen so GIF vira arquivo; o resto vive na
-// memoria do item e some no decode, e esta e a unica testemunha que sobra.
-int tex_magica(const char *caminho, unsigned char magica[4]);
 
 // Proporcao (w/h) da textura ja carregada; 0 se ainda nao esta pronta.
 // Necessaria para o "cover" do shader — sem ela a arte estica.

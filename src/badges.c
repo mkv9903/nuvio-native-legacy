@@ -210,9 +210,6 @@ static float fileira(uint64_t mask,float x,float y,float maxW,float h,float a,in
 float badges_desenhar(uint64_t mask,float x,float y,float maxW,float h,float a) {
   return fileira(mask,x,y,maxW,h,a,0);
 }
-float badges_desenhar_escura(uint64_t mask,float x,float y,float maxW,float h,float a) {
-  return fileira(mask,x,y,maxW,h,a,1);
-}
 // A FILEIRA DA FOLHA DE FONTES: os mesmos logos, TINGIDOS por GFX_MARCA (a
 // arte e branca e a forma mora no alfa, ver acima) e com folga menor. A folha
 // os usa como a linha de especificacao, abaixo do titulo, entao eles entram
@@ -343,52 +340,6 @@ float badges_desenhar_selos(uint64_t mask, float x, float y, float maxW, float h
 // logo). O rotulo e traduzido ANTES de procurar a palavra: "Ohne HDR", "Без HDR"
 // e "No HDR" saem do mesmo caminho, sem cravar a lingua. Sem a palavra na
 // traducao, ou sem espaco, cai no texto puro.
-static int partesRotulo(const char *rotulo, FormatoMarca f, char *ante, size_t na,
-                        char *depois, size_t nd) {
-  const char *t = i18n(rotulo), *nome = marca_formato_nome(f), *p;
-  size_t ln = strlen(nome);
-  ante[0] = depois[0] = 0;
-  if (!ln || !(p = strstr(t, nome))) return 0;
-  snprintf(ante, na, "%.*s", (int)(p - t), t);
-  snprintf(depois, nd, "%s", p + ln);
-  // Os espacos ao redor da palavra viram o respiro da marca (6 px).
-  { size_t k = strlen(ante); while (k && ante[k - 1] == ' ') ante[--k] = 0; }
-  { char *q = depois; while (*q == ' ') q++; memmove(depois, q, strlen(q) + 1); }
-  return 1;
-}
-float marca_rotulo_largura(TxtEstilo est, const char *rotulo, FormatoMarca f, float altura) {
-  char a[96], d[96];
-  float w = 0.0f;
-  if (!partesRotulo(rotulo, f, a, sizeof a, d, sizeof d))
-    return (float)txt_linha(est, rotulo, 0, 0, 0, 255).w;
-  if (a[0]) w += (float)txt_linha(est, a, 0, 0, 0, 255).w + 6.0f;
-  w += marca_formato_largura(f, altura);
-  if (d[0]) w += (float)txt_linha(est, d, 0, 0, 0, 255).w + 6.0f;
-  return w;
-}
-float marca_rotulo(TxtEstilo est, const char *rotulo, FormatoMarca f, float x, float y,
-                   float altura, int tinta, float a) {
-  char an[96], de[96];
-  float k = (float)tinta / 255.0f, x0 = x;
-  if (!partesRotulo(rotulo, f, an, sizeof an, de, sizeof de)) {
-    TxtLinha l = txt_linha(est, rotulo, tinta, tinta, tinta, 255);
-    txt_desenhar_alpha(l, x, y, a);
-    return (float)l.w;
-  }
-  {
-    TxtLinha ref = txt_linha(est, an[0] ? an : de[0] ? de : "H", tinta, tinta, tinta, 255);
-    float cy = y + (float)ref.h * 0.5f;
-    if (an[0]) { txt_desenhar_alpha(ref, x, y, a); x += (float)ref.w + 6.0f; }
-    x += marca_formato(f, x, cy - altura * 0.5f, altura, k, k, k, a);
-    if (de[0]) {
-      TxtLinha l = txt_linha(est, de, tinta, tinta, tinta, 255);
-      x += 6.0f;
-      txt_desenhar_alpha(l, x, y, a);
-      x += (float)l.w;
-    }
-  }
-  return x - x0;
-}
 
 // --- SELOS DE TEXTO ----------------------------------------------------------
 float badge_largura(const char *texto) {

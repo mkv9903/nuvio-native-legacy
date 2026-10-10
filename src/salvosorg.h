@@ -14,7 +14,7 @@
 //
 // POR PERFIL. "Kids" e a organizacao de quem esta no sofa, e a TV de sala tem
 // varios perfis: o arquivo e salvos-org-p<perfil>.txt (o mesmo esquema da
-// agenda), relido quando perfis_ativo() muda.
+// metadados de lançamento), relido quando perfis_ativo() muda.
 //
 // O FORMATO E VERSIONADO E TOLERANTE: "# nuvio salvos-org v1" na primeira
 // linha, uma chave por linha separada por TAB, e chave desconhecida e pulada.
