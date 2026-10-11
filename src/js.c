@@ -32,7 +32,7 @@ const char *js_fim(const char *p) {
 // 12,4 s de fio principal parado — `upd=12737` no [quadro] — e 157 pastas,
 // 1,2 s. O strstr procurava a chave ate o FIM DO DOCUMENTO inteiro e so
 // depois a faixa recusava o achado: cada chave ausente numa pasta
-// (heroBackdropUrl, focusGifUrl, genre...) era uma varredura do blob inteiro,
+// (heroBackdropUrl, titleLogoUrl, genre...) era uma varredura do blob inteiro,
 // e sao oito chaves assim por pasta. Quadratico no numero de pastas, e a
 // escolha de perfil e o sync pagavam por ele. Agora a varredura para em `fim`.
 static const char *pulaEm(const char *p, const char *fim) {

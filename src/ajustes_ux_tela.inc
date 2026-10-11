@@ -77,8 +77,7 @@ static const Item TELA[] = {
 
   SEC("Reprodução", "Qualidade, som e o que o player faz", "aj_circle-play"),
     ROT("Imagem e som"), OPC(AJ_QUALIDADE), OPC(AJ_DV),
-      OPC(AJ_DV_MKV),
-      OPC(AJ_ATMOS), OPC(AJ_DTS_AC3),
+      OPC(AJ_ATMOS),
     ROT("Durante e depois"),
       OPC(AJ_PAUSA_OVERLAY), OPC(AJ_PLR_CLASSIF),  OPC(AJ_CW_CONCLUIDO), OPC(AJ_SAIDA_PLAYER),
       OPC(AJ_PROPORCAO_PADRAO), OPC(AJ_MANTER_VIDEO), OPC(AJ_BRILHO_PLAYER),

@@ -14,7 +14,7 @@ mkdir -p "$saida" "$tmp/dados"
 python3 tests/ctxlista_servidor.py $PORTA 2>"$tmp/servidor.log" & SRV=$!
 trap 'kill $SRV 2>/dev/null || true; rm -rf "$tmp"' EXIT
 sources=()
-for source in src/*.c src/dts/*.c; do
+for source in src/*.c; do
   case "$source" in src/main.c|src/busca.c) continue;; esac   # busca.c entra no teste
   sources+=("$source")
 done

@@ -22,8 +22,7 @@ void startup_stage(const char *name) {
   close(fd);
 }
 
-// Before any other constructor (default is 65535; libtorrent and FFmpeg
-// are in the binary, and their static C++ runs in that range).
+// Record startup and arm crash logging before default-priority constructors.
 __attribute__((constructor(101)))
 static void startup_constructor(void) {
   rename(FILE_STAGE, FILE_PREV);

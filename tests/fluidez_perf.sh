@@ -14,7 +14,7 @@ trap 'rm -rf "$tmp"' EXIT
 flags=()
 if ! grep -q gfx_ambiente_descarregar src/gfx.h; then flags+=(-DNV_PERF_BASE); fi
 sources=()
-for source in src/*.c src/dts/*.c; do
+for source in src/*.c; do
   if [ "$source" != src/main.c ]; then sources+=("$source"); fi
 done
 cc "${sources[@]}" "$aqui/tests/fluidez_perf.c" -Isrc -o "$tmp/perf" \

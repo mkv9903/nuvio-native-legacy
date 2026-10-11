@@ -405,18 +405,15 @@ static int idxAtual(void) {
   return idx;
 }
 static int ehCanal(void) { return canalSessao; }
-// A MARCA DO DTS da faixa que esta tocando (DTS, DTS-HD, DTS:X), ou -1. Aparece
-// em todo estado do DTS — a TV tocando sozinha, o app convertendo, a conversao
-// desligada ou falha (dono, 06/10: "a badge do DTS ... quando for ativado ou
-// quando nao for"). O DTS e da FONTE; o estado so diz como ele chega, e isso
-// vai na ilha e nas Informacoes.
+// Source codec badge for the current DTS track, including unsupported audio.
+// Native playback status is reported separately in the island and information.
 static int marcaDtsAtual(void) {
   int e = video_dts_estado();
   if (e == VIDEO_DTS_NENHUM) return -1;
   switch (video_faixa_dts(video_audio(video_audio_atual()))) {
     case 3: return FMT_DTSX;
     case 2: return FMT_DTSHD;
-    default: return FMT_DTS;   // convertendo, a faixa vem do FFmpeg como "dts"
+    default: return FMT_DTS;
   }
 }
 // CODEC E CANAIS DA FAIXA TOCANDO ("E-AC-3 5.1 Atmos", "DTS-HD MA 5.1", #293),
@@ -2255,9 +2252,6 @@ static void avMontarOsd(AoVivoOsd *o) {
     { const char *d = NULL;
       switch (video_dts_estado()) {
         case VIDEO_DTS_NATIVO:     d = "Áudio: DTS, decodificado pela TV"; break;
-        case VIDEO_DTS_PREPARANDO: d = "Áudio: DTS, preparando a conversão"; break;
-        case VIDEO_DTS_CONVERTIDO: d = "Áudio: DTS convertido para AAC estéreo nesta TV"; break;
-        case VIDEO_DTS_FALHOU:     d = "Áudio: DTS, a conversão falhou (sem som)"; break;
         case VIDEO_DTS_SEM_SOM:    d = "Áudio: DTS, esta TV não toca (sem som)"; break;
       }
       if (d) snprintf(o->info[k++], sizeof o->info[0], "%s", i18n(d)); }
@@ -3190,41 +3184,6 @@ static void desenharBloco(const LegBloco *bl, float x0, float y, float alpha, in
   }
 }
 
-// LIMPA o texto que o AVPlay entrega no onsubtitlechange (#122): SRT vem com
-// <i>, <b>, <font ...> e <br>; ASS com {\\tags} e \\N. O overlay desenha texto
-// puro, linha por linha. Exposto para a regressao.
-void player_limpar_legenda_nativa(char *s) {
-  char *r = s, *w = s;
-  while (*r) {
-    if (*r == '<') {
-      if (!strncasecmp(r, "<br", 3)) *w++ = '\n';
-      while (*r && *r != '>') r++;
-      if (*r) r++;
-    } else if (*r == '{' && r[1] == '\\') {
-      while (*r && *r != '}') r++;
-      if (*r) r++;
-    } else if (*r == '\\' && (r[1] == 'N' || r[1] == 'n')) { *w++ = '\n'; r += 2; }
-    else if (*r == '\\' && r[1] == 'h') { *w++ = ' '; r += 2; }
-    else if (*r == '\r') r++;
-    else if (!strncmp(r, "&amp;", 5)) { *w++ = '&'; r += 5; }
-    else if (!strncmp(r, "&lt;", 4))  { *w++ = '<'; r += 4; }
-    else if (!strncmp(r, "&gt;", 4))  { *w++ = '>'; r += 4; }
-    else if (!strncmp(r, "&quot;", 6)) { *w++ = '"'; r += 6; }
-    else *w++ = *r++;
-  }
-  *w = 0;
-  // Sem linhas vazias nas pontas: um "\n" final viraria um bloco mais alto.
-  while (w > s && (w[-1] == '\n' || w[-1] == ' ')) *--w = 0;
-  r = s; while (*r == '\n' || *r == ' ') r++;
-  if (r != s) memmove(s, r, strlen(r) + 1);
-}
-
-int player_texto_legenda_nativa(char *dst, int tam) {
-  if (!video_legenda_nativa(dst, tam)) return 0;
-  player_limpar_legenda_nativa(dst);
-  return dst[0] != 0;
-}
-
 /* O uMS da C9 limita fonte e escala. OpenSubtitles passa por este overlay
  * SDL/GLES, exatamente como o overlay HTML do app web. Desde o #92 tambem
  * desenha ASS: varios blocos ao mesmo tempo, cada um no seu lugar. */
@@ -3315,11 +3274,6 @@ static void desenharLegendaExternaCorpo(void) {
 }
 
 static void desenharLegendaPrincipal(float *topoPilha){
-  PlrRect bitmapArea = areaVideoLegenda();
-  float bitmapAlpha = (legEstilo.opacidade==3?.25f:legEstilo.opacidade==2?.5f:
-                      legEstilo.opacidade==1?.75f:1.f) * entrada;
-  if (video_dts_legenda_desenhar(posLegenda(), legEstilo.atrasoMs,
-        bitmapArea.x, bitmapArea.y, bitmapArea.w, bitmapArea.h, bitmapAlpha)) return;
   /* ASS completo: libass devolve uma lista de bitmaps por camada, preservando
    * karaoke, movimento, desenho vetorial, fontes e todas as tags do arquivo.
    * Da folha, so chegam ao ASS o que nao desmonta o estilo do autor: tamanho
@@ -3375,14 +3329,6 @@ static void desenharLegendaPrincipal(float *topoPilha){
   }
   LegendaCue cues[LEGENDA_SIMULTANEAS];
   int n = legenda_cues(posLeg, atraso, cues, LEGENDA_SIMULTANEAS), i;
-  // Sem legenda externa, a EMBUTIDA que o player nativo nao desenha (#122):
-  // o mesmo overlay, com a mesma folha de estilo da pessoa.
-  if (n <= 0 && comVideo && player_texto_legenda_nativa(cues[0].texto, sizeof cues[0].texto)) {
-    cues[0].inicio = cues[0].fim = 0; cues[0].an = 0; cues[0].negrito = cues[0].italico = 0;
-    cues[0].cor = -1; cues[0].posX = cues[0].posY = -1.f; cues[0].resX = cues[0].resY = 0.f;
-    cues[0].ordem = 0;
-    n = 1;
-  }
   // PREVIA DA BARRA DE ESTILO (faixas.c): sem fala neste instante, uma linha
   // de exemplo com o estilo da pessoa, para tamanho, cor e posicao terem o que
   // mostrar. So quando e o app que desenha (no ASS o lugar e do arquivo).
@@ -3931,11 +3877,7 @@ void player_desenhar(Uint32 agora) {
     if (!abrindoViva) { abrindoDesde = agora; abrindoExp = 0; abrindoT = 0.0f; abrFitIdx = -2; }
     abrindoViva = 1;
   } else abrindoViva = 0;
-  // O DTS NA ILHA: como o audio DTS desta faixa chega — direto da TV,
-  // convertido pelo app (PR #259), ou sem som. Uma vez por estado, depois de
-  // ele ficar 1,5 s parado (o erro 200 da TV chega logo depois do load e
-  // trocaria "nativo" por "sem som" num piscar). "Preparando" nao entra: o
-  // cartao de abertura ja esta na tela.
+  // Report native DTS playback or the TV rejecting this track.
   { static int dtsVisto;
     static Uint32 dtsDesde;
     int e = player_carregando() || ehCanal() ? VIDEO_DTS_NENHUM : video_dts_estado();
@@ -3943,16 +3885,14 @@ void player_desenhar(Uint32 agora) {
     // A guia parental (tambem na ilha, de prioridade baixa) vem primeiro: o
     // aviso do DTS espera ela fechar, em vez de derruba-la.
     if (pgDesde && (float)(agora - pgDesde) / 1000.0f < PG_SEG_TOTAL) dtsDesde = agora;
-    if (e != VIDEO_DTS_NENHUM && e != VIDEO_DTS_PREPARANDO && agora - dtsDesde >= 1500u) {
-      Uint32 dur = e == VIDEO_DTS_FALHOU || e == VIDEO_DTS_SEM_SOM ? 10000u : 5000u;
+    if (e != VIDEO_DTS_NENHUM && agora - dtsDesde >= 1500u) {
+      Uint32 dur = e == VIDEO_DTS_SEM_SOM ? 10000u : 5000u;
       if (agora - dtsDesde < 1500u + dur) {
         PlrIlhaPedido pd;
         memset(&pd, 0, sizeof pd);
         pd.icone = "dts";
-        pd.corIcone = e == VIDEO_DTS_FALHOU || e == VIDEO_DTS_SEM_SOM ? 1 : 0;
+        pd.corIcone = e == VIDEO_DTS_SEM_SOM ? 1 : 0;
         pd.texto = e == VIDEO_DTS_NATIVO ? i18n("Áudio DTS nativo")
-                 : e == VIDEO_DTS_CONVERTIDO ? i18n("Áudio DTS convertido nesta TV")
-                 : e == VIDEO_DTS_FALHOU ? i18n("Não deu para converter o áudio DTS")
                  : i18n("Esta TV não toca áudio DTS");
         pd.semFim = 1; pd.aberta = 1;
         plrilha_pedir(&pd);

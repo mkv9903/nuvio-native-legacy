@@ -443,21 +443,20 @@ int main(int argc, char **argv) {
     }
   }
   // A MARCA DO DTS (dono, 06/10): no canto e na ilha, com a TV tocando o DTS
-  // sozinha, com o app convertendo (PR #259) e com a TV sem som.
-  if (quer(argc, argv, "dts-nativo") || quer(argc, argv, "dts-convertido") ||
+  // sozinha ou com a TV recusando o audio.
+  if (quer(argc, argv, "dts-nativo") ||
       quer(argc, argv, "dts-sem-som")) {
-    static const char *ids[3] = { "dts-nativo", "dts-convertido", "dts-sem-som" };
-    static const int est[3] = { VIDEO_DTS_NATIVO, VIDEO_DTS_CONVERTIDO, VIDEO_DTS_SEM_SOM };
+    static const char *ids[2] = { "dts-nativo", "dts-sem-som" };
+    static const int est[2] = { VIDEO_DTS_NATIVO, VIDEO_DTS_SEM_SOM };
     int q;
-    for (q = 0; q < 3; q++) {
+    for (q = 0; q < 2; q++) {
       VideoSimulacao v;
       if (!quer(argc, argv, ids[q])) continue;
       abrir(&filme);
       memset(&v, 0, sizeof v);
       v.largura = 1920; v.altura = 1080; v.pronto = 1; v.duracao = 9420; v.pos = 4360;
       v.nAudio = 1; v.audioAtual = 0; v.dts = est[q];
-      if (q == 1) faixa(&v.audio[0], "Ingl\xc3\xaas \xc2\xb7 dts", "en", "dts");
-      else faixa(&v.audio[0], "Ingl\xc3\xaas  \xc2\xb7  DTS-HD MA \xc2\xb7 5.1", "en", "A_DTS/LOSSLESS");
+      faixa(&v.audio[0], "Ingl\xc3\xaas  \xc2\xb7  DTS-HD MA \xc2\xb7 5.1", "en", "A_DTS/LOSSLESS");
       video_simular(&v);
       quadros(10);
       player_shot_estado(relogio, 4360.0f, 9420.0f, 1, 0, 0, 0);

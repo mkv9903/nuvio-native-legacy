@@ -7,7 +7,7 @@ cd "$(dirname "$0")/.."
 work=$(mktemp -d "${TMPDIR:-/tmp}/nuvio-fundo-assado.XXXXXX")
 trap 'rm -rf "$work"' EXIT
 sources=()
-for source in src/*.c src/dts/*.c; do
+for source in src/*.c; do
   [ "$source" != src/main.c ] && sources+=("$source")
 done
 gl=($(pkg-config --libs glesv2 egl) -ldl -pthread -lm)

@@ -38,7 +38,7 @@ typedef struct {
      entre eles mora em col_banner/col_capa, na ordem do app web. */
   char groupBackdrop[512];
   char groupId[64];   /* id da colecao no web; a chave de ordem da conta e collection_<groupId> */
-  char frameDir[600];
+  char artDir[600];   /* local folder artwork, including static portraits */
   char detailHero[512];
   int editorial; /* 1: legacy vector export; 2: approved cinematic image pair */
   int local;     /* 1: veio do collections.json do pacote (arte e ajustes curados aqui) */
@@ -46,7 +46,7 @@ typedef struct {
      col_extra_definir: e a marca que permite reinjeta-la depois de cada
      reconstrucao sem duplicar. */
   int extra;
-  int frames, hideTitle, nSources;
+  int hideTitle, nSources;
   /* FORMA DO CARTAO da pasta (COL_FORMA_*): o `tileShape` que o editor de
      colecoes do app web grava por pasta. Ver col_forma_texto. */
   int forma;

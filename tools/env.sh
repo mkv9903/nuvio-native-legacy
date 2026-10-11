@@ -7,7 +7,7 @@
 # and the web app already publishes it in the bundle. What CANNOT enter the package
 # is what used to live in art/trakt.txt and art/addons.txt: those are USER credentials.
 #
-#   eval "cc src/*.c src/dts/*.c $(tools/env.sh) ..."
+#   eval "cc src/*.c $(tools/env.sh) ..."
 set -e
 
 REQUIRE_CORE=0

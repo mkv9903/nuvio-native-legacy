@@ -9,7 +9,7 @@ saida="${1:-/tmp/nuvio-busca}"
 tmp="$(mktemp -d "${TMPDIR:-/tmp}/nuvio-busca-shot-XXXXXX")"
 trap 'rm -rf "$tmp"' EXIT
 sources=()
-for source in src/*.c src/dts/*.c; do
+for source in src/*.c; do
   [ "$source" = "src/main.c" ] && continue
   [ "$source" = "" ] && continue
   sources+=("$source")

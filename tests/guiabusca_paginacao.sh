@@ -11,7 +11,7 @@ if [ "${SANITIZE:-0}" = 1 ]; then flags+=(-fsanitize=address,undefined -fno-omit
 tmp="$(mktemp -d "${TMPDIR:-/tmp}/nuvio-guiabusca-pag-XXXXXX")"
 trap 'rm -rf "$tmp"' EXIT
 sources=()
-for s in src/*.c src/dts/*.c; do case "$s" in src/main.c|src/guia.c) continue;; esac; sources+=("$s"); done
+for s in src/*.c; do case "$s" in src/main.c|src/guia.c) continue;; esac; sources+=("$s"); done
 cc ${flags[@]+"${flags[@]}"} "${sources[@]}" tests/guiabusca_paginacao.c -Isrc -o "$tmp/t" -O1 -g \
   -DNV_LINUX_DESKTOP $(pkg-config --cflags sdl2 SDL2_image SDL2_ttf) \
   $(pkg-config --libs sdl2 SDL2_image SDL2_ttf glesv2 egl zlib) -ldl -pthread -lm \

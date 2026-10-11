@@ -441,7 +441,7 @@
         "Ver exemplo"
       ],
       "fonte": "novidades1312.c:230-231 (Filtro MP4); Glass UI 1.8.0 (commit 7cd12a51)",
-      "prova": "streams.c:1105-1120 (Só MP4, Em cache, Dublado, Sem HDR); streams.c:1988 (Fora do cache)",
+      "prova": "streams.c:1105-1120 (Só MP4, Em cache, Dublado); streams.c:1988 (Fora do cache)",
       "visual": "Topo da folha com os filtros"
     },
     {

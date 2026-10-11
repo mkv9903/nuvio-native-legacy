@@ -4,7 +4,7 @@
 set -eu
 cd "$(dirname "$0")/.."
 sources=()
-for source in src/*.c src/dts/*.c; do [ "$source" != src/main.c ] && sources+=("$source"); done
+for source in src/*.c; do [ "$source" != src/main.c ] && sources+=("$source"); done
 bin="${TMPDIR:-/tmp}/nuvio-text-camadas"
 cc "${sources[@]}" tests/text_camadas.c -Isrc -o "$bin" \
   -O1 -g -DNV_LINUX_DESKTOP $(pkg-config --cflags sdl2 SDL2_image SDL2_ttf)  \

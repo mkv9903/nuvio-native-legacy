@@ -214,8 +214,6 @@
   0, /* default aspect ratio: Ultimo usado */
   1, /* also in Continue watching (2.0.2): Desligado (V_LIGA: 1 = Desligado) = one title, one place */
   0, /* continue on the profile picker (#303): Ligado (V_LIGA: 0 = Ligado) = as before */
-  0, /* DTS converted to: Estereo (AAC) = the proven path */
-  1, /* Dolby Vision in MKV (2.0.2, experimental): Desligado */
   0,
   0, 0, /* add-on order (action; list lives in fonteregra.c) and use of it: Nao */
   0, /* play while verifying the first auto source (2.0.2): Ligado */

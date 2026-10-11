@@ -8,7 +8,7 @@ cd "$(dirname "$0")/.."
 flags=()
 if [ "${SANITIZE:-0}" = 1 ]; then flags+=(-fsanitize=address,undefined -fno-omit-frame-pointer); fi
 sources=()
-for source in src/*.c src/dts/*.c; do
+for source in src/*.c; do
   if [ "$source" != src/main.c ]; then sources+=("$source"); fi
 done
 out="${TMPDIR:-/tmp}/nuvio-mipcpu"

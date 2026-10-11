@@ -336,11 +336,6 @@ float badges_desenhar_selos(uint64_t mask, float x, float y, float maxW, float h
   return x > start ? x - start - 8.0f : 0.0f;
 }
 
-// ROTULO COM A PALAVRA DO FORMATO TROCADA PELA MARCA ("Sem HDR" -> "Sem" +
-// logo). O rotulo e traduzido ANTES de procurar a palavra: "Ohne HDR", "Без HDR"
-// e "No HDR" saem do mesmo caminho, sem cravar a lingua. Sem a palavra na
-// traducao, ou sem espaco, cai no texto puro.
-
 // --- SELOS DE TEXTO ----------------------------------------------------------
 float badge_largura(const char *texto) {
   TxtLinha l = txt_linha(TXT_CAPTION2, texto, 0, 0, 0, 255);

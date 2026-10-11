@@ -43,23 +43,6 @@ fi
 CONTAINER_RUNTIME="${NUVIO_CONTAINER_RUNTIME:-docker}"
 BUILD_PLATFORM="${NUVIO_BUILD_PLATFORM:-linux/arm64}"
 SDK_IMAGE="${NUVIO_SDK_IMAGE:-nuvio-webos-sdk}"
-# DTS (PR #259): FFmpeg lives inside IMAGE. By default build requires
-# conversion and fails if FFmpeg is missing; rebuild image in that case.
-# NUVIO_DTS_FFMPEG=0 compiles without conversion; auto queries image and allows
-# building without it when FFmpeg is unavailable.
-DTS_ENABLED="${NUVIO_DTS_FFMPEG:-1}"
-case "$DTS_ENABLED" in 0|1|auto) ;; *) echo 'NUVIO_DTS_FFMPEG must be 0, 1 or auto' >&2; exit 2;; esac
-if [ "$DTS_ENABLED" = auto ]; then
-  if "$CONTAINER_RUNTIME" run --rm --platform "$BUILD_PLATFORM" "$SDK_IMAGE" \
-       sh -c 'test -f "${NUVIO_DTS_ROOT:-/opt/nuvio-dts}/include/libavcodec/avcodec.h"' 2>/dev/null; then
-    DTS_ENABLED=1
-  else
-    DTS_ENABLED=0
-    echo "==> WARNING: image $SDK_IMAGE lacks DTS FFmpeg; building WITHOUT DTS conversion"
-    echo "    (docker build --platform linux/arm64 -t $SDK_IMAGE tools/  to include)"
-  fi
-fi
-
 # --high-cache can come before or after --build/--ipk. Only alters a -D and names;
 # code remains identical — variant does not require separate branch.
 VARIANTE=""
@@ -83,13 +66,9 @@ trap cleanup EXIT
 ENVF=$(mktemp "${TMPDIR:-/tmp}/nuvio-arm-env.XXXXXXXX"); CLEANUP_FILES="$CLEANUP_FILES $ENVF"
 tools/env.sh --env-file "$ENVF"
 
-DTS_ENV=()
-if [ -n "${NUVIO_DTS_ROOT:-}" ]; then DTS_ENV=(-e "NUVIO_DTS_ROOT=$NUVIO_DTS_ROOT"); fi
 "$CONTAINER_RUNTIME" run --rm --platform "$BUILD_PLATFORM" --env-file "$ENVF" \
   -e NUVIO_EXTRA_CFLAGS="${NUVIO_EXTRA_CFLAGS:-}" \
   -e NUVIO_ASS_LIBASS="${NUVIO_ASS_LIBASS:-1}" \
-  -e NUVIO_DTS_FFMPEG="$DTS_ENABLED" \
-  "${DTS_ENV[@]}" \
   -v "$PWD":/work:z "$SDK_IMAGE" sh -c '
   set -e
   SR=$NUVIO_SYSROOT
@@ -101,15 +80,7 @@ if [ -n "${NUVIO_DTS_ROOT:-}" ]; then DTS_ENV=(-e "NUVIO_DTS_ROOT=$NUVIO_DTS_ROO
     ASS_CFLAGS="-DNV_ASS_LIBASS -I$ASS/include"
     ASS_LIBS="-L$ASS/lib -Wl,--start-group -lass -lharfbuzz -lfribidi -lfreetype -Wl,--end-group"
   fi
-  DTS_CFLAGS=""
-  DTS_LIBS=""
-  if [ "${NUVIO_DTS_FFMPEG:-1}" = "1" ]; then
-    DTS=${NUVIO_DTS_ROOT:-/opt/nuvio-dts}
-    [ -f "$DTS/include/libavcodec/avcodec.h" ] || { echo "FFmpeg DTS missing; rebuild tools/Dockerfile or use NUVIO_DTS_FFMPEG=0" >&2; exit 2; }
-    DTS_CFLAGS="-DNV_DTS_FFMPEG -I$DTS/include"
-    DTS_LIBS="-L$DTS/lib -Wl,--start-group -lavformat -lavcodec -lswresample -lavutil -Wl,--end-group -lpthread -lm"
-  fi
-  arm-webos-linux-gnueabi-gcc src/*.c src/dts/*.c -o nuvio-proto.arm -O2 -DNV_WEBOS $NUVIO_EXTRA_CFLAGS $ASS_CFLAGS $DTS_CFLAGS \
+  arm-webos-linux-gnueabi-gcc src/*.c -o nuvio-proto.arm -O2 -DNV_WEBOS $NUVIO_EXTRA_CFLAGS $ASS_CFLAGS \
     -DNV_SUPABASE_URL="\"$NV_SUPABASE_URL\"" \
     -DNV_SUPABASE_ANON_KEY="\"$NV_SUPABASE_ANON_KEY\"" \
     -DNV_TV_LOGIN_BASE="\"$NV_TV_LOGIN_BASE\"" \
@@ -121,21 +92,13 @@ if [ -n "${NUVIO_DTS_ROOT:-}" ]; then DTS_ENV=(-e "NUVIO_DTS_ROOT=$NUVIO_DTS_ROO
     -DNV_SEEKR_API_KEY="\"$NV_SEEKR_API_KEY\"" \
     -DNV_VERSAO="\"$NV_VERSAO\"" \
     -I$SR/usr/include -I$SR/usr/include/SDL2 \
-    -lSDL2 -lSDL2_image -lSDL2_ttf -lGLESv2 -lEGL -ldl -lpthread -lz -lm $ASS_LIBS $DTS_LIBS \
-    -Wl,--exclude-libs,ALL -Wl,--export-dynamic-symbol=pthread_create
-  # src/dts/rt_shim.c: LG audio sink (KADP_OSA_CreateThread) binds to our pthread_create
+    -lSDL2 -lSDL2_image -lSDL2_ttf -lGLESv2 -lEGL -ldl -lpthread -lz -lm $ASS_LIBS \
+    -Wl,--exclude-libs,ALL
   # Keep static FreeType private: older TV SDL_ttf must use its own ABI.
-  mkdir -p deploy/app/lib
-  find deploy/app/lib -maxdepth 1 -type f -name "dts-starfish-webos*.so" -delete
-  if [ -d deploy/app/licenses/dts ]; then
-    find deploy/app/licenses/dts -maxdepth 1 -type f \
-      \( -name "COPYING.LGPLv2.1" -o -name "SOURCE.txt" \) -delete
-  fi
-  if [ "${NUVIO_DTS_FFMPEG:-1}" = "1" ]; then
-    bash tools/build-dts-pipeline.sh --in-container --output deploy/app/lib
-    mkdir -p deploy/app/licenses/dts
-    cp "$DTS/COPYING.LGPLv2.1" "$DTS/SOURCE.txt" deploy/app/licenses/dts/
-  fi'
+  # Remove generated payloads left by builds of the retired converter.
+  rm -f deploy/app/lib/dts-starfish-webos*.so
+  rm -rf deploy/app/licenses/dts
+'
 
 # Verify configuration arrived in binary.
 while IFS='=' read -r NAME VALOR; do
@@ -211,13 +174,6 @@ if [ "$1" = "--ipk" ]; then
     rm -f "$IPK"
     exit 1
   fi
-  for f in lib/dts-starfish-webos3.so lib/dts-starfish-webos4.so licenses/dts/COPYING.LGPLv2.1 licenses/dts/SOURCE.txt; do
-    if printf '%s\n' "$PKG_LIST" | grep -qE "(^|/)$f$"; then has=1; else has=0; fi
-    if [ "$has" != "$DTS_ENABLED" ]; then
-      echo "    ABORTED: DTS=$DTS_ENABLED and package $([ $has = 1 ] && echo includes || echo does not include) $f"; rm -f "$IPK"; exit 1
-    fi
-  done
-  echo "    DTS: $([ "$DTS_ENABLED" = 1 ] && echo 'conversion included (adapters + LGPL notice)' || echo 'without conversion')"
   echo "    $IPK ($(du -h "$IPK" | cut -f1)) — without art/{$(echo $USER_FILES $USER_GLOBS $USER_COLLECTIONS $USER_DIRS | tr ' ' ',')}"
 fi
 
@@ -229,18 +185,6 @@ SSH="sshpass -p $TV_PASS ssh -o StrictHostKeyChecking=no ${NUVIO_SSH_OPTS:-}"
 SCP="sshpass -p $TV_PASS scp -o StrictHostKeyChecking=no -q ${NUVIO_SSH_OPTS:-}"
 
 $SSH "root@$TV_IP" "mkdir -p $APPDIR"
-
-DTS_PAYLOAD=()
-if [ "$DTS_ENABLED" = 1 ]; then
-  DTS_PAYLOAD=(lib/dts-starfish-webos3.so lib/dts-starfish-webos4.so
-               licenses/dts/COPYING.LGPLv2.1 licenses/dts/SOURCE.txt)
-  echo "==> deploying DTS adapters and license notices"
-  $SSH "root@$TV_IP" "mkdir -p $APPDIR/lib $APPDIR/licenses/dts"
-  for arquivo in "${DTS_PAYLOAD[@]}"; do
-    $SCP "deploy/app/$arquivo" "root@$TV_IP:$APPDIR/$arquivo.novo"
-    $SSH "root@$TV_IP" "mv -f $APPDIR/$arquivo.novo $APPDIR/$arquivo && chmod 644 $APPDIR/$arquivo"
-  done
-fi
 
 echo "==> deploying binary to $TV_IP"
 $SCP nuvio-proto.arm "root@$TV_IP:$APPDIR/nuvio-proto.novo"
@@ -280,15 +224,6 @@ if [ "$LOCAL" != "$REMOTO" ]; then
   exit 1
 fi
 echo "    ok ($LOCAL)"
-for arquivo in "${DTS_PAYLOAD[@]}"; do
-  LOCAL=$(md5 -q "deploy/app/$arquivo" 2>/dev/null || md5sum "deploy/app/$arquivo" | cut -d' ' -f1)
-  REMOTO=$($SSH "root@$TV_IP" "md5sum $APPDIR/$arquivo | cut -d' ' -f1" | tr -d '\r')
-  if [ "$LOCAL" != "$REMOTO" ]; then
-    echo "    FAILED: $arquivo local $LOCAL != TV $REMOTO"; exit 1
-  fi
-  echo "    ok ($arquivo)"
-done
-
 PID=$($SSH "root@$TV_IP" "pidof nuvio-proto" 2>/dev/null | tr -d "\r")
 if [ -n "$PID" ]; then
   echo "==> stopping old process ($PID)"

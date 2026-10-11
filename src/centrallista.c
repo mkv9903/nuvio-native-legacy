@@ -12,8 +12,8 @@
 // destaque e limite de fileiras pedem a tela de Ajustes.
 static const CentralItem CATALOGO[] = {
   { "qualidade", "aj_monitor-play", "Qualidade máx." },
-  { "dolbyVision", "aj_sparkles", "Dolby Vision" },
-  { "dolbyAtmos", "aj_audio-lines", "Dolby Atmos" },
+  { "dolbyVision", "aj_sparkles", "Preferir fontes Dolby Vision" },
+  { "dolbyAtmos", "aj_audio-lines", "Preferir fontes Dolby Atmos" },
   { "escolherFonteManual", "aj_list-video", "Escolher fonte" },
   { "fontePrioridadeLocal", "aj_gauge", "Prioridade" },
   { "fonteHdrLocal", "aj_sparkle", "HDR e DV" },

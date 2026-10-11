@@ -4,7 +4,7 @@
 set -eu
 cd "$(dirname "$0")/.."
 sources=()
-for source in src/*.c src/dts/*.c; do [ "$source" != src/main.c ] && sources+=("$source"); done
+for source in src/*.c; do [ "$source" != src/main.c ] && sources+=("$source"); done
 ass_flags=()
 if command -v pkg-config >/dev/null 2>&1 && pkg-config --exists libass; then
   # O mesmo binario de captura exercita o caminho completo quando libass esta

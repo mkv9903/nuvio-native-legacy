@@ -1723,30 +1723,19 @@ int stream_automatico_canal(void) { return automaticoCom(0); }
 
 static int grupo, filtro, soMp4, soCache, soDub;
 
-// BOTOES DO CABECALHO. "Sem HDR" so existe onde ha o que renegociar (webOS);
-// ver o bloco "TELA PRETA COM AUDIO TOCANDO" em video.h. Oferecer um botao que
-// nao faz nada seria pior que nao oferecer: a pessoa aperta, nada muda, e passa
-// a duvidar dos outros. "Só MP4" (#91) filtra a lista — permanece na folha.
-// Ordem visivel, da esquerda: [Sem HDR] e MP4 como pilulas com rotulo,
-// Recarregar e Fechar como discos de icone (Lucide rotate-cw e x).
+// Source filters, refresh and close actions share the header row.
 //
 // "EM CACHE" E "DUBLADO" (dono, 02/10, escolheu entre tres): filtros como o
 // MP4, e nao grupos — resolucao x HDR/SDR ja da ate 8 grupos, e mais um eixo
 // picotaria a lista em grupos de 1 ou 2 fontes. Em cache = o debrid ja tem o
 // arquivo (Stream.foraCache e 0), toca agora; Dublado = audio em portugues.
-enum { BT_RECARREGAR, BT_SEM_HDR, BT_SO_MP4, BT_CACHE, BT_DUB, BT_FECHAR };
+enum { BT_RECARREGAR, BT_SO_MP4, BT_CACHE, BT_DUB, BT_FECHAR };
 static int botaoDe(int i) {
-  if (!video_pode_forcar_sdr()) i++;
-  if (i == 0) return BT_SEM_HDR;
-  if (i == 1) return BT_SO_MP4;
-  if (i == 2) return BT_CACHE;
-  if (i == 3) return BT_DUB;
-  if (i == 4) return BT_RECARREGAR;
-  return BT_FECHAR;
+  static const int ordem[] = { BT_SO_MP4, BT_CACHE, BT_DUB, BT_RECARREGAR, BT_FECHAR };
+  return i >= 0 && i < 5 ? ordem[i] : BT_FECHAR;
 }
-static int nBotoes(void) { return video_pode_forcar_sdr() ? 6 : 5; }
+static int nBotoes(void) { return 5; }
 static const char *rotuloBotao(int b) {
-  if (b == BT_SEM_HDR) return "Sem HDR";
   if (b == BT_SO_MP4)  return "Só MP4";
   if (b == BT_CACHE)   return "Em cache";
   if (b == BT_DUB)     return "Dublado";
@@ -2528,9 +2517,6 @@ void stream_folha_evento(const SDL_Event *e) {
     if(grupo==-1) {
       switch(botaoDe(foco)) {
         case BT_RECARREGAR: recarregar=1; break;
-        // Fecha a folha junto: a imagem volta (ou nao) na propria tela do
-        // player, e deixar a folha aberta em cima esconderia o resultado.
-        case BT_SEM_HDR:    video_forcar_sdr(); aberta=0; break;
         case BT_SO_MP4:     soMp4 = !soMp4; rolagem=0;velRol=0; break;
         case BT_CACHE:      soCache = !soCache; rolagem=0;velRol=0; break;
         case BT_DUB:        soDub = !soDub; rolagem=0;velRol=0; break;
@@ -2791,8 +2777,8 @@ static void chipFolha(GfxRect r, const char *rot, float rotW, const char *icone,
   }
 }
 
-// TODOS OS BOTOES NA LINHA DO TITULO (#202). Antes, com seis botoes (a LG tem
-// "Sem HDR") ou em ingles/alemao, os filtros desciam para uma linha propria e
+// TODOS OS BOTOES NA LINHA DO TITULO (#202). Antes, com rotulos longos
+// em ingles/alemao, os filtros desciam para uma linha propria e
 // a lista comecava 68 px mais baixo. Agora a fileira encolhe ate caber, em
 // degraus, MEDIDO e nao suposto por lingua:
 //   0. rotulos inteiros, folga de 20 de cada lado;
@@ -2803,11 +2789,11 @@ static void chipFolha(GfxRect r, const char *rot, float rotW, const char *icone,
 //      kicker explica o que ele faz em qualquer caso.
 // No degrau 2 o filtro ligado continua no acento, entao "qual esta ativo" se
 // le sem foco. Se nem os discos couberem (titulo enorme), o titulo e cortado.
-static float bwCab[6], rotWCab[6], titMaxCab, gapCab;
-static const char *rotCab[6], *icoCab[6];
+static float bwCab[5], rotWCab[5], titMaxCab, gapCab;
+static const char *rotCab[5], *icoCab[5];
 static int nivelCab;
 static const char *iconeFiltro(int b) {
-  return b == BT_SEM_HDR ? "aj_sun-dim" : b == BT_SO_MP4 ? "aj_film"
+  return b == BT_SO_MP4 ? "aj_film"
        : b == BT_CACHE ? "aj_zap" : b == BT_DUB ? "aj_languages" : NULL;
 }
 static void medirCabecalho(void) {
@@ -2920,15 +2906,10 @@ static void corpoFolha(float x, float w, float anim, Uint32 agora, int ilha) {
   // CABECALHO, tres faixas (ver FOLHA_CAB_Y): kicker, titulo com os botoes a
   // direita, abas de addon.
   //
-  // A LINHA DE AJUDA so aparece com a fileira de botoes em foco, NO LUGAR do
-  // kicker: "Sem HDR" nao se explica pelo rotulo (e no degrau compacto o
-  // filtro e so um icone), e uma linha propria empurrava as abas para baixo
-  // a cada vez que o foco subia.
+  // Show action help in the existing context line while the header is focused.
   const char *ajuda=NULL;
   if (grupo==-1) {
-    if(botaoDe(foco)==BT_SEM_HDR)
-      ajuda="Imagem preta com o áudio tocando? Recarrega esta fonte sem HDR nem Dolby Vision.";
-    else if(botaoDe(foco)==BT_RECARREGAR)
+    if(botaoDe(foco)==BT_RECARREGAR)
       ajuda="Pergunta as fontes de novo a todos os addons.";
     else if(botaoDe(foco)==BT_CACHE)
       ajuda=soCache
@@ -2959,7 +2940,7 @@ static void corpoFolha(float x, float w, float anim, Uint32 agora, int ilha) {
   medirCabecalho();
   txt_desenhar_alpha(txt_linha_corta(TXT_ILHA_TITULO,"Fontes",243,242,239,255,titMaxCab),tx,oy+94,anim);
   // Os botoes alinhados a direita, centrados no titulo. Ordem do foco = ordem
-  // visivel, da esquerda: [Sem HDR] Só MP4, Em cache, Dublado, Recarregar, Fechar.
+  // visivel, da esquerda: Só MP4, Em cache, Dublado, Recarregar, Fechar.
   { int nbt=nBotoes(); float bx=lx+rw;
     for(int i=0;i<nbt;i++) bx-=bwCab[i]+(i?gapCab:0.0f);
     for(int i=0;i<nbt;i++){

@@ -22,30 +22,30 @@ static void semVazar(const char *url, const char *segredo) {
 int main(void) {
   // btttr.cc (BetterPosters/PostersPlus): segmentos CURTOS sao a config.
   caso("https://btttr.cc/abcDE1234/pp01/Zx9yW8vU7tS6rQ/tt0111161.jpg",
-       "https://btttr.cc/<redigido>/<redigido>/<redigido>/tt0111161.jpg");
-  caso("https://api.btttr.cc/k3y/poster", "https://api.btttr.cc/<redigido>/<redigido>");
-  caso("https://btttr.cc/soconfig", "https://btttr.cc/<redigido>");
+       "https://btttr.cc/<redacted>/<redacted>/<redacted>/tt0111161.jpg");
+  caso("https://api.btttr.cc/k3y/poster", "https://api.btttr.cc/<redacted>/<redacted>");
+  caso("https://btttr.cc/soconfig", "https://btttr.cc/<redacted>");
   // AioMetadata, ElfHosted, RPDB, top-posters
   caso("https://aiometadata.elfhosted.com/stremio/0f0e0d0c-aaaa-bbbb-cccc-111122223333/meta/movie/tt1.json",
-       "https://aiometadata.elfhosted.com/<redigido>/<redigido>/<redigido>/<redigido>/tt1.json");
-  caso("https://meu-aiometadata.example.org/cfg/poster/tt42", "https://meu-aiometadata.example.org/<redigido>/<redigido>/tt42");
+       "https://aiometadata.elfhosted.com/<redacted>/<redacted>/<redacted>/<redacted>/tt1.json");
+  caso("https://meu-aiometadata.example.org/cfg/poster/tt42", "https://meu-aiometadata.example.org/<redacted>/<redacted>/tt42");
   caso("https://api.ratingposterdb.com/t0-free-rpdb/imdb/poster-default/tt0111161.jpg?fallback=true",
-       "https://api.ratingposterdb.com/<redigido>/<redigido>/<redigido>/tt0111161.jpg?<redigido>");
+       "https://api.ratingposterdb.com/<redacted>/<redacted>/<redacted>/tt0111161.jpg?<redacted>");
   caso("https://api.top-streaming.stream/TP-abc/imdb/poster-default/tt5.jpg",
-       "https://api.top-streaming.stream/<redigido>/<redigido>/<redigido>/tt5.jpg");
+       "https://api.top-streaming.stream/<redacted>/<redacted>/<redacted>/tt5.jpg");
   // generico: segmento longo / jwt / uuid / config serializada / hex
   caso("https://addon.example.com/eyJhbGciOi/manifest.json",
-       "https://addon.example.com/<redigido>/manifest.json");
+       "https://addon.example.com/<redacted>/manifest.json");
   caso("https://addon.example.com/lang=pt|key=abc/catalog/movie/top.json",
-       "https://addon.example.com/<redigido>/catalog/movie/top.json");
+       "https://addon.example.com/<redacted>/catalog/movie/top.json");
   caso("https://addon.example.com/0123456789abcdef0123456789abcdef/poster/tt1.jpg",
-       "https://addon.example.com/<redigido>/poster/tt1.jpg");
+       "https://addon.example.com/<redacted>/poster/tt1.jpg");
   caso("https://addon.example.com/550e8400-e29b-41d4-a716-446655440000/x",
-       "https://addon.example.com/<redigido>/x");
-  caso("https://addon.example.com/cfg%7B%22k%22%7D/x", "https://addon.example.com/<redigido>/x");
+       "https://addon.example.com/<redacted>/x");
+  caso("https://addon.example.com/cfg%7B%22k%22%7D/x", "https://addon.example.com/<redacted>/x");
   // userinfo e query
   caso("https://usuario:senha@iptv.example.com/live/a.png?token=XYZ",
-       "https://iptv.example.com/live/a.png?<redigido>");
+       "https://iptv.example.com/live/a.png?<redacted>");
   // o que interessa para diagnostico fica: TMDB, metahub, virtual do app
   caso("https://image.tmdb.org/t/p/w500/8Gxv8gSFCU0XGDykEGv7zR1n2ua.jpg",
        "https://image.tmdb.org/t/p/w500/8Gxv8gSFCU0XGDykEGv7zR1n2ua.jpg");
@@ -53,7 +53,7 @@ int main(void) {
        "https://images.metahub.space/background/medium/tt0111161/img");
   caso("https://nuvio.invalid/arte/tmdb/m/278/pt", "https://nuvio.invalid/arte/tmdb/m/278/pt");
   // ultimo segmento longo SEM cara de arquivo de midia: redigido
-  caso("https://addon.example.com/d/AbCdEfGhIjKlMnOpQrStUvWxYz", "https://addon.example.com/d/<redigido>");
+  caso("https://addon.example.com/d/AbCdEfGhIjKlMnOpQrStUvWxYz", "https://addon.example.com/d/<redacted>");
   // sem esquema: copia
   caso("/tmp/nuvio/cache/abc.img", "/tmp/nuvio/cache/abc.img");
   caso("", "");

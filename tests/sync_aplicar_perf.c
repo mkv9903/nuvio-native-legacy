@@ -65,9 +65,8 @@ int main(void) {
            "\"coverImageUrl\":\"https://cdn.xperience-app.com/covers/default/pasta-%03d.cover.webp?v=1759500000&w=640\","
            "\"heroBackdropUrl\":\"https://cdn.xperience-app.com/covers/default/pasta-%03d.backdrop.webp?v=1759500000\","
            "\"titleLogoUrl\":\"https://cdn.xperience-app.com/logos/pasta-%03d.logo.png?v=1759500000\","
-           "\"focusGifUrl\":\"%s\",\"focusGifEnabled\":true,\"hideTitle\":false,\"tileShape\":\"poster\","
-           "\"sources\":[", f ? "," : "", pasta, pasta, pasta, pasta, pasta,
-           pasta % 3 ? "" : "https://media.giphy.com/media/abcdefghijklmnop/giphy.gif");
+           "\"hideTitle\":false,\"tileShape\":\"poster\","
+           "\"sources\":[", f ? "," : "", pasta, pasta, pasta, pasta, pasta);
       for (s = 0; s < 4; s++)
         k += (size_t)snprintf(in + k, cap - k, "%s{\"provider\":\"addon\",\"addonId\":\"addon.demo\","
              "\"addonBaseUrl\":\"https://fixture.example/manifest.json\",\"type\":\"%s\","

@@ -444,10 +444,10 @@ static void painel(float a) {
 
 static const char *retratoLocal(const ColFolder *folder) {
   static char caminho[700];
-  if (!folder || !folder->frameDir[0]) return "";
-  snprintf(caminho, sizeof caminho, "%s/portrait.png", folder->frameDir);
+  if (!folder || !folder->artDir[0]) return "";
+  snprintf(caminho, sizeof caminho, "%s/portrait.png", folder->artDir);
   if (access(caminho, R_OK) == 0) return caminho;
-  snprintf(caminho, sizeof caminho, "%s/portrait.jpg", folder->frameDir);
+  snprintf(caminho, sizeof caminho, "%s/portrait.jpg", folder->artDir);
   return access(caminho, R_OK) == 0 ? caminho : "";
 }
 

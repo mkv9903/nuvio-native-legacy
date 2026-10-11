@@ -34,9 +34,6 @@ const char *marca_formato_nome(FormatoMarca f);
 // "4K"/"UHD"/"2160p" -> 4K, "1080p"/"FHD" -> 1080p, "720p"/"HD" -> 720p (o
 // "HD" dos pacotes de IPTV, ao lado de FHD, e 720p) e "SD" -> SD. Sem caixa.
 int marca_resolucao(const char *nome);
-// Rotulo cuja palavra de formato vira a marca: "Sem HDR" -> "Sem" [HDR].
-// `rotulo` e a chave em portugues (traduzida aqui); `y` e o TOPO da linha de
-// texto e a marca fica centrada nela. Devolve a largura desenhada.
 // Marca do HDR que a FONTE anuncia (nao o que o painel ativou), ou -1.
 int badges_fonte_hdr_marca(uint64_t mask);
 float badges_desenhar(uint64_t mask,float x,float y,float maxW,float height,float alpha);

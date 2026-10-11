@@ -7,7 +7,7 @@ cd "$(dirname "$0")/.."
 work=$(mktemp -d "${TMPDIR:-/tmp}/nuvio-hero-rampa.XXXXXX")
 trap 'rm -rf "$work"' EXIT
 sources=()
-for source in src/*.c src/dts/*.c; do
+for source in src/*.c; do
   [ "$source" != src/main.c ] && sources+=("$source")
 done
 cc "${sources[@]}" tests/hero_trailer_rampa_shot.c -Isrc -o "$work/test" \

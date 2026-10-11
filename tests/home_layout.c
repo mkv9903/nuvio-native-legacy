@@ -160,7 +160,6 @@ int main(void) {
   assert(scrollX[foco.fileira] == 123);
   assert(col_carregar("tests/fixtures/collections") == 2);
   assert(col_folder(0)->nSources==2);
-  assert(col_folder(0)->frames==0);
   assert(col_folder(-1)==NULL);
   const char *ids[]={"", "now_playing_movies","trending_movies","trending_series",
     "ai_movies_for_you","ai_series_for_you","snoak_top100_movies","snoak_top100_series"};

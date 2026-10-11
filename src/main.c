@@ -1,10 +1,6 @@
 // Bootstrap: janela, contexto GL, loop e telemetria. Toda a UI vive nos modulos.
 #include "app_id.h"
 #include "arranque.h"
-#ifdef NV_DTS_DEBUG
-#include "dts/dts_engine.h"
-#include "dts/dts_pipeline.h"
-#endif
 #include <SDL2/SDL.h>
 #include "central.h"
 #include "sdlcompat.h"
@@ -458,13 +454,8 @@ int main(int argc, char **argv) {
   // o compositor NAO exibe a janela — o app roda a 60fps desenhando para
   // ninguem. Medido: "Invalid appId specified OR Unsupported Application Type".
 #ifndef NV_SEM_WEBOS
-#ifdef NV_DTS_DEBUG
-  setenv("APPID", NV_APP_ID, 1);
-  setenv("LS2_APPID", NV_APP_ID, 1);
-#else
   setenv("APPID", NV_APP_ID, 0);
   setenv("LS2_APPID", NV_APP_ID, 0);
-#endif
   setenv("SDL_VIDEODRIVER", "wayland", 0);
 #endif
   // Lancado pelo SAM, stdout e stderr vao para /dev/null — toda a telemetria
@@ -497,10 +488,6 @@ int main(int argc, char **argv) {
   setvbuf(stdout, NULL, _IOLBF, 0);
   arranque_etapa("main");
   arranque_relatar();
-#ifdef NV_DTS_DEBUG
-  printf("[dts-debug] appId=%s engine=%d nativeAdapter=%d; diagnostic build, TV validation pending\n",
-         NV_APP_ID, dts_engine_available(), dts_pipeline_available(0));
-#endif
   if (!getenv("XDG_RUNTIME_DIR")) setenv("XDG_RUNTIME_DIR", "/tmp/xdg", 1);
 
   // O SAM lanca o app passando o JSON de launch como argv[1], entao so tratamos

@@ -1,7 +1,7 @@
 #!/bin/bash
 # src/net_url.c anda junto com src/net.c: rede.c imprime URL redigida no log e
 # a redacao mora naquele arquivo (ver o cabecalho dele). Quem compila por glob
-# de src/*.c src/dts/*.c nao precisa pensar nisso; quem lista fontes a mao, sim.
+# de src/*.c nao precisa pensar nisso; quem lista fontes a mao, sim.
 set -eu
 cd "$(dirname "$0")/.."
 cc -Isrc tests/mkv_caps.c src/net.c src/net_url.c -o /tmp/nuvio-mkv-caps-tests \

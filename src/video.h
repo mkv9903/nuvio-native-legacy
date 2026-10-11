@@ -35,9 +35,7 @@ int  video_registro_negado(void);
 // devolver mediaId e nunca buscar o arquivo — falha silenciosa.
 int  video_tocar(const char *url);
 
-// Chamar UMA VEZ POR QUADRO. Hoje serve ao prazo do recuo de Dolby Vision
-// (ver o comentario em video.c): sem esta batida, um arquivo que a TV recusa
-// com DolbyHdrInfo ficaria sem imagem ate o usuario desistir e sair.
+// Advance native playback binding, queued seeks and reconnection each frame.
 void video_bombear(void);
 void video_parar(void);
 void video_pausar(int pausado);
@@ -160,14 +158,8 @@ const char *video_erro_texto(void);
 // nunca comeca" — o sintoma do #158, com bufferRange subindo e nenhum
 // videoInfo. Onde a plataforma nao da o sinal (Tizen), 1: nao afirma nada.
 int video_decoder_anunciou(void);
-int video_dts_legenda_desenhar(double seconds, int delay_ms, float x, float y, float w, float h, float alpha);
-// Dolby Vision in MKV (webOS, Settings > Playback): 1 while our demux feeds
-// the TV with the file's Dolby Vision; video_dv_recuo_consumir says once why
-// it handed playback back to the TV player (1 slow source, 2 did not start).
-int video_dv_recuo_consumir(void);
 // 1 once the current source has played on webOS (kept across reloads of it).
 int video_fonte_tocou(void);
-  // actual local conversion output, empty for native playback
 int    video_audio_nao_suportado(void);  // uMS errorCode 200: video segue sem som
 int    video_terminou(void); // 1 depois do fim de fluxo (endOfStream) da fonte atual
 // 1 depois que OUTRO app tomou o video da TV nesta sessao (so o .tpk sabe:
@@ -200,8 +192,6 @@ typedef struct {
   // mostra ao lado de "Embutida"; a escolha automatica pesa. 0 = comum/nao se sabe.
   int  tipoLeg;
   int canais;        // original audio channels, 0 unknown
-  int stream_index;  // source demux index for DTS sessions, -1 in native webOS
-  int stream_id;     // original container track ID, -1 when unknown
 } VideoFaixa;
 
 int  video_n_audio(void);
@@ -219,7 +209,7 @@ void video_sondar_mkv_agora(void);
 int  video_audio_atual(void);
 // A faixa e DTS? 0 nao, 1 DTS, 2 DTS-HD (MA/HRA/Express), 3 DTS:X. Le o codec
 // e o rotulo (o uMS e o MKV escrevem "DTS", "A_DTS/LOSSLESS", "DTS-HD MA";
-// a sessao convertida, o nome do FFmpeg "dts"). Codigo puro, todos os alvos.
+// "dts"). Codigo puro, todos os alvos.
 int  video_faixa_dts(const VideoFaixa *f);
 // O que aconteceu com o audio DTS da faixa atual (marca DTS no player e o
 // aviso da ilha). A marca aparece em TODOS os estados diferentes de NENHUM:
@@ -227,22 +217,13 @@ int  video_faixa_dts(const VideoFaixa *f);
 enum {
   VIDEO_DTS_NENHUM = 0,     // faixa atual nao e DTS (ou nada tocando)
   VIDEO_DTS_NATIVO,         // a TV decodifica o DTS sozinha
-  VIDEO_DTS_PREPARANDO,     // a conversao local (PR #259) esta abrindo
-  VIDEO_DTS_CONVERTIDO,     // DTS -> AAC estereo convertido no app
-  VIDEO_DTS_FALHOU,         // a conversao falhou; voltou ao nativo sem som
-  VIDEO_DTS_SEM_SOM         // a TV recusa DTS e a conversao esta desligada aqui
+  VIDEO_DTS_SEM_SOM         // the TV rejected the selected DTS track
 };
 int  video_dts_estado(void);
 int  video_legenda_atual(void);   // -1 = desligada
 
 void video_escolher_audio(int i);
 void video_escolher_legenda(int i);   // -1 desliga
-// Texto da legenda EMBUTIDA em vigor quando o player nativo nao a desenha
-// (Samsung: o AVPlay so entrega o texto no onsubtitlechange, issue #122).
-// Devolve 1 e preenche `dst` quando ha fala na tela agora; 0 no webOS (o uMS
-// desenha) e no Mac.
-int  video_legenda_nativa(char *dst, int tam);
-
 // Legenda de arquivo externo (OpenSubtitles). O uMS baixa e sincroniza
 // sozinho; o app so passa a URL.
 void video_legenda_externa(const char *url);
@@ -296,35 +277,6 @@ const char *video_hdr(void);   // hdrType cru: "none", "HDR10", "DolbyVision"...
 // usada pelos modos de zoom do player.
 int  video_largura(void);
 int  video_altura(void);
-
-// --- TELA PRETA COM AUDIO TOCANDO -------------------------------------------
-//
-// NAO DA PARA DETECTAR, e isso foi MEDIDO neste aparelho, nao suposto: o uMS
-// reporta videoInfo, sourceInfo e loadCompleted normalmente nos arquivos que
-// ficam sem imagem (caso registrado: videoInfo 3840x1606 hdrType=DolbyVision,
-// loadCompleted em 3212 ms, tela preta com o audio correndo). Nao existe no uMS
-// sinal de QUADRO EXIBIDO — o currentTime avanca puxado pelo audio. A tentativa
-// de recuo automatico por prazo esta registrada como removida em video.c.
-//
-// Os dois recuos automaticos que EXISTEM cobrem o caso em que o pipeline
-// desmente a fonte (pedimos DolbyVision e o hdrType volta HDR10 ou none). O
-// caso que sobra e o pior: o pipeline CONFIRMA DolbyVision, o ACB aceita, e nao
-// ha quadro. Recuar automaticamente ali quebraria o DV que funciona de verdade
-// nos MP4 perfil 5 e 8 — e por isso a saida e a pessoa dizer que a tela esta
-// preta, em vez de o app adivinhar.
-//
-// video_forcar_sdr recarrega a MESMA fonte, na posicao atual, sem afirmar HDR
-// nenhum. A escolha vale pela sessao: uma recuperacao posterior do pipeline nao
-// traz o Dolby Vision de volta pelas costas.
-//
-// video_pode_forcar_sdr diz se o alvo tem o que renegociar — so o webOS tem.
-// No Tizen o HDR e decidido pelo AVPlay do firmware e nao ha equivalente; a
-// interface usa isto para nao oferecer um botao que nao faz nada.
-int  video_pode_forcar_sdr(void);
-#ifdef NV_SHOT_HOOKS
-void video_shot_pode_forcar_sdr(int sim);   // so o coto do Mac (capturas)
-#endif
-void video_forcar_sdr(void);
 
 // VELOCIDADE DE REPRODUCAO (#202), em centesimos (150 = 1,5x; velocidade.h).
 // video_velocidade guarda o pedido e o backend o aplica quando o pipeline

@@ -16,7 +16,7 @@ trap 'rm -rf "$tmp"' EXIT
 monta() {   # $1 = raiz das fontes, $2 = binario, $3.. = -D extras
   local raiz="$1" bin="$2"; shift 2
   local sources=()
-  for source in "$raiz"/src/*.c "$raiz"/src/dts/*.c; do
+  for source in "$raiz"/src/*.c; do
     case "$source" in */src/main.c) continue;; esac
     sources+=("$source")
   done

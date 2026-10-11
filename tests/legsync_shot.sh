@@ -7,7 +7,7 @@ cd "$(dirname "$0")/.."
 T=${TMPDIR:-/tmp}; FX="$T/nv-legref-fx"
 bash tests/legref_fixtures.sh "$FX"
 sources=()
-for source in src/*.c src/dts/*.c; do [ "$source" != src/main.c ] && sources+=("$source"); done
+for source in src/*.c; do [ "$source" != src/main.c ] && sources+=("$source"); done
 # LS_RITMO=0: sem o teto de 8 Ranges/s (servidor local).
 cc "${sources[@]}" tests/legsync_shot.c -Isrc -DLS_RITMO=0 -o /tmp/nuvio-legsync-shot \
   -O1 -g -DNV_LINUX_DESKTOP $(pkg-config --cflags sdl2 SDL2_image SDL2_ttf)  \

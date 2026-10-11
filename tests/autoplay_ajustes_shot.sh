@@ -7,7 +7,7 @@ cd "$(dirname "$0")/.."
 export NUVIO_DADOS=$(mktemp -d "${TMPDIR:-/tmp}/nuvio-autoplay-dados.XXXXXX")
 trap 'rm -rf "$NUVIO_DADOS"' EXIT
 sources=()
-for source in src/*.c src/dts/*.c; do
+for source in src/*.c; do
   if [ "$source" != src/main.c ]; then sources+=("$source"); fi
 done
 cc -DAJUSTES_TESTE "${sources[@]}" tests/autoplay_ajustes_shot.c -Isrc -o "$NUVIO_DADOS/shot" \

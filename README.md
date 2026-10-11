@@ -70,8 +70,13 @@ bash tools/arm.sh --ipk --build
 
 Packaging requires `ares-package`. Configure server/API values through
 `local.properties` or the variables read by `tools/env.sh`; keep credentials out
-of version control. The SDK includes libass and DTS conversion support.
-See [the DTS notes](docs/features/dts/README.md) and [installation guide](INSTALL.md).
+of version control. The SDK includes libass for styled subtitles.
+See the [installation guide](INSTALL.md).
+
+LG playback uses the TV's native player. The app does not bundle FFmpeg or
+convert DTS audio, and there is no experimental Dolby Vision MKV pipeline.
+Audio and video format support depends on the TV. The Dolby Vision and Dolby
+Atmos source preferences affect source selection, not decoding.
 
 `tools/arm.sh` without `--build` deploys to the configured rooted TV.
 Use `--build` for local verification.

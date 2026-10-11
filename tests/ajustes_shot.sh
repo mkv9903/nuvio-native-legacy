@@ -10,7 +10,7 @@
 set -eu
 cd "$(dirname "$0")/.."
 sources=()
-for source in src/*.c src/dts/*.c; do
+for source in src/*.c; do
   if [ "$source" != src/main.c ]; then sources+=("$source"); fi
 done
 cc -DAJUSTES_TESTE "${sources[@]}" tests/ajustes_shot.c -Isrc -o "${NUVIO_SHOT_BIN:-/tmp/nuvio-ajustes-shot}" \

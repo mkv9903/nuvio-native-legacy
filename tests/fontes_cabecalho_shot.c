@@ -3,8 +3,8 @@
 //
 // Estados: lista com "Melhor para esta TV" na primeira linha, a fileira de
 // botoes em foco com "So MP4" ligado, e as abas de addon em foco. Cada um em
-// portugues e em alemao (os rotulos mais longos), com e sem o "Sem HDR" da LG
-// (6 botoes), na folha solta (pagina do titulo) e na ilha do player.
+// portugues e em alemao (os rotulos mais longos)
+// (5 botoes), na folha solta (pagina do titulo) e na ilha do player.
 //
 // Mede, em pixels da tela, do topo da folha ate a primeira linha da lista
 // (o cabecalho), e confere que nenhum botao passa por cima do titulo nem sai
@@ -34,17 +34,22 @@
 static GLuint fbo, fboTex;
 enum { LW = 1920, LH = 1080 };
 static const char *saida;
-static unsigned char quadro[LW * LH * 3];
+static unsigned char quadro[LW * LH * 4];
 static int noPlayer;
 static Uint32 relogio = 100000;
 
 static void salvar(const char *id) {
-  SDL_Surface *s = SDL_CreateRGBSurface(0, LW, LH, 24, 0xff, 0xff00, 0xff0000, 0);
+  SDL_Surface *s = SDL_CreateRGBSurfaceWithFormat(0, LW, LH, 32, SDL_PIXELFORMAT_RGBA32);
   char nome[700];
   glFinish(); glBindFramebuffer(GL_FRAMEBUFFER, fbo); glPixelStorei(GL_PACK_ALIGNMENT, 1);
-  glReadPixels(0, 0, LW, LH, GL_RGB, GL_UNSIGNED_BYTE, quadro);
+  glReadPixels(0, 0, LW, LH, GL_RGBA, GL_UNSIGNED_BYTE, quadro);
   for (int y = 0; y < LH; y++)
-    memcpy((unsigned char *)s->pixels + y * s->pitch, quadro + (size_t)(LH - 1 - y) * LW * 3, (size_t)LW * 3);
+    memcpy((unsigned char *)s->pixels + y * s->pitch, quadro + (size_t)(LH - 1 - y) * LW * 4, (size_t)LW * 4);
+  // GLES guarantees RGBA readback. Reject an empty capture before saving it.
+  { int visible = 0;
+    for (size_t i = 0; i < sizeof quadro; i += 4)
+      if (quadro[i] > 30 || quadro[i + 1] > 30 || quadro[i + 2] > 30) { visible = 1; break; }
+    assert(visible); }
   snprintf(nome, sizeof nome, "%s-%s.png", saida, id);
   assert(IMG_SavePNG(s, nome) == 0);
   SDL_FreeSurface(s);
@@ -92,7 +97,6 @@ int main(int argc, char **argv) {
   Stream v[6];
   saida = argc > 1 ? argv[1] : "/tmp/nv-fontes-cab";
   noPlayer = getenv("NUVIO_SHOT_PLAYER") && atoi(getenv("NUVIO_SHOT_PLAYER"));
-  video_shot_pode_forcar_sdr(getenv("NUVIO_SHOT_SEMHDR") && atoi(getenv("NUVIO_SHOT_SEMHDR")));
   assert(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) == 0);
   IMG_Init(IMG_INIT_PNG | IMG_INIT_JPG);
   SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
@@ -157,7 +161,6 @@ int main(int argc, char **argv) {
   for (int i = 0; i < 12; i++) tecla(SDLK_UP);
   // Fileira em foco no ultimo botao (Fechar); anda ate "So MP4" e liga.
   for (int i = 0; i < 6; i++) tecla(SDLK_LEFT);
-  if (getenv("NUVIO_SHOT_SEMHDR") && atoi(getenv("NUVIO_SHOT_SEMHDR"))) tecla(SDLK_RIGHT);
   tecla(SDLK_RETURN);   // So MP4 ligado
   tecla(SDLK_RIGHT);    // foco em "Em cache"
   quadros(30);

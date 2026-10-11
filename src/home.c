@@ -8,13 +8,6 @@
 #include "focoprof.h"
 #include "posterprov.h"
 #include "corviva.h"
-// NV_LEVE (tools/tizen.sh --leve): build de diagnostico sem a animacao do
-// cartaz em foco, um dos suspeitos do travamento de #72.
-#ifdef NV_LEVE
-#  define NV_SEM_GIF 1
-#else
-#  define NV_SEM_GIF 0
-#endif
 #include "trakt.h"
 #include "simkl.h"
 #include "idioma.h"
@@ -3850,10 +3843,6 @@ static void alvoCard(float x, float y, float w, float h, int r, int c) {
 
 static void desenhaAtalhos(int r, float y) {
   float w = larguraFil(r), h = alturaFil(r);
-  static int ultimo=-1;static Uint32 desde;
-  // Quadro da sequencia de JPEG que ja esta resolvido, para nao reconsultar
-  // o cache nos ~4 quadros de tela que cabem entre dois passos de 67 ms.
-  static int seqIndice=-1;static GLuint seqTex;
   for (int c = 0; c < fileiras[r].n; c++) {
     float x = ajustes_conteudo_x() + c * passoFil(r) - scrollX[r] + bordaX(r);
     if (x + w < 0 || x > NV_TELA_W) continue;
@@ -3875,42 +3864,6 @@ static void desenhaAtalhos(int r, float y) {
     const ColFolder *folder=col_folder(fileiras[r].folders[c]);if(!folder)continue;
     const char *arte = col_capa(folder);
     GLuint tex = arte && arte[0] ? tex_obter_larg(arte, w) : 0;
-    if(foco.fileira==r&&foco.coluna==c&&folder->frames>0 && !NV_SEM_GIF &&
-       !ajustes_animacoes_reduzidas()) {
-      int id=fileiras[r].folders[c];Uint32 now=SDL_GetTicks();
-      if(ultimo!=id){ultimo=id;desde=now;seqIndice=-1;seqTex=0;}
-      if(now-desde>350) {
-        char frame[700];int index=(int)((now-desde-350)/67)%folder->frames+1;
-        // SO QUANDO O QUADRO DA SEQUENCIA MUDA, e nao a 60 por segundo.
-        //
-        // Este bloco pedia TRES texturas ao cache em TODO quadro — a atual e
-        // duas de pre-busca — enquanto o indice so avanca a cada 67 ms. Numa
-        // TV a 60 fps sao 180 consultas por segundo aos mesmos tres arquivos,
-        // cada uma pegando o mutex que os dois fios de decode tambem disputam,
-        // e cada uma remarcando `ultimoQuadro` das tres entradas — o que
-        // distorce o LRU a favor da sequencia e contra os cartazes visiveis.
-        // O ramo do GIF logo acima ja andava no passo certo (`>=67`); este
-        // ficou de fora.
-        //
-        // A textura resolvida fica guardada entre os passos, senao o cartaz
-        // voltaria a capa parada nos quadros em que nao se consulta nada.
-        if(index!=seqIndice){
-          seqIndice=index;
-          snprintf(frame,sizeof frame,"%s/%03d.jpg",folder->frameDir,index);
-          // PASSAGEIRA, e nao tex_obter_larg: o quadro vale 67 ms, e pedido
-          // como cartaz ele expulsava do cache, um por quadro, os posteres
-          // das fileiras de cima (medido: 15 despejos/s com a tela parada).
-          seqTex=tex_obter_passageira(frame,480);
-          // UMA de pre-busca, nao duas: a segunda so existia para cobrir o
-          // caso de a primeira nao ter chegado, e a 67 ms de passo ela chega.
-          // Cada quadro da sequencia e 480x270 RGBA = 518 KB no cache; uma
-          // pasta de 90 quadros sao 46 MB de um orcamento de 96.
-          snprintf(frame,sizeof frame,"%s/%03d.jpg",folder->frameDir,index%folder->frames+1);
-          tex_obter_passageira(frame,480);
-        }
-        if(seqTex)tex=seqTex;
-      }
-    }
     if (tex) {
       gfx_tex_aspect_atual = tex_aspecto(arte);
       // PASSA O FOCO, como a fileira de cartazes faz. Antes ia 0 fixo: o card

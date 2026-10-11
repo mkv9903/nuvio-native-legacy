@@ -12,7 +12,7 @@ saida="${1:-/tmp/nuvio-biblioteca}"
 tmp="$(mktemp -d "${TMPDIR:-/tmp}/nuvio-bibshot-XXXXXX")"
 trap 'rm -rf "$tmp"' EXIT
 sources=()
-for source in src/*.c src/dts/*.c; do
+for source in src/*.c; do
   if [ "$source" != src/main.c ]; then sources+=("$source"); fi
 done
 cc "${sources[@]}" tests/biblioteca_shot.c -Isrc -o "$tmp/shot" \

@@ -34,7 +34,7 @@ done < "$ENVF"
 read -r -a DEP_CFLAGS <<< "$(pkg-config --cflags "${DEPS[@]}")"
 read -r -a DEP_LIBS <<< "$(pkg-config --libs "${DEPS[@]}")"
 mkdir -p build/linux
-"$CC" src/*.c src/dts/*.c -Isrc -o build/linux/nuvio-native -O1 -g \
+"$CC" src/*.c -Isrc -o build/linux/nuvio-native -O1 -g \
   "${DEFINES[@]}" "${DEP_CFLAGS[@]}" "${DEP_LIBS[@]}" -ldl -pthread -lm
 echo "Linux UI build: $PWD/build/linux/nuvio-native"
 if [ "$BUILD_ONLY" = 1 ]; then exit 0; fi

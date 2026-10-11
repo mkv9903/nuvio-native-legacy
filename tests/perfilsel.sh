@@ -23,7 +23,7 @@ if [ "${1:-}" = --capturas ] || [ "${1:-}" = --capturas-b ] ||
   [ "${1:-}" = --capturas-b ] && variante=B
   [ "${1:-}" = --capturas-compacto ] && efeitos=compacto
   fontes=()
-  for f in src/*.c src/dts/*.c; do [ "$f" != src/main.c ] && fontes+=("$f"); done
+  for f in src/*.c; do [ "$f" != src/main.c ] && fontes+=("$f"); done
   cc "${fontes[@]}" tests/perfilsel_visual.c -DNV_PERFILSEL_TEST -Isrc -o /tmp/nuvio-perfilsel-shot \
     -O1 -g -DNV_LINUX_DESKTOP $(pkg-config --cflags sdl2 SDL2_image SDL2_ttf)  \
      -lSDL2 -lSDL2_image -lSDL2_ttf -lz $(pkg-config --libs glesv2 egl) -ldl -pthread -lm \

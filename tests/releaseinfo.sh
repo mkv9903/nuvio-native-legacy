@@ -5,7 +5,7 @@ cd "$(dirname "$0")/.."
 test_dir=$(mktemp -d "${TMPDIR:-/tmp}/nuvio-releaseinfo-XXXXXX")
 trap 'rm -rf "$test_dir"' EXIT
 sources=()
-for source in src/*.c src/dts/*.c; do
+for source in src/*.c; do
   case "$source" in src/main.c|src/releaseinfo.c) continue;; esac
   sources+=("$source")
 done

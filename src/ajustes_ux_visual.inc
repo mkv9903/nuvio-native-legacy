@@ -133,7 +133,6 @@ static const char *ajVisualIcone(int op) {
     case AJ_SELOS_PACOTE_REM: return "aj_list-video";
     case AJ_QUALIDADE: return "aj_monitor-play";
     case AJ_DV: return "aj_monitor-play";
-    case AJ_DV_MKV: return "aj_monitor-play";
     case AJ_ATMOS: return "aj_monitor-play";
     case AJ_PAUSA_OVERLAY: return "aj_circle-play";
     case AJ_PLR_CLASSIF: return "aj_shield";
@@ -168,7 +167,6 @@ static const char *ajVisualIcone(int op) {
     case AJ_DESCANSO_ESTILO: return "aj_image";
     case AJ_DESCANSO_FONTE: return "aj_film";
     case AJ_PROPORCAO_PADRAO: return "aj_maximize-2";
-    case AJ_DTS_AC3: return "aj_audio-lines";
     case AJ_BRILHO_PLAYER: return "aj_sun-dim";
     case AJ_MANTER_VIDEO: return "aj_memory-stick";
     case AJ_RELOGIO: case AJ_RELOGIO_12H: return "aj_clock";

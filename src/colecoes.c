@@ -430,12 +430,11 @@ static int carregarPacote(const char *dir) {
       js_texto(p,pe,"id",v->id,sizeof v->id);js_texto(p,pe,"title",v->title,sizeof v->title);
       js_texto(p,pe,"cover",v->cover,sizeof v->cover);js_texto(p,pe,"hero",v->hero,sizeof v->hero);js_texto(p,pe,"logo",v->logo,sizeof v->logo);
       localiza(v->cover,sizeof v->cover,dir);localiza(v->hero,sizeof v->hero,dir);localiza(v->logo,sizeof v->logo,dir);
-      v->hideTitle=js_num(p,pe,"hideTitle",0);v->frames=js_num(p,pe,"frames",0);
-      if(v->frames<0||v->frames>90)v->frames=0;
+      v->hideTitle=js_num(p,pe,"hideTitle",0);
+      snprintf(v->artDir,sizeof v->artDir,"%s/collections/%s",dir,v->id);
       /* O pacote nao traz tileShape: sem ele fica PAISAGEM (o zero), que e o
          desenho para o qual a arte curada dele foi feita. */
       { char forma[16]=""; if(js_texto(p,pe,"tileShape",forma,sizeof forma)) v->forma=col_forma_texto(forma); }
-      snprintf(v->frameDir,sizeof v->frameDir,"%s/collections/%s",dir,v->id);
       /* Local paired artwork survives catalog imports. Activate only a complete pair. */
       char editorial[512];
       if(arteEditorial(editorial,sizeof editorial,dir,"editorial",v->id,"home")&&
@@ -895,7 +894,7 @@ static int definirJson(const char *json) {
   antes = count;
   // A conta manda o CONJUNTO e a ordem. Mas o pacote traz as mesmas pastas
   // (mesmo id: o collections.json e gerado do perfil do dono) com arte editorial,
-  // quadros de animacao e ajustes curados que a conta nao tem — a versao local
+  // arte local e ajustes curados que a conta nao tem — a versao local
   // da pasta e a que fica, com grupo e titulo da conta. Sem isto cada pull
   // trocava a arte curada pela capa crua do CDN.
   //
@@ -979,7 +978,6 @@ static int definirJson(const char *json) {
         int trocou = 0;
         if (PASTA(i).cover[0]) {
           snprintf(v.cover, sizeof v.cover, "%s", PASTA(i).cover);
-          v.frames = 0;
           trocou = 1;
         }
         if (PASTA(i).hero[0]) {
@@ -1003,7 +1001,7 @@ static int definirJson(const char *json) {
     // SO AQUI, e nao na entrada da funcao. Bumpar de saida faria a assinatura
     // da home mudar a CADA ciclo de sync, inclusive quando a conta veio vazia e
     // as pastas locais foram mantidas — uma remontagem por ciclo, de graca, que
-    // reinicia animacoes e refaz o foco.
+    // refaz o foco.
     if (fCapaCortada)
       printf("[colecoes] %d URL(s) de capa passavam de 511 bytes e foram descartadas\n", fCapaCortada);
   }

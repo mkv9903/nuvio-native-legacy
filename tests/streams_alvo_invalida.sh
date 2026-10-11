@@ -4,7 +4,7 @@
 set -eu
 cd "$(dirname "$0")/.."
 sources=()
-for source in src/*.c src/dts/*.c; do
+for source in src/*.c; do
   [ "$source" != src/main.c ] && sources+=("$source")
 done
 

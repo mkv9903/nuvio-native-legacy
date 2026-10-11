@@ -300,7 +300,7 @@ static int tocando(char *tit, size_t nt, char *meta, size_t nm) {
                           !strcmp(hdr, "DolbyVision") ? "Dolby Vision" : hdr);
   if (video_tem_atmos() && u < nm)
     u += (size_t)snprintf(meta + u, nm - u, "%sAtmos", u ? " · " : "");
-  // DTS tocando direto ou convertido (PR #259): a faixa diz, o estado nao muda o nome.
+  // The native track determines the DTS format shown here.
   if (video_dts_estado() != VIDEO_DTS_NENHUM && u < nm) {
     int d = video_faixa_dts(video_audio(video_audio_atual()));
     u += (size_t)snprintf(meta + u, nm - u, "%s%s", u ? " · " : "",

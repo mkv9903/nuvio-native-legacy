@@ -6,7 +6,7 @@ import {spawnSync} from 'node:child_process';
 const root = path.resolve(import.meta.dirname, '..');
 const art = path.join(root, 'deploy/app/art');
 const source = process.argv[2];
-if (!source || source.startsWith('--')) throw Error('Usage: node tools/import-collections.mjs <profile-directory> [--no-animation]');
+if (!source || source.startsWith('--')) throw Error('Usage: node tools/import-collections.mjs <profile-directory>');
 function property(file, key) {
   const line = fs.readFileSync(path.join(source, file+'.properties'), 'utf8').split('\n').find(l=>l.startsWith(key+'='));
   if (!line) throw Error('Profile property missing: '+key);
@@ -70,24 +70,7 @@ for (const c of collections) {
     if(c.title==='Directors'&&portraitUrl) {
       await localImage(portraitUrl,dir,id,'portrait');
     }
-    let frames=0;
-    // 15 fps keeps the original focus motion fluid on TV without involving the
-    // video pipeline. Only the focused tile asks for these bounded frames.
-    if(f.focusGifEnabled!==false && f.focusGifUrl && !process.argv.includes('--no-animation')) {
-      fs.mkdirSync(dir,{recursive:true});
-      try {
-        const gif=path.join(dir,'source.gif');
-        if(!fs.existsSync(gif) || process.argv.includes('--refresh-animation')) {
-          const response=await fetch(f.focusGifUrl,{signal:AbortSignal.timeout(15000)});
-          if(!response.ok) throw Error('image');
-          fs.writeFileSync(gif,Buffer.from(await response.arrayBuffer()));
-        }
-        for(const name of fs.readdirSync(dir)) if(/^\d{3}\.jpg$/.test(name)) fs.unlinkSync(path.join(dir,name));
-        const result=spawnSync('ffmpeg',['-v','error','-i',gif,'-t','6','-vf','fps=15,scale=480:270:force_original_aspect_ratio=decrease,pad=480:270:(ow-iw)/2:(oh-ih)/2','-q:v','4','-frames:v','90','-y',path.join(dir,'%03d.jpg')],{timeout:30000});
-        if(result.status===0) frames=fs.readdirSync(dir).filter(x=>/^\d{3}\.jpg$/.test(x)).length;
-      } catch { console.log('Static fallback:',f.title); }
-    }
-    folders.push({id,title:f.title,cover,hero,logo,hideTitle:f.hideTitle?1:0,frames,sources});
+    folders.push({id,title:f.title,cover,hero,logo,hideTitle:f.hideTitle?1:0,sources});
   }
   if(folders.length) groups.push({id:c.id,title:c.title,folders});
 }

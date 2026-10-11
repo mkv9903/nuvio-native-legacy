@@ -4,7 +4,7 @@
 static uint64_t fakeNow = UINT64_C(1700000000000);
 static uint64_t fixtureNow(void) { return fakeNow; }
 #define streamfit_agora_ms fixtureNow
-#define STREAMFIT_REDE_EXISTE 1 // Android behaviour; LG/TPK/WGT hide the no-network line
+#define STREAMFIT_REDE_EXISTE 1 // Exercise connection diagnostics with a fixture network.
 #include "../src/streams.c"
 #undef streamfit_agora_ms
 #include <assert.h>
@@ -18,10 +18,26 @@ int p2p_ativo(void) { return 0; }
 int selospacote_ativo(void) { return -1; }
 unsigned selospacote_versao(void) { return 1; }
 int selospacote_casar(const char *const *p,int n,unsigned short *o,int m) { (void)p;(void)n;(void)o;(void)m;return 0; }
+void selospacote_colorido(int ligado) { (void)ligado; }
+int selospacote_embutidos_ok(void) { return 0; }
+const SeloFiltro *selospacote_filtro(unsigned short id) { (void)id;return NULL; }
 const char *ajustes_qualidade(void) { return "Automatica"; }
 int ajustes_fonte_texto_addon(void) { return 0; }
-int video_pode_forcar_sdr(void) { return 0; }
-void video_forcar_sdr(void) {}
+int ajustes_dolby_vision(void) { return 0; }
+int ajustes_dolby_atmos(void) { return 0; }
+int ajustes_tamanho_max_gb(void) { return 0; }
+int ajustes_tamanho_min_gb(void) { return 0; }
+int ajustes_fonte_escopo(void) { return FR_ESCOPO_TODAS; }
+int ajustes_fonte_regex_modo(void) { return FR_REGEX_DESLIGADA; }
+int ajustes_fonte_usar_outros(void) { return 1; }
+int ajustes_selos_coloridos(void) { return 0; }
+// Quality mode keeps the autoplay queue independent of connection measurements.
+int ajustes_fonte_prioridade(void) { return 1; }
+int ajustes_fonte_hdr(void) { return 1; }
+unsigned fonteregra_versao(void) { return 1; }
+int fonteregra_grupo(const FonteRegraCfg *cfg,const char *nome,int plugin,const char *texto) {
+  (void)cfg;(void)nome;(void)plugin;(void)texto;return 0;
+}
 int player_aberto(void) { return 0; }
 void plrui_decimal(char *s) { (void)s; }
 static char lastLookup[64]; static int lookups; static double lookupValue;

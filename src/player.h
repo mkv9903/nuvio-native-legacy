@@ -101,9 +101,6 @@ int   player_so_barra(void);
 // A mola da fileira de botoes: fecha (0) com o foco na barra, volta (1) com
 // ele embaixo. Para teste.
 float player_fileira(void);
-// #122: texto da legenda embutida entregue pelo player nativo, ja limpo.
-void  player_limpar_legenda_nativa(char *s);
-int   player_texto_legenda_nativa(char *dst, int tam);
 float player_posicao_seg(void);
 int   player_pausado(void);
 // Fator de cor do OSD do player (Ajustes > Brilho da interface no player + degrau

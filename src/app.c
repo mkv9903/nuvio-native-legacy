@@ -2420,19 +2420,8 @@ void app_atualizar(float dt, Uint32 agora) {
   posterprov_preferir_addon(ajustes_poster_addon());
   col_arte_conta(ajustes_col_arte_conta());
   // O backend precisa progredir mesmo no login, perfis e transicoes que
-  // retornam cedo: seek pendente no Tizen e prazo de recuo DV no webOS.
+  // retornam cedo: binding, seek pendente e reconexao no webOS.
   video_bombear();
-  // Dolby Vision in MKV handed playback back to the TV player (HDR10).
-  { int dvr = video_dv_recuo_consumir();
-    if (dvr) {
-      const char *t = dvr == 1
-        ? i18n("A conexão não acompanhou o Dolby Vision. Continuando em HDR10.")
-        : i18n("Dolby Vision não abriu nesta fonte. Continuando em HDR10.");
-      // The island is hidden while a film plays: the player's own toast is
-      // what the person sees there (the island alone showed it after exit).
-      if (player_aberto()) player_toast(t, 6000u);
-      else ilha_avisar("dv-mkv", ILHA_INFO, NULL, t, 6000u, 0);
-    } }
   player_validar_retido(agora);
   if (tela == TELA_LOGIN) {
     login_atualizar(dt, agora);

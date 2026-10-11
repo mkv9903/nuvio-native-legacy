@@ -15,7 +15,7 @@ mkdir -p "$tmp/nuvio-avisodisp-1"
 NUVIO_DADOS="$tmp/nuvio-avisodisp-1" "$tmp/unidade" | grep -v "^\[dados\]"
 # A central inteira: precisa do resto do app linkado (sem janela).
 sources=()
-for source in src/*.c src/dts/*.c; do
+for source in src/*.c; do
   if [ "$source" != src/main.c ]; then sources+=("$source"); fi
 done
 cc "${sources[@]}" tests/avisodisp_avisos.c -Isrc -o "$tmp/central" \

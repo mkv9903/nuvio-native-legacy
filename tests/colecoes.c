@@ -112,31 +112,18 @@ int main(void) {
   assert(col_definir_json("[{\"profile_id\":1,\"collections_json\":[{\"id\":\"r\",\"title\":\"R\",\"folders\":[{\"id\":\"g\",\"title\":\"G\",\"sources\":[{\"addonId\":\"a\",\"type\":\"movie\",\"catalogId\":\"k\"}]}]}],\"updated_at\":\"x\"}]") == 1);
   assert(!strcmp(col_folder(0)->groupId, "r"));
   puts("ok  linha da RPC com o array direto");
-  // GIF DE FOCO (#29). O pacote nao guarda URL nenhuma — ele converte o GIF em
-  // 001.jpg..090.jpg na importacao —, entao a URL so chega por aqui. Sem esta
-  // leitura as colecoes da conta nunca animam, que e o issue inteiro.
-  assert(col_definir_json("{\"collections\":[{\"id\":\"c\",\"title\":\"T\",\"folders\":["
-    "{\"id\":\"g1\",\"title\":\"Com GIF\",\"focusGifUrl\":\"https://cdn/a.gif\","
-      "\"sources\":[{\"addonId\":\"a\",\"type\":\"movie\",\"catalogId\":\"k\"}]},"
-    "{\"id\":\"g2\",\"title\":\"Sem campo\","
-      "\"sources\":[{\"addonId\":\"a\",\"type\":\"movie\",\"catalogId\":\"k\"}]},"
-    "{\"id\":\"g3\",\"title\":\"Desligado\",\"focusGifUrl\":\"https://cdn/c.gif\",\"focusGifEnabled\":false,"
-      "\"sources\":[{\"addonId\":\"a\",\"type\":\"movie\",\"catalogId\":\"k\"}]}]}]}") == 3);
-  assert(col_n() == 3);
-  assert(!strcmp(col_folder(0)->id, "g1") && !strcmp(col_folder(2)->id, "g3"));
-  puts("ok  obsolete focus animation fields are ignored");
   // pacote + conta com o mesmo id: fica a arte local, grupo/titulo da conta
   { char dir[] = "/tmp/nuvio-col-XXXXXX"; char caminho[300]; FILE *f;
     assert(mkdtemp(dir));
     snprintf(caminho, sizeof caminho, "%s/collections.json", dir); f = fopen(caminho, "w");
-    fputs("{\"groups\":[{\"id\":\"c1\",\"title\":\"Streaming\",\"folders\":[{\"id\":\"f1\",\"title\":\"Netflix\",\"cover\":\"collections/f1/cover.jpg\",\"hero\":\"collections/f1/hero.jpg\",\"frames\":12,\"sources\":[{\"title\":\"Movies\",\"base\":\"https://addon/abc\",\"type\":\"movie\",\"catId\":\"nf_movies\"}]}]}]}", f); fclose(f);
-    assert(col_carregar(dir) == 1 && col_folder(0)->local && col_folder(0)->frames == 12);
+    fputs("{\"groups\":[{\"id\":\"c1\",\"title\":\"Streaming\",\"folders\":[{\"id\":\"f1\",\"title\":\"Netflix\",\"cover\":\"collections/f1/cover.jpg\",\"hero\":\"collections/f1/hero.jpg\",\"sources\":[{\"title\":\"Movies\",\"base\":\"https://addon/abc\",\"type\":\"movie\",\"catId\":\"nf_movies\"}]}]}]}", f); fclose(f);
+    assert(col_carregar(dir) == 1 && col_folder(0)->local);
     assert(col_definir_json("{\"collections\":[{\"id\":\"c1\",\"title\":\"Streaming Renomeado\",\"folders\":[{\"id\":\"f1\",\"title\":\"Netflix\",\"coverImageUrl\":\"https://cdn/nf.webp\",\"sources\":[{\"addonId\":\"x\",\"type\":\"movie\",\"catalogId\":\"nf_movies\"}]}]},{\"id\":\"c2\",\"title\":\"Nova\",\"folders\":[{\"id\":\"f9\",\"title\":\"Nova pasta\",\"coverImageUrl\":\"https://cdn/n.webp\",\"sources\":[{\"addonId\":\"x\",\"type\":\"movie\",\"catalogId\":\"k\"}]}]}]}") == 2);
-    assert(strstr(col_folder(0)->hero, "/collections/f1/hero.jpg") && col_folder(0)->frames == 12 && col_folder(0)->local);
+    assert(strstr(col_folder(0)->hero, "/collections/f1/hero.jpg") && col_folder(0)->local);
     assert(!strcmp(col_folder(0)->group, "Streaming Renomeado") &&
            !strcmp(col_folder(0)->sources[0].addonId, "x") && !col_folder(0)->sources[0].base[0]);
     assert(!strcmp(col_folder(1)->cover, "https://cdn/n.webp") && !col_folder(1)->local);
-    puts("ok  pasta do pacote guarda arte e quadros; a conta da grupo, titulo e pastas novas"); }
+    puts("ok  pasta do pacote guarda arte; a conta da grupo, titulo e pastas novas"); }
   // "ARTE DAS PASTAS DA CONTA": desligado e o pacote (acima); ligado, capa,
   // fundo e logo da conta vencem campo a campo, e desligar de novo devolve a
   // arte curada na hora (o casamento e refeito com a ultima resposta).
@@ -145,14 +132,13 @@ int main(void) {
       "{\"collections\":[{\"id\":\"c1\",\"title\":\"S\",\"folders\":["
       "{\"id\":\"f1\",\"title\":\"Netflix\",\"coverImageUrl\":\"https://cdn/nf.webp\","
         "\"heroBackdropUrl\":\"https://cdn/nf-hero.jpg\",\"titleLogoUrl\":\"https://cdn/nf-logo.png\","
-        "\"focusGifUrl\":\"https://cdn/nf.gif\","
         "\"sources\":[{\"addonId\":\"x\",\"type\":\"movie\",\"catalogId\":\"k\"}]},"
       "{\"id\":\"f2\",\"title\":\"Prime\",\"titleLogoUrl\":\"https://cdn/pv-logo.png\","
         "\"sources\":[{\"addonId\":\"x\",\"type\":\"movie\",\"catalogId\":\"k\"}]}]}]}";
     assert(mkdtemp(dir));
     snprintf(caminho, sizeof caminho, "%s/collections.json", dir); f = fopen(caminho, "w");
     fputs("{\"groups\":[{\"id\":\"c1\",\"title\":\"S\",\"folders\":["
-          "{\"id\":\"f1\",\"title\":\"Netflix\",\"cover\":\"c/f1.jpg\",\"hero\":\"c/f1h.jpg\",\"logo\":\"c/f1l.png\",\"frames\":12,"
+          "{\"id\":\"f1\",\"title\":\"Netflix\",\"cover\":\"c/f1.jpg\",\"hero\":\"c/f1h.jpg\",\"logo\":\"c/f1l.png\","
             "\"sources\":[{\"title\":\"M\",\"base\":\"https://a\",\"type\":\"movie\",\"catId\":\"k\"}]},"
           "{\"id\":\"f2\",\"title\":\"Prime\",\"cover\":\"c/f2.jpg\",\"hero\":\"c/f2h.jpg\",\"logo\":\"c/f2l.png\","
             "\"sources\":[{\"title\":\"M\",\"base\":\"https://a\",\"type\":\"movie\",\"catId\":\"k\"}]}]}]}", f);
@@ -160,11 +146,11 @@ int main(void) {
     col_arte_conta(0);
     assert(col_carregar(dir) == 2);
     assert(col_definir_json(conta) == 2);
-    assert(strstr(col_folder(0)->cover, "c/f1.jpg") && col_folder(0)->frames == 12);
+    assert(strstr(col_folder(0)->cover, "c/f1.jpg"));
     assert(strstr(col_folder(1)->logo, "c/f2l.png"));
     col_arte_conta(1);   // refaz na hora, sem nova resposta da conta
     assert(col_n() == 2 && col_folder(0)->local && col_folder(1)->local);
-    assert(!strcmp(col_folder(0)->cover, "https://cdn/nf.webp") && col_folder(0)->frames == 0);
+    assert(!strcmp(col_folder(0)->cover, "https://cdn/nf.webp"));
     assert(!strcmp(col_folder(0)->hero, "https://cdn/nf-hero.jpg") && !col_folder(0)->editorial);
     assert(!strcmp(col_folder(0)->logo, "https://cdn/nf-logo.png"));
     // So o logo na conta: capa e fundo continuam os do pacote.
@@ -173,33 +159,10 @@ int main(void) {
     assert(col_definir_json(conta) == 2);   // ciclo de sync com o ajuste ligado: estavel
     assert(!strcmp(col_folder(0)->cover, "https://cdn/nf.webp"));
     col_arte_conta(0);   // desligar devolve a arte curada
-    assert(strstr(col_folder(0)->cover, "c/f1.jpg") && col_folder(0)->frames == 12 &&
+    assert(strstr(col_folder(0)->cover, "c/f1.jpg") &&
            strstr(col_folder(0)->hero, "c/f1h.jpg") && strstr(col_folder(1)->logo, "c/f2l.png"));
     remove(caminho); rmdir(dir);
     puts("ok  arte das pastas da conta: desligado o pacote, ligado a conta campo a campo, volta na hora"); }
-  { char dir[] = "/tmp/nuvio-colgif-XXXXXX"; char caminho[300]; FILE *f;
-    const char *conta =
-      "{\"collections\":[{\"id\":\"c1\",\"title\":\"G\",\"folders\":["
-      "{\"id\":\"comq\",\"title\":\"Com quadros\",\"focusGifUrl\":\"https://cdn/q.gif\","
-        "\"sources\":[{\"addonId\":\"a\",\"type\":\"movie\",\"catalogId\":\"k\"}]},"
-      "{\"id\":\"semq\",\"title\":\"Sem quadros\",\"focusGifUrl\":\"https://cdn/s.gif\","
-        "\"sources\":[{\"addonId\":\"a\",\"type\":\"movie\",\"catalogId\":\"k\"}]}]}]}";
-    assert(mkdtemp(dir));
-    snprintf(caminho, sizeof caminho, "%s/collections.json", dir); f = fopen(caminho, "w");
-    fputs("{\"groups\":[{\"id\":\"c1\",\"title\":\"G\",\"folders\":["
-          "{\"id\":\"comq\",\"title\":\"Com quadros\",\"frames\":12,"
-            "\"sources\":[{\"title\":\"M\",\"base\":\"https://a\",\"type\":\"movie\",\"catId\":\"k\"}]},"
-          "{\"id\":\"semq\",\"title\":\"Sem quadros\",\"frames\":0,"
-            "\"sources\":[{\"title\":\"M\",\"base\":\"https://a\",\"type\":\"movie\",\"catId\":\"k\"}]}]}]}", f);
-    fclose(f);
-    assert(col_carregar(dir) == 2);
-    assert(col_folder(0)->frames == 12 && col_folder(1)->frames == 0);
-    assert(col_definir_json(conta) == 2);
-    assert(col_folder(0)->frames == 12);
-    assert(col_folder(1)->frames == 0);
-    assert(col_folder(0)->local && col_folder(1)->local);
-    remove(caminho); rmdir(dir);
-    puts("ok  JPEG sequences survive account data with obsolete animation fields"); }
   // OS QUATRO NIVEIS DE col_diagnostico. O que este teste guarda nao e a
   // funcao e sim a CAPACIDADE DE SEPARAR causas: os quatro casos abaixo
   // produzem hoje o mesmo sintoma na tela (fileira solta na home, #18) e o

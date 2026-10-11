@@ -109,20 +109,6 @@ void net_job_release(NetJob *job);
 void net_job_cancel(NetJob *job);
 NetError net_job_state(NetJob *job);
 
-/* Bounded, validated byte ranges for the local DTS demuxer. Unlike the old
- * long-offset API this works past 2 GiB on ARM. Only matching HTTP 206 bodies
- * are accepted; total is -1 when unknown. Caller frees the returned buffer.
- * Raw headers use one Name: value per line. Credentials are stripped when a
- * redirect changes origin. Cancelling also interrupts an idle transfer. */
-char *net_download_range64_final(const char *url, const char *headers,
-                                 int64_t start, int64_t end, long *size,
-                                 int64_t *total, int *status,
-                                 volatile int *cancelled, char *final, int *cross);
-char *net_download_range64_headers(const char *url, const char *headers,
-                                   int64_t start, int64_t end, long *size,
-                                   int64_t *total, int *status,
-                                   volatile int *cancelled);
-
 typedef struct NetMeasurement {
   int status;                              // 0 = transport without response
   long bytes;                              // received body; -1 when not measured
@@ -420,14 +406,6 @@ void rede_job_soltar(RedeJob *j);
 void rede_job_cancelar(RedeJob *j);
 RedeErro rede_job_estado(RedeJob *j);
 
-char *rede_baixar_trecho64_final(const char *url, const char *headers,
-                                 int64_t start, int64_t end, long *size,
-                                 int64_t *total, int *status,
-                                 volatile int *cancelled, char *final, int *cross);
-char *rede_baixar_trecho64_cab(const char *url, const char *headers,
-                               int64_t start, int64_t end, long *size,
-                               int64_t *total, int *status,
-                               volatile int *cancelled);
 char *rede_baixar(const char *url, int s);
 char *rede_baixar_bin(const char *url, int s, long *n);
 char *rede_baixar_com(const char *u, int s, const char *const *h);

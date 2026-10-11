@@ -180,21 +180,6 @@ static void testar(void) {
   teclaPlayer(SDLK_RIGHT);
   teclaPlayer(SDLK_PAUSE);teclaPlayer(SDLK_RETURN);assert(player_pediu_faixas()==0);
   player_encerrar();
-  // #122: o texto que o AVPlay entrega no onsubtitlechange vira texto puro
-  // para o overlay (SRT com tags HTML, ASS com {\tags} e \N).
-  { char t[256];
-    snprintf(t,sizeof t,"<i>Olá</i><br/><font color=\"#ff0\">mundo</font>\n");
-    player_limpar_legenda_nativa(t);assert(!strcmp(t,"Olá\nmundo"));
-    snprintf(t,sizeof t,"{\\an8}{\\i1}Letreiro\\Nsegunda\\hlinha{\\i0}");
-    player_limpar_legenda_nativa(t);assert(!strcmp(t,"Letreiro\nsegunda linha"));
-    // Como o AVPlay do Tizen 10 entregou de verdade (emulador, MKV com SRT):
-    // "Primeira fala\r\u0000" — o NUL corta a string, o \r sobra.
-    snprintf(t,sizeof t,"Primeira fala\r");
-    player_limpar_legenda_nativa(t);assert(!strcmp(t,"Primeira fala"));
-    snprintf(t,sizeof t,"Tom &amp; Jerry &lt;3");
-    player_limpar_legenda_nativa(t);assert(!strcmp(t,"Tom & Jerry <3"));
-    // Fora da Samsung nao ha legenda embutida para o app desenhar.
-    assert(!player_texto_legenda_nativa(t,sizeof t)&&!t[0]); }
   // #121: com os controles ESCONDIDOS, esquerda/direita e busca, como no
   // YouTube e na Netflix — os controles sobem com o foco NA BARRA e o primeiro
   // toque ja anda 10 s. Antes subiam com o foco nos botoes e o toque seguinte
@@ -466,6 +451,9 @@ static void captura(const char *nome,SDL_Window *win,int painel) {
   }
 }
 int main(int argc,char **argv) {
+  // Match app startup: initialize networking before the player starts workers.
+  // Otherwise this short test can exit while a worker initializes OpenSSL.
+  rede_preparar();
   assert(SDL_Init(SDL_INIT_VIDEO|SDL_INIT_TIMER)==0);
   testar();
   if(argc<2)return 0;

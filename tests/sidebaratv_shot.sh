@@ -12,7 +12,7 @@ NUVIO_DADOS=$(mktemp -d "${TMPDIR:-/tmp}/nuvio-sidebaratv.XXXXXX")
 export NUVIO_DADOS
 trap 'rm -rf "$NUVIO_DADOS"' EXIT
 sources=()
-for source in src/*.c src/dts/*.c; do
+for source in src/*.c; do
   if [ "$source" != src/main.c ]; then sources+=("$source"); fi
 done
 cc "${sources[@]}" tests/sidebaratv_shot.c -Isrc -o "$NUVIO_DADOS/shot" \
