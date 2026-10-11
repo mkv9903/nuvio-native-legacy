@@ -16,7 +16,8 @@ LIBASS_VERSION=${LIBASS_VERSION:-0.17.5}
 
 mkdir -p "$BUILD" "$PREFIX"
 export AR RANLIB CC CXX
-export CFLAGS="${CFLAGS:--O2 -fPIC}"
+export CFLAGS="${CFLAGS:--O2 -g -fPIC}"
+export CXXFLAGS="${CXXFLAGS:--O2 -g -fPIC}"
 export LDFLAGS="${LDFLAGS:---sysroot=$SYSROOT}"
 # The SDK ships its cross pkg-config alongside the compiler. Meson must use
 # it so HarfBuzz can resolve the FreeType .pc file from the prefix being built.
@@ -50,7 +51,14 @@ cd "$BUILD/harfbuzz-${HARFBUZZ_VERSION}"
 export PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig"
 export PKG_CONFIG_LIBDIR="$PREFIX/lib/pkgconfig"
 printf '%s\n' "[binaries]" "c = '$CC'" "cpp = '$CXX'" "ar = '$AR'" "strip = '$STRIP'" "pkg-config = '$PKG_CONFIG'" "" "[properties]" "sys_root = '$SYSROOT'" "" "[built-in options]" "c_args = ['-I$PREFIX/include/freetype2']" "cpp_args = ['-I$PREFIX/include/freetype2']" "" "[host_machine]" "system = 'linux'" "kernel = 'linux'" "subsystem = 'linux'" "cpu_family = 'arm'" "cpu = 'armv7'" "endian = 'little'" > "$BUILD/ass-cross.ini"
-meson setup build --cross-file "$BUILD/ass-cross.ini" --prefix="$PREFIX" -Ddefault_library=static -Dglib=disabled -Dgraphite=disabled -Dicu=disabled -Dcairo=disabled -Dtests=disabled -Ddocs=disabled -Dutilities=disabled -Dfreetype=enabled
+# Optimize the text shaper and keep symbols for the separate debug artifact.
+# Meson's default build type is debug (-O0), including its C++ sources.
+set -- setup build --cross-file "$BUILD/ass-cross.ini" --prefix="$PREFIX" \
+  --buildtype=debugoptimized -Ddefault_library=static -Dglib=disabled \
+  -Dgraphite=disabled -Dicu=disabled -Dcairo=disabled -Dtests=disabled \
+  -Ddocs=disabled -Dutilities=disabled -Dfreetype=enabled
+if [ -f build/meson-private/coredata.dat ]; then set -- "$@" --reconfigure; fi
+meson "$@"
 meson compile -C build -j2; meson install -C build
 
 fetch "https://github.com/libass/libass/releases/download/${LIBASS_VERSION}/libass-${LIBASS_VERSION}.tar.xz" libass.tar.xz
@@ -63,4 +71,5 @@ make -j2; make install
 
 test -f "$PREFIX/include/ass/ass.h"
 test -f "$PREFIX/lib/libass.a"
+printf 'debugoptimized\n' > "$PREFIX/.nuvio-build-type"
 echo "ASS ARM dependencies installed in $PREFIX"

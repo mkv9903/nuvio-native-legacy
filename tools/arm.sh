@@ -1,5 +1,5 @@
 #!/bin/bash
-# Compiles for ARM and installs on TV via DIRECT COPY. Full cycle (~30s).
+# Compiles an optimized webOS release and installs on TV via DIRECT COPY.
 #
 #   bash tools/arm.sh            # compile, copy, verify, and launch
 #   bash tools/arm.sh --build    # compile only
@@ -15,6 +15,9 @@
 #                                # title stamp indicates "high cache".
 #                                # Standard build calculates budget dynamically
 #                                # at launch from RAM.
+#   bash tools/arm.sh --debug --ipk --build
+#                                # unstripped optimized build, -debug IPK.
+# Symbols for either mode are archived under build/webos/ by build ID.
 #
 # Does NOT use appInstallService: it reports success without replacing the binary.
 #
@@ -43,32 +46,63 @@ fi
 CONTAINER_RUNTIME="${NUVIO_CONTAINER_RUNTIME:-docker}"
 BUILD_PLATFORM="${NUVIO_BUILD_PLATFORM:-linux/arm64}"
 SDK_IMAGE="${NUVIO_SDK_IMAGE:-nuvio-webos-sdk}"
-# --high-cache can come before or after --build/--ipk. Only alters a -D and names;
-# code remains identical — variant does not require separate branch.
+BUILD_ONLY=0
+MAKE_IPK=0
+BUILD_MODE=release
+SELECTED_MODE=""
 VARIANTE=""
-if [ "$1" = "--alto-cache" ] || [ "$1" = "--high-cache" ]; then shift; VARIANTE="highcache"; fi
-if [ "$2" = "--alto-cache" ] || [ "$2" = "--high-cache" ]; then set -- "$1"; VARIANTE="highcache"; fi
-if [ "$3" = "--alto-cache" ] || [ "$3" = "--high-cache" ]; then set -- "$1" "$2"; VARIANTE="highcache"; fi
+for option in "$@"; do
+  case "$option" in
+    --build) BUILD_ONLY=1 ;;
+    --ipk) MAKE_IPK=1 ;;
+    --high-cache|--alto-cache) VARIANTE=highcache ;;
+    --release|--debug)
+      mode=${option#--}
+      if [ -n "$SELECTED_MODE" ] && [ "$SELECTED_MODE" != "$mode" ]; then
+        echo 'arm.sh: choose either --release or --debug' >&2; exit 2
+      fi
+      BUILD_MODE=$mode; SELECTED_MODE=$mode ;;
+    --help|-h)
+      echo 'Usage: bash tools/arm.sh [--release|--debug] [--ipk] [--build] [--high-cache]'
+      echo 'Default: optimized, stripped release with separate symbols in build/webos/.'
+      echo 'Use --build to stop before TV deployment; --ipk also creates a package.'
+      exit 0 ;;
+    *) echo "arm.sh: unknown option: $option" >&2; exit 2 ;;
+  esac
+done
 if [ "$VARIANTE" = "highcache" ]; then
   export NUVIO_EXTRA_CFLAGS="${NUVIO_EXTRA_CFLAGS:-} -DNV_TEX_MB_FIXO=300"
   echo "==> HIGH CACHE variant (300 MB textures)"
 fi
 
-echo "==> compiling for ARM"
+BUILD_COMMIT=$(git rev-parse HEAD)
+BUILD_DIRTY=0
+BUILD_LABEL=${BUILD_COMMIT:0:12}
+if [ -n "$(git status --porcelain)" ]; then
+  BUILD_DIRTY=1; BUILD_LABEL="$BUILD_LABEL-dirty"
+fi
+
+echo "==> compiling for ARM ($BUILD_MODE)"
 # Server configuration enters via ENVIRONMENT VARIABLES and -Ds are assembled
 # inside container. Passing them via `sh -c` command line would require nested quotes
 # and fail silently: empty macro, binary builds and installs, login screen says
 # "package assembled without server".
 # Single cleanup function handles temporary files:
-CLEANUP_FILES=""
-cleanup() { [ -n "$CLEANUP_FILES" ] && rm -rf $CLEANUP_FILES; }
+CLEANUP_FILES=()
+cleanup() { rm -rf -- "${CLEANUP_FILES[@]}"; }
 trap cleanup EXIT
-ENVF=$(mktemp "${TMPDIR:-/tmp}/nuvio-arm-env.XXXXXXXX"); CLEANUP_FILES="$CLEANUP_FILES $ENVF"
+ENVF=$(mktemp "${TMPDIR:-/tmp}/nuvio-arm-env.XXXXXXXX"); CLEANUP_FILES+=("$ENVF")
 tools/env.sh --env-file "$ENVF"
 
+# Container variables must expand inside the SDK, not on the host.
+# shellcheck disable=SC2016
 "$CONTAINER_RUNTIME" run --rm --platform "$BUILD_PLATFORM" --env-file "$ENVF" \
   -e NUVIO_EXTRA_CFLAGS="${NUVIO_EXTRA_CFLAGS:-}" \
   -e NUVIO_ASS_LIBASS="${NUVIO_ASS_LIBASS:-1}" \
+  -e NUVIO_BUILD_MODE="$BUILD_MODE" \
+  -e NUVIO_BUILD_COMMIT="$BUILD_COMMIT" \
+  -e NUVIO_BUILD_DIRTY="$BUILD_DIRTY" \
+  -e NUVIO_BUILD_LABEL="$BUILD_LABEL" \
   -v "$PWD":/work:z "$SDK_IMAGE" sh -c '
   set -e
   SR=$NUVIO_SYSROOT
@@ -77,10 +111,14 @@ tools/env.sh --env-file "$ENVF"
   ASS_LIBS=""
   if [ "${NUVIO_ASS_LIBASS:-1}" = "1" ]; then
     [ -f "$ASS/include/ass/ass.h" ] || { echo "libass ARM missing in image; rebuild tools/Dockerfile or use NUVIO_ASS_LIBASS=0" >&2; exit 2; }
+    if [ ! -f "$ASS/.nuvio-build-type" ] || [ "$(cat "$ASS/.nuvio-build-type")" != debugoptimized ]; then
+      echo "ARM subtitle libraries need rebuilding: docker build --platform linux/arm64 -t nuvio-webos-sdk tools/" >&2
+      exit 2
+    fi
     ASS_CFLAGS="-DNV_ASS_LIBASS -I$ASS/include"
     ASS_LIBS="-L$ASS/lib -Wl,--start-group -lass -lharfbuzz -lfribidi -lfreetype -Wl,--end-group"
   fi
-  arm-webos-linux-gnueabi-gcc src/*.c -o nuvio-proto.arm -O2 -DNV_WEBOS $NUVIO_EXTRA_CFLAGS $ASS_CFLAGS \
+  arm-webos-linux-gnueabi-gcc src/*.c -o nuvio-proto.arm -O2 -g -DNV_WEBOS $NUVIO_EXTRA_CFLAGS $ASS_CFLAGS \
     -DNV_SUPABASE_URL="\"$NV_SUPABASE_URL\"" \
     -DNV_SUPABASE_ANON_KEY="\"$NV_SUPABASE_ANON_KEY\"" \
     -DNV_TV_LOGIN_BASE="\"$NV_TV_LOGIN_BASE\"" \
@@ -93,12 +131,20 @@ tools/env.sh --env-file "$ENVF"
     -DNV_VERSAO="\"$NV_VERSAO\"" \
     -I$SR/usr/include -I$SR/usr/include/SDL2 \
     -lSDL2 -lSDL2_image -lSDL2_ttf -lGLESv2 -lEGL -ldl -lpthread -lz -lm $ASS_LIBS \
-    -Wl,--exclude-libs,ALL
+    -Wl,--exclude-libs,ALL -Wl,--build-id=sha1
   # Keep static FreeType private: older TV SDL_ttf must use its own ABI.
+  mkdir -p build/webos
+  NUVIO_OBJCOPY=arm-webos-linux-gnueabi-objcopy \
+  NUVIO_STRIP=arm-webos-linux-gnueabi-strip \
+  NUVIO_READELF=arm-webos-linux-gnueabi-readelf \
+  NUVIO_ARTIFACT_PLATFORM=webos NUVIO_ARTIFACT_VERSION="$NV_VERSAO" \
+    bash tools/split-symbols.sh nuvio-proto.arm "build/webos/$NUVIO_BUILD_LABEL" "$NUVIO_BUILD_MODE" \
+    > "build/webos/latest-$NUVIO_BUILD_MODE.txt"
   # Remove generated payloads left by builds of the retired converter.
   rm -f deploy/app/lib/dts-starfish-webos*.so
   rm -rf deploy/app/licenses/dts
 '
+echo "    symbols and build hashes: $(cat "build/webos/latest-$BUILD_MODE.txt")"
 
 # Verify configuration arrived in binary.
 while IFS='=' read -r NAME VALOR; do
@@ -114,7 +160,6 @@ while IFS='=' read -r NAME VALOR; do
 done < "$ENVF"
 
 cp nuvio-proto.arm deploy/app/nuvio-proto
-rm -f ./*.ipk
 
 # Package from clean copy, never deploy/app directly:
 USER_FILES="trakt.txt addons.txt tmdb.txt mdblist.txt ajustes.txt
@@ -125,20 +170,25 @@ USER_COLLECTIONS="collections.json catalogo-rede.bin catalogo-rede.bin.tmp"
 USER_DIRS="collections"
 
 # The same allowlisted payload is used by IPKs and direct SSH deployments.
-STAGING=$(mktemp -d "${TMPDIR:-/tmp}/nuvio-arm-pacote.XXXXXXXX"); CLEANUP_FILES="$CLEANUP_FILES $STAGING"
+STAGING=$(mktemp -d "${TMPDIR:-/tmp}/nuvio-arm-pacote.XXXXXXXX"); CLEANUP_FILES+=("$STAGING")
 bash tools/stage-webos.sh deploy/app "$STAGING/app"
 
-if [ "$1" = "--ipk" ]; then
+if [ "$MAKE_IPK" = 1 ]; then
   echo "==> packaging (without credentials)"
-  "$ARES" "$STAGING/app" -o .
-  IPK=$(ls -t ./*.ipk | head -1)
-  if [ -n "$VARIANTE" ]; then
-    NOVO="${IPK%.ipk}-$VARIANTE.ipk"
-    mv -f "$IPK" "$NOVO"; IPK="$NOVO"
+  mkdir "$STAGING/packages"
+  "$ARES" "$STAGING/app" -o "$STAGING/packages"
+  PACKAGES=("$STAGING/packages/"*.ipk)
+  if [ "${#PACKAGES[@]}" -ne 1 ] || [ ! -f "${PACKAGES[0]}" ]; then
+    echo '    ABORTED: expected exactly one generated IPK' >&2; exit 1
   fi
+  IPK=${PACKAGES[0]}
+  PACKAGE_NAME=$(basename "${IPK%.ipk}")
+  [ -n "$VARIANTE" ] && PACKAGE_NAME="$PACKAGE_NAME-$VARIANTE"
+  [ "$BUILD_MODE" = debug ] && PACKAGE_NAME="$PACKAGE_NAME-debug"
+  PACKAGE_NAME="$PACKAGE_NAME.ipk"
 
   # Verify finished package contents:
-  PKG_LIST=$(cd "$STAGING" && ar x "$OLDPWD/$IPK" 2>/dev/null && tar tzf data.tar.gz 2>/dev/null)
+  PKG_LIST=$(cd "$STAGING" && ar x "$IPK" 2>/dev/null && tar tzf data.tar.gz 2>/dev/null)
   if [ -z "$PKG_LIST" ]; then
     echo "    ABORTED: could not read package contents to verify; will not claim it is clean"
     rm -f "$IPK"
@@ -149,7 +199,7 @@ if [ "$1" = "--ipk" ]; then
     printf '%s\n' "$PKG_LIST" | grep -q "art/$f$" && LEAKED="$LEAKED $f"
   done
   for pre in stalker-p xtream-p listas-p trakt-p trakt-fluxo-p simkl-p; do
-    printf '%s\n' "$PKG_LIST" | grep -qE "art/$pre[0-9]+\.txt$" && LEAKED="$LEAKED $pre*.txt"
+    printf '%s\n' "$PKG_LIST" | grep -qE "art/${pre}[0-9]+\.txt$" && LEAKED="$LEAKED $pre*.txt"
   done
   printf '%s\n' "$PKG_LIST" | grep -qE "art/(trakt-fluxo|simkl)\.txt$" && LEAKED="$LEAKED trakt-fluxo.txt/simkl.txt"
   printf '%s\n' "$PKG_LIST" | grep -qE '(^|/)conta-[^/]*\.txt(\.tmp)?$' && LEAKED="$LEAKED conta-*.txt/conta-*.txt.tmp"
@@ -158,6 +208,7 @@ if [ "$1" = "--ipk" ]; then
     printf '%s\n' "$PKG_LIST" | grep -q "art/$d/" && LEAKED="$LEAKED $d/"
   done
   printf '%s\n' "$PKG_LIST" | grep -qE 'art/(cinematic|editorial|poster|logo|ep|elenco|prov)/|art/[0-9][0-9]\.jpg$|art/(catalogo|ids|elenco|episodios|extra|LEIA-ME-addons)\.txt$' && LEAKED="$LEAKED sample catalog/artwork"
+  printf '%s\n' "$PKG_LIST" | grep -qE '(^|/)(build|symbols)/|\.debug$|(^|/)build\.json$|\.(full|unstripped)$' && LEAKED="$LEAKED developer symbol artifacts"
   if [ -n "$LEAKED" ]; then
     echo "    ABORTED: package contains private or sample data ->$LEAKED"
     rm -f "$IPK"
@@ -169,10 +220,11 @@ if [ "$1" = "--ipk" ]; then
     rm -f "$IPK"
     exit 1
   fi
-  echo "    $IPK ($(du -h "$IPK" | cut -f1)) — without private data or sample catalogs/artwork"
+  cp "$IPK" "$PACKAGE_NAME"
+  echo "    $PACKAGE_NAME ($(du -h "$PACKAGE_NAME" | cut -f1)) — without private data, sample catalogs/artwork, or symbol files"
 fi
 
-if [ "$1" = "--build" ] || [ "$2" = "--build" ]; then exit 0; fi
+if [ "$BUILD_ONLY" = 1 ]; then exit 0; fi
 
 # Direct SSH deploy to rooted TV:
 APPDIR=/media/developer/apps/usr/palm/applications/$APP_ID

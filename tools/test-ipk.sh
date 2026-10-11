@@ -1,9 +1,8 @@
 #!/bin/bash
 # Verifies that .ipk does NOT contain user credentials — without requiring docker.
 #
-# Runs only the packaging portion of arm.sh (same staging, same exclusion list,
-# same verification) using nuvio-proto already present in deploy/app.
-# Normal development cycle requires compiling for ARM, and this avoids full 30s build.
+# Packages the same allowlisted payload as arm.sh, using the executable already
+# present in deploy/app, without recompiling or contacting a TV.
 #
 # TWO PITFALLS this test prevents:
 #   1. `ares-package deploy/app` includes entire directory, and art/ contains Trakt
@@ -14,29 +13,56 @@
 #      Must unpack `ar` and inspect data.tar.gz.
 set -e
 cd "$(dirname "$0")/.."
-ARES="${NUVIO_ARES_PACKAGE:-../NuvioWeb-0.3.38-beta/node_modules/.bin/ares-package}"
-USER_FILES="trakt.txt addons.txt tmdb.txt mdblist.txt ajustes.txt
-            progresso.txt nuvem.txt sessao.txt perfil.txt cliente.txt home-pos.txt debrid.txt fanart.txt p2p.txt"
+if [ -n "${NUVIO_ARES_PACKAGE:-}" ]; then
+  ARES="$NUVIO_ARES_PACKAGE"
+elif [ -x "../NuvioWeb-0.3.38-beta/node_modules/.bin/ares-package" ]; then
+  ARES="../NuvioWeb-0.3.38-beta/node_modules/.bin/ares-package"
+else
+  ARES="$(command -v ares-package || echo ares-package)"
+fi
 STAGING=$(mktemp -d)
 trap 'rm -rf "$STAGING"' EXIT
-cp -R deploy/app "$STAGING/app"
-rm -rf "$STAGING/app/art/cache"
-for f in $USER_FILES; do rm -f "$STAGING/app/art/$f"; done
+bash tools/stage-webos.sh deploy/app "$STAGING/app"
 
-OUTPUT_DIR=$(mktemp -d)
+OUTPUT_DIR="$STAGING/packages"
+mkdir "$OUTPUT_DIR"
 "$ARES" "$STAGING/app" -o "$OUTPUT_DIR" >/dev/null
-IPK=$(ls -t "$OUTPUT_DIR"/*.ipk | head -1)
+PACKAGES=("$OUTPUT_DIR/"*.ipk)
+if [ "${#PACKAGES[@]}" -ne 1 ] || [ ! -f "${PACKAGES[0]}" ]; then
+  echo 'ABORTED: expected exactly one generated IPK' >&2; exit 1
+fi
+IPK=${PACKAGES[0]}
 
 PKG_LIST=$(cd "$STAGING" && ar x "$IPK" 2>/dev/null && tar tzf data.tar.gz 2>/dev/null)
 [ -z "$PKG_LIST" ] && { echo "ABORTED: could not read package to verify"; exit 1; }
 
 echo "test package: $(du -h "$IPK" | cut -f1)"
-echo ".txt files inside art/:"
-printf '%s\n' "$PKG_LIST" | grep -E "art/.*\.txt$" | sed 's|.*/art/|  |' | sort
-LEAKED=""
-for f in $USER_FILES; do
-  printf '%s\n' "$PKG_LIST" | grep -q "art/$f$" && LEAKED="$LEAKED $f"
-done
-rm -rf "$OUTPUT_DIR"
-if [ -n "$LEAKED" ]; then echo "FAILED: package contains credentials ->$LEAKED"; exit 1; fi
-echo "OK: zero credentials in package"
+python3 - "$STAGING/app" "$STAGING/data.tar.gz" <<'PY'
+import json, pathlib, sys, tarfile
+source = pathlib.Path(sys.argv[1])
+prefix = 'usr/palm/applications/space.mkv.nuvio.native/'
+expected = {prefix + p.relative_to(source).as_posix(): p for p in source.rglob('*') if p.is_file()}
+package_info = 'usr/palm/packages/space.mkv.nuvio.native/packageinfo.json'
+app_info = json.loads((source / 'appinfo.json').read_text())
+found_info = False
+# Stream once; repeatedly seeking in gzip would decompress the app hundreds of times.
+with tarfile.open(sys.argv[2], mode='r|gz') as archive:
+    for member in archive:
+        if member.isdir():
+            continue
+        assert member.isfile(), 'unexpected link or special file'
+        name = member.name.removeprefix('./')
+        assert not name.endswith('.debug') and not name.endswith('/build.json')
+        if name == package_info:
+            assert not found_info, 'duplicate package metadata'
+            info = json.load(archive.extractfile(member))
+            assert info['id'] == app_info['id'] and info['version'] == app_info['version']
+            found_info = True
+            continue
+        assert name in expected, 'file outside allowlisted payload: ' + name
+        assert archive.extractfile(member).read() == expected.pop(name).read_bytes(), name
+        if name == prefix + 'nuvio-proto':
+            assert member.mode == 0o755, 'executable permissions changed'
+assert found_info and not expected, 'missing package metadata or runtime files'
+PY
+echo "OK: exact allowlisted payload, executable mode, no private/sample data or symbol files"

@@ -65,13 +65,37 @@ Build the SDK image and compile/package without deploying to a TV:
 ```bash
 docker build --platform linux/arm64 -t nuvio-webos-sdk tools/
 bash tools/arm.sh --build
-bash tools/arm.sh --ipk --build
+bash tools/arm.sh --release --ipk --build
 ```
 
 Packaging requires `ares-package`. Configure server/API values through
 `local.properties` or the variables read by `tools/env.sh`; keep credentials out
 of version control. The SDK includes libass for styled subtitles.
 See the [installation guide](INSTALL.md).
+
+webOS builds default to release mode: the app and subtitle libraries are optimized
+with `-O2`, and debug sections are removed from the shipped executable. Logging,
+local diagnostics and crash capture stay enabled. Matching symbols, a copy of the
+shipped executable and their hashes are saved under
+`build/webos/<commit>/<build-id>/release/`. A modified working tree adds `-dirty`
+to the commit folder. `build/webos/latest-release.txt` records the latest folder.
+Keep that folder with each distributed IPK to diagnose crashes from that build.
+
+For an optimized build with symbols still inside the executable, use:
+
+```bash
+bash tools/arm.sh --debug --ipk --build
+```
+
+Debug IPKs have a `-debug.ipk` suffix and do not overwrite release IPKs. Their
+artifacts are recorded in `build/webos/latest-debug.txt`. Both modes include an
+ELF build ID and a debug link to the matching `.debug` file. Symbol archives are
+local build artifacts and are excluded from IPKs and Git. Linux preview continues
+to use `-O1 -g` for development.
+
+After updating the build scripts, rebuild the SDK image using the command above;
+the build rejects older subtitle libraries that were compiled without the new
+optimization settings.
 
 LG playback uses the TV's native player. The app does not bundle FFmpeg or
 convert DTS audio, and there is no experimental Dolby Vision MKV pipeline.

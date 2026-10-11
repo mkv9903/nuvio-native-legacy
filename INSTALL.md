@@ -3,11 +3,15 @@
 Build your personal fork without deploying it:
 
 ```bash
-bash tools/arm.sh --ipk --build
+bash tools/arm.sh --release --ipk --build
 ```
 
 The package excludes saved account credentials. `tools/test-ipk.sh` checks the
 package, and `arm.sh` verifies its contents during packaging.
+The release executable is stripped; matching symbols and build hashes stay in
+`build/webos/` (see `build/webos/latest-release.txt`). Preserve that folder for
+crash analysis. `--debug` produces an unstripped `-debug.ipk` instead. Logging and
+local crash capture remain enabled in both modes.
 
 This app is **Nuvio Native**, package ID `space.mkv.nuvio.native`. Install it as
 a separate app and sign in again. It starts with fresh local data and leaves

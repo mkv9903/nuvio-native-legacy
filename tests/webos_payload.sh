@@ -25,6 +25,10 @@ for file in 00.jpg 39.jpg catalogo.txt ids.txt elenco.txt episodios.txt extra.tx
 done
 mkdir -p "$source_app/lib" "$source_app/licenses/dts"
 printf 'retired converter\n' > "$source_app/lib/dts-starfish-webos.so"
+mkdir -p "$source_app/build/symbols"
+for file in nuvio-proto.debug nuvio-proto.full build.json build/symbols/app.debug; do
+  printf 'developer artifact\n' > "$source_app/$file"
+done
 
 bash tools/stage-webos.sh "$source_app" "$scratch/payload"
 python3 - "$source_app" "$scratch/payload" <<'PY'
