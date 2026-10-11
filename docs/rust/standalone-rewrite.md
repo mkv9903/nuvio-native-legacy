@@ -110,6 +110,9 @@ and the known working integration, then implement them directly in Rust.
 
 ## Completion evidence
 
+See [implementation progress](standalone-progress.md) for current coverage and
+the remaining work toward the first prototype.
+
 Track feature coverage explicitly rather than promising a line count. Retain
 unit and service integration tests, synthetic account/profile fixtures, Linux
 rendered screenshots/navigation checks, runtime memory observations, dependency

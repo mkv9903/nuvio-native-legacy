@@ -2,14 +2,60 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(from = "ProfileWire")]
 pub struct Profile {
     pub profile_index: u32,
     #[serde(default)]
     pub name: String,
     #[serde(default)]
     pub is_primary: bool,
-    #[serde(default, alias = "uses_primary_plugins")]
     pub uses_primary_addons: bool,
+    pub avatar_url: String,
+    pub background_url: String,
+    pub color_hex: String,
+    pub has_pin: bool,
+}
+
+#[derive(Deserialize)]
+struct ProfileWire {
+    profile_index: Option<u32>,
+    id: Option<u32>,
+    name: Option<String>,
+    is_primary: Option<bool>,
+    uses_primary_addons: Option<bool>,
+    uses_primary_plugins: Option<bool>,
+    avatar_url: Option<String>,
+    profile_background_url: Option<String>,
+    avatar_color_hex: Option<String>,
+    pin_enabled: Option<bool>,
+}
+
+impl From<ProfileWire> for Profile {
+    fn from(wire: ProfileWire) -> Self {
+        let index = wire
+            .profile_index
+            .filter(|v| *v > 0)
+            .or(wire.id)
+            .unwrap_or(0);
+        Self {
+            profile_index: index,
+            name: wire
+                .name
+                .filter(|v| !v.is_empty())
+                .unwrap_or_else(|| format!("Profile {index}")),
+            is_primary: wire.is_primary.unwrap_or(index == 1),
+            uses_primary_addons: wire
+                .uses_primary_addons
+                .or(wire.uses_primary_plugins)
+                .unwrap_or(false),
+            avatar_url: wire.avatar_url.unwrap_or_default(),
+            background_url: wire.profile_background_url.unwrap_or_default(),
+            color_hex: wire
+                .avatar_color_hex
+                .unwrap_or_else(|| "#1E88E5".to_owned()),
+            has_pin: wire.pin_enabled.unwrap_or(false),
+        }
+    }
 }
 
 impl Profile {
@@ -94,6 +140,14 @@ impl<T> ProfileHome<T> {
         self.ticket = None;
         self.rows.clear();
     }
+
+    pub fn accepts(&self, ticket: &HomeTicket) -> bool {
+        self.ticket.as_ref() == Some(ticket)
+    }
+
+    pub fn ticket(&self) -> Option<&HomeTicket> {
+        self.ticket.as_ref()
+    }
 }
 
 #[cfg(test)]
@@ -165,5 +219,18 @@ mod tests {
         assert_eq!(p[1].addon_profile(&p), Ok(4));
         p[0].is_primary = false;
         assert!(p[1].addon_profile(&p).is_err());
+    }
+
+    #[test]
+    fn explicit_addon_sharing_overrides_the_legacy_field() {
+        let profile: Profile = serde_json::from_str(
+            r#"{"profile_index":2,"uses_primary_addons":false,"uses_primary_plugins":true}"#,
+        )
+        .unwrap();
+        assert!(!profile.uses_primary_addons);
+        let legacy: Profile =
+            serde_json::from_str(r#"{"id":2,"uses_primary_plugins":true}"#).unwrap();
+        assert!(legacy.uses_primary_addons);
+        assert_eq!(legacy.profile_index, 2);
     }
 }
