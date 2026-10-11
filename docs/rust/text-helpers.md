@@ -132,7 +132,9 @@ ARM inspection before and after stripping passes: EABI5 soft-float, GNU loader
 dynamic native dependencies. No new runtime library is required. Physical-TV
 execution of this helper batch has not yet been performed.
 
-The isolated Rust Test package was built from clean commit `cead05c2`:
+The historical text-batch package was built from clean commit `cead05c2`.
+The root IPK is now superseded by the [JSON reader build](json-reader.md);
+the following hashes identify the earlier text artifact:
 
 - Package: `space.mkv.nuvio.rusttest_2.1.0_arm.ipk`, 9,111,578 bytes.
 - Package SHA-256: `7bbead9f04a98017943af90df1537103570017aaffe68cf4ef26db0101b79c13`.
