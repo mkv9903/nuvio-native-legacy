@@ -39,7 +39,6 @@ extern void NV_TEX_TEST_BEFORE_DISK_LOCK(void);
 #include "posterprov.h"
 #include <stdint.h>
 #include "cachearte.h"
-#include "artefalta.h"
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>

@@ -23,7 +23,7 @@ body:
     attributes:
       label: Nuvio version
       description: Settings › About shows it.
-      placeholder: "e.g. 1.5.3 (high cache)"
+      placeholder: "e.g. 2.0.2"
     validations:
       required: true
   - type: textarea
@@ -33,9 +33,8 @@ body:
       description: Steps to reproduce help a lot. A photo or short video of the screen is welcome.
     validations:
       required: true
-  - type: input
+  - type: textarea
     id: log
     attributes:
-      label: Log
-      description: Right after it happens, use Settings › Account › Send log and write the time here.
-      placeholder: "e.g. sent at 21:40"
+      label: Local log
+      description: Attach the local log file or paste the relevant excerpts here.
