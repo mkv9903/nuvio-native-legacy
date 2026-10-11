@@ -1,5 +1,8 @@
 // Bootstrap: janela, contexto GL, loop e telemetria. Toda a UI vive nos modulos.
 #include "app_id.h"
+#ifdef NV_RUST_CORE
+#include "rust_core.h"
+#endif
 #include "arranque.h"
 #include <SDL2/SDL.h>
 #include "central.h"
@@ -253,8 +256,8 @@ static void teclasInjetadas(void (*entregar)(const SDL_Event *)) {
     soltarEm = 0;
   }
   static time_t bloqueadoKey;
-  if (!pedidoNovo("/tmp/nuvio-key", &bloqueadoKey)) return;
-  FILE *f = fopen("/tmp/nuvio-key", "r");
+  if (!pedidoNovo(NV_DIAG_PREFIX "-key", &bloqueadoKey)) return;
+  FILE *f = fopen(NV_DIAG_PREFIX "-key", "r");
   if (!f) return;
   // A tecla injetada tambem conta como gente no controle: sem isto a tela de
   // descanso entrava 2 min depois da ultima tecla DE VERDADE, no meio de uma
@@ -355,7 +358,7 @@ static void teclasInjetadas(void (*entregar)(const SDL_Event *)) {
     else { e.type = SDL_KEYUP; entregar(&e); }
   }
   fclose(f);
-  consomeOuBloqueia("/tmp/nuvio-key", &bloqueadoKey);
+  consomeOuBloqueia(NV_DIAG_PREFIX "-key", &bloqueadoKey);
 }
 
 // Tamanho do buffer de onde a captura le. Definido no arranque, junto com o
@@ -364,7 +367,7 @@ static int capW = (int)NV_TELA_W, capH = (int)NV_TELA_H;
 
 // No Android nao ha /tmp: o pedido mora na pasta de dados (adb run-as).
 static const char *pedidoVideo(void) {
-  return "/tmp/nuvio-video";
+  return NV_DIAG_PREFIX "-video";
 }
 
 // Mesmo protocolo das outras ferramentas: escreva uma URL em /tmp/nuvio-video e
@@ -390,8 +393,8 @@ static void videoSeSolicitado(void) {
 
 static void capturaSeSolicitado(void) {
   static time_t bloqueado;
-  if (!pedidoNovo("/tmp/nuvio-shot-req", &bloqueado)) return;
-  consomeOuBloqueia("/tmp/nuvio-shot-req", &bloqueado);
+  if (!pedidoNovo(NV_DIAG_PREFIX "-shot-req", &bloqueado)) return;
+  consomeOuBloqueia(NV_DIAG_PREFIX "-shot-req", &bloqueado);
 
   // Le o DRAWABLE inteiro, nao 1920x1080 fixo: em tela retina o buffer e maior
   // que a janela, e ler o tamanho da janela captura so um quarto da imagem.
@@ -420,13 +423,13 @@ static void capturaSeSolicitado(void) {
   cab[34] = n & 255; cab[35] = (n >> 8) & 255; cab[36] = (n >> 16) & 255; cab[37] = (n >> 24) & 255;
 
   // grava num temporario e so entao renomeia: quem le nunca pega arquivo pela metade
-  FILE *f = fopen("/tmp/.nuvio-shot.tmp", "wb");
+  FILE *f = fopen(NV_SCREENSHOT_TEMP, "wb");
   if (f) {
     fwrite(cab, 1, 54, f);
     fwrite(px, 1, n, f);
     fclose(f);
-    rename("/tmp/.nuvio-shot.tmp", "/tmp/nuvio-shot.bmp");
-    printf("captura: /tmp/nuvio-shot.bmp (%u bytes)\n", tam);
+    rename(NV_SCREENSHOT_TEMP, NV_DIAG_PREFIX "-shot.bmp");
+    printf("capture: %s (%u bytes)\n", NV_DIAG_PREFIX "-shot.bmp", tam);
   }
   free(px);
 }
@@ -454,8 +457,13 @@ int main(int argc, char **argv) {
   // o compositor NAO exibe a janela — o app roda a 60fps desenhando para
   // ninguem. Medido: "Invalid appId specified OR Unsupported Application Type".
 #ifndef NV_SEM_WEBOS
+#ifdef NV_RUST_CORE
+  setenv("APPID", NV_APP_ID, 1);
+  setenv("LS2_APPID", NV_APP_ID, 1);
+#else
   setenv("APPID", NV_APP_ID, 0);
   setenv("LS2_APPID", NV_APP_ID, 0);
+#endif
   setenv("SDL_VIDEODRIVER", "wayland", 0);
 #endif
   // Lancado pelo SAM, stdout e stderr vao para /dev/null — toda a telemetria
@@ -586,6 +594,26 @@ int main(int argc, char **argv) {
   // ja esta resolvido desde o topo do main.
   NV_ETAPA("dados_iniciar");
   dados_iniciar(dirArte);
+#ifdef NV_RUST_CORE
+  NV_ETAPA("rust-core-probe");
+  if (nuvio_rust_core_abi_version() != NUVIO_RUST_ABI_VERSION) {
+    fprintf(stderr, "[rust-core] ABI mismatch; startup stopped\n");
+    return 1;
+  }
+  NuvioRustProbe rustProbe = {0};
+  int rustStatus = nuvio_rust_core_probe(dados_dir(), &rustProbe);
+  int rustPassed = rustStatus == 0 &&
+    rustProbe.abi_version == NUVIO_RUST_ABI_VERSION &&
+    rustProbe.checks == NUVIO_RUST_CHECKS_OK &&
+    rustProbe.checksum == NUVIO_RUST_CHECKSUM;
+  printf("[rust-core] app=%s ABI=%u probe=%s status=%d checks=%u checksum=%llu\n",
+         NV_APP_ID, rustProbe.abi_version, rustPassed ? "PASS" : "FAIL",
+         rustStatus, rustProbe.checks, (unsigned long long)rustProbe.checksum);
+  fflush(stdout);
+  if (!rustPassed) return 1;
+  printf("[rust-core] modules=addon-url\n");
+  fflush(stdout);
+#endif
   negcache_disco(dados_ler, dados_gravar_leve);   // 404 de API de metadados lembrado entre arranques
   #ifdef NV_LEVE
   printf("[leve] build de diagnostico: pool de fios 12, sem canal de avisos, sem recomendacoes, sem sync periodico, sem GIF de foco\n");
@@ -662,9 +690,9 @@ int main(int argc, char **argv) {
     if (quer4k) { printf("[4k] pedindo %dx%d — a linha `janela=` abaixo diz o "
                          "que a TV concedeu\n", pedeW, pedeH); fflush(stdout); } }
   SDL_Window *win;
-  const char *windowTitle = "Nuvio Native";
+  const char *windowTitle = NV_APP_NAME;
 #ifdef NV_LINUX_DESKTOP
-  windowTitle = "Nuvio Native - Linux UI preview";
+  windowTitle = NV_APP_NAME " - Linux UI preview";
 #endif
   NV_ETAPA("SDL_CreateWindow");
   win = SDL_CreateWindow(windowTitle, SDL_WINDOWPOS_CENTERED,
@@ -1354,8 +1382,8 @@ int main(int argc, char **argv) {
       // Instrumento de campo (gfx.h, gfx_modos_desligados): a lista em
       // /tmp/nuvio-gfx-off desliga modos de desenho; e o preenchimento do
       // ultimo quadro por modo, para saber quem pesa sem recompilar.
-      { FILE *fq = fopen("/tmp/nuvio-quadros", "r"); rastroQuadros = fq != NULL; if (fq) fclose(fq); }
-      { FILE *fo = fopen("/tmp/nuvio-gfx-off", "r");
+      { FILE *fq = fopen(NV_DIAG_PREFIX "-quadros", "r"); rastroQuadros = fq != NULL; if (fq) fclose(fq); }
+      { FILE *fo = fopen(NV_DIAG_PREFIX "-gfx-off", "r");
         unsigned long long m = 0; int n;
         if (fo) { while (fscanf(fo, "%d", &n) == 1) if (n >= 0 && n < GFX_NMODOS) m |= 1ull << n; fclose(fo); }
         if (m != gfx_modos_desligados) { printf("[gpu-modos] desligados=%llx\n", m); gfx_modos_desligados = m; }
@@ -1403,7 +1431,7 @@ int main(int argc, char **argv) {
       // ler, e rodar o binario a mao nao funciona (sem a identidade do app o
       // compositor recusa a superficie e ele morre em silencio). Sem isto nao
       // ha como MEDIR quadro no aparelho — so olhar e achar.
-      { FILE *fp = fopen("/tmp/nuvio-fps.txt", "w");
+      { FILE *fp = fopen(NV_DIAG_PREFIX "-fps.txt", "w");
         if (fp) {
           fprintf(fp, "drawable=%dx%d FPS=%.1f pior=%.1fms janks=%d"
                   " texto=%.1fms/%d texturas=%d %.1fMB"

@@ -97,10 +97,14 @@ const char *log_file_path(void) {
   static char caminho[256];
   static int resolvido;
   if (!resolvido) {
+#ifdef NV_RUST_CORE
+    const char *env = getenv("NUVIO_RUST_LOG");
+#else
     const char *env = getenv("NUVIO_LOG");
+#endif
     resolvido = 1;
     if (env && env[0]) snprintf(caminho, sizeof caminho, "%s", env);
-#if defined(NV_LINUX_DESKTOP)
+#if defined(NV_LINUX_DESKTOP) && !defined(NV_RUST_CORE)
     // Linux logs to the terminal unless a local log file is requested:
     // NUVIO_LOG=/tmp/space.mkv.nuvio.native.log bash tools/linux.sh
     else caminho[0] = 0;

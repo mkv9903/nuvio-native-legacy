@@ -8,16 +8,20 @@ if [ "$#" -ne 2 ]; then
 fi
 source_app=$1
 payload_app=$2
-[ -f "$source_app/appinfo.json" ] && [ -f "$source_app/nuvio-proto" ] || {
+metadata=${NUVIO_STAGE_APPINFO:-$source_app/appinfo.json}
+executable=${NUVIO_STAGE_BINARY:-$source_app/nuvio-proto}
+if [ ! -f "$metadata" ] || [ ! -f "$executable" ]; then
   echo "stage-webos: source app metadata or executable is missing" >&2
   exit 1
-}
+fi
 [ ! -e "$payload_app" ] || {
   echo "stage-webos: destination must not already exist" >&2
   exit 1
 }
 mkdir -p "$payload_app/art"
-for resource in appinfo.json icon.png icon-large.png icon-20.png icon-large-20.png splash.png nuvio-proto fonts; do
+cp "$metadata" "$payload_app/appinfo.json"
+cp "$executable" "$payload_app/nuvio-proto"
+for resource in icon.png icon-large.png icon-20.png icon-large-20.png splash.png fonts; do
   cp -R "$source_app/$resource" "$payload_app/$resource"
 done
 # Preserve license notices; the retired conversion license bundle is omitted.

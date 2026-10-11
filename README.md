@@ -19,7 +19,10 @@ features. Update checks use releases from
 UI and log/report uploads have been removed. Logs, crash reports and diagnostics
 stay on the device. Settings help and previews, and first-use explanations remain
 available; the separate User guide has been removed.
-Source translation to English is a separate, later step.
+The Rust rewrite is underway on the `rust-rewrite` branch, including
+English source, documentation, and UI. An isolated **Nuvio Rust Test** build
+links the first Rust core to the existing C UI. See the
+[rewrite documents](docs/rust/README.md) and [test instructions](docs/rust/testing.md).
 
 ## Linux UI preview
 

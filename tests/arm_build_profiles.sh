@@ -6,6 +6,17 @@ scratch=$(mktemp -d "${TMPDIR:-/tmp}/nuvio-arm-profile-test.XXXXXXXX")
 trap 'rm -rf "$scratch"' EXIT
 mkdir -p "$scratch/tools" "$scratch/deploy/app/art" "$scratch/deploy/app/fonts" "$scratch/bin"
 cp tools/arm.sh tools/env.sh tools/stage-webos.sh tools/split-symbols.sh "$scratch/tools/"
+mkdir -p "$scratch/rust/licenses"
+cp rust/licenses/* "$scratch/rust/licenses/"
+cat > "$scratch/tools/rust-core.sh" <<'SH'
+#!/bin/bash
+set -euo pipefail
+cd "$(dirname "$0")/.."
+printf '%s\n' "$*" > rust-build-args.txt
+mkdir -p build/rust
+touch build/rust/libnuvio_core.a
+printf '%s/build/rust/libnuvio_core.a\n' "$PWD"
+SH
 printf '{"id":"space.mkv.nuvio.native",\n"version":"1.2.3"}\n' > "$scratch/deploy/app/appinfo.json"
 for file in nuvio-proto icon.png icon-large.png icon-20.png icon-large-20.png splash.png; do
   printf 'test asset\n' > "$scratch/deploy/app/$file"
@@ -30,21 +41,22 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 printf '#include <stdio.h>\nint main(void) { puts("%s"); return 0; }\n' "$NV_VERSAO" > sample.c
-cc -O2 -g -Wl,--build-id=sha1 sample.c -o nuvio-proto.arm
-mkdir -p build/webos
+mkdir -p "$(dirname "$NUVIO_ARM_BINARY")" "$NUVIO_ARCHIVE_ROOT"
+cc -O2 -g -Wl,--build-id=sha1 sample.c -o "$NUVIO_ARM_BINARY"
 NUVIO_ARTIFACT_PLATFORM=webos NUVIO_ARTIFACT_VERSION="$NV_VERSAO" \
-  bash tools/split-symbols.sh nuvio-proto.arm "build/webos/$NUVIO_BUILD_LABEL" "$NUVIO_BUILD_MODE" \
-  > "build/webos/latest-$NUVIO_BUILD_MODE.txt"
+  bash tools/split-symbols.sh "$NUVIO_ARM_BINARY" "$NUVIO_ARCHIVE_ROOT/$NUVIO_BUILD_LABEL" "$NUVIO_BUILD_MODE" \
+  > "$NUVIO_ARCHIVE_ROOT/latest-$NUVIO_BUILD_MODE.txt"
 SH
 cat > "$scratch/bin/ares" <<'SH'
 #!/bin/bash
 set -euo pipefail
 source_app=$1; output=$3
-mkdir -p "$output/arwork/usr/palm/applications/space.mkv.nuvio.native"
-cp -R "$source_app/." "$output/arwork/usr/palm/applications/space.mkv.nuvio.native/"
+app_id=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["id"])' "$source_app/appinfo.json")
+mkdir -p "$output/arwork/usr/palm/applications/$app_id"
+cp -R "$source_app/." "$output/arwork/usr/palm/applications/$app_id/"
 tar czf "$output/data.tar.gz" -C "$output/arwork" usr
 printf '2.0\n' > "$output/debian-binary"
-ar r "$output/space.mkv.nuvio.native_1.2.3_arm.ipk" "$output/debian-binary" "$output/data.tar.gz" > /dev/null 2>&1
+ar r "$output/${app_id}_1.2.3_arm.ipk" "$output/debian-binary" "$output/data.tar.gz" > /dev/null 2>&1
 SH
 cat > "$scratch/bin/sshpass" <<'SH'
 #!/bin/bash
@@ -78,6 +90,26 @@ readelf -S "$scratch/nuvio-proto.arm" | grep -q '\.debug_info'
 # All four flags, including build-only in the middle.
 run_build --debug --build --high-cache --ipk
 [ -f "$scratch/space.mkv.nuvio.native_1.2.3_arm-highcache-debug.ipk" ]
+
+# The Rust flag alone stops before deployment and preserves production outputs.
+production_checksums=$(sha256sum "$scratch/nuvio-proto.arm" "$scratch/deploy/app/nuvio-proto" "$scratch/deploy/app/appinfo.json" "$release")
+run_build --rust-test --ipk
+[ "$production_checksums" = "$(sha256sum "$scratch/nuvio-proto.arm" "$scratch/deploy/app/nuvio-proto" "$scratch/deploy/app/appinfo.json" "$release")" ]
+[ "$(cat "$scratch/rust-build-args.txt")" = '--target armv7-unknown-linux-gnueabi' ]
+[ -f "$scratch/build/rust/webos/nuvio-rust-test.arm" ]
+[ -f "$scratch/build/webos-rust/latest-release.txt" ]
+mkdir "$scratch/rust-package"
+(cd "$scratch/rust-package"; ar x "$scratch/space.mkv.nuvio.rusttest_1.2.3_arm.ipk"; tar xzf data.tar.gz)
+python3 - "$scratch/rust-package/usr/palm/applications/space.mkv.nuvio.rusttest/appinfo.json" <<'PY'
+import json, sys
+metadata = json.load(open(sys.argv[1]))
+assert metadata['id'] == 'space.mkv.nuvio.rusttest'
+assert metadata['title'] == 'Nuvio Rust Test'
+PY
+run_build --debug --rust-test --ipk
+[ "$(cat "$scratch/rust-build-args.txt")" = '--target armv7-unknown-linux-gnueabi --debug' ]
+[ -f "$scratch/space.mkv.nuvio.rusttest_1.2.3_arm-debug.ipk" ]
+[ "$production_checksums" = "$(sha256sum "$scratch/nuvio-proto.arm" "$scratch/deploy/app/nuvio-proto" "$scratch/deploy/app/appinfo.json" "$release")" ]
 
 # Exercise engine selection in a PATH without the host's Docker/Podman. The
 # runtime fixture still compiles and packages an executable through arm.sh.
@@ -119,3 +151,4 @@ grep -q 'container runtime not found: podman' "$scratch/build.log"
 [ ! -e "$scratch/runtime.log" ]
 echo 'ARM profiles: PASS (default release, debug/high-cache names, flag order, release preserved, no TV contact)'
 echo 'ARM runtimes: PASS (Docker priority, Podman fallback, flag/env/path selection, missing engines, help without runtime)'
+echo 'Rust packaging: PASS (independent ID/title/binary/symbols, soft-float target, production preserved, implicit build-only)'

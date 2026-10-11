@@ -467,7 +467,7 @@ static int acbTipoAtual = -1, acbTipoFalhou = -1;
 static char hdrTipo[24] = "none";
 
 static void lerAjustesAcb(void) {
-  FILE *f = fopen("/tmp/nuvio-acb", "r");
+  FILE *f = fopen(NV_DIAG_PREFIX "-acb", "r");
   if (!f) return;
   if (fscanf(f, "%d %d %d %d", &tipoJogador, &tipoSink, &estCarregado, &estTocando) > 0) {
     printf("[video] acb ajustes: jogador=%d sink=%d carregado=%d tocando=%d\n",
@@ -864,7 +864,7 @@ static int eventoPayload(const char *p, unsigned minhaSessao) {
     // Ler com: sshpass ... scp root@TV:/tmp/nuvio-faixas.json .
     { static int despejou;
       if (!despejou) {
-        FILE *fd = fopen("/tmp/nuvio-faixas.json", "w");
+        FILE *fd = fopen(NV_DIAG_PREFIX "-faixas.json", "w");
         if (fd) { fputs(p, fd); fclose(fd); despejou = 1; }
       } }
 

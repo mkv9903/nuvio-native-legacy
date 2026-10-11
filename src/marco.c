@@ -1,3 +1,4 @@
+#include "app_id.h"
 #include "marco.h"
 #include <stdio.h>
 #include <pthread.h>
@@ -31,7 +32,7 @@ static unsigned long long agoraMs(void) {
 void marco_iniciar(void) {
   FILE *f;
   t0 = agoraMs();
-  f = fopen("/tmp/nuvio-marcos.txt", "w");
+  f = fopen(NV_DIAG_PREFIX "-marcos.txt", "w");
   if (f) { fprintf(f, "ms\tevento\n"); fclose(f); }
 }
 
@@ -43,7 +44,7 @@ void marco(const char *nome) {
   // dois fios nao intercalarem meia linha cada.
   ms = agoraMs() - t0;
   pthread_mutex_lock(&trava);
-  f = fopen("/tmp/nuvio-marcos.txt", "a");
+  f = fopen(NV_DIAG_PREFIX "-marcos.txt", "a");
   if (f) { fprintf(f, "%llu\t%s\n", ms, nome); fclose(f); }
   pthread_mutex_unlock(&trava);
   printf("[t] %llu %s\n", ms, nome);

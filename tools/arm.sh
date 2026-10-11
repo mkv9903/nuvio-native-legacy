@@ -8,6 +8,8 @@
 #                                # generate .ipk and STOP: do not touch TV.
 #                                # Mode for packaging a variant (webos3, high
 #                                # cache) without disturbing installed app.
+#   bash tools/arm.sh --rust-test --ipk
+#                                # isolated Rust Test package; always build-only.
 #   bash tools/arm.sh --high-cache [--ipk|--build]   (--alto-cache also accepted)
 #                                # HIGH CACHE variant: texture budget locked
 #                                # to 300 MB (NV_TEX_MB_FIXO), for TVs with
@@ -53,12 +55,17 @@ SDK_IMAGE="${NUVIO_SDK_IMAGE:-nuvio-webos-sdk}"
 BUILD_ONLY=0
 MAKE_IPK=0
 BUILD_MODE=release
+RUST_TEST=0
+ARM_BINARY=nuvio-proto.arm
+ARCHIVE_ROOT=build/webos
+RUST_LIB=''
 SELECTED_MODE=""
 VARIANTE=""
 for option in "$@"; do
   case "$option" in
     --build) BUILD_ONLY=1 ;;
     --ipk) MAKE_IPK=1 ;;
+    --rust-test) RUST_TEST=1 ;;
     --high-cache|--alto-cache) VARIANTE=highcache ;;
     --podman|--docker)
       runtime=${option#--}
@@ -73,14 +80,27 @@ for option in "$@"; do
       fi
       BUILD_MODE=$mode; SELECTED_MODE=$mode ;;
     --help|-h)
-      echo 'Usage: bash tools/arm.sh [--podman|--docker] [--release|--debug] [--ipk] [--build] [--high-cache]'
+      echo 'Usage: bash tools/arm.sh [--podman|--docker] [--release|--debug] [--ipk] [--build] [--high-cache] [--rust-test]'
       echo 'Default: optimized, stripped release with separate symbols in build/webos/.'
       echo 'Use --build to stop before TV deployment; --ipk also creates a package.'
+      echo '--rust-test uses a separate package/data/log identity and always stops before deployment.'
       echo 'Runtime: explicit flag, then NUVIO_CONTAINER_RUNTIME, then Docker/Podman detection.'
       exit 0 ;;
     *) echo "arm.sh: unknown option: $option" >&2; exit 2 ;;
   esac
 done
+if [ "$RUST_TEST" = 1 ]; then
+  BUILD_ONLY=1
+  APP_ID=space.mkv.nuvio.rusttest
+  ARM_BINARY=build/rust/webos/nuvio-rust-test.arm
+  ARCHIVE_ROOT=build/webos-rust
+  export NUVIO_EXTRA_CFLAGS="${NUVIO_EXTRA_CFLAGS:-} -DNV_RUST_CORE=1"
+  rust_args=(--target armv7-unknown-linux-gnueabi)
+  [ "$BUILD_MODE" = debug ] && rust_args+=(--debug)
+  RUST_LIB=$(bash tools/rust-core.sh "${rust_args[@]}")
+  RUST_LIB="/work/${RUST_LIB#"$PWD/"}"
+  echo '==> Nuvio Rust Test (isolated package; manual installation)'
+fi
 if [ -z "$CONTAINER_RUNTIME" ]; then
   if command -v docker > /dev/null 2>&1; then
     CONTAINER_RUNTIME=docker
@@ -129,12 +149,19 @@ tools/env.sh --env-file "$ENVF"
   -e NUVIO_BUILD_COMMIT="$BUILD_COMMIT" \
   -e NUVIO_BUILD_DIRTY="$BUILD_DIRTY" \
   -e NUVIO_BUILD_LABEL="$BUILD_LABEL" \
+  -e NUVIO_ARM_BINARY="$ARM_BINARY" \
+  -e NUVIO_ARCHIVE_ROOT="$ARCHIVE_ROOT" \
+  -e NUVIO_RUST_LIB="$RUST_LIB" \
+  -e NUVIO_RUST_TEST="$RUST_TEST" \
   -v "$PWD":/work:z "$SDK_IMAGE" sh -c '
   set -e
   SR=$NUVIO_SYSROOT
   ASS=$NUVIO_ASS_ROOT
   ASS_CFLAGS=""
   ASS_LIBS=""
+  RUST_LIBS=""
+  if [ -n "$NUVIO_RUST_LIB" ]; then RUST_LIBS="$NUVIO_RUST_LIB -lrt"; fi
+  mkdir -p "$(dirname "$NUVIO_ARM_BINARY")"
   if [ "${NUVIO_ASS_LIBASS:-1}" = "1" ]; then
     [ -f "$ASS/include/ass/ass.h" ] || { echo "libass ARM missing in image; rebuild tools/Dockerfile or use NUVIO_ASS_LIBASS=0" >&2; exit 2; }
     if [ ! -f "$ASS/.nuvio-build-type" ] || [ "$(cat "$ASS/.nuvio-build-type")" != debugoptimized ]; then
@@ -144,7 +171,7 @@ tools/env.sh --env-file "$ENVF"
     ASS_CFLAGS="-DNV_ASS_LIBASS -I$ASS/include"
     ASS_LIBS="-L$ASS/lib -Wl,--start-group -lass -lharfbuzz -lfribidi -lfreetype -Wl,--end-group"
   fi
-  arm-webos-linux-gnueabi-gcc src/*.c -o nuvio-proto.arm -O2 -g -DNV_WEBOS $NUVIO_EXTRA_CFLAGS $ASS_CFLAGS \
+  arm-webos-linux-gnueabi-gcc src/*.c -o "$NUVIO_ARM_BINARY" -O2 -g -DNV_WEBOS $NUVIO_EXTRA_CFLAGS $ASS_CFLAGS \
     -DNV_SUPABASE_URL="\"$NV_SUPABASE_URL\"" \
     -DNV_SUPABASE_ANON_KEY="\"$NV_SUPABASE_ANON_KEY\"" \
     -DNV_TV_LOGIN_BASE="\"$NV_TV_LOGIN_BASE\"" \
@@ -156,21 +183,34 @@ tools/env.sh --env-file "$ENVF"
     -DNV_SEEKR_API_KEY="\"$NV_SEEKR_API_KEY\"" \
     -DNV_VERSAO="\"$NV_VERSAO\"" \
     -I$SR/usr/include -I$SR/usr/include/SDL2 \
-    -lSDL2 -lSDL2_image -lSDL2_ttf -lGLESv2 -lEGL -ldl -lpthread -lz -lm $ASS_LIBS \
+    $RUST_LIBS -lSDL2 -lSDL2_image -lSDL2_ttf -lGLESv2 -lEGL -ldl -lpthread -lz -lm $ASS_LIBS \
     -Wl,--exclude-libs,ALL -Wl,--build-id=sha1
   # Keep static FreeType private: older TV SDL_ttf must use its own ABI.
-  mkdir -p build/webos
+  mkdir -p "$NUVIO_ARCHIVE_ROOT"
+  if [ "$NUVIO_RUST_TEST" = 1 ]; then
+    NUVIO_READELF=arm-webos-linux-gnueabi-readelf \
+      bash tools/inspect-rust-webos.sh "$NUVIO_ARM_BINARY" > "$NUVIO_ARCHIVE_ROOT/abi-$NUVIO_BUILD_MODE.json"
+  fi
   NUVIO_OBJCOPY=arm-webos-linux-gnueabi-objcopy \
   NUVIO_STRIP=arm-webos-linux-gnueabi-strip \
   NUVIO_READELF=arm-webos-linux-gnueabi-readelf \
   NUVIO_ARTIFACT_PLATFORM=webos NUVIO_ARTIFACT_VERSION="$NV_VERSAO" \
-    bash tools/split-symbols.sh nuvio-proto.arm "build/webos/$NUVIO_BUILD_LABEL" "$NUVIO_BUILD_MODE" \
-    > "build/webos/latest-$NUVIO_BUILD_MODE.txt"
+    bash tools/split-symbols.sh "$NUVIO_ARM_BINARY" "$NUVIO_ARCHIVE_ROOT/$NUVIO_BUILD_LABEL" "$NUVIO_BUILD_MODE" \
+    > "$NUVIO_ARCHIVE_ROOT/latest-$NUVIO_BUILD_MODE.txt"
+  if [ "$NUVIO_RUST_TEST" = 1 ]; then
+    # Hash the executable that ships and retain evidence beside its symbols.
+    NUVIO_READELF=arm-webos-linux-gnueabi-readelf \
+      bash tools/inspect-rust-webos.sh "$NUVIO_ARM_BINARY" > "$NUVIO_ARCHIVE_ROOT/abi-$NUVIO_BUILD_MODE.json"
+    cp "$NUVIO_ARCHIVE_ROOT/abi-$NUVIO_BUILD_MODE.json" \
+      "$(cat "$NUVIO_ARCHIVE_ROOT/latest-$NUVIO_BUILD_MODE.txt")/abi.json"
+  fi
   # Remove generated payloads left by builds of the retired converter.
-  rm -f deploy/app/lib/dts-starfish-webos*.so
-  rm -rf deploy/app/licenses/dts
+  if [ "$NUVIO_RUST_TEST" != 1 ]; then
+    rm -f deploy/app/lib/dts-starfish-webos*.so
+    rm -rf deploy/app/licenses/dts
+  fi
 '
-echo "    symbols and build hashes: $(cat "build/webos/latest-$BUILD_MODE.txt")"
+echo "    symbols and build hashes: $(cat "$ARCHIVE_ROOT/latest-$BUILD_MODE.txt")"
 
 # Verify configuration arrived in binary.
 while IFS='=' read -r NAME VALOR; do
@@ -179,13 +219,13 @@ while IFS='=' read -r NAME VALOR; do
     echo "    warning: $NAME empty in local.properties"
     continue
   fi
-  if ! strings nuvio-proto.arm 2>/dev/null | grep -qF -- "$VALOR"; then
+  if ! strings "$ARM_BINARY" 2>/dev/null | grep -qF -- "$VALOR"; then
     echo "    ABORTED: $NAME not found in ARM binary"
     exit 1
   fi
 done < "$ENVF"
 
-cp nuvio-proto.arm deploy/app/nuvio-proto
+if [ "$RUST_TEST" != 1 ]; then cp "$ARM_BINARY" deploy/app/nuvio-proto; fi
 
 # Package from clean copy, never deploy/app directly:
 USER_FILES="trakt.txt addons.txt tmdb.txt mdblist.txt ajustes.txt
@@ -197,7 +237,21 @@ USER_DIRS="collections"
 
 # The same allowlisted payload is used by IPKs and direct SSH deployments.
 STAGING=$(mktemp -d "${TMPDIR:-/tmp}/nuvio-arm-pacote.XXXXXXXX"); CLEANUP_FILES+=("$STAGING")
-bash tools/stage-webos.sh deploy/app "$STAGING/app"
+if [ "$RUST_TEST" = 1 ]; then
+  python3 - deploy/app/appinfo.json "$STAGING/appinfo.json" "$APP_ID" <<'PY'
+import json, pathlib, sys
+source, destination, app_id = sys.argv[1:]
+metadata = json.loads(pathlib.Path(source).read_text())
+metadata.update(id=app_id, title='Nuvio Rust Test')
+pathlib.Path(destination).write_text(json.dumps(metadata, indent=2) + '\n')
+PY
+  NUVIO_STAGE_APPINFO="$STAGING/appinfo.json" NUVIO_STAGE_BINARY="$ARM_BINARY" \
+    bash tools/stage-webos.sh deploy/app "$STAGING/app"
+  mkdir -p "$STAGING/app/licencas/rust"
+  cp rust/licenses/* "$STAGING/app/licencas/rust/"
+else
+  bash tools/stage-webos.sh deploy/app "$STAGING/app"
+fi
 
 if [ "$MAKE_IPK" = 1 ]; then
   echo "==> packaging (without credentials)"

@@ -51,4 +51,29 @@ if bash tools/stage-webos.sh "$source_app" "$scratch/payload" > /dev/null 2>&1; 
   echo 'FAIL: staging accepted an existing destination' >&2
   exit 1
 fi
+# Isolated variants can stage a different executable and metadata without
+# replacing or depending on a production executable in the resource directory.
+printf '{"id":"space.mkv.nuvio.rusttest","title":"Nuvio Rust Test"}\n' > "$scratch/rust-appinfo.json"
+printf 'isolated executable\n' > "$scratch/rust-executable"
+rm "$source_app/nuvio-proto"
+NUVIO_STAGE_APPINFO="$scratch/rust-appinfo.json" NUVIO_STAGE_BINARY="$scratch/rust-executable" \
+  bash tools/stage-webos.sh "$source_app" "$scratch/rust-payload"
+cmp "$scratch/rust-appinfo.json" "$scratch/rust-payload/appinfo.json"
+cmp "$scratch/rust-executable" "$scratch/rust-payload/nuvio-proto"
+[ "$(cat "$source_app/appinfo.json")" = 'runtime resource' ]
+printf '{"id":"space.mkv.nuvio.native","title":"Nuvio Native"}\n' > "$source_app/appinfo.json"
+bash tools/stage-rust-preview.sh "$source_app" "$scratch/rust-executable" "$scratch/preview-payload"
+python3 - "$scratch/preview-payload" <<'PY'
+import json, pathlib, sys
+preview = pathlib.Path(sys.argv[1])
+assert json.loads((preview / 'appinfo.json').read_text())['id'] == 'space.mkv.nuvio.rusttest'
+assert (preview / 'art/catalogo.txt').is_file()
+assert (preview / 'art/00.jpg').is_file()
+assert (preview / 'art/poster/asset.jpg').is_file()
+assert (preview / 'licencas/rust/COPYRIGHT').is_file()
+for name in ['collections.json', 'catalogo-rede.bin', 'sessao.txt', 'ajustes.txt',
+             'conta-user.txt', 'jellyfin-p1.txt', 'future-private-data.txt', 'cache']:
+    assert not (preview / 'art' / name).exists(), name
+PY
 echo 'webOS payload: PASS (UI resources, no sample/private data, unchanged source)'
+echo 'Rust preview payload: PASS (isolated identity, sample UI content, no account/settings/cache files)'

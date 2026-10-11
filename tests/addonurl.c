@@ -23,11 +23,20 @@
 #include <string.h>
 #include <unistd.h>
 #include "addons.h"
+#include "addonstats.h"
 #include "fontecache.h"
 
 // ---------------------------------------------------------------- duble
 static char pedido[8192];      // a ultima URL que chegou a rede
 static int  nPedidos, nPedidosGrande;
+// Keep URL checks independent of latency history and statistics persistence.
+void addonstats_registrar(const char *name, unsigned ms, int responded) {
+  (void)name; (void)ms; (void)responded;
+}
+int addonstats_segunda_s(const char *name, int default_seconds) {
+  (void)name; return default_seconds;
+}
+void addonstats_salvar(void) {}
 const char *rede_ultimo_erro(void) { return ""; }
 char *rede_baixar(const char *url, int s) {
   (void)s;

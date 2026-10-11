@@ -8,9 +8,10 @@
 #include <time.h>
 #include <unistd.h>
 
-#define FILE_STAGE  "/tmp/space.mkv.nuvio.native-startup.txt"
-#define FILE_PREV   "/tmp/space.mkv.nuvio.native-startup-previous.txt"
-#define FILE_CRASH  "/tmp/space.mkv.nuvio.native-startup-crash.txt"
+#include "app_id.h"
+#define FILE_STAGE  "/tmp/" NV_APP_ID "-startup.txt"
+#define FILE_PREV   "/tmp/" NV_APP_ID "-startup-previous.txt"
+#define FILE_CRASH  "/tmp/" NV_APP_ID "-startup-crash.txt"
 #define STAGE_END   "quadro-1"   // reached this point = not a startup failure
 
 void startup_stage(const char *name) {

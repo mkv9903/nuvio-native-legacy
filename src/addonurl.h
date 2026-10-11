@@ -1,51 +1,82 @@
-// TAMANHO DA URL BASE DE UM ADDON — um numero so para o app inteiro (#201).
-//
-// A chave do addon vai embutida no CAMINHO da URL (addons.h), e ha addon que
-// embute a configuracao INTEIRA: a do Comet e um base64 de ~830 caracteres, e a
-// URL dele passa de 870. Enquanto cada modulo guardava a base num `char[600]`
-// proprio, ela era cortada em silencio ja na leitura da conta, o Comet recebia
-// uma configuracao pela metade e respondia o manifesto "❌ | Comet", com uma
-// fonte so. Nada no log dizia que a URL tinha sido cortada.
-//
-// 2048 e nao 1024: a configuracao padrao do Comet ja ocupa 870, e cada servico
-// de debrid a mais na mesma configuracao soma. 2048 da mais que o dobro do caso
-// medido e ainda deixa <base> + caminho longe dos 4096 que rede.c aceita.
-//
-// QUEM GUARDA A BASE USA ESTE NUMERO. Quem monta um pedido (<base>/stream/...,
-// <base>/catalog/...) usa NV_ADDON_PEDIDO_MAX e CONFERE o retorno do snprintf
-// com NV_COUBE: pedido que nao coube nao e feito. URL cortada nao e uma URL
-// pior, e OUTRA URL — e o addon responde a ela como se fosse valida.
-//
-// QUEM NAO USA, E POR QUE. Duas copias secundarias continuam em 600 porque
-// alarga-las custaria memoria demais para o que rendem, e as duas tem a base
-// inteira a mao por outro caminho:
-//   - ColSource.base (colecoes.h), 8192 fontes: +12 MB. O que nao cabe fica
-//     vazio e a leitura cai em addons_base_por_id(addonId);
-//   - GCanal.base (guia.c), 3 x 900 canais: +3,9 MB. O que nao cabe fica vazio,
-//     que e o caso "pergunta a fonte a todos os addons". Lembrete, fontecache,
-//     spotlight e o diagnostico da Live TV recebem a base do canal e herdam
-//     esse teto.
-// Nas duas a regra e a mesma daqui: vazio sim, cortado nunca.
-//
-// NUNCA IMPRIMIR A BASE. Ela carrega a chave de debrid do dono; o log diz o
-// nome do addon e o tamanho, e so.
+/* Shared add-on URL limits and the staged C/Rust adapter.
+ *
+ * Provider configuration can be embedded in long paths or queries. Keep the
+ * entire URL or reject it; never send a silently truncated configuration.
+ * 2048 covers the measured ~870-byte Comet configuration with room to grow.
+ * Requests have another 1024 bytes for the resource path, below rede.c's 4096.
+ *
+ * Primary base storage uses NV_ADDON_URL_MAX. Secondary collection/channel
+ * copies remain smaller to avoid multiplying TV RAM use; empty copies fall
+ * back to the primary base rather than retaining a truncated URL.
+ *
+ * Logs contain an add-on name and lengths only. Never log a configured URL.
+ * Rust owns the URL rules in NV_RUST_CORE builds. C keeps variadic formatting
+ * and log integration; existing callers and saved/external fields keep names.
+ * Normal C builds retain the reference implementation during migration.
+ */
 #ifndef NV_ADDONURL_H
 #define NV_ADDONURL_H
+
+#include <stdio.h>
+#include <stddef.h>
+#include <stdarg.h>
+#include <string.h>
+#include <strings.h>
+#include <ctype.h>
 
 #define NV_ADDON_URL_MAX    2048
 #define NV_ADDON_PEDIDO_MAX (NV_ADDON_URL_MAX + 1024)
 
-// O snprintf que escreveu em `buf` coube inteiro? `w` e o retorno dele.
+/* Check snprintf's required length against a fixed-size destination. */
 #define NV_COUBE(w, buf) ((w) >= 0 && (size_t)(w) < sizeof(buf))
 
-#include <stdio.h>
-#include <stddef.h>
+#ifdef NV_RUST_CORE
+#include "rust_core.h"
 
-// A PORTA DE ENTRADA. Toda URL de addon que chega (conta, arquivo, instalacao
-// pela TV) passa por aqui antes de ser guardada. 1 = cabe. 0 = nao cabe, e a
-// linha de log e a unica noticia que o dono tera disso: quem chama PULA o
-// addon. `static inline` para os testes que compilam um modulo so nao
-// precisarem de mais um arquivo na linha de comando.
+/* Reject an oversized installed URL without exposing its configuration. */
+static inline int nv_addon_url_cabe(const char *name, size_t length) {
+  if (nuvio_rust_addon_url_fits(length)) return 1;
+  printf("[addons] %s: URL length %lu exceeds maximum %d: add-on skipped\n",
+         name && *name ? name : "Addon", (unsigned long)length, NV_ADDON_URL_MAX - 1);
+  fflush(stdout);
+  return 0;
+}
+
+/* A failed or truncated request must never reach the network. */
+static inline int nv_addon_pedido_coube(const char *name, int length, size_t capacity) {
+  if (nuvio_rust_addon_request_fits(length, capacity)) return 1;
+  printf("[addons] %s: request length %d exceeds maximum %lu: skipped\n",
+         name && *name ? name : "Addon", length, (unsigned long)(capacity ? capacity - 1 : 0));
+  fflush(stdout);
+  return 0;
+}
+
+/* Stable Rust cannot accept C variadic arguments. Format only the resource
+ * path here, then let Rust join it before the unchanged base query. */
+static inline int nv_addon_url(char *output, size_t capacity, const char *base,
+                               const char *format, ...) {
+  char path[NV_ADDON_PEDIDO_MAX];
+  va_list args;
+  va_start(args, format);
+  int length = vsnprintf(path, sizeof path, format, args);
+  va_end(args);
+  return nuvio_rust_addon_request(output, capacity, base, path, length);
+}
+
+/* UTF-8 and other non-ASCII bytes are percent-encoded individually. */
+static inline int nv_addon_id(char *output, size_t capacity, const char *id) {
+  return nuvio_rust_addon_id(output, capacity, id);
+}
+
+/* Remove outer C whitespace, stremio scheme, trailing slashes and manifest
+ * suffix. Keep a nonempty query verbatim. Overflow produces an empty string.
+ * Inputs and outputs are caller-owned, NUL-terminated, non-overlapping bytes. */
+static inline void nv_addon_base(const char *url, char *output, size_t capacity) {
+  nuvio_rust_addon_base(url, output, capacity);
+}
+
+#else
+/* Legacy C reference: leave behavior unchanged until all callers migrate. */
 static inline int nv_addon_url_cabe(const char *nome, size_t len) {
   if (len < NV_ADDON_URL_MAX) return 1;
   printf("[addons] %s: URL de %lu caracteres nao cabe (maximo %d): addon ignorado\n",
@@ -54,11 +85,6 @@ static inline int nv_addon_url_cabe(const char *nome, size_t len) {
   return 0;
 }
 
-// O PEDIDO (<base>/stream/..., /catalog/..., /manifest.json) COUBE NO BUFFER?
-// `w` e o retorno do snprintf que o montou, `tam` o tamanho do buffer. Com a
-// base limitada por NV_ADDON_URL_MAX e o buffer em NV_ADDON_PEDIDO_MAX isto nao
-// deveria disparar; existe para que, se um id ou um caminho crescer, o pedido
-// cortado NAO SAIA. Quem chama pula o pedido quando volta 0.
 static inline int nv_addon_pedido_coube(const char *nome, int w, size_t tam) {
   if (w >= 0 && (size_t)w < tam) return 1;
   printf("[addons] %s: pedido de %d caracteres nao cabe (maximo %lu): pulado\n",
@@ -66,25 +92,6 @@ static inline int nv_addon_pedido_coube(const char *nome, int w, size_t tam) {
   fflush(stdout);
   return 0;
 }
-
-// A QUERY DA URL DO ADDON VIAJA EM TODO PEDIDO (paridade com o Nuvio oficial).
-//
-// O Nuvio web (addonRepository.canonicalizeUrl, buildStreamUrl,
-// buildSubtitlesUrl, buildManifestUrl) separa "<caminho>?<query>" da URL
-// instalada e monta "<caminho>/stream/<tipo>/<id>.json?<query>": a query vai em
-// TODO pedido. Este app jogava a query fora (baseNormalizada, #24), e um addon
-// que guarda a configuracao nela (?apikey=..., ?config=...) recebia aqui um
-// pedido sem configuracao que la funciona.
-//
-// Regra: a BASE guardada mantem a query; quem monta um pedido usa nv_addon_url,
-// que poe o caminho ANTES da query. `fmt` e o caminho com a barra inicial
-// ("/stream/%s/%s.json"). Devolve o tamanho que o pedido teria (como o
-// snprintf), para conferir com nv_addon_pedido_coube/NV_COUBE; pedido que nao
-// coube sai "" — nunca uma URL cortada.
-#include <stdarg.h>
-#include <string.h>
-#include <strings.h>
-#include <ctype.h>
 
 static inline int nv_addon_url(char *dst, size_t n, const char *base, const char *fmt, ...) {
   char caminho[NV_ADDON_PEDIDO_MAX];
@@ -105,14 +112,6 @@ static inline int nv_addon_url(char *dst, size_t n, const char *base, const char
   return w;
 }
 
-// O ID NO CAMINHO (/stream/<tipo>/<id>.json, /meta/..., /subtitles/...).
-// O Nuvio web passa o id por encodeURIComponent (buildStreamUrl, buildMetaUrl,
-// encodeSubtitleId); aqui ele ia cru. Id com espaco, "/", "#", "?", "%" ou
-// acento (canal de IPTV, id que e uma URL) virava outro caminho ou um pedido
-// invalido. Codifica o que nao e "pchar" do RFC 3986 e deixa o resto como
-// esta — ":" inclusive, que e o que todo addon ja recebe deste app
-// ("tt123:1:2") e o que o Nuvio web manda nas legendas. Id comum sai igual.
-// Devolve 1 se coube; 0 deixa `dst` vazio.
 static inline int nv_addon_id(char *dst, size_t n, const char *id) {
   static const char HEX[] = "0123456789ABCDEF";
   const unsigned char *p = (const unsigned char *)(id ? id : "");
@@ -129,13 +128,6 @@ static inline int nv_addon_id(char *dst, size_t n, const char *id) {
   return 1;
 }
 
-// A NORMALIZACAO DA URL INSTALADA, uma so para o app (addons, guia, colecoes).
-// A mesma do Nuvio oficial (canonicalizeUrl + normalizeAddonUrl):
-//   - espaco em volta fora; "stremio://" vira "https://";
-//   - "/manifest.json" no fim do CAMINHO sai, sem caixa ("/Manifest.json");
-//   - barra final do caminho sai ("<base>//stream" e outra URL para alguns);
-//   - a QUERY FICA (ver nv_addon_url); "?" sozinho nao e query.
-// O que nao cabe em `tam` sai "" (vazio sim, cortado nunca).
 static inline void nv_addon_base(const char *url, char *dst, size_t tam) {
   const char *ini, *fim, *q;
   size_t k;
@@ -163,4 +155,5 @@ static inline void nv_addon_base(const char *url, char *dst, size_t tam) {
   }
 }
 
-#endif
+#endif /* NV_RUST_CORE */
+#endif /* NV_ADDONURL_H */

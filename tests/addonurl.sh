@@ -1,25 +1,37 @@
 #!/bin/bash
-# #201: a URL de um addon chega INTEIRA ao pedido (1500 caracteres), e a que
-# passa de NV_ADDON_URL_MAX e recusada com uma linha de log — nunca cortada.
-# Ver o cabecalho de tests/addonurl.c. NAO precisa de rede.
-#
-#   bash tests/addonurl.sh
-set -eu
+# Long configured URLs survive install/export/reload/request construction.
+# Oversized URLs are rejected, and diagnostics never expose their contents.
+# The same integration cases exercise either implementation without a network.
+#   bash tests/addonurl.sh [--rust]
+set -euo pipefail
 cd "$(dirname "$0")/.."
-flags=(-O1 -g -Isrc -ffunction-sections -fdata-sections -Wl,--gc-sections \
-       -DNV_LINUX_DESKTOP $(pkg-config --cflags sdl2 SDL2_image SDL2_ttf)  \
+addon_scratch=$(mktemp -d "${TMPDIR:-/tmp}/nuvio-addonurl.XXXXXXXX")
+trap 'rm -rf "$addon_scratch"' EXIT
+read -r -a dependency_flags <<< "$(pkg-config --cflags sdl2 SDL2_image SDL2_ttf)"
+flags=(-O1 -g -Isrc -ffunction-sections -fdata-sections '-Wl,--gc-sections' \
+       -DNV_LINUX_DESKTOP "${dependency_flags[@]}" \
        -Wall -Wno-unused-function -Wno-deprecated-declarations -Wno-macro-redefined)
-if [ "${SANITIZE:-0}" = 1 ]; then flags+=(-fsanitize=address,undefined -fno-omit-frame-pointer); fi
-# SO addons.c e js.c, com a mesma receita de tests/addonslista.sh: -dead_strip
-# descarta o resto do modulo e os vizinhos sao dublados no proprio teste.
-cc "${flags[@]}" src/addons.c src/js.c tests/addonurl.c -o /tmp/nuvio-addonurl-tests
-saida=$(/tmp/nuvio-addonurl-tests)
-echo "$saida" | grep -v '^\[addons\]' || true
-echo "$saida" | grep -q 'addonurl: ok'
-# A recusa e DITA: nome do addon e tamanho. Duas vezes — a linha do arquivo
-# (2100) e a instalacao pela TV (2100).
-n=$(echo "$saida" | grep -cF '[addons] Grande: URL de 2100 caracteres nao cabe (maximo 2047): addon ignorado')
-[ "$n" = 2 ] || { echo "FALHOU: esperava 2 linhas de recusa, vieram $n"; exit 1; }
-# E a URL em si nunca vai para o log: ela carrega a chave de debrid do dono.
-if echo "$saida" | grep -q 'SEGREDO'; then echo "FALHOU: URL de addon no log"; exit 1; fi
-echo "addonurl.sh: ok"
+if [ "${SANITIZE:-0}" = 1 ]; then flags+=('-fsanitize=address,undefined' -fno-omit-frame-pointer); fi
+libraries=()
+refusal='[addons] Grande: URL de 2100 caracteres nao cabe (maximo 2047): addon ignorado'
+implementation=C
+case "${1:-}" in
+  '') ;;
+  --rust)
+    flags+=(-DNV_RUST_CORE=1)
+    libraries+=("$(bash tools/rust-core.sh)" -ldl -lpthread -lm -lrt)
+    refusal='[addons] Grande: URL length 2100 exceeds maximum 2047: add-on skipped'
+    implementation=Rust ;;
+  *) echo 'Usage: bash tests/addonurl.sh [--rust]' >&2; exit 2 ;;
+esac
+if [ "$#" -gt 1 ]; then echo 'Usage: bash tests/addonurl.sh [--rust]' >&2; exit 2; fi
+# Discard unused sections; the test supplies the neighboring service doubles.
+cc "${flags[@]}" src/addons.c src/js.c tests/addonurl.c "${libraries[@]}" -o "$addon_scratch/test"
+output=$("$addon_scratch/test")
+printf '%s\n' "$output" | grep -v '^\[addons\]' || true
+printf '%s\n' "$output" | grep -q 'addonurl: ok'
+# One rejection from loading the file and one from installing the add-on.
+count=$(printf '%s\n' "$output" | grep -cF "$refusal" || true)
+[ "$count" = 2 ] || { echo "FAIL: expected 2 rejection messages, got $count"; exit 1; }
+if printf '%s\n' "$output" | grep -q 'SEGREDO'; then echo 'FAIL: configured URL appeared in the log'; exit 1; fi
+echo "addonurl.sh: $implementation ok"

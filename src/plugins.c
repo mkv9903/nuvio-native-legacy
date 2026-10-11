@@ -1,3 +1,4 @@
+#include "app_id.h"
 // Ver plugins.h. Portado de agente/plugins2 (F09) e refeito em cima do N01:
 // manifesto/codigo/TMDB por plugrede com teto antes de alocar, geracao de
 // conta/perfil por RedeGrupo, estado por conta+perfil, ACK do sync por
@@ -566,7 +567,7 @@ int plugins_definir_da_conta(const PlugRepo *l, int n, unsigned ger) {
   if (n < 0 || (n > 0 && !l)) return 0;
   // PORTA DE TESTE (como /tmp/nuvio-key): com /tmp/nuvio-plugins-local a lista
   // deste aparelho fica e a da conta nao a substitui.
-  { FILE *t = fopen("/tmp/nuvio-plugins-local", "r");
+  { FILE *t = fopen(NV_DIAG_PREFIX "-plugins-local", "r");
     if (t) { fclose(t); printf("[plugins] /tmp/nuvio-plugins-local: a lista da conta (%d) nao substitui a local\n", n); return 0; } }
   if (n > PLUG_REPOS_MAX) n = PLUG_REPOS_MAX;
   pthread_mutex_lock(&trava);

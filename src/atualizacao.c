@@ -567,6 +567,10 @@ static int podeReconsultar(void) {
 }
 
 void atualizacao_verificar(void) {
+#ifdef NV_RUST_CORE
+  /* Test packages are installed manually; production releases use another ID. */
+  return;
+#endif
   static long ultChamada;
   long rel = (long)time(NULL);
   int vence;
@@ -588,6 +592,10 @@ void atualizacao_verificar(void) {
 }
 
 void atualizacao_procurar_agora(void) {
+#ifdef NV_RUST_CORE
+  printf("[rust-test] Install test updates manually using the Rust Test IPK.\n");
+  return;
+#endif
   if (!mtx) mtx = SDL_CreateMutex();
   if (!mtx || !podeReconsultar()) return;
   SDL_LockMutex(mtx);
@@ -686,6 +694,10 @@ void atualizacao_abrir(void) {
 }
 
 void atualizacao_evento(const SDL_Event *e) {
+#ifdef NV_RUST_CORE
+  (void)e;
+  return;
+#endif
   SDL_Keycode k;
   if (!aberto || e->type != SDL_KEYDOWN) return;
   k = e->key.keysym.sym;
