@@ -277,11 +277,6 @@ IGNORAR = {
     # (ajustes_teste_quadro) and embedded art subfolder (ajArte) are not
     # UI text.
     "Mbps", "com.linvo.cinemeta_movie_top", "poster/",
-    # Usage guide (10/03): mockup frame IDs in ajustesTesteGuia and
-    # guide.json entry ID they point to. Only capture uses them; they
-    # never go to screen.
-    "guia-fontes", "guia-fileiras", "guia-legendas", "guia-vindo-do-whatsnew",
-    "h-fileiras",
     # Word that Sources sheet LOOKS FOR in file name/description to
     # know if there is Portuguese audio (streams.c, idiomaDa). Comparison data,
     # never drawn text.

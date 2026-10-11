@@ -319,7 +319,6 @@ static const struct { int corpo, peso; } ESTILOS[TXT_NFONTES] = {
   // Ajustes no Glass UI (text.h). 600/800 claros sobre o miolo escuro: Bold.
   { 23, PESO_MEDIUM  },   // TXT_AJ_ITEM: categoria no indice (mockup 21/500)
   { 25, PESO_MEDIUM  },   // TXT_AJ_ROTULO: nome na linha (23/500)
-  { 22, PESO_MEDIUM  },   // TXT_AJ_VALOR: valor na linha (20/500)
   { 18, PESO_BOLD    },   // TXT_AJ_CHIP: "Ligado" / "Desligado" (17/600)
   { 33, PESO_BOLD    },   // TXT_AJ_INSP: titulo do inspetor (32/700)
   { 15, PESO_BOLD    },   // TXT_AJ_KBD: tecla das dicas (14/700)

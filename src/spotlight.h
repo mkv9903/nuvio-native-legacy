@@ -85,8 +85,6 @@
 void spot_abrir(int voz);
 // Busca somente preferencias locais, sem consultas de catalogo/pessoas nem historico.
 void spot_abrir_ajustes(int voz);
-// "Buscar no guia" (Guia de uso): os recursos do guia e os ajustes que casam.
-void spot_abrir_guia(void);
 // Reabre a busca local após abrir um resultado, restaurando consulta e foco.
 void spot_reabrir_ajustes(void);
 void spot_fechar(void);
@@ -112,8 +110,7 @@ enum {
   SPOT_CANAL,       // id/nome/base do canal (guia_item_do_canal)
   SPOT_CATALOGO,    // indice = cat_fileira(indice)
   SPOT_ADDONS,      // abre a tela de Addons
-  SPOT_AJUSTE,      // indice = OpcaoId estavel da preferencia
-  SPOT_GUIA         // indice = recurso do Guia de uso (ajustes_guia_ir)
+  SPOT_AJUSTE       // indice = OpcaoId estavel da preferencia
 };
 typedef struct {
   int  tipo;

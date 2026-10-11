@@ -298,14 +298,6 @@ int main(int argc, char **argv) {
           tecla(*t == 'u' ? SDLK_UP : *t == 'd' ? SDLK_DOWN : *t == 'l' ? SDLK_LEFT : *t == 'r' ? SDLK_RIGHT
                 : *t == 'o' ? SDLK_RETURN : SDLK_ESCAPE);
       }
-      if (!strcmp(id, "guia-busca")) {
-        int k;
-        SDL_Event e = { 0 };
-        spot_abrir_guia();
-        spot_texto_externo("legenda");
-        e.type = SDL_KEYDOWN; e.key.keysym.sym = SDLK_DOWN;
-        for (k = 0; k < 4 && spot_linha_focada() < 0; k++) spot_evento(&e);
-      }
       if (quadrosCaptura != 60) snprintf(nome, sizeof nome, "%s-%s-q%d.png", saida, id, quadrosCaptura);
       else snprintf(nome, sizeof nome, "%s-%s.png", saida, id);
       captura(nome, w);

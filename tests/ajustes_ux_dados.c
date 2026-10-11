@@ -483,8 +483,6 @@ int main(void) {
   assert(somenteDesteAparelho(AJ_ESMAECER) && somenteDesteAparelho(AJ_BRILHO_PLAYER));
   { int vE = 0, vB = 0, k; for (k = 0; k < AJ_N_TELA; k++) if (TELA[k].tipo == IT_OPC) { vE += TELA[k].op == AJ_ESMAECER; vB += TELA[k].op == AJ_BRILHO_PLAYER; } assert(vE == 1 && vB == 1); }
   assert(indiceResultado(AJ_ESMAECER, ajustes_buscar("oled", resultados, AJ_N)) >= 0);
-  /* 2.0: "Novidades 2.0" e a ULTIMA opcao: acao em Sobre e ajuda, sem chave gravada. */
-
   /* Retomada (05/10): "Manter o video pronto ao sair" e a ULTIMA opcao. Avancada, local,
      DESLIGADA de fabrica (instalacao antiga sem a chave = nao retem), nunca no perfil seguro,
      e so com a saida para a home valendo. */

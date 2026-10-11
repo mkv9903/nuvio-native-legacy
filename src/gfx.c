@@ -3380,8 +3380,8 @@ static void desfEncerrar(void) {
 }
 
 // --- MINIATURA ---------------------------------------------------------------------
-// Uma tela de verdade desenhada num alvo proprio e mostrada reduzida (a previa
-// das Novidades, o inspetor do Guia de uso). O desenho continua em coordenadas
+// Uma tela de verdade desenhada num alvo proprio e mostrada reduzida nas
+// previas dos Ajustes. O desenho continua em coordenadas
 // de layout: o uTela e o viewport fazem a reducao, como no snapshot, e a
 // regiao [x0, x0 + w/esc] x [y0, y0 + h/esc] do layout cobre o alvo inteiro.
 static GLint miniFboAnt, miniVpAnt[4];

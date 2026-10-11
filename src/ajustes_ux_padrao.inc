@@ -179,7 +179,6 @@
   2,                /* espera pelos add-ons: 5 s (#221; indice 2 da lista do #202) */
   0,                /* ver o registro na tela: acao */
   0,                /* medidor de desempenho: DESLIGADO (V_MEDIDOR: 0 = Desligado) */
-  0,                /* guia de uso: acao */
   0, 0, 0,          /* pacote de selos (espelho de selospacote_ativo), adicionar e remover: o embutido */
   0,                /* tamanho da interface: 100%, o de sempre */
   2,                /* fundo: Frost desde a 2.0 (FUNDO_FROST; dono, 05/10/2026) */

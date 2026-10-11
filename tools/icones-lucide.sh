@@ -26,8 +26,8 @@ activity gauge zap database
 arrow-up-down heart moon sun-dim
 arrow-up arrow-down pencil
 pause send scroll-text server-crash shield-check cpu log-out
-panel-left list-x bell audio-lines layers type sliders-horizontal book-open user-plus
-alarm-clock badge-check captions chart-column chevrons-down circle-check circle-dot compass droplet feather film funnel globe image image-plus inbox key key-round layout-list life-buoy link list-ordered list-video loader log-in map maximize-2 menu message-square monitor-play mouse-pointer move-horizontal pause picture-in-picture-2 play quote send server settings-2 shield sparkle stethoscope thumbs-up unlink wand sparkles corner-up-left book-open-text
+panel-left list-x bell audio-lines layers type sliders-horizontal user-plus
+alarm-clock badge-check captions chart-column chevrons-down circle-check circle-dot compass droplet feather film funnel globe image image-plus inbox key key-round layout-list life-buoy link list-ordered list-video loader log-in map maximize-2 menu message-square monitor-play mouse-pointer move-horizontal pause picture-in-picture-2 play quote send server settings-2 shield sparkle stethoscope thumbs-up unlink wand sparkles corner-up-left
 pipette blend spotlight paint-roller
 ellipsis
 hard-drive volume-2 package tag

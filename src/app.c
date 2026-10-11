@@ -1935,10 +1935,6 @@ static void spotAtender(void) {
       addonsui_abrir();
       trocarTela(TELA_ADDONS);
       break;
-    case SPOT_GUIA:
-      if (tela != TELA_AJUSTES) { ajustes_abrir_no_guia(); trocarTela(TELA_AJUSTES); menu_definir_destino(MENU_AJUSTES); }
-      ajustes_guia_ir(p.indice);
-      break;
     case SPOT_AJUSTE:
       detail_fechar();
       ajustes_abrir_opcao(p.indice);
@@ -2802,16 +2798,6 @@ void app_atualizar(float dt, Uint32 agora) {
     else if (buscaAjustes == 1) spot_abrir_ajustes(0);
   }
 
-  // Os atalhos de tela do Guia de uso ("Abrir o Guia de TV" e cia.): a tela e
-  // o item do menu, como se a pessoa tivesse ido pelo menu.
-  if (tela == TELA_AJUSTES) {
-    switch (ajustes_pediu_tela()) {
-      case AJ_TELA_GUIA_TV:    trocarTela(TELA_GUIA);       menu_definir_destino(MENU_GUIA);       break;
-      case AJ_TELA_BIBLIOTECA: trocarTela(TELA_BIBLIOTECA); menu_definir_destino(MENU_BIBLIOTECA); break;
-      case AJ_TELA_PERFIL:     trocarTela(TELA_PERFIL);     menu_definir_destino(MENU_PERFIL);     break;
-      default: break;
-    }
-  }
   if (tela == TELA_AJUSTES && ajustes_pediu_addons()) {
     addonsui_abrir();
     trocarTela(TELA_ADDONS);

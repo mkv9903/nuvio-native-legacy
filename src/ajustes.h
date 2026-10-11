@@ -51,29 +51,6 @@ void ajustes_abrir_no_trakt(void);
 // Fontes e addons > Escolha da fonte, na linha "Espera pelos add-ons": o destino
 // do OK na explicacao da espera na ilha do player (#202).
 void ajustes_abrir_na_espera_fonte(void);
-// GUIA DE USO (Ajustes › Sobre e ajuda): a proxima abertura vai direto ao
-// guia. `daNovidades` = 1 quando quem abriu foi o cartao da 1.8.0: o guia
-// ganha "Voltar às novidades" e o Voltar dele devolve ao cartao
-// (ajustes_pediu_novidades, lido e zerado pelo app.c).
-void ajustes_abrir_no_guia(void);
-// O guia esta na tela (por cima das ilhas de Ajustes).
-int  ajustes_guia_aberto(void);
-// Os atalhos "Abrir o Guia de TV / a Biblioteca /
-// Perfil e Stats" do guia: 1..5 na ordem, lido e zerado pelo app.c.
-enum { AJ_TELA_GUIA_TV = 1, AJ_TELA_BIBLIOTECA, AJ_TELA_PERFIL = 5 };
-int  ajustes_pediu_tela(void);
-// O guia para o Spotlight no modo guia (spot_abrir_guia): as entradas que
-// casam com `consulta` (titulo antes de texto), os textos de cada uma e a
-// imagem dela; ajustes_guia_ir abre o guia na entrada.
-int  ajustes_guia_buscar(const char *consulta, int *out, int max);
-const char *ajustes_guia_titulo(int e);
-const char *ajustes_guia_texto(int e);
-const char *ajustes_guia_icone(int e);
-const char *ajustes_guia_capitulo(int e);
-const char *ajustes_guia_onde(int e);
-int  ajustes_guia_novo(int e);
-void ajustes_guia_imagem(int e, float x, float y, float w, float h);
-void ajustes_guia_ir(int e);
 // A linha em foco (indice AJ_*; -1 com o foco num grupo), para os testes
 // conferirem onde a tela abriu.
 int  ajustes_opcao_em_foco(void);

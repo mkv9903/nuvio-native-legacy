@@ -1261,7 +1261,7 @@ float ajustes_ui_antes_depois(const char *rot, int a, int b, const char *unid, i
 }
 // O grafico de pressao da memoria (os ultimos 2 min) sem o painel em volta.
 // O historico de EXEMPLO (o do mockup): sobe, passa do teto e volta. Usado
-// pelas capturas e pela previa do cartao de novidades da 1.8.0.
+// pelas capturas dos Ajustes.
 #ifdef AJUSTES_TESTE
 static void ajMemExemplo(long *hist, long teto) {
   int i;

@@ -10,8 +10,6 @@
 // lado ache cada peca.
 
 #include "home.h"
-// A linha e o inspetor do "Guia de uso" moram com o guia (ajustes_ux_guia.inc).
-static int guiaTotal(void);
 static char uxDirArte[1024];
 void ajustes_recursos(const char *dirArte) {
   snprintf(uxDirArte, sizeof uxDirArte, "%s", dirArte ? dirArte : "");
@@ -597,7 +595,7 @@ static float ajLinhaH(int i) {
   GfxRect fr = aj2ListaR();
   // "Depende de: ..." so na linha em foco (2.0.2): nas Notas eram oito linhas
   // repetindo a mesma frase; apagada, a linha ja diz que esta presa.
-  if ((inativa(op) && uxRequisito(op) >= 0 && aj2FocoNaLista(i)) || op == AJ_GUIA) h = AJ2_LN_SUB;
+  if (inativa(op) && uxRequisito(op) >= 0 && aj2FocoNaLista(i)) h = AJ2_LN_SUB;
   // A regua de cores abre NA LINHA, com e sem inspetor: o inspetor mostra a
   // previa viva e as medidas da cor (aj2PreviaCor).
   if (op == AJ_TEMA && ajEditandoLinha(op) && aj2FocoNaLista(i)) baixo += AJ_REGUA_H;
@@ -781,7 +779,6 @@ static const char *ajEstadoAcao(int op) {
     else snprintf(b, sizeof b, i18n("%d na Home"), home);
     return b;
   }
-  if (op == AJ_GUIA) { snprintf(b, sizeof b, i18n("%d recursos"), guiaTotal()); return b; }
 
   return textoLeitura(op);
 }
@@ -905,7 +902,7 @@ static void ajDesenharLinha(int item, float y, float f, float a) {
   GfxRect fr = aj2ListaR();
   GfxRect ln = { fr.x + 18.0f, y, fr.w - 36.0f, h };
   int desligada = inativa(op), emFoco = f > 0.5f, ed = ajEditandoLinha(op);
-  int sub = (desligada && uxRequisito(op) >= 0 && aj2FocoNaLista(item)) || op == AJ_GUIA;
+  int sub = desligada && uxRequisito(op) >= 0 && aj2FocoNaLista(item);
   int abre = h > 102.0f;
   float aT = a * (desligada ? 0.45f : 1.0f), aTx = a * aj2TextoLista;
   float xDir = ln.x + ln.w - 22.0f, yc = abre ? y + AJ2_LN_LINHA1 * 0.5f : y + h * 0.5f;
@@ -1003,8 +1000,7 @@ static void ajDesenharLinha(int item, float y, float f, float a) {
     if (sub) {
       char t[200];
       TxtLinha s;
-      if (op == AJ_GUIA) snprintf(t, sizeof t, "%s", i18n("Tudo o que o app faz, por assunto"));
-      else snprintf(t, sizeof t, emFoco ? i18n("Depende de: %s · OK mostra") : i18n("Depende de: %s"),
+      snprintf(t, sizeof t, emFoco ? i18n("Depende de: %s · OK mostra") : i18n("Depende de: %s"),
                     i18n(rotuloOpcao(uxRequisito(op))));
       s = ajTxtC(TXT_V2_18, t, maxW);
       txt_desenhar_alpha(s, tx, y + 12.0f + 32.0f + 4.0f + (22.0f - s.h) * 0.5f, 0.5f * aT);
@@ -1163,5 +1159,4 @@ static float ajEf(const char *icone, const char *s, float x, float y, float w, f
 #include "ajustes_ux_v2.inc"
 #include "ajustes_ux_ilha.inc"
 #include "ajustes_ux_fileiras.inc"
-#include "ajustes_ux_guia.inc"
 #include "ajustes_ux_secoes.inc"

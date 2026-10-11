@@ -400,7 +400,7 @@ unsigned gfx_snap_geracao(void);
 void gfx_tamanho_alvo(int w, int h);
 
 // MINIATURA: uma tela DE VERDADE desenhada num alvo proprio e mostrada
-// reduzida (previa das Novidades da 1.8.0, inspetor do Guia de uso). Entre
+// reduzida nas previas dos Ajustes. Entre
 // comecar e terminar o desenho segue em coordenadas de layout: o ponto
 // (x0, y0) cai no canto de cima do alvo e cada unidade vale `esc` pixels.
 // Nada de gfx_desfocado/gfx_ambiente/snapshot la dentro.

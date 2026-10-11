@@ -17,7 +17,8 @@ along with the previously deleted social, P2P, Discord and personal media-server
 features. Update checks use releases from
 [this fork](https://github.com/mkv9903/nuvio-native-legacy/releases). The announcement feed, donation
 UI and log/report uploads have been removed. Logs, crash reports and diagnostics
-stay on the device; the user guide and first-use explanations remain available.
+stay on the device. Settings help and previews, and first-use explanations remain
+available; the separate User guide has been removed.
 Source translation to English is a separate, later step.
 
 ## Linux UI preview
@@ -124,12 +125,6 @@ manual update checks may report that a release could not be retrieved.
 Tests live in `tests/`. `bash tools/test-all.sh` runs the logic suite and reports
 individual failures. Screenshot and performance checks are separate. Some checks
 need ffmpeg, mkvmerge or a graphical display.
-
-The user guide is generated from `design/guia-de-uso/guia.json`:
-
-```bash
-python3 tools/guia_inc.py
-```
 
 All ten app icons are available in Settings and change branding inside the app.
 The installed LG package icon stays fixed.

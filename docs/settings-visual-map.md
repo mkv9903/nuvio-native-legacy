@@ -21,7 +21,7 @@ preview. The `case` order of `ajVisualCena` follows the SEC order of src/ajustes
 | Live TV | channel playing on top, programme guide with now-line below |
 | Accounts and services | profiles (real avatars) and Trakt / sync / keys |
 | Performance on this TV | FPS meter and memory/image bars |
-| About and help | wordmark, version, update button, guide QR |
+| About and help | wordmark, version, update button, local logs |
 
 ## Art per category and per submenu
 

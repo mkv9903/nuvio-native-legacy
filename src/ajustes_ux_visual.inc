@@ -214,7 +214,6 @@ static const char *ajVisualIcone(int op) {
     case AJ_VELOCIDADE: return "aj_gauge";
     case AJ_ESPACO: return "aj_database";
     case AJ_TEX_MB: return "aj_memory-stick";
-    case AJ_GUIA: return "aj_book-open";
     case AJ_VERSAO_I: return "aj_info";
     case AJ_ATUALIZAR: return "aj_download";
     case AJ_VER_REGISTRO: return "aj_scroll-text";
@@ -258,7 +257,7 @@ static const signed char AJ_ARTE_SEC[AJS_N][AJ_ARTE_BLOCOS] = {
   {  2, 14, -1, -1, -1, -1 },   // TV ao vivo: Provedor, Se o canal nao abre
   { 23, 33,  8, -1, -1, -1 },   // Conta e perfis: Perfil, Trakt e Simkl, Notificacoes
   { 26, -1, -1, -1, -1, -1 },   // Desempenho desta TV
-  { 30, 25, -1, -1, -1, -1 },   // Sobre e ajuda: (guia e) App, Registro
+  { 30, 25, -1, -1, -1, -1 },   // Sobre e ajuda: App, Registro
 };
 static int ajCenaArteN(int sec) {
   return sec >= 0 && sec < AJS_N ? AJ_ARTE_SEC[sec][0] : 12;
@@ -600,10 +599,7 @@ static float ajVisualCena(int sec, int op, float x, float y, float w) {
         ACC(376, by + 9, 204 * pc[i], 9, i == 0 ? 1.0f : 0.6f);
       }
       break; }
-    default: {   // Sobre e ajuda: marca, versao, atualizacao e o QR do guia
-      static const unsigned QR[21] = { 0x1FC07F, 0x104A41, 0x175B5D, 0x174A5D, 0x1754DD, 0x104C41, 0x1FD57F, 0x000600,
-                                       0x1B6D3A, 0x0A9145, 0x15B6CB, 0x08592A, 0x1D2EB5, 0x0005A2, 0x1FCB4C, 0x1046D3,
-                                       0x175A28, 0x174D97, 0x1752AC, 0x104B55, 0x1FC93A };
+    default: {   // Sobre e ajuda: marca, versao, atualizacao e registros locais
       ajCenaArte(ajArte(AJA_FUNDO, A), q, rr, 0.6f);
       VID(36, 36, 344, 288, 24);
       { const char *marca = logoapp_caminho(logoapp_atual(), LOGO_F_HORIZONTAL);
@@ -613,10 +609,8 @@ static float ajVisualCena(int sec, int op, float x, float y, float w) {
       VID(62, 248, 200, 48, 24); gfx_cor(RR(62, 248, 200, 48), 0.5f, 1, 1, 1, 0.06f);
       ICON("aj_download", 80, 260, 24, 0.9f); BAR(116, 268, 100, 0.75f); ACC(240, 266, 10, 10, 1);
       VID(396, 36, 208, 288, 24);
-      gfx_cor(RR(424, 64, 152, 152), 12.0f / 152.0f, 0.953f, 0.949f, 0.937f, 1);
-      for (i = 0; i < 21; i++) for (j = 0; j < 21; j++)
-        if (QR[i] >> (20 - j) & 1) gfx_cor(RR(430 + j * 6.66f, 70 + i * 6.66f, 6.8f, 6.8f), 0, 0.06f, 0.06f, 0.07f, 1);
-      ICON("aj_book-open", 424, 244, 26, 0.85f); BAR(462, 254, 110, 0.6f); BAR(424, 290, 150, 0.35f);
+      ICON("aj_file-text", 424, 64, 26, 0.85f); BAR(462, 74, 110, 0.6f);
+      for (i = 0; i < 7; i++) BAR(424, 120 + i * 24, i % 3 == 1 ? 110 : 150, 0.35f);
       break; }
   }
   gfx_sem_recorte();

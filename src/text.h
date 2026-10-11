@@ -83,7 +83,7 @@ typedef enum {
   // O DO MOCKUP + ~8%: a InterDisplay embarcada e mais estreita que a Inter do
   // navegador (DESIGN.md §4: meca largura) — "Estilo, fileiras..." em 19 px
   // media 399 px contra 442 no mockup.
-  TXT_AJ_ITEM, TXT_AJ_ROTULO, TXT_AJ_VALOR, TXT_AJ_CHIP, TXT_AJ_INSP,
+  TXT_AJ_ITEM, TXT_AJ_ROTULO, TXT_AJ_CHIP, TXT_AJ_INSP,
   TXT_AJ_KBD, TXT_AJ_ESTADO, TXT_AJ_CAPS13, TXT_AJ_MINI9, TXT_AJ_MINI9B,
   TXT_AJ_VALOR18, TXT_AJ_NUM58, TXT_AJ_NUM64, TXT_AJ_NUM110, TXT_AJ_TIT28,
   TXT_AJ_MINI12, TXT_AJ_MINI13, TXT_AJ_MINI14, TXT_AJ_16B,
@@ -127,7 +127,7 @@ typedef enum {
   TXT_LOG_18B,  // numero forte no medidor          17 / 600
   TXT_MONO14B,  // numero da linha "quadros" no pacote 14 / 600
   TXT_LOG_T31,  // "Registro do app" ao lado do relogio 30 / 700
-  // NOVIDADES DA 1.8.0 E GUIA DE USO (mockups aprovados em 03/10). No FIM,
+  // Cartoes de informacao e atualizacao. No FIM,
   // como manda o comentario do TXT_RANK_GRANDE.
   TXT_NOV_TITULO,   // .c-tit do cartao de novidades  50 / 700
   TXT_G28R,   // "Você está na" do cartao da atualizacao (mockup 26/400; a

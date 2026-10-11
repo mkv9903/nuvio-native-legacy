@@ -133,11 +133,10 @@ enum {
   L_RECENTE,
   L_LIMPAR,
   L_AJUSTE,
-  L_GUIA,         // recurso do Guia de uso (modo guia)
 };
 // Alturas SEM vao entre as linhas, como as .row do mockup: o melhor resultado
 // e 140 de arte + 16 em cima e embaixo, a linha de titulo 62 de cartaz + 12.
-static const float ALTURA[] = { 50, 64, 172, 86, 86, 86, 86, 72, 72, 64, 64, 80, 76 };
+static const float ALTURA[] = { 50, 64, 172, 86, 86, 86, 86, 72, 72, 64, 64, 80 };
 
 typedef struct {
   int  tipo;
@@ -163,10 +162,6 @@ static float animLin[SP_MAX_LIN], entraLin[SP_MAX_LIN];
 // --- Estado ----------------------------------------------------------------------
 static int   aberto;
 static int   modoAjustes;
-// MODO GUIA (spot_abrir_guia): o "Buscar no guia" do Guia de uso. E um modo
-// Ajustes (so local, sem historico) com os recursos do guia na frente.
-static int   modoGuia;
-static char  consultaRealce[SP_MAX_TXT * 2];   // o termo realcado no modo guia
 static int   retornoAjustesValido;
 static char  retornoAjustesConsulta[SP_MAX_TXT];
 static char  retornoAjustesChave[96];
@@ -705,82 +700,6 @@ static void montarAjustes(const char *consultaLocal) {
   } }
 }
 
-// MODO GUIA (mockup do guia, quadro "guia-busca"): o melhor resultado com a
-// imagem do recurso, os outros recursos em "No guia" (com a contagem) e, embaixo,
-// os ajustes que casam, para quem quer ir direto a opcao. Campo vazio: os
-// recursos novos da 1.8.0.
-static void montarGuia(const char *q) {
-  int res[16], n, i;
-  if (!q || !q[0]) {
-    cabecalho(i18n("Novo na 1.8.0"));
-    for (i = 0, n = 0; i < 200 && n < 5; i++) {
-      Linha *l;
-      if (!ajustes_guia_titulo(i)[0]) break;
-      if (!ajustes_guia_novo(i)) continue;
-      l = nova(L_GUIA);
-      if (!l) return;
-      l->ref = i;
-      snprintf(l->t1, sizeof l->t1, "%s", i18n(ajustes_guia_titulo(i)));
-      snprintf(l->t2, sizeof l->t2, "%s  ·  %s", i18n(ajustes_guia_capitulo(i)), i18n(ajustes_guia_texto(i)));
-      snprintf(l->icone, sizeof l->icone, "%s", ajustes_guia_icone(i));
-      snprintf(l->chave, sizeof l->chave, "g|%d", i);
-      n++;
-    }
-    return;
-  }
-  n = ajustes_guia_buscar(q, res, 16);
-  for (i = 0; i < n && i < 7; i++) {
-    Linha *l;
-    if (i == 0) cabecalho(i18n("Melhor resultado"));
-    if (i == 1) {
-      cabecalho(i18n("No guia"));
-      snprintf(lin[nLin - 1].t2, sizeof lin[nLin - 1].t2, "%d", n);
-    }
-    l = nova(L_GUIA);
-    if (!l) return;
-    l->ref = res[i];
-    l->ref2 = i == 0;
-    snprintf(l->t1, sizeof l->t1, "%s", i18n(ajustes_guia_titulo(res[i])));
-    if (i == 0) {
-      char onde[400], *p;
-      snprintf(onde, sizeof onde, "%s", ajustes_guia_onde(res[i]));
-      p = strstr(onde, " | ");
-      if (p) *p = 0;
-      // A trilha traduzida pedaco a pedaco, como no inspetor do guia.
-      { char tr[400] = "", *s = onde, *sep;
-        while (s && *s) {
-          size_t k = strlen(tr);
-          sep = strstr(s, " › ");
-          if (sep) *sep = 0;
-          snprintf(tr + k, sizeof tr - k, "%s%s", k ? " › " : "", i18n(s));
-          s = sep ? sep + strlen(" › ") : NULL;
-        }
-        snprintf(l->t2, sizeof l->t2, "%s · %s", i18n(ajustes_guia_capitulo(res[i])), tr); }
-      snprintf(l->base, sizeof l->base, "%s", i18n(ajustes_guia_texto(res[i])));
-    } else snprintf(l->t2, sizeof l->t2, "%s · %s", i18n(ajustes_guia_capitulo(res[i])), i18n(ajustes_guia_texto(res[i])));
-    snprintf(l->icone, sizeof l->icone, "%s", ajustes_guia_icone(res[i]));
-    snprintf(l->chave, sizeof l->chave, "g|%d", res[i]);
-  }
-  { AjusteBuscaResultado r[3];
-    int m = ajustes_buscar(q, r, 3), k;
-    if (m > 0) cabecalho(i18n("Nos ajustes"));
-    for (k = 0; k < m; k++) {
-      Linha *l = nova(L_AJUSTE);
-      if (!l) return;
-      l->ref = r[k].op;
-      snprintf(l->t1, sizeof l->t1, "%s", r[k].titulo);
-      snprintf(l->t2, sizeof l->t2, "%s%s%s", r[k].caminho, r[k].valor[0] ? " · " : "", r[k].valor);
-      snprintf(l->icone, sizeof l->icone, "%s", r[k].icone[0] ? r[k].icone : "menu_settings");
-      snprintf(l->chave, sizeof l->chave, "aj|%d", r[k].op);
-    } }
-  if (nLin == 0) {
-    Linha *l = nova(L_AVISO);
-    if (l) { snprintf(l->t1, sizeof l->t1, i18n("Nada no guia para “%s”."), q);
-             snprintf(l->chave, sizeof l->chave, "g-vazio"); }
-  }
-  snprintf(consultaRealce, sizeof consultaRealce, "%s", q);
-}
-
 static void remontar(void) {
   char alvo[SP_MAX_TXT * 2];
   char chaveFoco[96] = "";
@@ -792,9 +711,7 @@ static void remontar(void) {
   snprintf(montada, sizeof montada, "%s", consulta);
   nLin = 0;
   busca_normalizar(consulta, alvo, sizeof alvo);
-  if (modoGuia) {
-    montarGuia(consulta);
-  } else if (modoAjustes) {
+  if (modoAjustes) {
     montarAjustes(consulta);
     if (nLin <= (modoAjustes ? 1 : 0)) {
       Linha *l = nova(L_AVISO);
@@ -835,7 +752,6 @@ static void remontar(void) {
     for (i = 0; i < nLin; i++) {
       lin[i].h = ALTURA[lin[i].tipo];
       if (lin[i].tipo == L_AJUSTE && lin[i].ref2 == 1) lin[i].h = 194.0f;
-      if (lin[i].tipo == L_GUIA && lin[i].ref2 == 1) lin[i].h = 204.0f;
       if (lin[i].tipo == L_AVISO && lin[i].t2[0]) lin[i].h += 30.0f;
       // Sem vao extra antes de um grupo: os 50 px do cabecalho ja sao o
       // "22 em cima, 10 embaixo" do kicker do mockup.
@@ -949,7 +865,6 @@ static void lerSistema(void) {
 // --- Ciclo de vida -------------------------------------------------------------------
 void spot_abrir(int voz) {
   modoAjustes = 0;
-  modoGuia = 0;
   retornoAjustesValido = 0;
   spotAbrirBase(voz, 1);
 }
@@ -989,16 +904,8 @@ static void spotAbrirBase(int voz, int tecladoAuto) {
   else if (tecladoAuto && imeDisponivel() && st_abre_sozinho()) abrirTecladoSis();
 }
 
-void spot_abrir_guia(void) {
-  modoAjustes = 1;
-  modoGuia = 1;
-  retornoAjustesValido = 0;
-  spotAbrirBase(0, 1);
-}
-
 void spot_abrir_ajustes(int voz) {
   modoAjustes = 1;
-  modoGuia = 0;
   retornoAjustesValido = 0;
   spotAbrirBase(voz, 1);
 }
@@ -1086,7 +993,6 @@ static void acionar(int i) {
     case L_CATALOGO: pedido.tipo = SPOT_CATALOGO; pedido.indice = l->ref; break;
     case L_ADDON:    pedido.tipo = SPOT_ADDONS;   pedido.indice = l->ref; break;
     case L_AJUSTE:   pedido.tipo = SPOT_AJUSTE;   pedido.indice = l->ref; break;
-    case L_GUIA:     pedido.tipo = SPOT_GUIA;     pedido.indice = l->ref; break;
     case L_CANAL:
       pedido.tipo = SPOT_CANAL;
       snprintf(pedido.id, sizeof pedido.id, "%s", l->id);
@@ -1480,7 +1386,7 @@ static void desenhaCampo(float dy, float a, Uint32 agora) {
   if (modoAjustes && nConsulta && !ouve) {
     char up[96];
     float w;
-    idioma_maiusc_em(ajustes_idioma(), up, sizeof up, i18n(modoGuia ? "Buscar no guia" : "Buscar nos ajustes"));
+    idioma_maiusc_em(ajustes_idioma(), up, sizeof up, i18n("Buscar nos ajustes"));
     w = txt_tracking(TXT_MINI, up, SP_TINTA, -1, 0, 0, 2.1f);
     if (xMax - w - 30.0f > tx + 200.0f) {
       TxtLinha m = txt_linha(TXT_MINI, "M", SP_TINTA, 255);
@@ -1495,7 +1401,7 @@ static void desenhaCampo(float dy, float a, Uint32 agora) {
   } else {
     const char *ph = ouve ? i18n(st_estado() == ST_PERMISSAO ? "Permita o microfone para falar…" : "Ouvindo…")
                    : av[0] ? i18n(av)
-                   : modoAjustes ? i18n(modoGuia ? "Buscar no guia" : "Buscar nos ajustes")
+                   : modoAjustes ? i18n("Buscar nos ajustes")
                    : i18n(comMic ? "Buscar ou falar: filmes, séries, pessoas, canais"
                                  : "Buscar filmes, séries, pessoas e canais");
     int amb = !ouve && av[0];
@@ -1618,104 +1524,6 @@ static void kicker(const char *t, float x, float yBase, float a) {
     txt_tracking(TXT_MINI, up, SP_TINTA, x, yBase - l.h, .45f * a, 2.1f); }
 }
 
-// O termo buscado realcado no texto (Bold e branco cheio), quebrando em linhas
-// de `w`: palavra a palavra, com o trecho que casa partido para fora dela.
-static size_t realceDesde;   // o realce so vale a partir deste byte (pula "Capitulo · ")
-static const char *achaRealce(const char *s, size_t *n) {
-  size_t q = strlen(consultaRealce), i, j;
-  if (!q || strlen(s) < realceDesde) return NULL;
-  for (i = realceDesde; s[i]; i++) {
-    for (j = 0; j < q && s[i + j]; j++) {
-      unsigned char a = (unsigned char)s[i + j], b = (unsigned char)consultaRealce[j];
-      if (a >= 'A' && a <= 'Z') a = (unsigned char)(a + 32);
-      if (b >= 'A' && b <= 'Z') b = (unsigned char)(b + 32);
-      if (a != b) break;
-    }
-    if (j == q) { *n = q; return s + i; }
-  }
-  return NULL;
-}
-static float textoRealce(const char *s, TxtEstilo eN, TxtEstilo eB, float x, float y, float w,
-                         float lh, int maxL, float aN, float aB) {
-  size_t mn = 0;
-  const char *m = achaRealce(s, &mn), *p = s;
-  float xx = x, yy = y, esp = (float)(txt_largura(eN, "a a") - txt_largura(eN, "aa"));
-  int linha = 1;
-  while (*p) {
-    char pal[200];
-    size_t k = 0;
-    while (*p == ' ') p++;
-    if (!*p) break;
-    while (p[k] && p[k] != ' ' && k < sizeof pal - 1) k++;
-    { float pw = 0;
-      const char *a0 = p;
-      size_t t;
-      for (t = 0; t < k;) {   // mede a palavra, com o trecho realcado em Bold
-        int dentro = m && a0 + t >= m && a0 + t < m + mn;
-        size_t u = t;
-        while (u < k && (m && a0 + u >= m && a0 + u < m + mn) == dentro) u++;
-        snprintf(pal, sizeof pal, "%.*s", (int)(u - t), a0 + t);
-        pw += (float)txt_largura(dentro ? eB : eN, pal);
-        t = u;
-      }
-      if (xx > x && xx + pw > x + w) {
-        if (linha >= maxL) {
-          TxtLinha r = txt_linha(eN, "…", SP_TINTA, 255);
-          txt_desenhar_alpha(r, xx, yy, aN);
-          return yy + lh - y;
-        }
-        linha++; xx = x; yy += lh;
-      }
-      for (t = 0; t < k;) {
-        int dentro = m && a0 + t >= m && a0 + t < m + mn;
-        size_t u = t;
-        TxtLinha l;
-        while (u < k && (m && a0 + u >= m && a0 + u < m + mn) == dentro) u++;
-        snprintf(pal, sizeof pal, "%.*s", (int)(u - t), a0 + t);
-        l = dentro ? txt_linha(eB, pal, 255, 255, 255, 255) : txt_linha(eN, pal, SP_TINTA, 255);
-        txt_desenhar_alpha(l, xx, yy, dentro ? aB : aN);
-        xx += l.w;
-        t = u;
-      }
-      xx += esp; }
-    p += k;
-  }
-  return yy + lh - y;
-}
-// Uma linha do modo guia: o melhor resultado com a imagem do recurso, ou a
-// linha com o icone no ladrilho e "Capitulo · frase" com o termo realcado.
-static void desenhaGuia(Linha *l, GfxRect r, float f, float a1, float a2, float a) {
-  int vidro = ajustes_vidro();
-  if (l->ref2 == 1) {
-    GfxRect art = { r.x + 18.0f, r.y + 18.0f, 300.0f, 168.0f };
-    float tx = art.x + art.w + 26.0f, dw = 0.0f, tw, ty;
-    TxtLinha t, m, o;
-    ajustes_guia_imagem(l->ref, art.x, art.y, art.w, art.h);
-    o = txt_linha(TXT_ILHA_APOIO, i18n("OK abre"), SP_TINTA, 255);
-    if (f > 0.02f) { txt_desenhar_alpha(o, r.x + r.w - 28.0f - o.w, r.y + (r.h - o.h) * 0.5f, .5f * f * a); dw = o.w + 40.0f; }
-    tw = r.x + r.w - tx - 26.0f - dw;
-    t = txt_linha_corta(TXT_AJ_INSP, l->t1, SP_TINTA, 255, tw);
-    m = txt_linha_corta(TXT_ILHA_META, l->t2, SP_TINTA, 255, tw);
-    ty = r.y + 38.0f;
-    txt_desenhar_alpha(t, tx, ty, a);
-    txt_desenhar_alpha(m, tx, ty + t.h + 6.0f, .62f * a);
-    textoRealce(l->base, TXT_AJ_ESTADO, TXT_AJ_16B, tx, ty + t.h + 6.0f + m.h + 12.0f,
-                tw < 600.0f ? tw : 600.0f, 25.0f, 2, .5f * a, a);
-    return;
-  }
-  { GfxRect dc = { r.x + 18.0f, r.y + (r.h - 52.0f) * 0.5f, 52.0f, 52.0f };
-    float tx = dc.x + 52.0f + 18.0f, tw = r.x + r.w - tx - 16.0f;
-    TxtLinha t = txt_linha_corta(TXT_ILHA_ITEM, l->t1, SP_TINTA, 255, tw);
-    if (vidro) gfx_cor(dc, 16.0f / 52.0f, 1, 1, 1, .07f * a);
-    else gfx_cor(dc, 16.0f / 52.0f, .125f, .129f, .153f, a);
-    gfx_icone((GfxRect){ dc.x + 14, dc.y + 14, 24, 24 }, l->icone, .953f, .949f, .937f, .75f * a);
-    txt_desenhar_alpha(t, tx, r.y + 12.0f, a1 * a);
-    { const char *p = strstr(l->t2, " · ");
-      realceDesde = p ? (size_t)(p - l->t2) : 0;
-      textoRealce(l->t2, TXT_ILHA_APOIO, TXT_AJ_16B, tx, r.y + 12.0f + t.h + 3.0f, tw, 22.0f, 1, a2 * a, a);
-      realceDesde = 0; } }
-}
-
 static void desenhaLinha(int i, float x, float y, float a) {
   Linha *l = &lin[i];
   float f = animLin[i], w = listaW;
@@ -1724,14 +1532,6 @@ static void desenhaLinha(int i, float x, float y, float a) {
   GfxRect r = { x, y, w, l->h };
   if (l->tipo == L_CAB) {
     kicker(l->t1, x + 12.0f, y + l->h - 11.0f, a);
-    if (l->t2[0]) {   // a contagem do grupo ("No guia 4")
-      char up[200];
-      float kw;
-      TxtLinha c = txt_linha(TXT_MINI, l->t2, SP_TINTA, 255);
-      idioma_maiusc_em(ajustes_idioma(), up, sizeof up, l->t1);
-      kw = txt_tracking(TXT_MINI, up, SP_TINTA, -1, 0, 0, 2.1f);
-      txt_desenhar_alpha(c, x + 12.0f + kw + 8.0f, y + l->h - 11.0f - c.h, .35f * a);
-    }
     return;
   }
   if (l->tipo == L_AVISO) {
@@ -1780,10 +1580,6 @@ static void desenhaLinha(int i, float x, float y, float a) {
       txt_desenhar_alpha(t, tx, ty, a);
       txt_desenhar_alpha(m, tx, ty + t.h + 6.0f, .62f * a);
       if (g.h) txt_desenhar_alpha(g, tx, ty + t.h + 6.0f + m.h + 6.0f, .42f * a); }
-    return;
-  }
-  if (l->tipo == L_GUIA) {
-    desenhaGuia(l, r, f, a1, a2, a);
     return;
   }
   if (l->tipo == L_AJUSTE && l->ref2 == 1) {

@@ -151,7 +151,7 @@ enum {
   AJC_IDI_INTERFACE, AJC_IDI_FAIXAS, AJC_IDI_LEGENDA2,
   AJC_TV_PROVEDOR, AJC_TV_PROBLEMAS,
   AJC_CON_PERFIS, AJC_CON_SOCIAL, AJC_CON_CHAVES, AJC_DES_TELA, AJC_DES_DIAG,
-  AJC_SOB_GUIA, AJC_SOB_APP,
+  AJC_SOB_APP,
   AJC_FON_ADDONS,
   AJC_N
 };
@@ -223,7 +223,6 @@ static int ajCenaSecao(int op) {
       return AJC_CON_CHAVES;
     case AJ_RESOLUCAO: case AJ_QUALIDADE_IMG: case AJ_GPU_EFEITOS: case AJ_NAV_RAPIDA: return AJC_DES_TELA;
     case AJ_MEDIDOR: case AJ_DIAGNOSTICO: case AJ_VELOCIDADE: return AJC_DES_DIAG;
-    case AJ_GUIA: return AJC_SOB_GUIA;
     case AJ_VERSAO_I: case AJ_ATUALIZAR: return AJC_SOB_APP;
     default: return -1;
   }
@@ -1168,25 +1167,6 @@ static void ajcDesDiag(int A) {
 }
 
 // --- SOBRE E AJUDA --------------------------------------------------------------------
-// Guia de uso: os capitulos de verdade e uma pagina aberta.
-static void ajcSobGuia(int A) {
-  int i, k;
-  ajCenaArte(ajArte(AJA_FUNDO, A), (GfxRect){ ajc.x, ajc.y, 640 * ajc.s, ajc.h }, 22, 0.62f);
-  CVID(36, 24, 250, 312, 24);
-  for (i = 0; i < 6 && i < GUIA_NCAPS; i++) {
-    float by = 40 + i * 48;
-    if (i == 1) gfx_cor(CR(46, by - 6, 230, 40), 0.5f, 1, 1, 1, 0.12f);
-    CICON(GUIA_CAPS[i].icone, 58, by + 4, 20, 0.85f);
-    ajcTxt(GUIA_CAPS[i].titulo, 12, i == 1, 88, by + 6, 180, i == 1 ? 1.0f : 0.7f);
-  }
-  CVID(302, 24, 302, 312, 24);
-  ajcTxt(GUIA_CAPS[1].titulo, 16, 1, 322, 44, 260, 1);
-  CBAR(322, 80, 250, 0.5f); CBAR(322, 96, 220, 0.5f);
-  for (k = 0; k < 3; k++) ajPreviaHomeArte(CX(322 + k * 90), CY(124), 82 * ajc.s, AJ_POS[(A + k) % 14]);
-  for (k = 0; k < 3; k++) { CBAR(322, 196 + k * 22, 240 - k * 40, 0.4f); }
-  CACC(322, 280, 120, 30, 1);
-  ajcFoco(AJ_GUIA, 28, 16, 584, 328, 26);
-}
 // O app: o simbolo, a versao, a atualizacao baixando e o que ha de novo.
 static void ajcSobApp(int A) {
   int i;
@@ -1241,7 +1221,6 @@ static float ajSecaoDesenhar(int cena, int op, float x, float y, float w) {
     case AJC_CON_CHAVES: ajcConChaves(A); break;
     case AJC_DES_TELA: ajcDesTela(A); break;
     case AJC_DES_DIAG: ajcDesDiag(A); break;
-    case AJC_SOB_GUIA: ajcSobGuia(A); break;
     case AJC_SOB_APP: ajcSobApp(A); break;
     case AJC_FON_ADDONS: ajcFonAddons(A); break;
     default: break;

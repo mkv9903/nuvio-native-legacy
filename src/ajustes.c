@@ -301,10 +301,6 @@ typedef enum {
   // "Medidor de desempenho" (Desempenho desta TV; desempenho.h). LOCAIS. No
   // fim pelo mesmo motivo: valor[] e CHAVE[] sao posicionais.
   AJ_VER_REGISTRO, AJ_MEDIDOR,
-  // GUIA DE USO (Ajustes › Sobre e ajuda, a primeira linha): abre a tela do
-  // guia (ajustes_ux_guia.inc). Acao. No fim pelo mesmo motivo: valor[] e
-  // CHAVE[] sao posicionais.
-  AJ_GUIA,
   // PACOTE DE SELOS (selospacote.h): qual pacote desenha os selos da folha de
   // Fontes (0 = "Do Nuvio", o embutido; 1.. = os pacotes da conta e desta TV),
   // adicionar um por URL e remover o escolhido. A escolha mora por perfil em
@@ -1096,7 +1092,6 @@ static const Opcao OPCOES[AJ_N] = {
   ESC("Espera pelos add-ons",            V_FONTE_PRAZO, 7),   // local: fonteEsperaLocal
   ACAO("Ver o registro na tela"),
   ESC("Medidor de desempenho",           V_MEDIDOR, 4),       // local: medidorFormaLocal
-  ACAO("Guia de uso"),
   ESC("Pacote de selos",                 V_SELOS_PACOTE, 4),   // por perfil: selospacote.c
   ACAO("Adicionar pacote de selos"),
   ACAO("Remover pacote"),
@@ -1309,7 +1304,6 @@ static const char *CHAVE[] = {
   "fonteEsperaLocal",
   // "-": acao, nao grava. O medidor e LOCAL e SEM o "-": e desta TV.
   "-verRegistro", "medidorFormaLocal",   // era "medidorDesempenhoLocal" (V_LIGA): ver ajustes_dir
-  "-guiaUso",
   // "-": a escolha mora em selos-p<N>.txt (por perfil), nao em ajustes.txt.
   "-selosPacote", "-selosPacoteAdd", "-selosPacoteRem",
   "tamanhoUiLocal",
@@ -1510,15 +1504,6 @@ void ajustes_abrir_na_cor(void) { abrirNaCor = 1; }
 void ajustes_abrir_na_fonte(void) { abrirNaFonte = 1; }
 void ajustes_abrir_no_trakt(void) { abrirNoTrakt = 1; }
 void ajustes_abrir_na_espera_fonte(void) { abrirNaEspera = 1; }
-static int abrirNoGuia;
-void ajustes_abrir_no_guia(void) { abrirNoGuia = 1; }
-// A tela do Guia de uso (ajustes_ux_guia.inc), aberta por cima das ilhas.
-static void guiaAbrir(void);
-static void guiaFechar(void);
-static void guiaEvento(const SDL_Event *e);
-static void guiaDesenhar(void);
-static void guiaAtualizar(float dt);
-static int guiaAberto;
 int  ajustes_opcao_em_foco(void) { return focoOp; }
 // Categoria mostrada na lista. Com o foco no indice ela e a categoria em foco
 // la; com o foco na lista, a do item.
@@ -3830,10 +3815,6 @@ int ajustes_iniciar(void) {
   // #202: o OK da explicacao de espera na ilha do player cai na linha que manda
   // nela, dentro de Fontes e addons > Escolha da fonte.
   if (abrirNaEspera) { abrirNaEspera = 0; focarOpcao(AJ_FONTE_PRAZO); }
-  // "Abrir o guia" do cartao da 1.8.0: a linha do guia em Sobre e ajuda e o
-  // guia aberto por cima dela (Voltar devolve ao cartao).
-  guiaFechar();
-  if (abrirNoGuia) { abrirNoGuia = 0; focarOpcao(AJ_GUIA); guiaAbrir(); }
   if (uxAbrirOp >= 0) { int op = uxAbrirOp; uxAbrirOp = -1; focarOpcao(op); }
   uxCancelar(); uxAviso[0] = 0; uxRetornarOp = -1;
   filAberta = 0; filFoco = 0; filCampo = 0; filPegou = 0; filTopo = 0;
@@ -3845,7 +3826,7 @@ int ajustes_iniciar(void) {
   rotulosDeIdioma();
   return 1;
 }
-void ajustes_encerrar(void) { uxCancelar(); uxRetornarOp = -1; guiaFechar(); }
+void ajustes_encerrar(void) { uxCancelar(); uxRetornarOp = -1; }
 int ajustes_quer_sair(void) { return sair; }
 
 // Valor das linhas so de leitura. O espaco em disco NAO e um numero inventado:
@@ -4479,7 +4460,6 @@ static const char *ajudaOpcao(int op) {
         : "Procura agora uma versão nova do Nuvio. Se houver, abre o cartão com o que mudou e o botão de instalar. O app também confere sozinho a cada 6 horas.";
     case AJ_VER_REGISTRO: return "Abre o registro do app por cima desta tela, ao vivo: o mesmo painel do botão vermelho do controle, para quem não tem esse botão.";
     case AJ_MEDIDOR: return "Mostra quadros por segundo, o pior quadro e a memória dentro da ilha do relógio, atualizados a cada 3 s. Mínimo fica na linha da hora, Menor ganha uma segunda linha e Grande abre o painel completo. Quando a ilha mostra um aviso, o medidor se recolhe e volta depois.";
-    case AJ_GUIA: return "O que o Nuvio faz, em 12 capítulos. Cada recurso diz onde fica e tem um atalho para ele.";
     case AJ_DIAGNOSTICO: return "Testa manifestos, fontes e artes dos addons, mede os tempos e aplica um perfil seguro de Qualidade ou Desempenho. O teste não marca títulos como assistidos.";
     case AJ_MENU_GUIA: case AJ_MENU_PERFIL:
       return "Desligado, o item some da barra lateral. Nada é apagado: ligue de novo para ele voltar.";
@@ -5373,7 +5353,6 @@ static const char *uxBloco(int op);
 static void eventoTela(const SDL_Event *e);
 void ajustes_evento(const SDL_Event *e) {
   AJ_ESCALA_INI();
-  if (guiaAberto) { guiaEvento(e); AJ_ESCALA_FIM(); return; }
   eventoTela(e);
   // FIM DA EDICAO DO LIMITE (issue #197): qualquer tecla que solte a linha
   // (OK, Voltar, cima/baixo, sair da tela) confirma a rajada. Sem rajada em
@@ -5444,7 +5423,6 @@ static void eventoTela(const SDL_Event *e) {
       return;
     }
     if (focoOp == AJ_VER_REGISTRO) { registro_abrir(); return; }
-    if (focoOp == AJ_GUIA) { guiaAbrir(); return; }
     if (focoOp == AJ_ADDONS) { pediuAddons = 1; return; }
     if (focoOp == AJ_PLUGINS) { pediuPlugins = 1; return; }
     if (focoOp == AJ_FONTE_ORDEM) { frAbrir(3); return; }
@@ -5574,7 +5552,6 @@ static void eventoTela(const SDL_Event *e) {
 static void aj2Atualizar(float dt);
 void ajustes_atualizar(float dt, Uint32 agora) {
   AJ_ESCALA_INI();
-  guiaAtualizar(dt);
   if (uxAviso[0] && SDL_TICKS_PASSED(agora, uxAvisoAte)) uxAviso[0] = 0;
   montarTela();
   valor[AJ_FONTE_REGEX_MODELO] = fonteregra_modelo_atual();   // espelho do padrao (#202)
@@ -5999,7 +5976,7 @@ static AjPreview familiaPreviaOpcao(int op) {
       return AJPV_CONTA;
     case AJ_SALVOS_DEST: case AJ_TRAKT: case AJ_SIMKL:  case AJ_HIST_CONTA:
       return AJPV_RASTREIO;
-    case AJ_VERSAO_I: case AJ_ATUALIZAR: case AJ_GUIA: case AJ_VER_REGISTRO:
+    case AJ_VERSAO_I: case AJ_ATUALIZAR: case AJ_VER_REGISTRO:
       return AJPV_ABOUT;
     case AJ_TMDB_LIGADO: case AJ_TMDB_IDIOMA: case AJ_TMDB_ARTE:
     case AJ_TMDB_BASICO: case AJ_TMDB_FICHA: case AJ_TMDB_DATAS:
@@ -6062,7 +6039,6 @@ static void ajDesenharTudo(Uint32 agora) {
   if (ajQuadroAddons) { ajustes_desenhar_addons(ajQuadroAddons - 1); return; }
 #endif
   montarTela();
-  if (guiaAberto) { guiaDesenhar(); return; }
   ajDesenharTela();
 
   // A folha de fileiras cobre a lista; o vinculo cobre as duas, porque ele e a
@@ -6172,32 +6148,6 @@ void ajustes_teste_tema(int tema, int vidro) {
 // OS QUADROS DO MOCKUP (ajustes-mockup.html), um por id, para a captura lado
 // a lado (tests/ajustes_shot.sh com NUVIO_AJ_QUADROS). Tema e vidro ficam os
 // que a captura escolheu.
-// Os quadros do mockup do Guia de uso (guia-mockup.html).
-static int ajustesTesteGuia(const char *id) {
-  static const struct { const char *id; int arte, idx, col; const char *ent; } Q[] = {
-    { "guia-capitulos", 13, GI_CAP0 + 1, GC_INDICE, NULL },
-    { "guia-fontes", 15, GI_CAP0 + 3, GC_LISTA, "f-folha" },
-    { "guia-ilha", 0, GI_CAP0 + 5, GC_LISTA, "i-avisos" },
-    { "guia-fileiras", 2, GI_CAP0 + 1, GC_BOTOES, "h-fileiras" },
-    { "guia-legendas", 21, GI_CAP0 + 4, GC_LISTA, "l-ass" },
-    { "guia-novo", 7, GI_NOVO, GC_LISTA, "a-vidro" },
-    { "guia-busca", 21, GI_BUSCA, GC_INDICE, NULL },
-  };
-  int i, k;
-  guiaFechar();
-  if (!strcmp(id, "guia")) { ajArteFundoN = 12; focarOpcao(AJ_GUIA); return 1; }
-  for (i = 0; i < (int)(sizeof Q / sizeof *Q); i++) {
-    if (strcmp(id, Q[i].id)) continue;
-    ajArteFundoN = Q[i].arte;
-    focarOpcao(AJ_GUIA);
-    guiaAbrir();
-    gv.idx = Q[i].idx; gv.col = Q[i].col; gv.ent = -1; gv.botao = 0;
-    if (Q[i].ent) for (k = 0; k < GUIA_NENT; k++) if (!strcmp(GUIA_ENT[k].id, Q[i].ent)) gv.ent = k;
-    guiaRolar(); guiaRol = guiaRolAlvo;
-    return 1;
-  }
-  return 0;
-}
 int ajustes_teste_quadro(const char *id) {
   int tema = valor[AJ_TEMA], vidro = valor[AJ_VIDRO];
   memcpy(valor, valorPadrao, sizeof valor);
@@ -6273,7 +6223,6 @@ int ajustes_teste_quadro(const char *id) {
     if (primeira < 0) return 0;
     focarOpcao(primeira);
   }
-  else if (!strncmp(id, "guia", 4)) { if (!ajustesTesteGuia(id)) return 0; }
   else if (!strcmp(id, "principal")) { focarOpcao(AJ_HOME_LAYOUT); }
   // 2.0 N1: logo e abertura. NUVIO_N1_LOGO / NUVIO_N1_ABERT escolhem o valor salvo.
   else if (!strncmp(id, "n1-", 3)) {
