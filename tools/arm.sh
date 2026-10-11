@@ -23,6 +23,9 @@
 #
 # Image comes from tools/Dockerfile:
 #   docker build --platform linux/arm64 -t nuvio-webos-sdk tools/
+#   podman build --platform linux/arm64 -t nuvio-webos-sdk tools/
+# Docker is preferred when both engines are installed. Select explicitly with
+# --podman/--docker or NUVIO_CONTAINER_RUNTIME (also accepts an executable path).
 #
 # -ldl is required: video.c opens libluna-service2 via dlopen.
 #
@@ -43,7 +46,8 @@ elif [ -x "../NuvioWeb-0.3.38-beta/node_modules/.bin/ares-package" ]; then
 else
   ARES="$(command -v ares-package || echo ares-package)"
 fi
-CONTAINER_RUNTIME="${NUVIO_CONTAINER_RUNTIME:-docker}"
+CONTAINER_RUNTIME="${NUVIO_CONTAINER_RUNTIME:-}"
+SELECTED_RUNTIME=""
 BUILD_PLATFORM="${NUVIO_BUILD_PLATFORM:-linux/arm64}"
 SDK_IMAGE="${NUVIO_SDK_IMAGE:-nuvio-webos-sdk}"
 BUILD_ONLY=0
@@ -56,6 +60,12 @@ for option in "$@"; do
     --build) BUILD_ONLY=1 ;;
     --ipk) MAKE_IPK=1 ;;
     --high-cache|--alto-cache) VARIANTE=highcache ;;
+    --podman|--docker)
+      runtime=${option#--}
+      if [ -n "$SELECTED_RUNTIME" ] && [ "$SELECTED_RUNTIME" != "$runtime" ]; then
+        echo 'arm.sh: choose either --podman or --docker' >&2; exit 2
+      fi
+      CONTAINER_RUNTIME=$runtime; SELECTED_RUNTIME=$runtime ;;
     --release|--debug)
       mode=${option#--}
       if [ -n "$SELECTED_MODE" ] && [ "$SELECTED_MODE" != "$mode" ]; then
@@ -63,13 +73,28 @@ for option in "$@"; do
       fi
       BUILD_MODE=$mode; SELECTED_MODE=$mode ;;
     --help|-h)
-      echo 'Usage: bash tools/arm.sh [--release|--debug] [--ipk] [--build] [--high-cache]'
+      echo 'Usage: bash tools/arm.sh [--podman|--docker] [--release|--debug] [--ipk] [--build] [--high-cache]'
       echo 'Default: optimized, stripped release with separate symbols in build/webos/.'
       echo 'Use --build to stop before TV deployment; --ipk also creates a package.'
+      echo 'Runtime: explicit flag, then NUVIO_CONTAINER_RUNTIME, then Docker/Podman detection.'
       exit 0 ;;
     *) echo "arm.sh: unknown option: $option" >&2; exit 2 ;;
   esac
 done
+if [ -z "$CONTAINER_RUNTIME" ]; then
+  if command -v docker > /dev/null 2>&1; then
+    CONTAINER_RUNTIME=docker
+  elif command -v podman > /dev/null 2>&1; then
+    CONTAINER_RUNTIME=podman
+  else
+    echo 'arm.sh: install Docker or Podman, or set NUVIO_CONTAINER_RUNTIME to an executable' >&2
+    exit 2
+  fi
+fi
+if ! command -v "$CONTAINER_RUNTIME" > /dev/null 2>&1; then
+  echo "arm.sh: container runtime not found: $CONTAINER_RUNTIME" >&2
+  exit 2
+fi
 if [ "$VARIANTE" = "highcache" ]; then
   export NUVIO_EXTRA_CFLAGS="${NUVIO_EXTRA_CFLAGS:-} -DNV_TEX_MB_FIXO=300"
   echo "==> HIGH CACHE variant (300 MB textures)"
@@ -83,6 +108,7 @@ if [ -n "$(git status --porcelain)" ]; then
 fi
 
 echo "==> compiling for ARM ($BUILD_MODE)"
+echo "    container runtime: $CONTAINER_RUNTIME"
 # Server configuration enters via ENVIRONMENT VARIABLES and -Ds are assembled
 # inside container. Passing them via `sh -c` command line would require nested quotes
 # and fail silently: empty macro, binary builds and installs, login screen says
@@ -112,7 +138,7 @@ tools/env.sh --env-file "$ENVF"
   if [ "${NUVIO_ASS_LIBASS:-1}" = "1" ]; then
     [ -f "$ASS/include/ass/ass.h" ] || { echo "libass ARM missing in image; rebuild tools/Dockerfile or use NUVIO_ASS_LIBASS=0" >&2; exit 2; }
     if [ ! -f "$ASS/.nuvio-build-type" ] || [ "$(cat "$ASS/.nuvio-build-type")" != debugoptimized ]; then
-      echo "ARM subtitle libraries need rebuilding: docker build --platform linux/arm64 -t nuvio-webos-sdk tools/" >&2
+      echo "ARM subtitle libraries need rebuilding: rebuild tools/Dockerfile with Docker or Podman (see README.md)" >&2
       exit 2
     fi
     ASS_CFLAGS="-DNV_ASS_LIBASS -I$ASS/include"

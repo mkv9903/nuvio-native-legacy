@@ -73,7 +73,7 @@ if [ "${#MISSING_CORE[@]}" -gt 0 ]; then
   fi
 fi
 
-# --env-file: writes variables to file for `docker run --env-file`.
+# --env-file: writes variables to file for Docker/Podman `run --env-file`.
 # Needed because ARM compilation runs INSIDE a container: passing -Ds on command
 # line would require nested quotes within `sh -c`, which fails silently — compiler
 # receives empty macro and app ships WITHOUT LOGIN, which happened on first TV deploy.

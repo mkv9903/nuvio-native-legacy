@@ -69,6 +69,33 @@ bash tools/arm.sh --build
 bash tools/arm.sh --release --ipk --build
 ```
 
+Podman is also supported, including rootless builds on Fedora:
+
+```bash
+podman build --platform linux/arm64 -t nuvio-webos-sdk tools/
+bash tools/arm.sh --podman --release --ipk --build
+```
+
+The script detects Docker first, then Podman. Use `--podman` or `--docker` to
+select an engine explicitly, or set `NUVIO_CONTAINER_RUNTIME` to the command or
+executable path. Flags take precedence over that environment variable. Build
+the SDK image with the same engine you use to run it; Docker and Podman normally
+have separate image stores. The project mount uses `:z` for SELinux compatibility.
+
+`linux/arm64` is the SDK container architecture; the resulting TV executable is
+32-bit ARMv7. On an amd64/x86-64 build machine, running this ARM64 SDK requires
+host AArch64 emulation through QEMU/binfmt. Setting `--platform` alone does not
+install that emulation. `NUVIO_BUILD_PLATFORM` and `NUVIO_SDK_IMAGE` can override
+the platform and image when using a different compatible SDK.
+
+On Fedora amd64, install the AArch64 emulator and register its binfmt handler
+before building the SDK image:
+
+```bash
+sudo dnf install podman qemu-user-static-aarch64
+sudo systemctl restart systemd-binfmt
+```
+
 Packaging requires `ares-package`. Both LG and Linux builds read server/API
 configuration from `local.properties` in the repository root. Create it from
 [local.properties.example](local.properties.example) if you do not already have

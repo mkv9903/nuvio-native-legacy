@@ -5,11 +5,12 @@
 # binario ARM nao ha o que instalar na TV. Nao apague.
 #
 #   docker build --platform linux/arm64 -t nuvio-webos-sdk tools/
+#   podman build --platform linux/arm64 -t nuvio-webos-sdk tools/
 #
 # O SDK e o buildroot da openlgtv. `relocate-sdk.sh` precisa rodar uma vez
 # depois de extrair: o buildroot grava caminhos absolutos do host onde foi
 # gerado, e sem relocar o gcc nao acha o proprio sysroot.
-FROM debian:bookworm-slim
+FROM docker.io/library/debian:bookworm-slim
 
 ARG SDK_URL=https://github.com/openlgtv/buildroot-nc4/releases/download/webos-a38c582/arm-webos-linux-gnueabi_sdk-buildroot-aarch64.tar.gz
 
