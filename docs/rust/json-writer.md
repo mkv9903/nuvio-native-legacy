@@ -119,7 +119,41 @@ The earlier suites pass alongside this batch: 293,723,352 reader assertions/
 comparisons and its account/provider integrations, 46,786 URL comparisons and
 both consumer variants, and 4,611,963 text comparisons plus retained C/Rust
 regressions. Rust formatting, Clippy with warnings denied, ShellCheck and
-whitespace checks pass. Integrated release results are recorded after building.
+whitespace checks pass. Integrated release results are below.
+
+## Integrated release validation
+
+Pinned Rust 1.85.1 Linux and ARM release builds pass from clean code commit
+`ffa37558`. The isolated Xvfb/Mesa llvmpipe preview logged a passing probe and
+the full module marker, rendered Home and Search, and consumed search opening
+and typed `fallout`. The screenshot showed populated titles, artwork and
+ratings. This account-free smoke check does not establish real account sync
+or TV performance; the account-writer paths use the automated consumers above
+and remain part of the user's next Linux check.
+
+```text
+[rust-core] app=space.mkv.nuvio.rusttest ABI=1 probe=PASS status=0 checks=7 checksum=522240
+[rust-core] modules=addon-url,stylized,text-cleanup,search-normalization,json-reader,json-writer
+```
+
+ARM inspection before/after stripping passes: ARMv7 EABI5 soft-float, GNU
+loader `/lib/ld-linux.so.3`, GLIBC symbols through 2.12 and exactly the previous
+hybrid build's native dependencies. The shared writer-layout assertions
+compile on both targets. No new runtime library is introduced.
+
+- Package: `space.mkv.nuvio.rusttest_2.1.0_arm.ipk`, 9,113,494 bytes.
+- Package SHA-256: `dc4aa4dabdab68ffd68eed43894f5ecf3547349e93303d355f9222ad6f52c236`.
+- Binary SHA-256: `5a7ac4f1afdabdfd0864a513801738b7af317a662b04c5b6047295c5b0d62db6`.
+- Build ID: `9fa58316f273c5934cbed79476d2b8a3a9621f4c`.
+- Symbols/ABI record: `build/webos-rust/ffa3755845e0/9fa58316f273c5934cbed79476d2b8a3a9621f4c/release/`.
+
+Verification compared all 601 runtime files with clean allowlisted staging.
+Test identity/title, executable permissions, current binary hash, full module
+marker, metadata and Rust notices match. No account/settings files, sample
+catalog/artwork or developer symbols are packaged. The root IPK replaces the
+reader-milestone artifact; these hashes and the source/symbol record identify
+the writer build. Generated evidence is under `build/rust/validation/` and
+ignored by Git. Physical-TV execution of this build remains unverified.
 
 ## User validation
 
