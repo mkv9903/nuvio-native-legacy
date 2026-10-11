@@ -88,6 +88,9 @@ The same runner also executes the existing `addons.c` integration scenarios
 with both C and Rust: installation, export, account-list reload, disk reload,
 stream-request construction and oversized-URL rejection. Network services are
 test doubles; no real credentials or provider requests are needed.
+The reused integration harness now has English test-owned names, comments,
+assertion descriptions and output. Existing C service entry points, the legacy
+C diagnostic expectation and multilingual ID fixtures remain compatible.
 
 The sanitizer option instruments the C harness and C reference. Rust is built
 with the pinned normal toolchain and retains its bounds checks; it is not an
@@ -133,8 +136,9 @@ can replace the root package and update the latest symbol pointer.
 
 ## Next boundary
 
-Inventory and migrate one provider response parser/model next, with fixtures
-for malformed, missing and Unicode data and explicit ownership of returned
-records. Keep C networking and the UI connected through the existing service
-interface. Provider workflows, account/sync, persistence and finally UI move
-after their own parity checks; this helper port does not mark those complete.
+The size/dependency inventory recommends text cleanup/search normalization
+next, followed by JSON helpers and provider response models/parsing; see
+[migration order and tests](migration-order.md). Keep C networking and the UI
+connected through the existing service interface. Provider workflows,
+account/sync, persistence and finally UI move after their own parity checks;
+this helper port does not mark those complete.

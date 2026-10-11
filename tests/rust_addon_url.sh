@@ -21,7 +21,7 @@ fi
 if ! grep -qF '[addons] Sample: request length -1 exceeds maximum 0: skipped' "$addon_scratch/output"; then
   echo 'FAIL: zero-capacity request diagnostic' >&2; exit 1
 fi
-if grep -qE 'https?://|stremio://|key=|hidden|SEGREDO' "$addon_scratch/output"; then
+if grep -qE 'https?://|stremio://|key=|hidden|SECRET' "$addon_scratch/output"; then
   echo 'FAIL: provider URL/credential in diagnostic output' >&2; exit 1
 fi
 bash tests/addonurl.sh
