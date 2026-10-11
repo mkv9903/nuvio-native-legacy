@@ -23,7 +23,7 @@ body:
     attributes:
       label: Nuvio version
       description: Settings › About shows it.
-      placeholder: "e.g. 2.0.2"
+      placeholder: "e.g. 2.1.0"
     validations:
       required: true
   - type: textarea
