@@ -92,9 +92,7 @@ static void ajDesenharInspetor(void) {
       int salvo = valor[opPv], ed = ajEditandoLinha(opPv);
       float ph, caixa = w * 9.0f / 16.0f;
       if (ed && opPv != AJ_FUNDO) valor[opPv] = uxPendente;
-      ajMiniRotuloV2 = 1;
       ph = ajCenaTroca(AJ_TROCA_INSPETOR, secAtual, opPv, x, y, w, 0);
-      ajMiniRotuloV2 = 0;
       if (ed) valor[opPv] = salvo;
       // O segmentado da opcao em foco, no canto de baixo da previa, sobre um
       // fundo escuro (a arte por tras pode ser clara).

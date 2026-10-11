@@ -227,24 +227,21 @@ typedef enum {
   // em que o veu zera; 1 = a borda oposta). uPar.x escolhe a borda cheia:
   // 0 = baixo, 1 = cima, 2 = esquerda, 3 = direita. Use por gfx_veu_css.
   GFX_VEU_CSS = 38,
-  // GFX_MINI — o alvo de uma miniatura (gfx_mini_desenhar): FBO lido de cabeca
-  // para cima, cantos por SDF.
-  GFX_MINI = 39,
   // GFX_TEXTURA — o recorte do titulo numa pilula/barra (cor de destaque
   // "Textura"). Nao se pede direto: gfx_rect troca para ele todo GFX_COR
   // cheio na cor exata do destaque enquanto gfx_textura_definir tem textura.
-  GFX_TEXTURA = 40,
+  GFX_TEXTURA = 39,
   // GFX_FOSCO — a luz assada (320x180, a arte borrada do fundo) lida em
   // COORDENADA DE TELA (vAmb) e recortada pelos cantos do painel: o vidro
   // fosco. uTex = o assado; uCor.a = alfa. Use gfx_vidro_fosco.
-  GFX_FOSCO = 41,
+  GFX_FOSCO = 40,
   // GFX_VITRINE_DIN — o GFX_VITRINE OPACO sobre o fundo da Dinamica
   // (GFX_FUNDO_DIN) calculado no proprio fragmento: o destaque e o fundo numa
   // passada so. Nao se pede direto: gfx_rect troca o GFX_VITRINE por ele
   // quando o fundo da Dinamica esta pendente e o destaque cobre o topo da tela
   // (ver gfx_fundo_din_desenhar). uDin = cor do topo e queda.
-  GFX_VITRINE_DIN = 42,
-  GFX_NMODOS = 43
+  GFX_VITRINE_DIN = 41,
+  GFX_NMODOS = 42
 } GfxModo;
 
 typedef struct {
@@ -392,26 +389,8 @@ void gfx_snap_terminar(void);   // volta para a tela
 int  gfx_snap_vazio(int *maxCanal);   // 1 = o snapshot (alvo ligado) saiu preto
 void gfx_snap_desenhar(void);  // pinta o snapshot ocupando a tela toda
 void gfx_snap_encerrar(void);
-int  gfx_snap_ativo(void);     // 1 enquanto o desenho vai para o snapshot
-// Cresce a cada gfx_snap_comecar: quem guardou algo no FBO sabe se outro
-// desenho passou por cima desde entao.
-unsigned gfx_snap_geracao(void);
-
 void gfx_tamanho_alvo(int w, int h);
 
-// MINIATURA: uma tela DE VERDADE desenhada num alvo proprio e mostrada
-// reduzida nas previas dos Ajustes. Entre
-// comecar e terminar o desenho segue em coordenadas de layout: o ponto
-// (x0, y0) cai no canto de cima do alvo e cada unidade vale `esc` pixels.
-// Nada de gfx_desfocado/gfx_ambiente/snapshot la dentro.
-typedef struct { GLuint fbo, tex; int w, h; } GfxMini;
-int  gfx_mini_alvo(GfxMini *m, int w, int h);   // cria ou recria; 0 = sem FBO
-void gfx_mini_comecar(GfxMini *m, float x0, float y0, float esc);
-void gfx_mini_terminar(void);
-void gfx_mini_desenhar(const GfxMini *m, GfxRect r, float raioPx, float a);
-void gfx_mini_liberar(GfxMini *m);
-// Dentro da miniatura: a base de `r` some ate `alfa` (o .gv.fade do mockup).
-void gfx_mini_esvanecer(GfxRect r, float alfa);   // drawable real, para restaurar viewport
 // TAMANHO DA INTERFACE (Ajustes > Aparencia). As camadas que nao sao a home
 // nem o detalhe (Ajustes, player, folhas, ilhas, menus, modais) desenham numa
 // TELA VIRTUAL de 1920/s x 1080/s, e o gfx amplia tudo por s na hora de
@@ -565,7 +544,7 @@ GLuint gfx_luz_canal(int canal, const float *chave, int n, void (*pintar)(void *
 // (GFX_DETALHE, GFX_HERO*) le o fundo pelo uAmb e sai opaca numa passada so;
 // um veu de cor de tela cheia vai junto na passada do fundo; qualquer outro
 // desenho pinta o fundo antes, como gfx_luz_canal_desenhar faria. Devolve 0
-// (e nao adia) dentro de snapshot/miniatura, com tesoura ou opacidade de grupo.
+// (e nao adia) dentro de snapshot, com tesoura ou opacidade de grupo.
 // Quem precisa LER a tela logo depois do fundo (conferencia) nao adia.
 int gfx_luz_canal_adiar(GLuint tex, int pontilhar);
 // A passada de tela da luz imersiva (GFX_SNAP de tela cheia, opaca e sem

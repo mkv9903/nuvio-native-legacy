@@ -1873,7 +1873,6 @@ void ajustes_textura_quadro(void) {
 // normalizeLayoutPreferences para nao inventar precedencia.
 int ajustes_rail_moderna(void)        { return lig(AJ_RAIL_MODERNA); }
 int ajustes_rail_recolhida(void)      { return ajustes_rail_moderna() ? 0 : lig(AJ_RAIL); }
-int ajustes_rail_moderna_blur(void)   { return lig(AJ_RAIL_BLUR); }
 int ajustes_hero_ligado(void)         { return lig(AJ_HERO); }
 int ajustes_hero_cheio(void)          { return lig(AJ_HERO_CHEIO); }
 int ajustes_home_layout(void) {
@@ -6296,9 +6295,6 @@ int ajustes_teste_quadro(const char *id) {
   scrollY = velY = 0;
   return 1;
 }
-
-// A arte atras da tela nas capturas (o indice da amostra de deploy/app/art).
-void ajustes_teste_arte(int n) { ajArteFundoN = n; }
 
 void ajustes_teste_fonte_interface(int familia) {
   if (familia < TXT_FAMILIA_INTER || familia > TXT_FAMILIA_ATKINSON) return;

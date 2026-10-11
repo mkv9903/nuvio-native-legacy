@@ -281,15 +281,12 @@ static const struct { int corpo, peso; } ESTILOS[TXT_NFONTES] = {
   { NV_FT_PG_RELOGIO, PESO_MEDIUM  },  // .player-clock (26/600)
   { NV_FT_PG_FIM,     PESO_REGULAR },  // .player-ends-at (20/400)
   { NV_FT_PG_ROTULO,  PESO_MEDIUM  },  // .player-parental-label (22/600)
-  { NV_FT_PG_GRAV,    PESO_REGULAR },  // .player-parental-severity (22/400)
   // ESCALA DOS PAINEIS (30/09, revisao de proporcao): titulo 34, item 26,
   // apoio 22 (NV_FT_PG_FIM). Eram 36 Regular / 24 Bold / 20: o item em Bold
   // pesava mais que o titulo, e o apoio ficava abaixo do piso de leitura.
-  { 34, PESO_MEDIUM },              // cabecalhos dos paineis (Fontes, Legendas, Episodios)
   { 26, PESO_MEDIUM },              // episodio/fonte/faixa dentro da lista
   { 28, PESO_MEDIUM },              // titulo no card Continuar assistindo
   { 23, PESO_REGULAR },             // temporada e nome do episodio
-  { 20, PESO_MEDIUM },              // tempo restante no badge do card
   { 110, PESO_BOLD },               // posição real no ranking
   { 20, PESO_REGULAR }, { 24, PESO_REGULAR }, { 28, PESO_REGULAR },
   { 32, PESO_REGULAR }, { 36, PESO_REGULAR }, { 40, PESO_REGULAR },
@@ -334,7 +331,6 @@ static const struct { int corpo, peso; } ESTILOS[TXT_NFONTES] = {
   { 13, PESO_BOLD    },   // TXT_AJ_MINI12 (12/700)
   { 14, PESO_REGULAR },   // TXT_AJ_MINI13: eixos dos graficos (13/400)
   { 15, PESO_REGULAR },   // TXT_AJ_MINI14 (14/400)
-  { 17, PESO_BOLD    },   // TXT_AJ_16B: rotulo das miniaturas (16/600)
   { 20, PESO_REGULAR },   // TXT_AJ_SUB: subtitulo e ajuda (19/400)
   { 20, PESO_BOLD    },   // TXT_AJ_SEG: segmentado e chip (19/600)
   { 19, PESO_REGULAR },   // TXT_AJ_18: estado curto da acao (18/400)
@@ -362,30 +358,24 @@ static const struct { int corpo, peso; } ESTILOS[TXT_NFONTES] = {
   { 18, PESO_MONO_B  },   // TXT_MONO18B
   { 16, PESO_MONO_R  },   // TXT_MONO16
   { 15, PESO_MONO_R  },   // TXT_MONO15
-  { 14, PESO_MONO_R  },   // TXT_MONO14
   { 13, PESO_MONO_R  },   // TXT_MONO13
   { 19, PESO_MONO_R  },   // TXT_MONO19
   { 44, PESO_BOLD    },   // TXT_LOG_N44
   { 35, PESO_BOLD    },   // TXT_LOG_T34 (34 no CSS; a InterDisplay e mais estreita)
-  { 88, PESO_BOLD    },   // TXT_LOG_COD
   { 19, PESO_BOLD    },   // TXT_LOG_19B
   { 18, PESO_BOLD    },   // TXT_LOG_18B
-  { 14, PESO_MONO_B  },   // TXT_MONO14B
   { 31, PESO_BOLD    },   // TXT_LOG_T31
-  { 51, PESO_BOLD    },   // TXT_NOV_TITULO (mockup 50/700)
   { 28, PESO_REGULAR },   // TXT_G28R
   { 33, PESO_MEDIUM  },   // TXT_V2_MENU
   { 33, PESO_BOLD    },   // TXT_V2_MENU_B
   { 26, PESO_REGULAR },   // TXT_V2_26
   { 54, PESO_BOLD    },   // TXT_V2_TIT
   { 19, PESO_BOLD    },   // TXT_V2_KICK
-  { 23, PESO_BOLD    },   // TXT_V2_CHIP
   { 29, PESO_BOLD    },   // TXT_V2_GRUPO
   { 24, PESO_REGULAR },   // TXT_V2_24
   { 34, PESO_MEDIUM  },   // TXT_V2_ROT
   { 28, PESO_REGULAR },   // TXT_V2_28
   { 25, PESO_BOLD    },   // TXT_V2_SEG
-  { 42, PESO_BOLD    },   // TXT_V2_INSP
   { 21, PESO_BOLD    },   // TXT_V2_KBD20
   { 19, PESO_BOLD    },   // TXT_V2_KBD18
   { 53, PESO_BOLD    },   // TXT_V2_NUM
@@ -398,8 +388,6 @@ static const struct { int corpo, peso; } ESTILOS[TXT_NFONTES] = {
   { 28, PESO_BOLD    },   // TXT_ILHA_NOME_L (24 + 17 %)
   { 22, PESO_REGULAR },   // TXT_ILHA_SUB_L (19 + 16 %)
   { 17, PESO_REGULAR },   // TXT_ILHA_HORA_L (15 + 13 %)
-  { 124, PESO_BOLD   },   // TXT_W20_HERO (mockup 120/800)
-  { 24, PESO_BOLD    },   // TXT_W20_24B (24/600)
   { 230, PESO_FINO   },   // TXT_DESC_HORA: numeral do relogio da tela de descanso
 };
 

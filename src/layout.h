@@ -549,7 +549,6 @@
 #define NV_FT_PG_RELOGIO 26   // .player-clock
 #define NV_FT_PG_FIM     22   // .player-ends-at
 #define NV_FT_PG_ROTULO  22   // .player-parental-label
-#define NV_FT_PG_GRAV    22   // .player-parental-severity
 // Entrelinha (leading) OFICIAL de cada estilo. Usar a altura que o SDL_ttf
 // devolve nao e a mesma coisa: ela varia com os acentos da linha, entao um
 // paragrafo fica com espacamento irregular linha a linha.

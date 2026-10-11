@@ -36,9 +36,9 @@ typedef enum {
   //   .player-ends-at        20 / 400
   //   .player-parental-label 22 / 600
   //   .player-parental-severity e .player-parental-separator 22 / 400
-  TXT_PG_RELOGIO, TXT_PG_FIM, TXT_PG_ROTULO, TXT_PG_GRAV,
-  TXT_PAINEL_TITULO, TXT_PAINEL_ITEM,
-  TXT_CW_TITULO, TXT_CW_META, TXT_CW_BADGE,
+  TXT_PG_RELOGIO, TXT_PG_FIM, TXT_PG_ROTULO,
+  TXT_PAINEL_ITEM,
+  TXT_CW_TITULO, TXT_CW_META,
   TXT_RANK,
   // Legenda externa: 50%..200%, em passos de 10. O firmware da C9 oferece
   // apenas cinco degraus; estas fontes pertencem ao overlay do proprio app.
@@ -86,7 +86,7 @@ typedef enum {
   TXT_AJ_ITEM, TXT_AJ_ROTULO, TXT_AJ_CHIP, TXT_AJ_INSP,
   TXT_AJ_KBD, TXT_AJ_ESTADO, TXT_AJ_CAPS13, TXT_AJ_MINI9, TXT_AJ_MINI9B,
   TXT_AJ_VALOR18, TXT_AJ_NUM58, TXT_AJ_NUM64, TXT_AJ_NUM110, TXT_AJ_TIT28,
-  TXT_AJ_MINI12, TXT_AJ_MINI13, TXT_AJ_MINI14, TXT_AJ_16B,
+  TXT_AJ_MINI12, TXT_AJ_MINI13, TXT_AJ_MINI14,
   TXT_AJ_SUB, TXT_AJ_SEG, TXT_AJ_18, TXT_AJ_SECAO, TXT_AJ_TEXTO, TXT_AJ_NOME,
   // ESCALA DO PLAYER NO GLASS UI (mockup aprovado em 03/10, player-mockup.html):
   // corpo e peso do CSS, com 600/800 em Bold pela regra optica de text.c.
@@ -117,19 +117,15 @@ typedef enum {
   TXT_MONO18B,  // numero da linha "quadros"        18 / 600
   TXT_MONO16,   // area do log (.ar 15,5/500), host 16 / 400
   TXT_MONO15,   // tempo da etapa, linha [tv]       15 / 400
-  TXT_MONO14,   // log no pacote (.pacote .lgl)     14 / 400
   TXT_MONO13,   // area no pacote, etiquetas [tex]  13 / 400
   TXT_MONO19,   // comando no painel vazio          19 / 400
   TXT_LOG_N44,  // fps no inspetor                  44 / 800
   TXT_LOG_T34,  // titulo do vazio e das dicas      34 / 700
-  TXT_LOG_COD,  // codigo do registro (ladrilhos)   88 / 800
   TXT_LOG_19B,  // chip "Enviar agora", contagem    18 / 600
   TXT_LOG_18B,  // numero forte no medidor          17 / 600
-  TXT_MONO14B,  // numero da linha "quadros" no pacote 14 / 600
   TXT_LOG_T31,  // "Registro do app" ao lado do relogio 30 / 700
   // Cartoes de informacao e atualizacao. No FIM,
   // como manda o comentario do TXT_RANK_GRANDE.
-  TXT_NOV_TITULO,   // .c-tit do cartao de novidades  50 / 700
   TXT_G28R,   // "Você está na" do cartao da atualizacao (mockup 26/400; a
               // InterDisplay e ~9% mais estreita que a Inter do navegador)
   // AJUSTES V2 (ajustes-v2.html, aprovado em 03/10): o menu grande, a lista
@@ -140,13 +136,11 @@ typedef enum {
   TXT_V2_26,       // descricao, sub, meta, dicas grandes (24/400)
   TXT_V2_TIT,      // titulo da lista e do editor (52/700)
   TXT_V2_KICK,     // kicker da lista e do inspetor (18/700)
-  TXT_V2_CHIP,     // chip Ligado/Avancados (22/600)
   TXT_V2_GRUPO,    // cabecalho de grupo (26/800)
   TXT_V2_24,       // contagem do grupo, dicas do inspetor (22/400)
   TXT_V2_ROT,      // rotulo da linha (32/500)
   TXT_V2_28,       // valor da linha, ajuda do inspetor (28 e 26/400)
   TXT_V2_SEG,      // segmentado e chips de grupo (24/600)
-  TXT_V2_INSP,     // titulo do inspetor (40/700)
   TXT_V2_KBD20,    // tecla das dicas do resumo (20/700)
   TXT_V2_KBD18,    // tecla das dicas do inspetor (18/700)
   TXT_V2_NUM,      // contagem do resumo (52/800)
@@ -159,9 +153,6 @@ typedef enum {
   TXT_V2_A3TIT,    // titulo da opcao sob a arte (46/700)
   // LISTA COM CAPA dos Salvos (painel lateral), ~17 % acima da escala da ilha.
   TXT_ILHA_NOME_L, TXT_ILHA_SUB_L, TXT_ILHA_HORA_L,
-  // GUIA DA 2.0 (novidades20.c): "Nuvio 2.0" do hero (mockup 120/800) e o
-  // negrito das frases dos capitulos (24/600, par do TXT_V2_24).
-  TXT_W20_HERO, TXT_W20_24B,
   TXT_DESC_HORA,   // relogio da tela de descanso (230, Montserrat ExtraLight; so digitos e ':')
   TXT_NFONTES
 } TxtEstilo;

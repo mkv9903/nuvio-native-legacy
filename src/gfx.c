@@ -41,7 +41,7 @@ typedef struct {
   GLint giro;    // uGiro do VS: rotacao de grupo (gfx_girar)
   float giroAtual[4];
   float altAtual, margemAtual, leveAtual;  // o ultimo valor enviado: so chama o GL se mudar
-  float telaAtual[2];       // o uTela enviado (muda so dentro de uma miniatura)
+  float telaAtual[2];       // o uTela enviado
 } Programa;
 static Programa progs[GFX_NMODOS];
 static int progAtual = -1;
@@ -91,11 +91,7 @@ float gfx_osd_mult = 1.0f;
 // Tamanho real do alvo da tela (em retina, maior que 1920x1080). Guardado aqui
 // porque toda volta de FBO precisa restaurar o viewport com ele.
 static int telaW = (int)NV_TELA_W, telaH = (int)NV_TELA_H;
-// MINIATURA (gfx_mini_*): o espaco de layout que o VS mapeia no viewport e a
-// escala do alvo. Fora dela, a tela cheia de sempre.
-static float uTelaW = NV_TELA_W, uTelaH = NV_TELA_H;
-static int   miniAtiva, miniPxW, miniPxH;
-static float miniX0, miniY0, miniEsc;
+static const float uTelaW = NV_TELA_W, uTelaH = NV_TELA_H;
 // O alvo da TELA (o ultimo gfx_tamanho_alvo): a unidade de gfx_fill_gpu. Os
 // alvos pequenos (luz assada, snapshot) mudam telaW por dentro e contam pelo
 // tamanho deles.
@@ -104,7 +100,7 @@ static int telaRealW = (int)NV_TELA_W, telaRealH = (int)NV_TELA_H;
 static int recorteAtivo;
 static GLint recorteBox[4];
 // Pixels que o quad `r` (layout) pinta no alvo atual: cortado pelo alvo e pela
-// tesoura, em telas do alvo da tela. Ignora giro e miniatura (aproximado).
+// tesoura, em telas do alvo da tela. Ignora giro (aproximado).
 static double fillGpuArea(GfxRect r, const float sub[4]) {
   float ex = (float)telaW / NV_TELA_W, ey = (float)telaH / NV_TELA_H;
   float x0 = (r.x + r.w * sub[0]) * ex, x1 = (r.x + r.w * sub[2]) * ex;
@@ -130,7 +126,7 @@ void gfx_tamanho_alvo(int w, int h) { telaW = w; telaH = h; telaRealW = w; telaR
 // e uAlt sai da altura JA ampliada — a rampa de borda segue com 1 px do alvo.
 // As passadas internas de tela cheia (luz assada, snapshot, desfoques) desligam
 // o fator: elas falam em tela real, nao em layout de camada.
-static float escUi = 1.0f, escAtiva = 1.0f, miniEscAnt = 1.0f;
+static float escUi = 1.0f, escAtiva = 1.0f;
 static int escUiFixa;   // NUVIO_TAMANHO_UI (capturas): Ajustes nao sobrescreve
 void gfx_escala_ui_definir(float s) { if (!escUiFixa) escUi = (s >= 1.0f && s <= 2.0f) ? s : 1.0f; }
 float gfx_escala_ui(void) { return escUi; }
@@ -139,8 +135,8 @@ float gfx_escala_entrar(void) { float a = escAtiva; escAtiva = escUi; return a; 
 void gfx_escala_sair(float anterior) { escAtiva = anterior; }
 // TRANSFORMACAO DE GRUPO (gfx_transformar): escala em torno de (ox, oy) e
 // deslocamento, em coordenadas de layout, ANTES do fator da camada. As
-// passadas internas (ESC_REAL, miniatura) desligam junto com o fator.
-static struct { int on; float ox, oy, s, dx, dy; } gfxTr, miniTrAnt;
+// passadas internas (ESC_REAL) desligam junto com o fator.
+static struct { int on; float ox, oy, s, dx, dy; } gfxTr;
 void gfx_transformar(float ox, float oy, float s, float dx, float dy) {
   gfxTr.on = !(s == 1.0f && dx == 0.0f && dy == 0.0f);
   gfxTr.ox = ox; gfxTr.oy = oy; gfxTr.s = s; gfxTr.dx = dx; gfxTr.dy = dy;
@@ -1275,15 +1271,6 @@ static const char *FS_CORPO[GFX_NMODOS] = {
   "  gl_FragColor = nv_dither(uCor.rgb, uRaio + (1.0 - uRaio) * uCor.a * g);\n"
   "}\n",
 
-  // GFX_MINI — o alvo de uma miniatura (gfx_mini_*): a textura e um FBO
-  // (origem embaixo), recortada pelos cantos.
-  "void main(){\n"
-  "  float m = bordaR(vUv, uRaio, uAspect);\n"
-  "  if (m <= 0.001) discard;\n"
-  "  vec4 t = texture2D(uTex, vec2(vUv.x, 1.0 - vUv.y));\n"
-  "  gl_FragColor = vec4(t.rgb / max(t.a, 0.004), t.a * uCor.a * m);\n"
-  "}\n",
-
   // GFX_TEXTURA — a pilula/barra feita do MATERIAL do titulo (cor de destaque
   // "Textura", acentos-mockup.html quadros 8-10). uJan = recorte da textura em
   // UV (origem xy, tamanho zw) ja em "cover" para este rect; uCor.rgb = a cor
@@ -1370,7 +1357,6 @@ static const struct { int sdf, cover; } PRECISA[GFX_NMODOS] = {
   {0,1},   /* GFX_HERO_CHEIO_CAM */
   {1,0},   /* GFX_JANELA — SDF da abertura; o cover e o do quadro da tela */
   {0,0},   /* GFX_VEU_CSS — degrade puro, sem SDF */
-  {1,0},   /* GFX_MINI — SDF dos cantos; a textura e um FBO */
   {1,0},   /* GFX_TEXTURA — SDF dos cantos; o recorte vem pronto em uJan */
   {1,0},   /* GFX_FOSCO — SDF dos cantos; a textura e o assado, lido por vAmb */
   {1,0}    /* GFX_VITRINE_DIN — o do GFX_VITRINE */
@@ -1817,7 +1803,7 @@ void gfx_rect(GfxRect r, GLuint tex, GfxModo modo, float foco,
   // fim deste desenho. Qualquer outro primeiro desenho pinta o fundo antes,
   // como sempre.
   if (dinPendente) {
-    if (modo == GFX_VITRINE && tex && !giroOn && !snapAtivo && !miniAtiva && !recorteAtivo &&
+    if (modo == GFX_VITRINE && tex && !giroOn && !snapAtivo && !recorteAtivo &&
         raio <= 0.0f && ca * gfx_opacidade_grupo >= 0.999f && gfx_desliza_atual == 0.0f &&
         progs[GFX_VITRINE_DIN].din >= 0 && !((gfx_modos_desligados >> (unsigned)GFX_FUNDO_DIN) & 1ull)) {
       float rx = r.x, ry = r.y, rw = r.w, rh = r.h;   // r ja em coordenadas de tela
@@ -1943,7 +1929,7 @@ void gfx_rect(GfxRect r, GLuint tex, GfxModo modo, float foco,
     ambIntacta = 0;
     return;
   }
-  if (!miniAtiva) {
+  {
     double ag = fillGpuArea(r, subAtual);
     gfx_fill_gpu += ag;
     if (blendLigado && !comAmb && !opaco) gfx_fill_gpu_mist += ag;
@@ -2021,7 +2007,7 @@ void gfx_rect(GfxRect r, GLuint tex, GfxModo modo, float foco,
     glUniform2f(P->tela, uTelaW, uTelaH);
     P->telaAtual[0] = uTelaW; P->telaAtual[1] = uTelaH;
   }
-  { float alt = r.h * (miniAtiva ? miniEsc : (float)telaH / NV_TELA_H), mg = 0.0f;
+  { float alt = r.h * ((float)telaH / NV_TELA_H), mg = 0.0f;
     if (PRECISA[modo].sdf) {
       if (raio > 0.0f) mg = 1.0f; else alt = 8192.0f;
     }
@@ -2341,7 +2327,7 @@ void gfx_ambiente(float alfa) {
 // primeiro desenho decide se o fundo e pintado antes dele, lido pelo uAmb da
 // arte, ou levado junto de um veu de tela cheia.
 int gfx_luz_canal_adiar(GLuint tex, int pontilhar) {
-  if (!tex || snapAtivo || miniAtiva || recorteAtivo || giroOn || dinPendente ||
+  if (!tex || snapAtivo || recorteAtivo || giroOn || dinPendente ||
       gfx_opacidade_grupo < 0.999f) return 0;
   // Um fundo opaco de tela cheia: a luz que estivesse pendente nao apareceria.
   ambPendente = 1; ambPendAlfa = 1.0f; ambIntacta = 1;
@@ -2416,7 +2402,7 @@ static void ambPintar(float alfa) {
 // pendente embaixo dele nao apareceria em pixel nenhum.
 void gfx_fundo_din_desenhar(const float topo[3], float queda) {
   GfxRect tela = { 0, 0, NV_TELA_W, NV_TELA_H };
-  if (!snapAtivo && !miniAtiva && !recorteAtivo && !giroOn && gfx_opacidade_grupo >= 0.999f) {
+  if (!snapAtivo && !recorteAtivo && !giroOn && gfx_opacidade_grupo >= 0.999f) {
     dinDescarregar();
     dinPend[0] = topo[0]; dinPend[1] = topo[1]; dinPend[2] = topo[2]; dinPend[3] = queda;
     dinPendente = 1;
@@ -2542,7 +2528,7 @@ static void dinResolverAdiado(void) {
 void gfx_mascara_opaca(GfxRect r, float raioPx) {
   float c = (raioPx > 0.0f ? raioPx : 0.0f) + 1.0f;
   GfxRect a, b;
-  if (!dinPendente || !dinAdiado || miniAtiva || snapAtivo || giroOn || escAtiva != 1.0f ||
+  if (!dinPendente || !dinAdiado || snapAtivo || giroOn || escAtiva != 1.0f ||
       gfx_opacidade_grupo < 0.999f) return;
   if (r.w < 2.0f * c + 4.0f || r.h < 2.0f * c + 4.0f || dinNOp + 2 > DIN_NOP) return;
   a = (GfxRect){ r.x + c, r.y + 1.0f, r.w - 2.0f * c, r.h - 2.0f };
@@ -2637,7 +2623,7 @@ int gfx_n_fundo_assados;
 int gfx_fundo_assado_desligado;
 GLuint gfx_luz_canal(int canal, const float *chave, int n, void (*pintar)(void *), void *ctx) {
   if (canal < 0 || canal >= CAN_N || n > 24 || canFalhou || gfx_fundo_assado_desligado ||
-      snapAtivo || miniAtiva) return 0;
+      snapAtivo) return 0;
   // Contexto perdido/refeito: o nome deixou de ser textura. Refaz os alvos.
   if (canTex[canal][0] && !glIsTexture(canTex[canal][0])) {
     memset(canTex[canal], 0, sizeof canTex[canal]); memset(canFbo[canal], 0, sizeof canFbo[canal]);
@@ -2739,7 +2725,7 @@ achou:
 int gfx_tela_px(float u, float v, unsigned char rgb[3]) {
   unsigned char px[4];
   int x = (int)(u * (float)telaW), y = (int)((1.0f - v) * (float)telaH);
-  if (snapAtivo || miniAtiva || telaW <= 0 || telaH <= 0) return 0;
+  if (snapAtivo || telaW <= 0 || telaH <= 0) return 0;
   if (x >= telaW) x = telaW - 1;
   if (y >= telaH) y = telaH - 1;
   glReadPixels(x, y, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, px);
@@ -2751,7 +2737,7 @@ int gfx_tela_bmp(const char *caminho) {
   // ~2 MB num 1080p, no /tmp da TV.
   int w = telaW, h = telaH, w2, h2, x, y, ok;
   unsigned char *px, *meio;
-  if (snapAtivo || miniAtiva || w <= 1 || h <= 1) return 0;
+  if (snapAtivo || w <= 1 || h <= 1) return 0;
   w2 = w / 2; h2 = h / 2;
   px = malloc((size_t)w * h * 4);
   meio = malloc((size_t)w2 * h2 * 4);
@@ -2988,12 +2974,8 @@ int gfx_snap_iniciar(int w, int h) {
 
 int gfx_snap_ok(void) { return snapFbo != 0; }
 
-static unsigned snapGeracao;
-int gfx_snap_ativo(void) { return snapAtivo; }
-unsigned gfx_snap_geracao(void) { return snapGeracao; }
 void gfx_snap_comecar(void) {
   if (!snapFbo || snapAtivo) return;
-  snapGeracao++;
   gfx_ambiente_descarregar();   // a luz e da tela, nao do snapshot
   GFX_OUTRO_INI();
   snapTelaW = telaW; snapTelaH = telaH;
@@ -3144,11 +3126,6 @@ void gfx_recorte(float x, float y, float w, float h) {
   GFX_TR_RECT(x, y, w, h);
   if (escAtiva != 1.0f) { x *= escAtiva; y *= escAtiva; w *= escAtiva; h *= escAtiva; }
   int yy = (int)((NV_TELA_H - (y + h)) * ey);
-  if (miniAtiva) {   // layout -> pixel do alvo da miniatura
-    ex = ey = miniEsc;
-    x -= miniX0;
-    yy = (int)((float)miniPxH - (y + h - miniY0) * miniEsc);
-  }
   glEnable(GL_SCISSOR_TEST);
   glScissor((int)(x * ex), yy, (int)(w * ex), (int)(h * ey));
   recorteAtivo = 1;
@@ -3377,93 +3354,4 @@ static void desfEncerrar(void) {
   }
   if (desfFbo) { glDeleteFramebuffers(1, &desfFbo); desfFbo = 0; }
   if (desfTmp) { gfx_tex_esquecer(desfTmp); glDeleteTextures(1, &desfTmp); desfTmp = 0; }
-}
-
-// --- MINIATURA ---------------------------------------------------------------------
-// Uma tela de verdade desenhada num alvo proprio e mostrada reduzida nas
-// previas dos Ajustes. O desenho continua em coordenadas
-// de layout: o uTela e o viewport fazem a reducao, como no snapshot, e a
-// regiao [x0, x0 + w/esc] x [y0, y0 + h/esc] do layout cobre o alvo inteiro.
-static GLint miniFboAnt, miniVpAnt[4];
-static int miniRecAnt;
-int gfx_mini_alvo(GfxMini *m, int w, int h) {
-  GLint ant;
-  GLenum st;
-  if (m->fbo && m->w == w && m->h == h) return 1;
-  gfx_mini_liberar(m);
-  glGenTextures(1, &m->tex);
-  glBindTexture(GL_TEXTURE_2D, m->tex);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-  gfx_tex_esquecer(0);
-  glGenFramebuffers(1, &m->fbo);
-  ant = fboLigado();
-  glBindFramebuffer(GL_FRAMEBUFFER, m->fbo);
-  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m->tex, 0);
-  st = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-  glBindFramebuffer(GL_FRAMEBUFFER, (GLuint)ant);
-  m->w = w; m->h = h;
-  if (st != GL_FRAMEBUFFER_COMPLETE) { gfx_mini_liberar(m); return 0; }
-  return 1;
-}
-void gfx_mini_comecar(GfxMini *m, float x0, float y0, float esc) {
-  if (!m->fbo || miniAtiva || esc <= 0.0f) return;
-  // O fundo pendente (luz, Frost adiado, fundo da Dinamica) e da TELA: sai
-  // nela antes de o desenho ir para o alvo da miniatura.
-  gfx_ambiente_descarregar();
-  GFX_OUTRO_INI();
-  glGetIntegerv(GL_FRAMEBUFFER_BINDING, &miniFboAnt);
-  glGetIntegerv(GL_VIEWPORT, miniVpAnt);
-  miniRecAnt = recorteAtivo;
-  glBindFramebuffer(GL_FRAMEBUFFER, m->fbo);
-  glDisable(GL_SCISSOR_TEST);
-  recorteAtivo = 0;
-  glClearColor(0, 0, 0, 0);
-  glClear(GL_COLOR_BUFFER_BIT);
-  // A miniatura e uma tela REAL de 1920x1080 reduzida: dentro dela nao ha
-  // camada ampliada (escala.h), venha de onde vier quem a desenha.
-  miniEscAnt = escAtiva; escAtiva = 1.0f;
-  miniTrAnt = gfxTr; gfxTr.on = 0;
-  miniAtiva = 1; miniPxW = m->w; miniPxH = m->h;
-  miniX0 = x0; miniY0 = y0; miniEsc = esc;
-  uTelaW = x0 + (float)m->w / esc;
-  uTelaH = y0 + (float)m->h / esc;
-  glViewport((GLint)(-x0 * esc), 0, (GLsizei)(uTelaW * esc + 0.5f), (GLsizei)(uTelaH * esc + 0.5f));
-  GFX_OUTRO_FIM();
-}
-void gfx_mini_terminar(void) {
-  if (!miniAtiva) return;
-  GFX_OUTRO_INI();
-  miniAtiva = 0;
-  escAtiva = miniEscAnt;
-  gfxTr = miniTrAnt;
-  uTelaW = NV_TELA_W; uTelaH = NV_TELA_H;
-  glBindFramebuffer(GL_FRAMEBUFFER, (GLuint)miniFboAnt);
-  glViewport(miniVpAnt[0], miniVpAnt[1], miniVpAnt[2], miniVpAnt[3]);
-  glDisable(GL_SCISSOR_TEST);
-  if (miniRecAnt) { glEnable(GL_SCISSOR_TEST); glScissor(recorteBox[0], recorteBox[1], recorteBox[2], recorteBox[3]); }
-  recorteAtivo = miniRecAnt;
-  GFX_OUTRO_FIM();
-}
-void gfx_mini_desenhar(const GfxMini *m, GfxRect r, float raioPx, float a) {
-  if (!m->tex || r.w < 1.0f || r.h < 1.0f) return;
-  gfx_tex_aspect_atual = 0.0f;
-  gfx_rect(r, m->tex, GFX_MINI, 0, 0, 0, raioPx / r.h, 1, 1, 1, a);
-}
-// Dentro da miniatura: a imagem some no retangulo `r` (layout), de nada no
-// alto a `alfa` na base — o mask-image do mockup. Multiplica cor e alfa do
-// alvo (o GFX_MINI desfaz a cor na leitura).
-void gfx_mini_esvanecer(GfxRect r, float alfa) {
-  if (!miniAtiva) return;
-  glBlendFuncSeparate(GL_ZERO, GL_ONE_MINUS_SRC_ALPHA, GL_ZERO, GL_ONE_MINUS_SRC_ALPHA);
-  gfx_veu_css(r, 0, 1.0f, 1.0f, alfa);
-  glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-}
-void gfx_mini_liberar(GfxMini *m) {
-  if (m->fbo) glDeleteFramebuffers(1, &m->fbo);
-  if (m->tex) { glDeleteTextures(1, &m->tex); gfx_tex_esquecer(m->tex); }
-  m->fbo = m->tex = 0; m->w = m->h = 0;
 }

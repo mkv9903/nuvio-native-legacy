@@ -96,7 +96,8 @@ static const char *ajArteFileira(int fil, int k, int fundo) {
 #ifdef NV_WEBOS
   return "";
 #else
-  { const char *r;
+  { static const int AJ_POS[14] = { 13, 12, 15, 2, 21, 9, 33, 36, 3, 29, 5, 10, 16, 20 };
+    const char *r;
     ajArteSoAmostra = 1;
     r = ajArte(fundo ? AJA_FUNDO : AJA_POSTER, AJ_POS[((fil < 0 ? 0 : fil) * 3 + k) % 14]);
     ajArteSoAmostra = 0;

@@ -348,19 +348,6 @@ void progress_confirm_pushed(const ProgressRecord *sent, int n) {
   RELEASE_LOCK();
 }
 
-void progress_mark_pushed(const char *const *keys, int n) {
-  int i, k, profile = perfis_ativo(), changed = 0;
-  if (!keys || n < 1) return;
-  ACQUIRE_LOCK();
-  load_file();
-  for (k = 0; k < n; k++) {
-    if (!keys[k]) continue;
-    i = find_record(profile, keys[k]);
-    if (i >= 0 && records[i].pending) { records[i].pending = 0; changed = 1; }
-  }
-  if (changed) save_file();
-  RELEASE_LOCK();
-}
 
 void progress_remove(const char *key) {
   int i;

@@ -69,10 +69,6 @@ void net_hosts_note(const char *url, int code, int http, unsigned ms);
 // Copies up to `max` hosts, highest request count first. Returns number copied.
 int  net_hosts_read(NetHost *dst, int max);
 
-// For "offline" log send screen: consecutive transport failures and across how many hosts (up to 4),
-// last host that responded, and how long ago. Returns 0 if no request answered yet in session.
-int  net_health_summary(int *failures, int *hosts, char *last_host, size_t size, unsigned *ago_ms);
-
 // Backward-compatibility shims
 #define REDE_SAUDE_FALHAS   NET_HEALTH_FAILURES
 #define REDE_SAUDE_HOSTS    NET_HEALTH_HOSTS
@@ -89,6 +85,5 @@ int  rede_saude_offline(void);
 unsigned rede_saude_seq(void);
 void rede_hosts_nota(const char *url, int codigo, int http, unsigned ms);
 int  rede_hosts_ler(RedeHost *dst, int max);
-int  rede_saude_resumo(int *falhas, int *hosts, char *ultHost, size_t tam, unsigned *haMs);
 
 #endif

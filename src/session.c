@@ -354,12 +354,6 @@ char *session_table(const char *table_name, const char *query, int *status) {
   return request_cloud(1, table_name, query, status);
 }
 
-char *session_function(const char *name, const char *body_json, int *status) {
-  char path[300];
-  if (!name || !*name) return NULL;
-  snprintf(path, sizeof path, "/functions/v1/%s", name);
-  return invoke_cloud(path, body_json, status);
-}
 
 // ---------------------------------------------------------------- login
 

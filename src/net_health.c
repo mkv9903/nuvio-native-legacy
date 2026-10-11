@@ -92,9 +92,6 @@ unsigned net_health_seq(void) {
 typedef struct { char host[64]; int requests, failures; unsigned ms[16]; int num_ms, idx_ms; } HostCount;
 static HostCount hosts_count[NET_HOSTS_MAX];
 static int num_hosts_count;
-static char last_ok_host[64];
-static unsigned last_ok_ms;
-static int has_last_ok;
 
 void net_hosts_note(const char *url, int code, int http, unsigned ms) {
   const char *p = url ? strstr(url, "://") : NULL, *f;
@@ -121,7 +118,6 @@ void net_hosts_note(const char *url, int code, int http, unsigned ms) {
   }
   hosts_count[i].requests++;
   if (code != 0 || http >= 400) hosts_count[i].failures++;
-  if (code == 0) { memcpy(last_ok_host, h, n + 1); last_ok_ms = current_now_ms(); has_last_ok = 1; }
   if (ms) {
     hosts_count[i].ms[hosts_count[i].idx_ms] = ms;
     hosts_count[i].idx_ms = (hosts_count[i].idx_ms + 1) % 16;
@@ -157,16 +153,6 @@ int net_hosts_read(NetHost *dst, int max) {
   return n;
 }
 
-int net_health_summary(int *failures, int *hosts, char *last_host, size_t size, unsigned *ago_ms) {
-  int had;
-  pthread_mutex_lock(&lock);
-  *failures = global_health.failures; *hosts = global_health.num_hosts;
-  had = has_last_ok;
-  if (last_host && size) snprintf(last_host, size, "%s", had ? last_ok_host : "");
-  if (ago_ms) *ago_ms = had ? current_now_ms() - last_ok_ms : 0;
-  pthread_mutex_unlock(&lock);
-  return had;
-}
 
 // Backward-compatibility shims
 int  rede_saude_passo(RedeSaude *s, int ok, unsigned host, unsigned agoraMs) {
@@ -179,6 +165,3 @@ void rede_hosts_nota(const char *url, int codigo, int http, unsigned ms) {
   net_hosts_note(url, codigo, http, ms);
 }
 int  rede_hosts_ler(RedeHost *dst, int max) { return net_hosts_read(dst, max); }
-int  rede_saude_resumo(int *falhas, int *hosts, char *ultHost, size_t tam, unsigned *haMs) {
-  return net_health_summary(falhas, hosts, ultHost, tam, haMs);
-}

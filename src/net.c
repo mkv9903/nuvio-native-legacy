@@ -435,36 +435,20 @@ static char *bucket_finish(Bucket *b) {
 static char *net_download_internal(const char *url, int seconds, long *size,
                                    const char *const *headers);
 static char *net_download_internal2(const char *url, int seconds, long *size,
-                                    const char *const *headers, int *status,
-                                    char *etag, unsigned etag_size);
+                                    const char *const *headers, int *status);
 static char *net_download_internal3(const char *url, int seconds, long *size,
-                                    const char *const *headers, int *status,
-                                    char *etag, unsigned etag_size, int *retry);
-
-typedef struct { char *dst; unsigned size; int *retry; } HeaderHunt;
+                                    const char *const *headers, int *status, int *retry);
 
 static size_t receive_header(void *data, size_t size, size_t count, void *u) {
-  HeaderHunt *c = (HeaderHunt *)u;
+  int *retry = (int *)u;
   const char *s = (const char *)data;
-  size_t bytes = size * count, n;
-  if (bytes >= 5 && !strncasecmp(s, "HTTP/", 5)) {
-    if (c && c->retry) *c->retry = 0;
-    if (c && c->dst && c->size) c->dst[0] = 0;
-  }
-  if (c && c->retry && bytes > 12 && !strncasecmp(s, "retry-after:", 12)) {
-    *c->retry = net_retry_seconds(s + 12, bytes - 12);
-  }
-  if (c && c->dst && c->size > 1 && bytes > 5 && !strncasecmp(s, "etag:", 5)) {
-    s += 5; bytes -= 5;
-    while (bytes && (*s == ' ' || *s == '\t')) { s++; bytes--; }
-    while (bytes && (s[bytes - 1] == '\r' || s[bytes - 1] == '\n' ||
-                     s[bytes - 1] == ' ')) bytes--;
-    n = bytes < (size_t)c->size - 1 ? bytes : (size_t)c->size - 1;
-    memcpy(c->dst, s, n);
-    c->dst[n] = 0;
-  }
-  return size * count;
+  size_t bytes = size * count;
+  if (retry && bytes >= 5 && !strncasecmp(s, "HTTP/", 5)) *retry = 0;
+  if (retry && bytes > 12 && !strncasecmp(s, "retry-after:", 12))
+    *retry = net_retry_seconds(s + 12, bytes - 12);
+  return bytes;
 }
+
 
 _Thread_local long net_cap = 0;
 
@@ -622,7 +606,7 @@ static char *chunk_once(const char *url, int seconds, long long start, long long
   net_cap = (long)(end - start + 1);
   net_final_dst = final; net_final_size = final ? final_size : 0;
   net_partial_ok = 1;
-  r = net_download_internal2(url, seconds, size, hdrs, &st, NULL, 0);
+  r = net_download_internal2(url, seconds, size, hdrs, &st);
   net_partial_ok = 0;
   net_final_dst = NULL; net_final_size = 0;
   net_cap = 0;
@@ -644,22 +628,18 @@ char *net_download_with(const char *url, int seconds, const char *const *headers
 
 char *net_download_st(const char *url, int seconds, const char *const *headers,
                       int *status) {
-  return net_download_internal2(url, seconds, NULL, headers, status, NULL, 0);
+  return net_download_internal2(url, seconds, NULL, headers, status);
 }
 
 char *net_download_st_retry(const char *url, int seconds, const char *const *headers,
                             int *status, int *retry_after) {
-  return net_download_internal3(url, seconds, NULL, headers, status, NULL, 0, retry_after);
+  return net_download_internal3(url, seconds, NULL, headers, status, retry_after);
 }
 
-char *net_download_etag(const char *url, int seconds, const char *const *headers,
-                        int *status, char *etag, unsigned etag_size) {
-  return net_download_internal2(url, seconds, NULL, headers, status, etag, etag_size);
-}
 
 static char *net_download_internal(const char *url, int seconds, long *size,
                                    const char *const *headers) {
-  return net_download_internal2(url, seconds, size, headers, NULL, NULL, 0);
+  return net_download_internal2(url, seconds, size, headers, NULL);
 }
 
 static int should_retry(int r, const Watcher *v, size_t bytes) {
@@ -670,25 +650,18 @@ static int should_retry(int r, const Watcher *v, size_t bytes) {
 }
 
 static char *net_download_internal2(const char *url, int seconds, long *size,
-                                    const char *const *headers, int *status,
-                                    char *etag, unsigned etag_size) {
-  return net_download_internal3(url, seconds, size, headers, status, etag, etag_size, NULL);
+                                    const char *const *headers, int *status) {
+  return net_download_internal3(url, seconds, size, headers, status, NULL);
 }
 
 static char *net_download_internal3(const char *url, int seconds, long *size,
-                                    const char *const *headers, int *status,
-                                    char *etag, unsigned etag_size, int *retry) {
+                                    const char *const *headers, int *status, int *retry) {
   Bucket b = {0};
-  HeaderHunt hunt;
   Watcher watcher;
   void *c, *list = NULL;
   int r = 0, attempt, reused = 0;
   unsigned long start, timeout_ms, elapsed = 0;
-  hunt.dst = (etag && etag_size > 1) ? etag : NULL;
-  hunt.size = etag_size;
-  hunt.retry = retry;
   if (retry) *retry = 0;
-  if (etag && etag_size) etag[0] = 0;
   if (status) *status = 0;
   if (!url || !*url) return NULL;
   if (!status && negcache_barra(url, (long)time(NULL))) return NULL;
@@ -700,9 +673,9 @@ static char *net_download_internal3(const char *url, int seconds, long *size,
     c = acquire_handle(url);
     if (!c) return NULL;
     curl_setopt(c, OPT_URL, url);
-    if (hunt.dst || hunt.retry) {
+    if (retry) {
       curl_setopt(c, OPT_HEADERFUNCTION, receive_header);
-      curl_setopt(c, OPT_HEADERDATA, &hunt);
+      curl_setopt(c, OPT_HEADERDATA, retry);
     }
     curl_setopt(c, OPT_WRITEFUNCTION, receive_body);
     curl_setopt(c, OPT_WRITEDATA, &b);
@@ -731,7 +704,6 @@ static char *net_download_internal3(const char *url, int seconds, long *size,
       release_handle_r(c, r, url);
       free(b.p);
       b.p = NULL; b.n = b.cap = 0;
-      if (etag && etag_size) etag[0] = 0;
       continue;
     }
     break;
@@ -1273,10 +1245,6 @@ char *net_download_range(const char *url, int seconds, long start, long end,
   return net_download_range_st(url, seconds, start, end, size, NULL, NULL, NULL, 0);
 }
 
-char *net_download_measured(const char *url, int seconds,
-                            const char *const *headers, NetMeasurement *measurement) {
-  return net_download_measured_control(url, seconds, headers, NULL, measurement);
-}
 
 char *net_download_measured_control(const char *url, int seconds,
                                     const char *const *headers,

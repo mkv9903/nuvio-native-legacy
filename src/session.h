@@ -93,9 +93,6 @@ void session_logout(void);
 // logs out. BLOCKS — call from a worker, never the draw loop.
 char *session_rpc(const char *function_name, const char *body_json, int *status);
 
-// Same thing for /functions/v1/<name>.
-char *session_function(const char *name, const char *body_json, int *status);
-
 // TABLE READ as user. Exists because not every surface has an RPC:
 // addon list only comes from table `addons`, and reading with anonymous key
 // returns 401 "permission denied for table addons" — RLS needs caller's token.

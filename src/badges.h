@@ -29,7 +29,6 @@ typedef enum {
 float marca_formato(FormatoMarca f, float x, float y, float altura,
                     float r, float g, float b, float a);
 float marca_formato_largura(FormatoMarca f, float altura);
-const char *marca_formato_nome(FormatoMarca f);
 // Nome de RESOLUCAO como os addons e o player escrevem -> a marca, ou -1:
 // "4K"/"UHD"/"2160p" -> 4K, "1080p"/"FHD" -> 1080p, "720p"/"HD" -> 720p (o
 // "HD" dos pacotes de IPTV, ao lado de FHD, e 720p) e "SD" -> SD. Sem caixa.

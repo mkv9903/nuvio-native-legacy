@@ -245,8 +245,6 @@ char *net_download_st_retry(const char *url, int seconds, const char *const *hea
 
 // GET with per-request measurement. Does not share cap, state, or accumulators with
 // other requests; diagnostic probe can call in series or on different threads without mixing numbers.
-char *net_download_measured(const char *url, int seconds,
-                            const char *const *headers, NetMeasurement *measurement);
 char *net_download_measured_control(const char *url, int seconds,
                                     const char *const *headers,
                                     const NetControl *control,
@@ -255,19 +253,6 @@ char *net_download_bin_measured_control(const char *url, int seconds,
                                         const char *const *headers,
                                         const NetControl *control,
                                         long *size, NetMeasurement *measurement);
-
-// Same, and COPIES RESPONSE ETag to `etag` (empty when server sent none).
-//
-// WHY SEPARATE FUNCTION: No other app path needed RESPONSE headers — status was enough.
-// Recommendations service polls once per minute while app is open, and without ETag each
-// probe would retrieve entire list only to find nothing changed. With ETag, common case
-// is 304 without body: returned `etag` goes into `If-None-Match` of next request; value
-// is OPAQUE to client — simply returns what was received.
-//
-// On 304 body is NULL and `*status` is 304; caller distinguishes this from transport failure (*status == 0).
-char *net_download_etag(const char *url, int seconds,
-                        const char *const *headers, int *status,
-                        char *etag, unsigned etag_size);
 
 // STREAM THROUGHPUT: downloads `url` from byte `start` for up to `seconds`
 // (counted from FIRST BYTE of body, not connection) or `max_bytes`, and DISCARDS BYTES —

@@ -114,23 +114,6 @@ static int ajImg(const char *c, GfxRect r, float raioPx, float a) {
   gfx_tex_aspect_atual = 0;
   return 1;
 }
-// Logo do titulo inteiro dentro de maxW x maxH, alinhado a esquerda e em cima.
-static float ajLogo(const char *c, float x, float y, float maxW, float maxH, float a) {
-  GLuint t;
-  float asp, w, h;
-  if (!c || !c[0]) return 0.0f;
-  t = tex_obter_larg(c, maxW);
-  if (!t) { if (!tex_falhou(c)) ajCenaFaltas++; return 0.0f; }
-  asp = tex_aspecto(c);
-  if (asp <= 0.0f) asp = 3.0f;
-  w = maxW; h = w / asp;
-  if (h > maxH) { h = maxH; w = h * asp; }
-  gfx_tex_aspect_atual = asp;
-  gfx_rect((GfxRect){ x, y, w, h }, t, GFX_ARTE, 0, 0, 0, 0, 1, 1, 1, a);
-  gfx_tex_aspect_atual = 0;
-  return w;
-}
-
 // --- MATERIAL -------------------------------------------------------------------
 static int ajVid(void) { return ajustes_vidro(); }
 // A sombra da ilha. `opaca` = o miolo vem por cima com alfa 1 (o solido): a
@@ -684,9 +667,6 @@ static void ajDesenharIndice(void) {
 }
 
 // --- PECAS DA LINHA ---------------------------------------------------------------
-static void ajChevron(float xDir, float yc, float al) {
-  ajIcone("aj_chevron-right", xDir - 24.0f, yc - 12.0f, 24.0f, al);
-}
 // Interruptor: o chip "Ligado" no acento a 22% (e estado), "Desligado" neutro.
 static float ajChipLiga(float xDir, float yc, int ligado, float a) {
   TxtLinha t;

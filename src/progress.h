@@ -75,9 +75,6 @@ int  progress_pending(ProgressRecord *out, int max);
 // Confirms successfully pushed records.
 void progress_confirm_pushed(const ProgressRecord *sent, int n);
 
-// Immediate key confirmation (compatibility).
-void progress_mark_pushed(const char *const *keys, int n);
-
 void progress_remove(const char *key);
 
 // Marks item as dismissed from Continue Watching at current timestamp.

@@ -283,36 +283,10 @@ static void bloqueadosESegredos(void) {
   xtream_esquecer();
 }
 
-/* F07: seek cache option. Appended, local, default off; on a TV without an
- * app-controlled disk cache (this host build, LG, Samsung) the row is
- * inactive, says so and the accessor never asks the backend for a cache. */
-
-// Cada categoria e cada submenu (ROT) tem a SUA arte: nenhum indice de
-// AJ_ARTE_SEC se repete, todo bloco de ajustes_ux_tela.inc tem coluna, e a
-// opcao devolve a arte do bloco dela (o primeiro bloco fica com a da categoria).
-static void artePorSubmenu(void) {
-  int visto[40] = { 0 }, s, g, i;
+// Cada categoria e opcao gerada tem uma chave de transicao propria.
+static void chavesPorCena(void) {
   montarTela();
   assert(nSecoes == AJS_N && nSecoes == 12);
-  for (s = 0; s < AJS_N; s++) {
-    int blocos = 0, ultimo = -1;
-    assert(AJ_ARTE_SEC[s][0] >= 0);
-    for (g = 0; g < AJ_ARTE_BLOCOS; g++) {
-      int n = AJ_ARTE_SEC[s][g];
-      if (n < 0) continue;
-      assert(n < 40 && !visto[n]);
-      visto[n] = 1;
-    }
-    for (i = secIni[s] + 1; i < secFim(s); i++) {
-      if (TELA[i].tipo == IT_ROT) { blocos++; continue; }
-      if (TELA[i].tipo != IT_OPC) continue;
-      g = blocos > 0 ? blocos - 1 : 0;
-      assert(g < AJ_ARTE_BLOCOS && AJ_ARTE_SEC[s][g] >= 0);
-      assert(ajCenaArteOp(TELA[i].op) == AJ_ARTE_SEC[s][g]);
-      if (g != ultimo) { assert(g == ultimo + 1); ultimo = g; }
-    }
-  }
-  // A mesma imagem nao pede troca; submenu ou categoria diferente pede.
   assert(ajCenaChave(AJS_REPRODUCAO, AJ_DV) != ajCenaChave(AJS_REPRODUCAO, AJ_ATMOS));  /* 2.0.2: one generated scene per option */
   assert(ajCenaChave(AJS_REPRODUCAO, AJ_DV) != ajCenaChave(AJS_REPRODUCAO, AJ_PAUSA_OVERLAY));
   // O primeiro bloco tem cena propria (o que ele controla), diferente da
@@ -320,15 +294,6 @@ static void artePorSubmenu(void) {
   assert(ajCenaChave(AJS_FONTES, AJ_FONTE_MANUAL) != ajCenaChave(AJS_FONTES, -1));
   assert(ajCenaChave(AJS_FONTES, AJ_FONTE_MANUAL) != ajCenaChave(AJS_FONTES, AJ_FONTE_PRAZO));
   assert(ajCenaChave(AJS_FONTES, AJ_ADDONS) != ajCenaChave(AJS_FONTES, AJ_FONTE_MANUAL));
-  { int vistoC[AJC_N] = { 0 }, ultimaC = -1, k2;
-    for (k2 = 0; k2 < AJ_N_TELA; k2++) {
-      int c;
-      if (TELA[k2].tipo != IT_OPC) continue;
-      c = ajCenaSecao(TELA[k2].op);
-      if (c < 0 || c == ultimaC) continue;
-      assert(c < AJC_N && (!vistoC[c] || TELA[k2].op == AJ_TMDB_IDIOMA));   // um bloco, uma cena: nada repetido em outro lugar
-      vistoC[c] = 1; ultimaC = c;
-    } }
   assert(ajCenaChave(AJS_CONTAS, -1) != ajCenaChave(AJS_CARTAZES, -1));
   assert(ajCenaChave(AJS_HOME, AJ_CW_LIGADO) != ajCenaChave(AJS_HOME, AJ_CW_ORDEM));
 }
@@ -607,7 +572,7 @@ int main(void) {
     assert(ajustes_leg2_junto() && ajustes_leg2_tamanho() == 100 && ajustes_leg2_cor() == 1 && ajustes_leg2_fundo() == 4 && ajustes_leg2_borda() == 2);
     valor[AJ_LEG2_POS] = a0; valor[AJ_LEG2_TAMANHO] = t0; valor[AJ_LEG2_COR] = valor[AJ_LEG2_FUNDO] = valor[AJ_LEG2_BORDA] = 0; }
   appIconsAvailableLocally();
-  artePorSubmenu();
+  chavesPorCena();
   reorganizacao202();
   prazoDosAddonsIntegrado();
   padroesEValores();

@@ -93,7 +93,3 @@ void addonsui_desenhar(Uint32 agora) {
   (void)agora;
   ajustes_desenhar_addons(foco);
 }
-
-#ifdef AJUSTES_TESTE
-void addonsui_teste_foco(int f) { foco = f; }
-#endif

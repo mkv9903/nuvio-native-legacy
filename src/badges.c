@@ -127,9 +127,6 @@ int marca_resolucao(const char *nome) {
   if (!strcasecmp(nome, "SD")) return FMT_SD;
   return -1;
 }
-const char *marca_formato_nome(FormatoMarca f) {
-  return ((int)f >= 0 && f < FMT_N) ? FORMATOS[f].texto : "";
-}
 // Largura sem desenhar, para o chamador alinhar a direita ou centralizar. Com a
 // textura ainda nao decodificada tex_aspecto vale 0 e a largura cai no palpite
 // (2,2 x altura): o quadro seguinte corrige, e a marca aparece no lugar certo.
