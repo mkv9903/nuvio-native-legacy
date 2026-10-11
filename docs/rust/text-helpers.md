@@ -170,3 +170,10 @@ default test data directory from normal Linux mode.
 No new full TV playback session is required for these helpers. A packaged
 Rust Test IPK accompanies the handoff for an optional TV smoke check.
 Native playback remains subject to TV validation when later work changes it.
+
+On October 11, 2026, the user tested normal Linux Rust Test mode and confirmed
+that account catalogs loaded correctly. This provides user validation of the
+account-backed Linux path with the text helpers linked. Individual accented
+search/source-display checks were not separately reported. The Linux search
+shortcut is **F5**; **F6** opens the microphone shortcut. Core migration proceeds
+with the [JSON reader](json-reader.md).
