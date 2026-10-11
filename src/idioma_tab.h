@@ -1094,6 +1094,7 @@
   { "Confira a internet e tente de novo.", "Check the internet and try again." },
   { "Confira o endereço e a porta (11470) em Ajustes > Avançado.", "Check the address and port (11470) in Settings > Advanced." },
   { "Confira o endereço e se o servidor está ligado, em Ajustes > Avançado.", "Check the address and that the server is on, in Settings > Advanced." },
+  { "Confira seus addons na conta e as fileiras em Ajustes.", "Check your account's add-ons and the rows in Settings." },
   { "Confirma que a conta Simkl é sua, neste perfil", "Confirms the Simkl account is yours, on this profile" },
   { "Confirmar", "Confirm" },
   { "Confirmar uso de mais memória", "Confirm using more memory" },

@@ -93,17 +93,22 @@ static const char *ajArteFileira(int fil, int k, int fundo) {
         if (a[0] && quero-- == 0) return a;
       }
     } }
+#ifdef NV_WEBOS
+  return "";
+#else
   { const char *r;
     ajArteSoAmostra = 1;
     r = ajArte(fundo ? AJA_FUNDO : AJA_POSTER, AJ_POS[((fil < 0 ? 0 : fil) * 3 + k) % 14]);
     ajArteSoAmostra = 0;
     return r; }
+#endif
 }
 // ajImg da arte da fileira: logo de canal inteiro numa placa clara.
 static int ajImgFil(int fil, int k, int fundo, GfxRect r, float raioPx, float a) {
   const char *c = ajArteFileira(fil, k, fundo);
   GLuint t;
   float asp, w, h;
+  if (!c || !c[0]) return ajImg(c, r, raioPx, a);
   if (fil < 0 || fil >= FIL_MAX || ajFilModo[fil] != ART_LOGO) return ajImg(c, r, raioPx, a);
   gfx_cor(r, raioPx / r.h, 0.27f, 0.28f, 0.31f, a);
   t = tex_obter_larg(c, r.w > r.h ? r.w : r.h);

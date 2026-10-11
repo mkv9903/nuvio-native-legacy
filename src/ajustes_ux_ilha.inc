@@ -1262,6 +1262,7 @@ float ajustes_ui_antes_depois(const char *rot, int a, int b, const char *unid, i
 // O grafico de pressao da memoria (os ultimos 2 min) sem o painel em volta.
 // O historico de EXEMPLO (o do mockup): sobe, passa do teto e volta. Usado
 // pelas capturas e pela previa do cartao de novidades da 1.8.0.
+#ifdef AJUSTES_TESTE
 static void ajMemExemplo(long *hist, long teto) {
   int i;
   for (i = 0; i < 120; i++) {
@@ -1270,6 +1271,7 @@ static void ajMemExemplo(long *hist, long teto) {
     hist[i] = (long)(v * teto);
   }
 }
+#endif
 static void ajGraficoMemoria(const long *hist, int nh, long teto, float x, float y, float w, float h);
 void ajustes_ui_grafico_memoria(float x, float y, float w, float h) {
   long hist[120], teto = tex_orcamento_bytes();
@@ -1278,11 +1280,6 @@ void ajustes_ui_grafico_memoria(float x, float y, float w, float h) {
   if (ajMemFixa) { teto = 240L << 20; nh = 120; ajMemExemplo(hist, teto); }
 #endif
   ajGraficoMemoria(hist, nh, teto, x, y, w, h);
-}
-void ajustes_ui_grafico_exemplo(float x, float y, float w, float h) {
-  long hist[120];
-  ajMemExemplo(hist, 240L << 20);
-  ajGraficoMemoria(hist, 120, 240L << 20, x, y, w, h);
 }
 static void ajGraficoMemoria(const long *hist, int nh, long teto, float x, float y, float w, float h) {
   int i;

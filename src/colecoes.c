@@ -110,10 +110,12 @@ static unsigned long long assinatura(void) {
 static char dirPacote[600];
 static int semConta;
 static int contaAplicada;
+#ifndef NV_WEBOS
 static void localiza(char *value,size_t cap,const char *dir) {
   if(!value[0]||strstr(value,"://")||value[0]=='/')return;
   char rel[600];snprintf(rel,sizeof rel,"%s",value);snprintf(value,cap,"%s/%s",dir,rel);
 }
+#endif
 int col_n(void) { int n; pthread_mutex_lock(&colTrava); n = count; pthread_mutex_unlock(&colTrava); return n; }
 
 // SOBE A CADA TROCA DO CONJUNTO DE PASTAS. A home decide se remonta por uma
@@ -392,6 +394,7 @@ pronto:
   pthread_mutex_unlock(&colTrava);
   return resultado;
 }
+#ifndef NV_WEBOS
 /* Arte editorial: JPEG primeiro, PNG depois.
  *
  * O gerador escrevia PNG 4K e os heros somavam 142 MB — 45% do pacote inteiro,
@@ -409,11 +412,19 @@ static int arteEditorial(char *saida,size_t n,const char *dir,const char *sub,
   snprintf(saida,n,"%s/%s/%s-%s.png",dir,sub,id,sufixo);
   return !access(saida,R_OK);
 }
+#endif
 
 static int carregarPacote(const char *dir) {
   revisao++;
   semConta = 0;
   if (dir && dir != dirPacote) snprintf(dirPacote, sizeof dirPacote, "%s", dir);
+#ifdef NV_WEBOS
+  // Bundled collection imports belong to desktop previews. TV collections
+  // are published by the signed-in account (definirJson).
+  count = 0;
+  aplicarExtras();
+  return count;
+#else
   char path[700];snprintf(path,sizeof path,"%s/collections.json",dir);
   FILE *f=fopen(path,"rb");if(!f)return 0;
   fseek(f,0,SEEK_END);long size=ftell(f);rewind(f);
@@ -458,6 +469,7 @@ static int carregarPacote(const char *dir) {
       if(v->nSources&&v->title[0]){nNovas+=v->nSources;count++;}
     }
   }free(body);fecharMontagem();aplicarExtras();return count;
+#endif
 }
 int col_carregar(const char *dir) {
   pthread_mutex_lock(&colTrava);

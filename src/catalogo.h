@@ -170,9 +170,11 @@ typedef struct {
   char vid[64];
 } CatEp;
 
+#ifndef NV_WEBOS
 // Le <dir>/catalogo.txt. Devolve quantos itens carregou (0 = nenhum, e quem
 // chama deve seguir com o que tiver).
 int  cat_carregar(const char *dirArte);
+#endif
 
 // --- CACHE EM DISCO DO CATALOGO MONTADO PELA REDE ----------------------------
 //
@@ -202,8 +204,8 @@ int  cat_carregar(const char *dirArte);
 int  cat_gravar_cache(const char *dirArte);
 int  cat_gravar_cache_se_identidade(const char *dirArte, const char *donoEsperado,
                                     int perfilEsperado);
-// Devolve 1 se carregou. Chamar DEPOIS de cat_carregar: ele substitui o
-// catalogo do pacote quando o cache existe e e valido.
+// Returns 1 when this account's previous catalog was restored. On desktop it
+// also replaces the preview fixtures loaded by cat_carregar.
 int  cat_ler_cache(const char *dirArte);
 
 // APAGA O CACHE DO CATALOGO. 1 se havia arquivo e ele saiu.

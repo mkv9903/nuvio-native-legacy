@@ -8,14 +8,19 @@
 // A linha de meta do titulo n da amostra ("Filme · 2015 · 141 min"): do
 // catalogo quando ha, senao de art/catalogo.txt (lido uma vez).
 static const char *ajMetaTitulo(int n) {
+#ifndef NV_WEBOS
   static char meta[40][96];
   static int lido;
+#endif
   static char buf[160];
   const char *gen = NULL, *m = NULL;
   if (cat_n() > 0) {
     const CatItem *c = cat_item(n % cat_n());
     if (c) { gen = c->genero; m = c->meta; }
   } else {
+#ifdef NV_WEBOS
+    return "";
+#else
     if (!lido && uxDirArte[0]) {
       char cam[1100], l[2048];
       FILE *f;
@@ -42,6 +47,7 @@ static const char *ajMetaTitulo(int n) {
       if (f) fclose(f);
     }
     return meta[n % 40];
+#endif
   }
   if (!gen || !gen[0]) return m ? m : "";
   { const char *pt = strstr(gen, " · ");
@@ -51,9 +57,14 @@ static const char *ajMetaTitulo(int n) {
 
 // O titulo n da amostra (catalogo ou art/catalogo.txt).
 static const char *ajTituloN(int n) {
+#ifndef NV_WEBOS
   static char t[40][96];
   static int lido;
+#endif
   if (cat_n() > 0) { const CatItem *c = cat_item(n % cat_n()); return c ? c->titulo : ""; }
+#ifdef NV_WEBOS
+  return i18n("Título");
+#else
   if (!lido && uxDirArte[0]) {
     char cam[1100], l[2048];
     FILE *f;
@@ -71,6 +82,7 @@ static const char *ajTituloN(int n) {
     if (f) fclose(f);
   }
   return t[n % 40];
+#endif
 }
 
 // Estilo de texto mais proximo de `px` entre os que a miniatura usa. 0 = nao

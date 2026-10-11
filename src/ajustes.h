@@ -291,8 +291,6 @@ void  ajustes_ui_foco_linha(GfxRect r, float raioPx);
 float ajustes_ui_antes_depois(const char *rot, int a, int b, const char *unid, int max,
                               float x, float y, float w, int compacto, float cr, float cg, float cb);
 void  ajustes_ui_grafico_memoria(float x, float y, float w, float h);
-// O mesmo grafico com o historico de exemplo (previa das Novidades da 1.8.0).
-void  ajustes_ui_grafico_exemplo(float x, float y, float w, float h);
 int   ajustes_relogio_cabe(void);
 // A FAIXA QUE A RAIL FIXA RESERVA na borda esquerda, em px de tela: com ela
 // presa, a borda da pilula de icones do menu (Moderna 136, Padrao 88, vezes o
@@ -406,7 +404,9 @@ void  ajustes_teste_escala(int percentual); // fixture only; does not persist
 int   ajustes_fundo(void);
 float ajustes_vidro_opacidade(void);   // 0,60..0,92; 0,78 = o vidro de sempre
 int   ajustes_vidro_fosco(void);
+#if !defined(NV_WEBOS) || defined(AJUSTES_TESTE)
 void  ajustes_teste_vidro_env(void);   // so capturas        // 1 = arte borrada atras do vidro
+#endif
 int   ajustes_icone_app(void);
 // 2.0 (N1): 0 = Novo (default), 1 = Classico. Local to this TV.
 int   ajustes_logo_app(void);

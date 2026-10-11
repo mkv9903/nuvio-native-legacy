@@ -121,21 +121,15 @@ USER_FILES="trakt.txt addons.txt tmdb.txt mdblist.txt ajustes.txt
             progresso.txt nuvem.txt sessao.txt perfil.txt cliente.txt
             listas.txt guia-fav.txt debrid.txt fanart.txt"
 
-USER_GLOBS="stalker-p*.txt xtream-p*.txt listas-p*.txt trakt-p*.txt trakt-fluxo*.txt simkl*.txt conta-*.txt conta-*.txt.tmp jellyfin-p*.txt jellyfin-p*.txt.tmp emby-p*.txt emby-p*.txt.tmp plex-p*.txt plex-p*.txt.tmp"
-
 USER_COLLECTIONS="collections.json catalogo-rede.bin catalogo-rede.bin.tmp"
 USER_DIRS="collections"
 
+# The same allowlisted payload is used by IPKs and direct SSH deployments.
+STAGING=$(mktemp -d "${TMPDIR:-/tmp}/nuvio-arm-pacote.XXXXXXXX"); CLEANUP_FILES="$CLEANUP_FILES $STAGING"
+bash tools/stage-webos.sh deploy/app "$STAGING/app"
+
 if [ "$1" = "--ipk" ]; then
   echo "==> packaging (without credentials)"
-  STAGING=$(mktemp -d "${TMPDIR:-/tmp}/nuvio-arm-pacote.XXXXXXXX"); CLEANUP_FILES="$CLEANUP_FILES $STAGING"
-  cp -R deploy/app "$STAGING/app"
-  rm -rf "$STAGING/app/art/cache"
-  for f in $USER_FILES $USER_COLLECTIONS; do rm -f "$STAGING/app/art/$f"; done
-  for g in $USER_GLOBS; do rm -f "$STAGING"/app/art/$g; done
-  for d in $USER_DIRS; do rm -rf "$STAGING/app/art/$d"; done
-  chmod 755 "$STAGING/app/nuvio-proto"
-
   "$ARES" "$STAGING/app" -o .
   IPK=$(ls -t ./*.ipk | head -1)
   if [ -n "$VARIANTE" ]; then
@@ -163,8 +157,9 @@ if [ "$1" = "--ipk" ]; then
   for d in $USER_DIRS; do
     printf '%s\n' "$PKG_LIST" | grep -q "art/$d/" && LEAKED="$LEAKED $d/"
   done
+  printf '%s\n' "$PKG_LIST" | grep -qE 'art/(cinematic|editorial|poster|logo|ep|elenco|prov)/|art/[0-9][0-9]\.jpg$|art/(catalogo|ids|elenco|episodios|extra|LEIA-ME-addons)\.txt$' && LEAKED="$LEAKED sample catalog/artwork"
   if [ -n "$LEAKED" ]; then
-    echo "    ABORTED: package contains credentials ->$LEAKED"
+    echo "    ABORTED: package contains private or sample data ->$LEAKED"
     rm -f "$IPK"
     exit 1
   fi
@@ -174,7 +169,7 @@ if [ "$1" = "--ipk" ]; then
     rm -f "$IPK"
     exit 1
   fi
-  echo "    $IPK ($(du -h "$IPK" | cut -f1)) — without art/{$(echo $USER_FILES $USER_GLOBS $USER_COLLECTIONS $USER_DIRS | tr ' ' ',')}"
+  echo "    $IPK ($(du -h "$IPK" | cut -f1)) — without private data or sample catalogs/artwork"
 fi
 
 if [ "$1" = "--build" ] || [ "$2" = "--build" ]; then exit 0; fi
@@ -201,8 +196,7 @@ $SCP /tmp/appinfo.stamped.json "root@$TV_IP:$APPDIR/appinfo.json"
 
 echo "==> synchronizing art"
 if ! ( set -o pipefail
-       tar czf - -C deploy/app --exclude 'art/cache' \
-           --exclude 'appinfo.json.stamped' \
+       tar czf - -C "$STAGING/app" \
            art fonts icon.png icon-large.png icon-20.png icon-large-20.png splash.png \
          | $SSH "root@$TV_IP" "tar xzf - -C $APPDIR" ) 2>&1 \
      | grep -v 'unknown extended header keyword'; then
@@ -212,6 +206,8 @@ if ! $SSH "root@$TV_IP" "test -f $APPDIR/art/marcas/trakt.png && test -f $APPDIR
   echo "    FAILED: art did not reach TV"; exit 1
 fi
 rm -f deploy/app/appinfo.json.stamped
+# Drop sample assets left by an older deployment, keeping user data/cache.
+$SSH "root@$TV_IP" "rm -rf $APPDIR/art/cinematic $APPDIR/art/editorial $APPDIR/art/poster $APPDIR/art/logo $APPDIR/art/ep $APPDIR/art/elenco $APPDIR/art/prov; rm -f $APPDIR/art/[0-9][0-9].jpg $APPDIR/art/catalogo.txt $APPDIR/art/ids.txt $APPDIR/art/elenco.txt $APPDIR/art/episodios.txt $APPDIR/art/extra.txt $APPDIR/art/LEIA-ME-addons.txt"
 $SSH "root@$TV_IP" "rm -f $APPDIR/core; rm -f /tmp/nuvio-shot-req /tmp/nuvio-shot.bmp" || true
 
 $SSH "root@$TV_IP" "mkdir -p $APPDIR/art/cache && chown -R 5152:5000 $APPDIR/art && chmod -R u+rwX $APPDIR/art"

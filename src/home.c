@@ -39,6 +39,7 @@
 #include "diretor.h"
 #include "descoberta.h"
 #include "dados.h"
+#include "sync.h"
 #include "tendencia.h"
 #include <strings.h>
 // Os veus da base de cada forma de card (gfx_veu_base): a fracao da altura que
@@ -147,8 +148,10 @@ static int fileiraItemIndice(const Fileira *f, int coluna) {
   return f->usaItens ? f->itens[coluna] : f->ini + coluna;
 }
 
-static char bd[MAX_ARTE][512];    int nBd = 0;    // backdrops 16:9
-static char pst[MAX_ARTE][512];   int nPst = 0;   // posters 2:3
+#ifndef NV_WEBOS
+static char bd[MAX_ARTE][512];    int nBd = 0;    // desktop preview backdrops
+static char pst[MAX_ARTE][512];   int nPst = 0;
+#endif
 
 // RESERVA, e so isso: e o que a home mostra enquanto a rede nao respondeu, ou
 // quando nao respondeu nenhuma. As fileiras de verdade vem de cat_fileira(),
@@ -165,12 +168,17 @@ static char pst[MAX_ARTE][512];   int nPst = 0;   // posters 2:3
 // As outras tres continuam: "Popular" e "Em alta" sao uma vitrine e nao afirmam
 // pertencer a ninguem. A fileira de continuar so nasce de progresso de verdade
 // — progresso.c, a conta ou o Trakt — em montarContinuar (descoberta.c).
+#ifdef NV_WEBOS
+static Fileira fileiras[MAX_FIL];
+static int nFileiras;
+#else
 static Fileira fileiras[MAX_FIL] = {
   { "Popular - Filme",      FILEIRA_NORMAL,   8, 0  },
   { "Popular - S\xc3\xa9rie", FILEIRA_NORMAL, 8, 8  },
   { "Em alta",              FILEIRA_NORMAL,   8, 16 },
 };
 static int nFileiras = 3;
+#endif
 static int retomarIndice = -1;
 static char retomarId[64];
 static unsigned retomarRev, retomarAplicada;
@@ -458,6 +466,7 @@ static Uint32 heroTrailerPrazoPreparacao(Uint32 agora) {
   return agora + NV_TRAILER_HERO_PREPARA_MS;
 }
 
+#ifndef NV_WEBOS
 static void carregaDir(const char *dir, char destino[][512], int *n, const char *sub) {
   char caminho[512];
   if (sub) snprintf(caminho, sizeof caminho, "%s/%s", dir, sub);
@@ -472,6 +481,7 @@ static void carregaDir(const char *dir, char destino[][512], int *n, const char 
   }
   closedir(d);
 }
+#endif
 
 // A forma do card sai de DUAS preferencias, e nao do tipo da fileira:
 //
@@ -622,7 +632,12 @@ static float larguraDe(TipoFileira t) {
   }
 }
 // Quantos titulos o hero percorre. Vem do catalogo quando existe.
-static int nAcervoHero(void) { int n = cat_n(); if (n) return n; return nBd ? nBd : 1; }
+static int nAcervoHero(void) {
+#ifndef NV_WEBOS
+  if (!cat_n()) return nBd;
+#endif
+  return cat_n();
+}
 // O CONJUNTO DE TITULOS QUE O DESTAQUE PERCORRE.
 //
 // Tres fontes, escolhidas na folha de fileiras (fil_hero_fonte):
@@ -975,10 +990,12 @@ static const char *arte_por_identidade(int indice, int deitado) {
   const char *arte = (deitado == 2) ? arte_hero_do_item(item)
                                     : arte_por_formato(item, deitado);
   if (arte) return arte;
+#ifndef NV_WEBOS
   if (cat_n() == 0 && indice >= 0) {
     if (!deitado && indice < nPst) return pst[indice];
     if (indice < nBd) return bd[indice];
   }
+#endif
   return NULL;
 }
 
@@ -1642,20 +1659,21 @@ int home_iniciar(const char *dirArte) {
   col_carregar(dirArte);
   badges_carregar(dirArte);
   selospacote_dir_embutidos(dirArte);   // pacotes de selos embutidos (padrao + colorido)
+#ifndef NV_WEBOS
   cat_carregar(dirArte);
-  // O cache da ULTIMA sessao entra por cima do catalogo do pacote, antes de
-  // qualquer rede. Se nao existir (primeira execucao) ou for de outra build,
-  // segue-se com o do pacote, como sempre foi.
+#endif
+  // Restore this account's last catalog before network requests. A fresh TV
+  // installation stays empty until discovery publishes the user's catalogs.
   // E com o texto/arte localizados que a sessao anterior ja buscou (#213): o
   // Continuar gravado no cache podia ter saido antes da traducao.
   if (cat_ler_cache(dirArte)) {
     desc_localizar_catalogo_cache();
     marco("catalogo do cache na tela");
   }
+#ifndef NV_WEBOS
   carregaDir(dirArte, bd, &nBd, NULL);
   carregaDir(dirArte, pst, &nPst, "poster");
-  if (!nBd) { printf("home: nenhum backdrop em %s\n", dirArte); return 0; }
-  if (!nPst) { printf("home: sem posters retrato, Top 10 usara backdrop\n"); }
+#endif
 
   // A HOME ABRE NO DESTAQUE. Era aqui que morava a nota dizendo que o hero e
   // informativo e que a navegacao comeca na primeira fileira — deixou de ser
@@ -1671,7 +1689,7 @@ int home_iniciar(const char *dirArte) {
   // abre no primeiro cartaz; o que a sessao lembra nasce em posCapturar, na
   // primeira remontagem.
   heroTrocaEm = SDL_GetTicks() + NV_HERO_INTERVALO_MS;
-  printf("home: %d backdrops, %d posters, %d fileiras\n", nBd, nPst, nFileiras);
+  printf("home: %d catalog items, %d rows\n", cat_n(), nFileiras);
   return 1;
 }
 
@@ -2515,7 +2533,6 @@ static void sincronizarFileiras(void) {
          nFileiras, fil_limite(), nCat);
 }
 
-int home_tem_fileiras(void) { return nFileiras > 0; }
 
 // A HOME DE OUTRO PERFIL ABRE NO TOPO, como no arranque: destaque em foco,
 // fileira 0 no primeiro cartaz, sem rolagem, e a memoria de posicao da sessao
@@ -4833,16 +4850,21 @@ void home_desenhar(Uint32 agora) {
   gfx_recorte(0.0f, corte, NV_TELA_W, NV_TELA_H - corte);
   const float topoFil = topoFileiras();
   float y = topoFil - scrollY + descida + bordaPag.x;
-  // NENHUMA FILEIRA. Nao e o arranque (ali a home mostra o catalogo do pacote
-  // ou o do cache): e o caso de a pessoa ter desligado todas em Ajustes. Sem
-  // texto, o hero sozinho com o resto da tela vazia le como travamento — e ela
-  // nao teria como adivinhar que foi ela quem apagou a home.
+  // An empty Home remains navigable, both before the first catalog arrives
+  // and after the user hides every row.
   if (nFileiras < 1 && !fileirasOcultas) {
     float tx = ajustes_conteudo_x();
-    TxtLinha t = txt_linha(TXT_ROW_TITULO, "Nenhuma fileira ativa", 240, 241, 245, 255);
+    int temCatalogo = cat_n() > 0 || col_n() > 0;
+    int carregando = !temCatalogo &&
+                     (sync_estado() == SYNC_RODANDO || desc_montando());
+    TxtLinha t = txt_linha(TXT_ROW_TITULO, carregando
+                          ? "Preparando seu catálogo…" : "Nenhuma fileira ativa",
+                          240, 241, 245, 255);
     txt_desenhar(t, tx, topoFil);
     txt_bloco(TXT_CAPTION,
-              "Ative fileiras em Ajustes, na categoria Fileiras da Home.",
+              carregando ? "Buscando seus addons e o que você estava assistindo."
+              : temCatalogo ? "Ative fileiras em Ajustes, na categoria Fileiras da Home."
+              : "Confira seus addons na conta e as fileiras em Ajustes.",
               183, 186, 194, tx, topoFil + t.h + 14.0f,
               NV_TELA_W - tx - NV_HOME_SAFE_RIGHT, 34, 1, 2);
   }

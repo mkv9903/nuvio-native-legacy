@@ -484,6 +484,8 @@ static void zerarFaixas(int quantos) {
   garantirFaixas(quantos);
 }
 
+#ifndef NV_WEBOS
+// Desktop preview catalog; the TV starts from its own cache/account catalogs.
 // Copia o campo ate o proximo '|' (ou fim de linha), sem estourar o destino.
 static const char *campo(const char *p, char *destino, size_t tam) {
   size_t k = 0;
@@ -723,6 +725,7 @@ int cat_carregar(const char *dirArte) {
   return n;
 }
 
+#endif
 // --- CACHE EM DISCO ----------------------------------------------------------
 //
 // Ver a nota em catalogo.h. O cabecalho carrega a versao E o sizeof(CatItem):

@@ -23,12 +23,16 @@ static const char *aviso = "";
 static char  fila[ST_FILA][600];
 static int   filaIni, filaN;
 
+#ifndef NV_WEBOS
 static int modoTeste = -1;
 void st_teste_ligar(int on) { modoTeste = on ? 1 : 0; }
 static int teste(void) {
   if (modoTeste < 0) { const char *e = getenv("NUVIO_SISTEXTO_TESTE"); modoTeste = e && *e == '1'; }
   return modoTeste;
 }
+#else
+static int teste(void) { return 0; }
+#endif
 
 // Quem fala com o teclado da TV e entrada_texto.h (SDL_StartTextInput do SDL da LG).
 int st_ime_disponivel(void) {
@@ -97,11 +101,15 @@ void st_fechar(int d) {
   nivel = 0.0f;
 }
 
-void st_teste_evento(const char *ev) {
+// The queue also carries real keyboard events; only its test API is excluded.
+static void enfileirar(const char *ev) {
   if (!ev || filaN >= ST_FILA) return;
   snprintf(fila[(filaIni + filaN) % ST_FILA], sizeof fila[0], "%s", ev);
   filaN++;
 }
+#ifndef NV_WEBOS
+void st_teste_evento(const char *ev) { enfileirar(ev); }
+#endif
 
 static int proximo(char *dst, size_t n) {
   (void)dst; (void)n;
@@ -176,10 +184,10 @@ int st_evento(const SDL_Event *e) {
     char ev[600];
     if (e->user.code == TS_EV_TEXTO) {
       snprintf(ev, sizeof ev, "T%s", texto_sistema_valor());
-      st_teste_evento(ev);
+      enfileirar(ev);
     } else if (e->user.code == TS_EV_FIM) {
-      if (e->user.data1) { snprintf(ev, sizeof ev, "D%s", texto_sistema_valor()); st_teste_evento(ev); }
-      else st_teste_evento("X");
+      if (e->user.data1) { snprintf(ev, sizeof ev, "D%s", texto_sistema_valor()); enfileirar(ev); }
+      else enfileirar("X");
     }
     return 1;
   }

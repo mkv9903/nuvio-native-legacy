@@ -1749,14 +1749,6 @@ static void guiaComCanalNoAr(void) {
   fflush(stdout);
 }
 
-// A home carregou? Sem arte no pacote ela nao carrega, e ate agora isso
-// DERRUBAVA o app: app_iniciar devolvia 0 e o main saia com codigo 1. Num
-// pacote de dono isso nunca acontecia porque a arte ia junto; num pacote
-// distribuivel, que nao pode levar arte nem credencial de ninguem, esse era o
-// comportamento da PRIMEIRA execucao de todo mundo — o app abria e fechava,
-// antes mesmo da tela de login.
-static int homePronta;
-
 static void trocarSalvosDePerfil(void) {
   int i, n = salvos_n();
   char (*antes)[24] = n > 0 ? malloc(sizeof *antes * (size_t)n) : NULL;
@@ -1786,9 +1778,7 @@ int app_iniciar(const char *dirArte) {
   login_recursos(dirArte);
   diagnostico_recuperar_checkpoint();
   stream_fit_fonte_metadados(fitRuntimeMeta);
-  homePronta = home_iniciar(dirArte);
-  if (!homePronta)
-    printf("[app] sem arte no pacote: a home so aparece depois do primeiro sync\n");
+  home_iniciar(dirArte);
   menu_iniciar();
   perfil_iniciar();
   // ANTES do primeiro sync e da primeira descoberta: salvos_aplicar_catalogo
@@ -1969,7 +1959,7 @@ static void spotAtender(void) {
 int app_no_login(void) { return tela == TELA_LOGIN; }
 
 int app_na_home(void) {
-  return tela == TELA_HOME && homePronta && !player_aberto() && !detail_aberto();
+  return tela == TELA_HOME && !player_aberto() && !detail_aberto();
 }
 
 // ONDE A AZUL/CH+ ABRE O PAINEL DE SALVOS/AVISOS (dono, 04/10: "tem que dar
@@ -2363,7 +2353,6 @@ static void legendasDaFonte(void) {
 // escolha de perfil que nunca concluia (#228).
 static const char *homeTrailerBloqueio(void) {
   if (tela != TELA_HOME) return "screen";
-  if (!homePronta) return "home-not-ready";
   if (!login_concluido()) return "login";
   if (!perfilsel_concluido()) return "profile-choice";
   if (player_aberto() || player_retido() || player_mini_ativo()) return "player";
@@ -2648,11 +2637,11 @@ void app_atualizar(float dt, Uint32 agora) {
   // Ele ensina a tecla vermelha, e o lugar errado para isso e a frente do
   // login: la a pessoa esta tentando enquadrar um QR com o celular, e um cartao
   // por cima atrapalha a unica coisa que ela precisa fazer. Depois da escolha
-  // de perfil, na primeira vez que a home aparece de verdade (homePronta, sem
+  // de perfil, na primeira vez que a home aparece de verdade (sem
   // player nem detalhe por cima), o cartao nao disputa com nada.
   //
   // Chamar em todo quadro nao custa: a decisao acontece uma vez e o modulo a
-  if (tela == TELA_HOME && homePronta && !player_aberto() && !detail_aberto()) {
+  if (tela == TELA_HOME && !player_aberto() && !detail_aberto()) {
     diagnostico_intro_primeira_vez();
     if (!diagnostico_intro_aberto()) {
       registro_aviso_primeira_vez();
@@ -2677,7 +2666,7 @@ void app_atualizar(float dt, Uint32 agora) {
   // de descoberta.
   { static Uint32 ultContinuar;
     if (!ultContinuar) ultContinuar = agora;
-    if (tela == TELA_HOME && homePronta && !player_aberto() && !player_mini_ativo() &&
+    if (tela == TELA_HOME && !player_aberto() && !player_mini_ativo() &&
         !detail_aberto() && agora - ultContinuar >= 10u * 60u * 1000u) {
       ultContinuar = agora;
       printf("[home] 10 min na home: refazendo Continuar assistindo\n"); fflush(stdout);
@@ -4080,42 +4069,6 @@ static void desenharTelas(Uint32 agora) {
   if (tela == TELA_LOGIN)          { login_desenhar(agora);     return; }
   if (tela == TELA_ESCOLHA_PERFIL) { perfilsel_desenhar(agora); return; }
 
-  // A HOME PODE FICAR PRONTA DEPOIS DO ARRANQUE, e ate agora ninguem reparava.
-  //
-  // homePronta saia de home_iniciar() e nunca mais era reavaliada. Num pacote
-  // COM arte prebaked ela nasce 1 e o defeito nao existe — que e o caso de todo
-  // pacote que este projeto ja montou. Num pacote SEM arte (o distribuivel, e o
-  // do alvo Tizen, onde o .wgt e read-only) ela nasce 0, o catalogo chega pelo
-  // sync segundos depois, home_atualizar monta as fileiras — e o app segue
-  // desenhando "Preparando seu catalogo..." para sempre, com 32 fileiras
-  // prontas atras. MEDIDO no navegador: "[home] 32 fileiras vindas do catalogo"
-  // no log, estado vazio na tela.
-  if (!homePronta && home_tem_fileiras()) {
-    homePronta = 1;
-    printf("[app] catalogo chegou depois do arranque: home liberada\n");
-    fflush(stdout);
-  }
-
-  // Estado vazio de verdade, em vez de uma tela preta que parece travamento.
-  if (!homePronta && tela == TELA_HOME && !player_aberto() && !detail_aberto()) {
-    GfxRect fundo = { 0, 0, NV_TELA_W, NV_TELA_H };
-    TxtLinha t, sb;
-    gfx_cor(fundo, 0.0f, NV_COR_FUNDO_R, NV_COR_FUNDO_G, NV_COR_FUNDO_B, 1.0f);
-    // A ABERTURA com a marca do icone escolhido; com o Original,
-    // a tela de sempre, so com o texto.
-    logoapp_marca((GfxRect){ (NV_TELA_W - 160.0f) * 0.5f, 260.0f, 160.0f, 160.0f }, 1.0f);
-    t = txt_linha(TXT_TITULO2, "Preparando seu catálogo…", 255, 255, 255, 255);
-    txt_desenhar(t, (NV_TELA_W - t.w) * 0.5f, 460.0f);
-    sb = txt_linha(TXT_BODY,
-                   sync_estado() == SYNC_RODANDO
-                     ? "Buscando seus addons e o que você estava assistindo."
-                     : "Se isto não sair daqui, confira seus addons na conta.",
-                   160, 162, 170, 255);
-    txt_desenhar(sb, (NV_TELA_W - sb.w) * 0.5f, 546.0f);
-    if (menu_visivel() && sidebar_permitida()) menu_desenhar(agora);
-    return;
-  }
-
   // O player cobre tudo; desenhar o que esta atras dele e trabalho jogado fora
   // — a mesma conta que ja valia para o cartao de detalhe esticado.
   // ...exceto enquanto o video do preview do guia CRESCE para a tela cheia: ai
@@ -4183,8 +4136,7 @@ static int relogioCabe(void) {
   // relogio (dono, 04/10). Ele volta, pela animacao da ilha, quando o cartao
   // estica para a pagina.
   if (detail_aberto() && detail_relogio_oculto()) return 0;
-  if (tela == TELA_HOME) { if (!homePronta) return 0; }
-  else if (tela != TELA_BUSCA &&
+  if (tela != TELA_HOME && tela != TELA_BUSCA &&
            tela != TELA_BIBLIOTECA && tela != TELA_PERFIL &&
            tela != TELA_ADDONS && tela != TELA_PLUGINS) return 0;
   // O MENU ABERTO NAO ESCONDE MAIS O RELOGIO (Glass UI, mockup "ilha" tela 1):

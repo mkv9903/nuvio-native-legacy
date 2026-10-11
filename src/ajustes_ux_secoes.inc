@@ -267,7 +267,7 @@ static float ajcTxtDir(const char *t, float px, int forte, float dir, float b, f
 // Dinamica faz), sem passada de desfoque.
 static void ajcBorrada(const char *c, GfxRect r, float raio, float a) {
   GLuint t;
-  if (!c || !c[0]) return;
+  if (!c || !c[0]) { ajImg(c, r, raio, a); return; }
   t = tex_obter_larg(c, 24.0f);
   if (!t) { gfx_cor(r, raio / r.h, 0.16f, 0.165f, 0.18f, 0.6f * a); ajCenaFaltas++; return; }
   gfx_tex_aspect_atual = tex_aspecto(c);
@@ -291,27 +291,41 @@ static void ajcTela(const char *arte, float a, float b, float c, float d, float 
 // Um still de episodio da amostra (deploy/app/art/ep: so as series tem) e
 // uma foto de elenco (art/elenco, 12 titulos), escolhidos pelo titulo `n`.
 static const char *ajcEp(int n, int k) {
+#ifdef NV_WEBOS
+  const CatEp *ep = cat_episodio(n, k > 0 ? k - 1 : 0);
+  return ep ? ep->thumb : "";
+#else
   static const char *const S[10] = { "00_1", "01_1", "15_1", "17_1", "19_1", "21_1", "23_1", "25_1", "27_1", "29_1" };
   static char b[6][1200];
   static int j;
   j = (j + 1) % 6;
   snprintf(b[j], sizeof b[j], "%s/ep/%s_%02d.jpg", uxDirArte, S[(n < 0 ? 0 : n) % 10], k);
   return b[j];
+#endif
 }
 static const char *ajcElenco(int n, int k) {
+#ifdef NV_WEBOS
+  const CatItem *item = cat_n() > 0 ? cat_item(n) : NULL;
+  return item && k >= 0 && k < item->nElenco ? item->elenco[k].foto : "";
+#else
   static char b[4][1200];
   static int j;
   j = (j + 1) % 4;
   snprintf(b[j], sizeof b[j], "%s/elenco/%02d_%d.jpg", uxDirArte, (n < 0 ? 0 : n) % 12, k);
   return b[j];
+#endif
 }
 // Indice de um logo de canal/titulo da amostra.
 static const char *ajcLogoAmostra(int n) {
+#ifdef NV_WEBOS
+  return ajArte(AJA_LOGO, n);
+#else
   static char b[4][1200];
   static int k;
   k = (k + 1) % 4;
   snprintf(b[k], sizeof b[k], "%s/logo/%02d.png", uxDirArte, n % 8);
   return b[k];
+#endif
 }
 
 // --- TELA INICIAL ---------------------------------------------------------------------

@@ -1737,12 +1737,14 @@ float ajustes_vidro_opacidade(void) {
 int ajustes_vidro_fosco(void) { return valor[AJ_VIDRO_FOSCO] == 1; }
 // Capturas do teste do vidro: NUVIO_SHOT_VIDRO_OPAC=60|70|78|86|92 e
 // NUVIO_SHOT_VIDRO_FOSCO=1 (sem gravar nada).
+#if !defined(NV_WEBOS) || defined(AJUSTES_TESTE)
 void ajustes_teste_vidro_env(void) {
   const char *o = getenv("NUVIO_SHOT_VIDRO_OPAC"), *f = getenv("NUVIO_SHOT_VIDRO_FOSCO");
   if (o && *o) { int n = atoi(o); valor[AJ_VIDRO_OPAC] = n <= 60 ? 0 : n <= 70 ? 1 : n <= 78 ? 2 : n <= 86 ? 3 : 4; }
   if (f && *f) valor[AJ_VIDRO_FOSCO] = atoi(f) ? 1 : 0;
   if ((o && *o) || (f && *f)) valor[AJ_VIDRO] = 0;   // o teste e do vidro: liga
 }
+#endif
 int ajustes_relogio_ligado(void) { return lig(AJ_RELOGIO); }
 int ajustes_relogio_pos(void) { return valor[AJ_RELOGIO_POS]; }
 int ajustes_classif_player(void) { return lig(AJ_PLR_CLASSIF); }

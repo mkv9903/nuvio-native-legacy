@@ -46,18 +46,25 @@ static const char *uxBloco(int op) {
 }
 
 // --- ARTE ---------------------------------------------------------------------
-// A arte das previas: a do CATALOGO quando ele ja chegou (os titulos da conta,
-// os mesmos da Home), e a amostra embarcada (deploy/app/art) antes disso. `n`
-// e o indice da amostra que o mockup usa; com catalogo vira o titulo n.
+// Prefer the user's catalog. Desktop fixtures can supply example artwork;
+// the TV draws a neutral placeholder when an image is unavailable.
 enum { AJA_FUNDO = 0, AJA_POSTER, AJA_LOGO };
 static int ajArteFundoN = 12;
-static int ajArteSoAmostra;   // 1 = ignora o catalogo e usa so a amostra embarcada   // titulo atras da tela (ajustes_teste_arte)
+#ifndef NV_WEBOS
+static int ajArteSoAmostra;   // desktop row-preview fixtures only
+#endif
 static const char *ajArte(int tipo, int n) {
+#ifndef NV_WEBOS
   static char buf[8][1100];
   static int k;
   char *b;
+#endif
   if (n < 0) n = 0;
-  if (cat_n() > 0 && !ajArteSoAmostra) {
+  if (cat_n() > 0
+#ifndef NV_WEBOS
+      && !ajArteSoAmostra
+#endif
+     ) {
     const CatItem *c = cat_item(n % cat_n());
     if (c) {
       const char *s = tipo == AJA_POSTER ? c->poster : tipo == AJA_LOGO ? c->logo : c->backdrop;
@@ -65,6 +72,9 @@ static const char *ajArte(int tipo, int n) {
       if (tipo == AJA_LOGO) return "";
     }
   }
+#ifdef NV_WEBOS
+  return "";
+#else
   if (!uxDirArte[0]) return "";
   k = (k + 1) % 8;
   b = buf[k];
@@ -72,6 +82,7 @@ static const char *ajArte(int tipo, int n) {
            tipo == AJA_POSTER ? "poster/" : tipo == AJA_LOGO ? "logo/" : "", n % 40,
            tipo == AJA_LOGO ? "png" : "jpg");
   return b;
+#endif
 }
 // Imagens pedidas e ainda nao prontas durante o desenho de uma cena: a troca
 // de cenas (ajustes_ux_secoes.inc) segura a cena anterior enquanto este numero
@@ -85,7 +96,15 @@ static void ajCenaTrocaAtualizar(float dt);
 // Arte em "cover" num retangulo de cantos `raioPx`. Devolve 1 se desenhou.
 static int ajImg(const char *c, GfxRect r, float raioPx, float a) {
   GLuint t;
-  if (!c || !c[0] || r.w < 1.0f || r.h < 1.0f || a <= 0.003f) return 0;
+  if (r.w < 1.0f || r.h < 1.0f || a <= 0.003f) return 0;
+  if (!c || !c[0]) {
+    gfx_cor(r, raioPx / r.h, 0.16f, 0.165f, 0.18f, 0.6f * a);
+    float side = fminf(r.w, r.h) * 0.18f;
+    if (side >= 12.0f)
+      gfx_icone((GfxRect){r.x + (r.w - side) * 0.5f, r.y + (r.h - side) * 0.5f, side, side},
+                "aj_image", 0.55f, 0.56f, 0.59f, 0.35f * a);
+    return 0;
+  }
   t = tex_obter_larg(c, r.w > r.h * 1.78f ? r.w : r.h * 1.78f);
   if (!t) {
     gfx_cor(r, raioPx / r.h, 0.16f, 0.165f, 0.18f, 0.6f * a);

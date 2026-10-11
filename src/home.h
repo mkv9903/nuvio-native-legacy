@@ -39,11 +39,6 @@ typedef struct {
 int  home_iniciar(const char *dirArte);
 int  home_cartao_foco_por_cima(int indice); // repinta o cartao focado (menu do cartaz)
 int  home_item_focado(HomeItem *out);      // 0 se o foco ainda nao foi desenhado
-                   // acervo de backdrops, usado pelo detalhe
-// Ha fileira montada? Serve para o app saber que o catalogo CHEGOU depois do
-// arranque, e nao so que existia na hora de abrir.
-int  home_tem_fileiras(void);
-   // arte do titulo i do catalogo
 void home_evento(const SDL_Event *e);
 void home_atualizar(float dt, Uint32 agora);
 // Poe a home no topo (destaque, fileira 0, sem rolagem) e esquece a posicao

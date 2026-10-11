@@ -39,6 +39,16 @@ void  sync_proteger_ajustes_locais(void) {}
 int   perfis_ativo(void) { return 1; }
 const char *addons_base_por_id(const char *id) { (void)id; return ""; }
 const char *addons_nome_por_id(const char *id) { (void)id; return ""; }
+#ifdef NV_WEBOS
+// No graphics/network dependencies are needed to start an empty Home.
+void extras_carregar(const char *dir) { (void)dir; }
+void badges_carregar(const char *dir) { (void)dir; }
+void selospacote_dir_embutidos(const char *dir) { (void)dir; }
+int desc_localizar_catalogo_cache(void) { return 0; }
+void marco(const char *nome) { (void)nome; }
+const char *dados_dir(void) { return ""; }
+const char *sessao_usuario(void) { return "test-account"; }
+#endif
 
 // LAYOUT E DESTAQUE DO TESTE. home.c le os dois por estes acessores; trocados
 // aqui por variaveis, sem arrastar o disco e os idiomas de ajustes.c para o
@@ -49,6 +59,14 @@ int teste_hero_ligado(void) { return testeHero; }
 static void homeCom(int layout, int heroLigado) { testeLayout = layout; testeHero = heroLigado; }
 
 int main(void) {
+#ifdef NV_WEBOS
+  // Use the real source resource directory: TV startup must ignore desktop
+  // fixtures even when old installations still contain them.
+  assert(home_iniciar("deploy/app/art"));
+  assert(cat_n() == 0 && nFileiras == 0 && col_n() == 0);
+  assert(nAcervoHero() == 0);
+  assert(arte_por_identidade(0, 0) == NULL);
+#endif
   // A composicao abaixo e a da home SEM o destaque no topo: e nela que a
   // primeira fileira de catalogo vira a vitrine (vitrineNaPrimeira). O #201
   // (com destaque) tem bloco proprio no fim.
@@ -158,7 +176,21 @@ int main(void) {
   assert(!strcmp(fileiras[foco.fileira].chave, chave));
   assert(foco.coluna == 2);
   assert(scrollX[foco.fileira] == 123);
+#ifdef NV_WEBOS
+  assert(col_carregar("tests/fixtures/collections") == 0);
+  { char json[2048];
+    FILE *f = fopen("tests/fixtures/collections/account.json", "r");
+    assert(f);
+    size_t n = fread(json, 1, sizeof json - 1, f);
+    json[n] = 0;
+    fclose(f);
+    assert(col_definir_json(json) == 2);
+    assert(!col_folder(0)->local && !col_folder(0)->editorial);
+    assert(!strcmp(col_folder(0)->hero, "https://example.invalid/hero.webp"));
+  }
+#else
   assert(col_carregar("tests/fixtures/collections") == 2);
+#endif
   assert(col_folder(0)->nSources==2);
   assert(col_folder(-1)==NULL);
   const char *ids[]={"", "now_playing_movies","trending_movies","trending_series",
@@ -234,10 +266,12 @@ int main(void) {
   snprintf(itensTeste[0].poster,sizeof itensTeste[0].poster,"own-poster.jpg");
   snprintf(itensTeste[0].backdrop,sizeof itensTeste[0].backdrop,"own-backdrop.jpg");
   snprintf(itensTeste[1].poster,sizeof itensTeste[1].poster,"other-poster.jpg");
+#ifndef NV_WEBOS
   nBd=2; nPst=1;
   snprintf(bd[0],sizeof bd[0],"fallback-0.jpg");
   snprintf(bd[1],sizeof bd[1],"fallback-1.jpg");
   snprintf(pst[0],sizeof pst[0],"fallback-poster-0.jpg");
+#endif
   cat_definir_tudo(itensTeste,48,NULL,0);
   assert(!strcmp(arte_por_identidade(0,0),"own-poster.jpg"));
   assert(!strcmp(arte_por_identidade(0,1),"own-backdrop.jpg"));

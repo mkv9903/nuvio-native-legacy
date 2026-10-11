@@ -112,7 +112,8 @@ int main(void) {
   assert(col_definir_json("[{\"profile_id\":1,\"collections_json\":[{\"id\":\"r\",\"title\":\"R\",\"folders\":[{\"id\":\"g\",\"title\":\"G\",\"sources\":[{\"addonId\":\"a\",\"type\":\"movie\",\"catalogId\":\"k\"}]}]}],\"updated_at\":\"x\"}]") == 1);
   assert(!strcmp(col_folder(0)->groupId, "r"));
   puts("ok  linha da RPC com o array direto");
-  // pacote + conta com o mesmo id: fica a arte local, grupo/titulo da conta
+#ifndef NV_WEBOS
+  // Desktop-only imports: local artwork can be matched to account folders.
   { char dir[] = "/tmp/nuvio-col-XXXXXX"; char caminho[300]; FILE *f;
     assert(mkdtemp(dir));
     snprintf(caminho, sizeof caminho, "%s/collections.json", dir); f = fopen(caminho, "w");
@@ -163,6 +164,7 @@ int main(void) {
            strstr(col_folder(0)->hero, "c/f1h.jpg") && strstr(col_folder(1)->logo, "c/f2l.png"));
     remove(caminho); rmdir(dir);
     puts("ok  arte das pastas da conta: desligado o pacote, ligado a conta campo a campo, volta na hora"); }
+#endif
   // OS QUATRO NIVEIS DE col_diagnostico. O que este teste guarda nao e a
   // funcao e sim a CAPACIDADE DE SEPARAR causas: os quatro casos abaixo
   // produzem hoje o mesmo sintoma na tela (fileira solta na home, #18) e o
@@ -216,7 +218,11 @@ int main(void) {
     fputs("{\"groups\":[{\"title\":\"G\",\"id\":\"g1\",\"folders\":[{\"id\":\"f1\",\"title\":\"Netflix\","
           "\"cover\":\"c.jpg\",\"sources\":[{\"base\":\"https://a\",\"type\":\"movie\",\"catId\":\"m\"}]}]}]}", f);
     fclose(f);
+#ifdef NV_WEBOS
+    assert(col_carregar(dir) == 0 && col_n() == 0);
+#else
     assert(col_carregar(dir) == 1);
+#endif
     assert(col_definir_json("[{\"collections_json\":[]}]") == 0 && col_n() == 0);
     col_esquecer_perfil();
     assert(col_n() == 0);
@@ -226,11 +232,16 @@ int main(void) {
     for (i = 0; i < col_n(); i++)
       if (!strcmp(col_folder(i)->id, "f1")) {
         achou = 1;
+#ifdef NV_WEBOS
+        assert(!col_folder(i)->local && !col_folder(i)->editorial);
+        assert(!strcmp(col_folder(i)->cover, "https://img/nf.jpg"));
+#else
         assert(col_folder(i)->local == 1 && strstr(col_folder(i)->cover, "/c.jpg"));
+#endif
       }
     assert(achou);
     unlink(arq); rmdir(dir);
-    puts("ok  troca de perfil: colecoes do anterior saem, arte do pacote volta"); }
+    puts("ok  profile switch clears old folders and restores this account's collections"); }
 
   { ColSource s; char n[128];
     memset(&s, 0, sizeof s);

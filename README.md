@@ -81,6 +81,13 @@ Atmos source preferences affect source selection, not decoding.
 `tools/arm.sh` without `--build` deploys to the configured rooted TV.
 Use `--build` for local verification.
 
+TV packages and direct deployments include only runtime UI resources. Sample
+catalogs, posters, title logos, cast/episode photos, and custom collection banners
+stay in the repository for Linux previews and screenshot tests. On TV, Home
+uses the signed-in account's catalog and local cache; settings and guides use
+available catalog images or neutral placeholders. Fonts, icons, format/rating
+badges, app artwork, guide content, and curated TV-addon suggestions are retained.
+
 LG data defaults to `~/.space.mkv.nuvio.native`, with an app-specific fallback
 under `/media/developer/temp/`. Local logs use
 `/tmp/space.mkv.nuvio.native.log`. You will need to sign in on the new installation.

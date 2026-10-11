@@ -144,6 +144,8 @@ static void captura(const char *nome, SDL_Window *win) {
 
 int main(int argc, char **argv) {
   const char *saida = argc > 1 ? argv[1] : "/tmp/nuvio-ajustes";
+  const char *arte = getenv("NUVIO_SHOT_ARTE_DIR");
+  if (!arte || !arte[0]) arte = "deploy/app/art";
   char nome[600];
   SDL_Window *w;
   SDL_GLContext gl;
@@ -166,9 +168,9 @@ int main(int argc, char **argv) {
   assert(gfx_iniciar());
   assert(txt_iniciar("deploy/app", 1));
   tex_iniciar(64);
-  gfx_icones_dir("deploy/app/art");
-  ajustes_recursos("deploy/app/art");
-  badges_carregar("deploy/app/art");   // marcas de formato (Dolby Vision, 4K...); no app quem faz e home_iniciar
+  gfx_icones_dir(arte);
+  ajustes_recursos(arte);
+  badges_carregar(arte);   // real UI assets, including format badges
 
   // FILEIRAS DE MENTIRA cobrindo as origens que a folha sabe distinguir: o
   // catalogo de addon (com nome de addon e tipo), o grupo de colecoes, e as

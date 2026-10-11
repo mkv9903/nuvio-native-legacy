@@ -284,9 +284,8 @@ void avisos_iniciar(void) {
       pthread_mutex_unlock(&trava); }
   }
   marcaGravar();
-  // DEMONSTRACAO: NUVIO_AVISOS_DEMO=1 poe um item de cada tipo na lista, para
-  // olhar o painel sem esperar versao nova, recado ou crash de verdade.
-  // So na previa; a TV nao tem ambiente.
+#ifndef NV_WEBOS
+  // Desktop-only fixture notices. Real update/crash notices remain on the TV.
   { const char *demo = getenv("NUVIO_AVISOS_DEMO");
     if (demo && demo[0] == '1') {
       int novos = 0;
@@ -302,6 +301,7 @@ void avisos_iniciar(void) {
       toast(novos);
       if (!crashQuando[0]) snprintf(crashQuando, sizeof crashQuando, "2026-09-19 18:57");
     } }
+#endif
 }
 
 void avisos_encerrar(void) {

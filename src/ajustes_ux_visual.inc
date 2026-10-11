@@ -284,7 +284,8 @@ static int ajCenaArteOp(int op) {
 // Arte cobrindo o quadro (ou o cinza das ilhas se ela ainda nao chegou) e o
 // escurecimento por cima.
 static void ajCenaArte(const char *arte, GfxRect q, float rr, float escuro) {
-  if (!ajImg(arte, q, rr, 1)) gfx_cor(q, rr / q.h, 0.10f, 0.105f, 0.12f, 1);
+  if (!ajImg(arte, q, rr, 1) && arte && arte[0])
+    gfx_cor(q, rr / q.h, 0.10f, 0.105f, 0.12f, 1);
   if (escuro > 0.003f) gfx_cor(q, rr / q.h, 0.031f, 0.031f, 0.039f, escuro);
 }
 // Peca de ilha sobre a foto: o miolo escuro do vidro (ou o solido #15161A).
