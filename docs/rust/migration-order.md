@@ -1,8 +1,8 @@
 # Core migration order and test policy
 
 The second migrated batch is **text cleanup and search normalization**:
-`dobra.c`, `limpa.c` and `buscanorm.c`. They total 455 lines in the current C
-source, have existing focused tests and require no network, storage, SDL or GL.
+`dobra.c`, `limpa.c` and `buscanorm.c`. Their original implementations total 455
+C lines, have focused tests and require no network, storage, SDL or GL.
 They provide useful foundations for the later source/metadata flow without
 introducing another Rust dependency.
 
@@ -45,7 +45,7 @@ but publishes changes while holding a mutex and calls stream-fit invalidation.
 Conversely, a longer pure text module is a contained, testable change. The
 grouping above therefore favors behavioral boundaries over file size alone.
 
-## Next batch boundary
+## Text batch boundary
 
 Use English Rust names such as `text_cleanup`, `search_normalization` and
 `fold_stylized_character`; retain C entry-point names in temporary adapters.

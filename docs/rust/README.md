@@ -20,7 +20,7 @@ Work branch: `rust-rewrite`, created from `main` at
 - [Add-on URL helpers](addon-url.md): the first migrated module, English naming
   map, C adapter, byte/buffer contracts and reproducible parity checks.
 - [Migration order and tests](migration-order.md): measured module sizes,
-  dependency-based batches, the next text-helper group and test/translation policy.
+  dependency-based batches, completed helpers and test/translation policy.
 - [Text helpers](text-helpers.md): stylized character folding, provider cleanup,
   local search, the approved malformed UTF-8 correction and compatibility tests.
 - [Existing LG rendering research](../ux-render-lg.md): useful interaction,

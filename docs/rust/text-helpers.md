@@ -114,12 +114,52 @@ ASAN_OPTIONS=detect_leaks=0 bash tests/limpa.sh --rust
 
 ## Integrated validation and user check
 
-Linux and ARM builds and the graphical preview are the next integration
-checks. Build and packaging evidence will be recorded after they complete.
+Linux and ARM release builds pass with the pinned Rust 1.85.1 library. The
+Xvfb/Mesa llvmpipe preview logged a passing runtime probe and the complete
+module marker, rendered screenshots and consumed Down/Right/Back navigation.
+A second check preseeded only three first-run tutorial flags in temporary test
+data, opened Spotlight and typed `fallout`; its search field rendered correctly.
+This smoke check does not establish provider-backed result/source coverage or
+TV performance. Source cleanup is covered by the automated font corpus; real
+source-list appearance remains part of the user check below.
+
+```text
+[rust-core] modules=addon-url,stylized,text-cleanup,search-normalization
+```
+
+ARM inspection before and after stripping passes: EABI5 soft-float, GNU loader
+`/lib/ld-linux.so.3`, GLIBC symbols through 2.12, and exactly the previous build's
+dynamic native dependencies. No new runtime library is required. Physical-TV
+execution of this helper batch has not yet been performed.
+
+The isolated Rust Test package was built from clean commit `cead05c2`:
+
+- Package: `space.mkv.nuvio.rusttest_2.1.0_arm.ipk`, 9,111,578 bytes.
+- Package SHA-256: `7bbead9f04a98017943af90df1537103570017aaffe68cf4ef26db0101b79c13`.
+- Binary SHA-256: `cfede84aa0c722d6b1d905ce5fe0644e812a878a79c513b539b4c4b0ac3d4822`.
+- Build ID: `8a7cfd68fd2817c1f9504ea0d0bf5f9d64f6afe0`.
+- Symbols/ABI record: `build/webos-rust/cead05c22dce/8a7cfd68fd2817c1f9504ea0d0bf5f9d64f6afe0/release/`.
+
+Package verification compared all 601 runtime files with the clean allowlisted
+staging tree. Test ID/title, executable permissions, built binary hash, module
+marker, package metadata and Rust license notices match. No account/settings
+files, sampled catalog/artwork or developer symbols are packaged. Local
+validation evidence is under `build/rust/validation/`; generated files and the
+IPK are ignored by Git. Formatting, Clippy with warnings denied, ShellCheck and
+whitespace checks pass.
 
 For this pure helper batch, user testing should focus on the Linux preview:
-search accented titles, enter/remove non-ASCII characters with Backspace and
+search accented titles, enter/remove non-ASCII characters with the on-screen
+delete key or the desktop **Delete** key, and
 inspect available source names/descriptions for broken symbols or spacing.
+The existing Linux UI maps physical Backspace to Back; this batch retains its
+input handling. Dismiss first-run cards before testing search. Start the preview
+after pulling `rust-rewrite`:
+
+```sh
+bash tools/linux.sh --rust-test --preview
+```
+
 No new full TV playback session is required for these helpers. A packaged
-Rust Test IPK will still accompany the handoff for an optional TV smoke check.
+Rust Test IPK accompanies the handoff for an optional TV smoke check.
 Native playback remains subject to TV validation when later work changes it.
