@@ -4,12 +4,12 @@
 #include <stdlib.h>
 #include <string.h>
 
-static void truncados(void) {
-  const char *casos[] = {"{\"\\", "{\"x\":\"\\u", "{\"x\":\"\\uD800",
+static void incomplete_values(void) {
+  const char *cases[] = {"{\"\\", "{\"x\":\"\\u", "{\"x\":\"\\uD800",
                          "{\"x\":\"\\uD800\\u", "{\"x\":\"\\uD800\\uD", NULL};
   char dst[80];
-  for (int i = 0; casos[i]; i++) {
-    char *s = strdup(casos[i]);
+  for (int i = 0; cases[i]; i++) {
+    char *s = strdup(cases[i]);
     assert(js_fim(s) == s + strlen(s));
     js_texto(s, NULL, "x", dst, sizeof dst);
     js_texto_raiz(s, "x", dst, sizeof dst);
@@ -17,11 +17,11 @@ static void truncados(void) {
   }
 }
 
-static void faixas(void) {
+static void bounded_ranges(void) {
   const char *s = "{\"x\":\"abcdef\",\"n\":12345,\"v\":{\"a\":1}}";
   const char *f;
   char dst[80];
-  /* A faixa termina no meio do valor; o resto do documento nao pertence a ela. */
+  /* The range ends inside the value; the remaining document is inaccessible. */
   f = strstr(s, "def");
   assert(!js_texto(s, f, "x", dst, sizeof dst));
   assert(!js_texto_raiz_em(s, f, "x", dst, sizeof dst));
@@ -34,7 +34,7 @@ static void faixas(void) {
   assert(!js_texto(NULL, NULL, "x", dst, sizeof dst));
   assert(js_num(NULL, NULL, "n", -1) == -1);
   assert(js_fim(NULL) == NULL);
-  /* Faixa sem NUL, tamanho exato de alocacao: ASan vigia qualquer leitura extra. */
+  /* Exact allocation without NUL: ASan detects C reads beyond the range. */
   char *raw = malloc(8);
   memcpy(raw, "{\"x\":\"ab", 8);
   assert(!js_texto(raw, raw + 8, "x", dst, sizeof dst));
@@ -42,11 +42,11 @@ static void faixas(void) {
   free(raw);
 }
 
-static void valores(void) {
+static void field_values(void) {
   char dst[80];
-  const char *s = "{\"literal\":\"\\\"x\\\":\\\"falso\\\"\",\"x\":\"certo\"}";
+  const char *s = "{\"literal\":\"\\\"x\\\":\\\"fake\\\"\",\"x\":\"correct\"}";
   assert(js_texto(s, NULL, "x", dst, sizeof dst));
-  assert(!strcmp(dst, "certo"));
+  assert(!strcmp(dst, "correct"));
   assert(js_texto("{\"x\":\"Not\\u00edcias \\uD83D\\uDE00\"}", NULL,
                   "x", dst, sizeof dst));
   assert(!strcmp(dst, "Notícias 😀"));
@@ -59,12 +59,12 @@ static void valores(void) {
   assert(js_num("{\"n\":{\"n\":8580}}", NULL, "n", -1) == 8580);
   assert(js_bruto("{\"v\":true     }", NULL, "v", dst, 5));
   assert(!strcmp(dst, "true"));
-  assert(js_texto_raiz("{\"nested\":{\"x\":\"errado\"},\"x\":\"certo\"}",
+  assert(js_texto_raiz("{\"nested\":{\"x\":\"wrong\"},\"x\":\"correct\"}",
                        "x", dst, sizeof dst));
-  assert(!strcmp(dst, "certo"));
+  assert(!strcmp(dst, "correct"));
 }
 
-static void prefixos(void) {
+static void input_prefixes(void) {
   const char *s = "{\"x\":\"Not\\u00edcias \\uD83D\\uDE00\",\"n\":12.5e2,\"v\":[{\"x\":\"a\"}]}";
   char dst[80];
   for (size_t n = 0; n <= strlen(s); n++) {
@@ -79,33 +79,33 @@ static void prefixos(void) {
   }
 }
 
-static void padroes(void) {
-  char dst[24] = "nome conhecido";
+static void fallbacks(void) {
+  char dst[24] = "known name";
   assert(!js_texto("{}", NULL, "name", dst, sizeof dst));
-  assert(!strcmp(dst, "nome conhecido"));
+  assert(!strcmp(dst, "known name"));
   assert(!js_texto("{\"name\":null}", NULL, "name", dst, sizeof dst));
-  assert(!strcmp(dst, "nome conhecido"));
+  assert(!strcmp(dst, "known name"));
   assert(!js_texto("{\"name\":12}", NULL, "name", dst, sizeof dst));
-  assert(!strcmp(dst, "nome conhecido"));
-  assert(!js_texto("{\"name\":\"truncado", NULL, "name", dst, sizeof dst));
-  assert(!strcmp(dst, "nome conhecido"));
+  assert(!strcmp(dst, "known name"));
+  assert(!js_texto("{\"name\":\"incomplete", NULL, "name", dst, sizeof dst));
+  assert(!strcmp(dst, "known name"));
   assert(!js_bruto("{}", NULL, "name", dst, sizeof dst));
-  assert(!strcmp(dst, "nome conhecido"));
+  assert(!strcmp(dst, "known name"));
   assert(!js_bruto("{\"name\":{", NULL, "name", dst, sizeof dst));
-  assert(!strcmp(dst, "nome conhecido"));
-  assert(!js_bruto("{\"name\":\"longo\"}", NULL, "name", dst, 2));
-  assert(!strcmp(dst, "nome conhecido"));
-  /* O leitor de raiz ja possuia um contrato diferente: limpa a ausencia. */
+  assert(!strcmp(dst, "known name"));
+  assert(!js_bruto("{\"name\":\"long\"}", NULL, "name", dst, 2));
+  assert(!strcmp(dst, "known name"));
+  /* Root lookup has a different existing contract: absence clears output. */
   assert(!js_texto_raiz("{}", "name", dst, sizeof dst));
   assert(!dst[0]);
 }
 
 int main(void) {
-  truncados();
-  faixas();
-  valores();
-  prefixos();
-  padroes();
-  puts("js limites: ok");
+  incomplete_values();
+  bounded_ranges();
+  field_values();
+  input_prefixes();
+  fallbacks();
+  puts("JSON bounds: ok");
   return 0;
 }

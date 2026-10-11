@@ -12,7 +12,9 @@ Those results established the starting behavior. This group is now ported to
 Rust with its translated tests, eight Rust unit cases and 4,611,963 comparisons;
 see [the module record](text-helpers.md). The user approved strict invalid UTF-8
 handling in search; all valid text retains the original rules.
-The next recommended milestone is JSON reading/writing, starting with the reader.
+The JSON reader is now migrated with the approved fitting-prefix correction;
+see [its module record](json-reader.md). The next substep is the JSON writer
+(`jsw`), after the reader's integrated build and user validation.
 
 The following inventory was inspected on October 11, 2026, after the add-on
 URL port. Counts include comments and blank lines in the named `.c` files;
@@ -24,7 +26,7 @@ behavior. This is a recommended sequence, not one large rewrite per table row.
 | Order | Module or related group | Current C size | Complexity and scope |
 | --- | --- | --- | --- |
 | 1 | Text cleanup/search: `dobra`, `limpa`, `buscanorm` | 66 + 277 + 112 = **455** | Low to medium: migrated; original source counts before adapters. |
-| 2 | JSON reading/writing: `js`, `jsw` | 347 + 149 = **496** | Medium, broad reach: preserve tolerant reading, escaped Unicode, numeric behavior and writer ownership. Migrate the reader and writer as separate substeps in one milestone. |
+| 2 | JSON reading/writing: `js`, `jsw` | 347 + 149 = **496** | Medium, broad reach: preserve tolerant reading, escaped Unicode, numeric behavior and writer ownership. Reader migrated; writer pending as the next separate substep. |
 | 3 | Stream models/parsing/filtering: `stream_parse`, `naovideo`, badge detection | **425** plus extracted logic from the 391-line `badges` module | Medium: nested fields, exact byte sizes, proxy headers, torrent IDs and returned-record ownership. Retain badge drawing in C. |
 | 4 | Audio codec/channel labels: `audioinfo` | **64** | Low: pure formatting/tables; can accompany stream metadata work. Does not replace the native audio pipeline. |
 | 5 | Catalog/Continue Watching ordering: `catordem`, `catordemcache`, `cwordem` | 385 + 93 + 190 = **668** | Medium: ties, timestamps, caches and shared state. Group the ordering rules; validate storage changes separately. |

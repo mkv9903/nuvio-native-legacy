@@ -5,6 +5,53 @@
 #include <stdio.h>
 #include <math.h>
 
+#ifdef NV_RUST_CORE
+#include "rust_core.h"
+
+/* Match the GNU libc date-conversion ABI used by the Rust reader. */
+_Static_assert(sizeof(struct tm) == (sizeof(void *) == 8 ? 56 : 44), "GNU tm layout");
+_Static_assert(offsetof(struct tm, tm_isdst) == 32, "GNU tm integer fields");
+_Static_assert(_Alignof(struct tm) == _Alignof(long), "GNU tm alignment");
+_Static_assert(sizeof(time_t) == sizeof(long), "native time_t width");
+
+const char *js_fim(const char *input) { return nuvio_rust_json_end(input); }
+int js_tem(const char *start, const char *end, const char *key) {
+  return nuvio_rust_json_has(start, end, key);
+}
+int js_cadeia(const char *input, char *output, size_t capacity) {
+  return nuvio_rust_json_string(input, output, capacity);
+}
+int js_texto(const char *start, const char *end, const char *key,
+             char *output, size_t capacity) {
+  return nuvio_rust_json_text(start, end, key, output, capacity, 0);
+}
+int js_texto_linhas(const char *start, const char *end, const char *key,
+                    char *output, size_t capacity) {
+  return nuvio_rust_json_text(start, end, key, output, capacity, NUVIO_RUST_JSON_KEEP_LINES);
+}
+double js_num(const char *start, const char *end, const char *key, double fallback) {
+  return nuvio_rust_json_number(start, end, key, fallback);
+}
+const char *js_array(const char *start, const char *end, const char *key) {
+  return nuvio_rust_json_array(start, end, key);
+}
+const char *js_prox(const char *previous_end) { return nuvio_rust_json_next(previous_end); }
+const char *js_raiz_array(const char *body) { return nuvio_rust_json_root_array(body); }
+int js_bruto(const char *start, const char *end, const char *key,
+             char *output, size_t capacity) {
+  return nuvio_rust_json_raw(start, end, key, output, capacity);
+}
+long long js_ms_iso(const char *input) { return nuvio_rust_json_iso_ms(input); }
+int js_texto_raiz(const char *body, const char *key, char *output, size_t capacity) {
+  return nuvio_rust_json_text(body, NULL, key, output, capacity, NUVIO_RUST_JSON_ROOT_ONLY);
+}
+int js_texto_raiz_em(const char *start, const char *end, const char *key,
+                     char *output, size_t capacity) {
+  return nuvio_rust_json_text(start, end, key, output, capacity, NUVIO_RUST_JSON_ROOT_ONLY);
+}
+
+#else
+
 static const char *pula(const char *p) {
   while (*p && (unsigned char)*p <= ' ') p++;
   return p;
@@ -345,3 +392,4 @@ int js_texto_raiz_em(const char *ini, const char *fim, const char *chave,
   }
   return 0;
 }
+#endif

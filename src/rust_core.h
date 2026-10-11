@@ -64,4 +64,30 @@ int32_t nuvio_rust_search_codepoints(const char *input);
 /* buffer is writable through length inclusive; length is its current byte
  * length. Delete the final character in place; return the new length. Null = 0. */
 size_t nuvio_rust_search_delete_last(char *buffer, size_t length);
+
+/* Tolerant JSON reader, matching js.h. No allocation or pointer retention.
+ * start/end: readable range in one allocation; end must be >= start. A null
+ * end means NUL-terminated input. Explicit ranges need no NUL terminator.
+ * key and standalone strings are NUL-terminated bytes. Null inputs fail.
+ * Output owns capacity bytes, including NUL, and must not overlap inputs.
+ * Null/zero-capacity output writes nothing. Returned pointers borrow input.
+ * General text/raw failures preserve output; root text clears it on valid
+ * non-null arguments. Empty decoded strings write NUL and return 0. Decoded
+ * text retains only the fitting prefix; raw JSON must fit in full.
+ * Native strtod/sscanf/timegm preserve GNU runtime conversion/date behavior. */
+#define NUVIO_RUST_JSON_KEEP_LINES 1u
+#define NUVIO_RUST_JSON_ROOT_ONLY 2u
+const char *nuvio_rust_json_end(const char *input);
+int32_t nuvio_rust_json_has(const char *start, const char *end, const char *key);
+int32_t nuvio_rust_json_text(const char *start, const char *end, const char *key,
+                           char *output, size_t capacity, uint32_t flags);
+int32_t nuvio_rust_json_string(const char *input, char *output, size_t capacity);
+double nuvio_rust_json_number(const char *start, const char *end, const char *key,
+                             double fallback);
+const char *nuvio_rust_json_array(const char *start, const char *end, const char *key);
+const char *nuvio_rust_json_next(const char *previous_end);
+const char *nuvio_rust_json_root_array(const char *body);
+int32_t nuvio_rust_json_raw(const char *start, const char *end, const char *key,
+                          char *output, size_t capacity);
+int64_t nuvio_rust_json_iso_ms(const char *input);
 #endif

@@ -1,6 +1,6 @@
-// js_cadeia: elemento de array JSON com \uXXXX. O caso medido: addon de canal
-// em Python (json.dumps, ensure_ascii padrao) manda "genre":["Not\u00edcias"],
-// e o guia lia "Notu00edcias" — barra comida, escape cru.
+// Standalone JSON strings decode Unicode escapes from channel genre arrays.
+// Python json.dumps defaults to ensure_ascii, so provider Unicode often arrives
+// as escaped text. These multilingual provider values are preserved fixtures.
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
@@ -18,27 +18,27 @@ int main(void) {
   assert(g && js_cadeia(g, b, sizeof b));
   assert(!strcmp(b, "Not\xc3\xad" "cias"));
 
-  g = js_array(meta, NULL, "genres");          // 3 bytes por letra
+  g = js_array(meta, NULL, "genres");          // Three UTF-8 bytes per character
   assert(g && js_cadeia(g, b, sizeof b));
   assert(!strcmp(b, "\xe6\x96\xb0\xe9\x97\xbb"));
 
-  // name e description ja vinham por js_texto; o mesmo decodificador agora
+  // Named and standalone fields share the same decoder
   assert(js_texto(meta, NULL, "name", b, sizeof b));
   assert(!strcmp(b, "Canal \xc3\x81gua"));
   assert(js_texto(meta, NULL, "description", b, sizeof b));
-  assert(!strcmp(b, "Jornalismo 24h \xf0\x9f\x93\xba"));   // par de substitutos
+  assert(!strcmp(b, "Jornalismo 24h \xf0\x9f\x93\xba"));   // Surrogate pair
 
-  // escapes comuns e invalidos
+  // Ordinary and malformed escapes
   assert(js_cadeia("\"a\\\"b\\\\c\\/d\"", b, sizeof b) && !strcmp(b, "a\"b\\c/d"));
   assert(js_cadeia("\"x\\uZZ\"", b, sizeof b) && !strcmp(b, "x ZZ"));
 
-  // corte no meio de um caractere de 2 bytes volta a fronteira
+  // Truncation backs up before a partial two-byte character
   assert(js_cadeia("\"abc\xc3\xad\"", b, 5) && !strcmp(b, "abc"));
 
-  // nao e string
+  // Non-string inputs
   b[0] = 'q';
   assert(!js_cadeia("123", b, sizeof b));
   assert(!js_cadeia(NULL, b, sizeof b));
-  puts("jscadeia: ok");
+  puts("JSON strings: ok");
   return 0;
 }

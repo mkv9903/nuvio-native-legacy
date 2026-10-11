@@ -1,8 +1,8 @@
 #!/bin/bash
-set -eu
+# Explicit ranges, incomplete input, fallback preservation and root lookup.
+set -euo pipefail
 cd "$(dirname "$0")/.."
-DIR=$(mktemp -d /tmp/nuvio-js-limites.XXXXXX)
-trap 'rm -rf "$DIR"' EXIT
-cc -O1 -g -Wall -Wextra -fsanitize=address,undefined -Isrc \
-  src/js.c tests/js_limites.c -o "$DIR/teste"
-"$DIR/teste"
+export SANITIZE="${SANITIZE:-1}"
+source tests/json_helpers_build.sh
+cc "${json_flags[@]}" src/js.c tests/js_limites.c "${json_libraries[@]}" -o "$json_scratch/bounds"
+"$json_scratch/bounds"

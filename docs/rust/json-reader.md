@@ -1,55 +1,149 @@
-# JSON reader migration review
+# JSON reader migration
 
-Status: reviewed C implementation and baseline tests; Rust implementation is
-pending. The next step migrates `src/js.c` while retaining the C JSON writer
-(`jsw`) and existing C callers. The original reader is 347 lines including
-comments/blank lines. This record is a starting audit, not a completed port.
+Status: the Rust Test build now uses the Rust reader through the existing C
+entry points in `src/js.c`. The original C implementation remains unchanged
+under the non-Rust build path. The JSON writer (`src/jsw.c`) remains C and is
+the next substep; account, provider, UI and playback callers remain C.
 
 ## Compatibility boundary
 
-The existing reader is a tolerant byte scanner for known provider/account
-formats rather than a complete JSON parser. Preserve its bounded ranges,
-borrowed input pointers, key lookup, root-only lookup, array iteration, raw
-JSON copying and caller-owned output buffers. Bounded input may have no NUL;
-the explicit end pointer must bound all reads.
+`rust/nuvio-core/src/json_reader.rs` scans the application's known JSON formats.
+It preserves the existing tolerant byte reader rather than introducing a full
+JSON validator or a third-party dependency. All buffers belong to the caller;
+no Rust allocation or retained pointer crosses the ABI. Output buffers must
+not overlap readable input/key buffers. Returned array/container pointers borrow
+the original input.
 
-String decoding handles Unicode escapes and surrogate pairs, ordinary escapes
-and the separate newline-preserving mode. Missing/non-string/truncated fields
-preserve the destination for the general text reader; the root-only reader
-has a different established contract and clears its output. Empty strings and
-insufficient output capacity also need explicit compatibility coverage.
+An explicit `[start,end)` range may contain NUL and need no terminator at its
+end. Every key and standalone input is NUL-terminated. A null range end selects
+the existing NUL-terminated mode. Bounded string, numeric and raw readers never
+read beyond the explicit end. Container-end and array-advance helpers walk only
+the relevant element/prefix: they do not measure the remaining document first.
+This retains linear traversal of account arrays.
 
-Numeric reading accepts quoted ratings, finds usable nested occurrences and
-uses a caller fallback for invalid/non-finite values. Timestamp parsing shares
-UTC milliseconds with account progress ordering. Preserve those contracts and
-validate their platform behavior during migration.
+| Existing C entry point | Rust implementation |
+| --- | --- |
+| `js_fim` | `nuvio_rust_json_end` |
+| `js_tem` | `nuvio_rust_json_has` |
+| `js_cadeia` | `nuvio_rust_json_string` |
+| `js_texto`, `js_texto_linhas` | `nuvio_rust_json_text`, ordinary/keep-lines mode |
+| `js_texto_raiz`, `js_texto_raiz_em` | `nuvio_rust_json_text`, root-only mode |
+| `js_num` | `nuvio_rust_json_number` |
+| `js_array` | `nuvio_rust_json_array` |
+| `js_prox` | `nuvio_rust_json_next` |
+| `js_raiz_array` | `nuvio_rust_json_root_array` |
+| `js_bruto` | `nuvio_rust_json_raw` |
+| `js_ms_iso` | `nuvio_rust_json_iso_ms` |
 
-Use English Rust names/documentation and retain the temporary C entry points.
-Existing malformed-input tolerance must be represented by tests; intentional
-corrections require an explicit expected result and user agreement.
+Public C names and protocol keys remain compatible; Rust names, adapters,
+header documentation and migrated test descriptions are English. Multilingual
+provider values remain valid content. ABI version 1 gains additive functions.
 
-## Baseline and pending truncation decision
+## Preserved tolerant behavior
 
-On October 11, 2026, both baseline scripts passed with C ASan/UBSan:
+General lookup returns the first matching raw key outside quoted values,
+including nested occurrences. Root-only lookup checks depth-one keys in the
+first object. These distinct rules avoid replacing manifest IDs/catalog names
+with nested values. Keys are compared as raw bytes, without decoding escapes.
+
+Missing, non-string or incomplete string values preserve general-reader
+output. Root-only lookup clears output before lookup for valid non-null
+arguments. Empty decoded strings write NUL and return 0; a nonempty fitting
+prefix returns 1. Raw JSON copying preserves output unless the complete value
+fits, including its brackets/braces/string quotes.
+
+Unicode escapes decode to UTF-8, combining valid surrogate pairs. Lone
+surrogates become spaces. Invalid hex emits a space and leaves its hex bytes
+for literal copying, as before. Escaped NUL remains an embedded output NUL.
+Ordinary mode replaces escaped newline/CR/tab with spaces; keep-lines mode
+retains newline, drops CR and substitutes a space for tab. Unknown escapes
+retain their escaped character. Literal malformed UTF-8 retains the original
+byte policy; the previously approved strict search-normalization rule does
+not silently change provider JSON parsing.
+
+Numeric lookup accepts quoted ratings and searches past nonnumeric values
+for another occurrence. It preserves native `strtod` prefix conversion,
+finite-value checks, the 128-byte temporary limit and caller fallbacks.
+Timestamp conversion retains the existing `sscanf` date format and native
+GNU `timegm` calendar normalization/range, including 32-bit `time_t` on the TV.
+It interprets the value as UTC and ignores zone suffixes, as the old reader did;
+this is not a general ISO-8601 offset parser. At most three fractional digits
+are kept. Rust uses these existing libc primitives without a new runtime
+library. C and Rust compile-time checks validate the native `struct tm` layout
+and time width on the current GNU Linux/ARM targets. Other platform adapters
+will require separate validation when cross-platform work begins.
+
+## Approved truncation correction
+
+On October 11, 2026, the user approved keeping only the fitting decoded prefix.
+With capacity 3 (including NUL), C reads `"\u65e5AB"` as `AB`, skipping the
+three-byte character that cannot fit. Rust returns an empty string, matching
+the literal form `"日AB"`. With `"P\u65e5AB"` and capacity 3, Rust returns `P`.
+It stops before the first decoded character that cannot fit instead of copying
+later text. All other established tolerant rules above are retained.
+
+This correction is covered independently of the unchanged C oracle. It is
+not counted as a claim of exact legacy behavior. There is no saved-data or
+provider-protocol migration.
+
+## Reproducible verification
 
 ```sh
-ASAN_OPTIONS=detect_leaks=0 SANITIZE=1 bash tests/jscadeia.sh
-ASAN_OPTIONS=detect_leaks=0 bash tests/js_limites.sh
+ASAN_OPTIONS=detect_leaks=0 SANITIZE=1 bash tests/rust_json_reader.sh
+ASAN_OPTIONS=detect_leaks=0 bash tests/jscadeia.sh --rust
+ASAN_OPTIONS=detect_leaks=0 bash tests/js_limites.sh --rust
 ```
 
-The existing cases cover decoded Unicode/surrogate pairs, quote/backslash/slash
-escapes, incomplete strings/escapes, explicitly bounded non-NUL allocations,
-numeric ranges/quoted values, root versus nested fields, raw copying and
-destination preservation. Carry and translate these cases during the port.
-Add real C/Rust comparisons and appropriate account/provider integration tests.
+The migration retains and translates both existing reader regression suites,
+which run against C and Rust. Four new Rust unit tests exercise decoded
+prefixes, tolerant escapes/embedded NUL, newline handling, root lookup and
+native numeric/date conversion. The complete core currently has 12 Rust unit
+tests, all passing with pinned Rust 1.85.1.
 
-A confirmed C inconsistency needs a user decision before implementation:
-with capacity 3 (including NUL), the valid JSON string `"\u65e5AB"` yields
-`AB`, because the three-byte escaped character cannot fit and is skipped.
-The identical string with the literal character `"日AB"` instead yields an
-empty string, stopping before the incomplete UTF-8 character.
+The direct C/Rust harness passes 293,723,352 assertions/comparisons. It checks
+every Unicode scalar with both implementations at sufficient capacity and
+independently checks fitting prefixes/capacity guards for each scalar. Other
+cases cover every prefix of representative documents, exact-size non-NUL
+allocations, root/nested fields, raw copying, destination preservation,
+embedded NUL, quoted/nested/non-finite/oversized numbers, permissive and
+normalized dates, native 2038 boundaries and 3,000 deterministic malformed
+byte inputs. Explicit ranges also end at a protected memory page, so an
+out-of-range Rust read faults even though Rust is not ASan-instrumented.
+ASan/UBSan instruments the C adapters, reference and consumers; this is not a
+claim of Rust sanitizer instrumentation. Leak detection is disabled for this
+sandbox's tracing limitation.
 
-Recommendation: Rust should stop at the first decoded character that cannot
-fit, retaining the fitting prefix and its NUL rather than copying later text.
-Document this as an intentional correction; keep the other tolerant parsing
-rules unless a separate decision approves changing them. User choice pending.
+Representative existing consumers pass using the actual Rust reader: profile
+selection/persistence across two processes, account library/watched episodes,
+progress sync, Xtream channel/account/EPG parsing, stream metadata and add-on
+installation/export/reload. Their dependencies use the existing test doubles;
+no real account or network is accessed by these tests. Neighboring modules'
+fixtures remain with those modules until their own migration.
+
+The earlier URL suite still passes all 46,786 comparisons and both consumer
+variants. Text helpers still pass 4,611,963 comparisons and their C/Rust
+regressions. Rust formatting, Clippy with warnings denied, ShellCheck and
+whitespace checks pass. Integrated Linux/ARM/package results are recorded
+below after the release build.
+
+## User validation
+
+After pulling `rust-rewrite`, use the account-enabled Linux mode:
+
+```sh
+NUVIO_UI_PREVIEW=0 bash tools/linux.sh --rust-test
+```
+
+Check that your profile and account rows/add-ons load, then open search with
+**F5** (or **Fn+F5**), a title and its sources. Check names, descriptions,
+ratings and multilingual text, including multiline source descriptions.
+Close/relaunch and confirm login/profile state persists. `--preview` skips
+account login/sync and is only the optional sample-content UI mode. Linux
+playback remains stubbed.
+
+The JSON reader also supplies native playback/service responses. A targeted
+TV check of one familiar video, source selection, subtitle list and saved
+resume position is appropriate for this broadly used parser, even though the
+playback pipeline itself has not changed. A full codec/performance matrix is
+not required for this batch. Physical-TV execution of this reader remains
+pending until the user reports it.
