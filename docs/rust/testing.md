@@ -64,32 +64,44 @@ need the same build and physical-TV checks.
 
 ## Linux: test now
 
-From the repository root on a Linux machine with a desktop session:
+For account login and synced rows/add-ons, run from the repository root on a
+Linux machine with a desktop session:
 
 ```bash
-bash tools/linux.sh --rust-test --preview
+NUVIO_UI_PREVIEW=0 bash tools/linux.sh --rust-test
 ```
 
 This compiles and launches the window titled **Nuvio Rust Test - Linux UI
 preview**. It stages clean resources in `build/linux-rust/preview-app/`,
 including public sample catalog/artwork and fonts, excluding developer
-accounts, settings and caches. Preview data defaults to
+accounts, settings and caches. Normal Linux data defaults to
+`${XDG_DATA_HOME:-$HOME/.local/share}/space.mkv.nuvio.rusttest`.
+Sign in separately, select a profile and let account sync load its rows/add-ons.
+`NUVIO_UI_PREVIEW=0` clears any inherited account-free preview setting.
+
+For an optional account-free sample UI check, use:
+
+```bash
+bash tools/linux.sh --rust-test --preview
+```
+
+`--preview` skips login/account sync, so it cannot validate account-backed rows.
+Its default data directory is
 `${XDG_DATA_HOME:-$HOME/.local/share}/nuvio-rust-preview/space.mkv.nuvio.rusttest`.
-The normal login mode, `bash tools/linux.sh --rust-test`, uses
-`${XDG_DATA_HOME:-$HOME/.local/share}/space.mkv.nuvio.rusttest` instead.
+Both modes stub video playback.
 
 For an already-built local executable, skip recompilation:
 
 ```bash
-NUVIO_UI_PREVIEW=1 build/linux-rust/nuvio-rust-test build/linux-rust/preview-app/art
+NUVIO_UI_PREVIEW=0 build/linux-rust/nuvio-rust-test build/linux-rust/preview-app/art
 ```
 
-This direct command uses the runtime's default data directory rather than the
-launcher's preview directory; both are scoped to the test ID.
+This direct command uses the runtime's default test data directory. If you
+normally set a custom data parent, retain that setting for the same local state.
 
 1. Confirm the window opens and text/artwork render. Dismiss first-use dialogs
-   using Back or Enter. If the fresh Home says "No active rows", enable rows
-   in Settings under Home rows.
+   using Back or Enter. In normal mode, sign in and select your profile first.
+   If Home still says "No active rows", check Settings under Home rows.
 2. Use arrows, Enter, Back/Escape and the mouse. Open a title and Settings,
    navigate back, and open the log with F9.
 3. Close/reopen the test app and check that a local setting persists. Confirm

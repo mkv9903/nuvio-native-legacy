@@ -153,12 +153,19 @@ search accented titles, enter/remove non-ASCII characters with the on-screen
 delete key or the desktop **Delete** key, and
 inspect available source names/descriptions for broken symbols or spacing.
 The existing Linux UI maps physical Backspace to Back; this batch retains its
-input handling. Dismiss first-run cards before testing search. Start the preview
-after pulling `rust-rewrite`:
+input handling. Dismiss first-run cards before testing search. For account-backed
+rows, add-ons and source descriptions, use the normal Linux mode after pulling
+`rust-rewrite`:
 
 ```sh
-bash tools/linux.sh --rust-test --preview
+NUVIO_UI_PREVIEW=0 bash tools/linux.sh --rust-test
 ```
+
+Sign in to Rust Test separately, select your profile and let account sync load
+its rows/add-ons. Linux playback remains stubbed. The `--preview` flag is an
+optional account-free mode that skips login/account sync and uses sample UI
+content; it cannot validate account-backed rows. It also uses a different
+default test data directory from normal Linux mode.
 
 No new full TV playback session is required for these helpers. A packaged
 Rust Test IPK accompanies the handoff for an optional TV smoke check.
