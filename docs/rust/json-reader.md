@@ -2,8 +2,8 @@
 
 Status: the Rust Test build now uses the Rust reader through the existing C
 entry points in `src/js.c`. The original C implementation remains unchanged
-under the non-Rust build path. The JSON writer (`src/jsw.c`) remains C and is
-the next substep; account, provider, UI and playback callers remain C.
+under the non-Rust build path. The [JSON writer](json-writer.md) has since
+migrated too; account, provider, UI and playback callers remain C.
 
 ## Compatibility boundary
 
@@ -97,7 +97,7 @@ ASAN_OPTIONS=detect_leaks=0 bash tests/js_limites.sh --rust
 The migration retains and translates both existing reader regression suites,
 which run against C and Rust. Four new Rust unit tests exercise decoded
 prefixes, tolerant escapes/embedded NUL, newline handling, root lookup and
-native numeric/date conversion. The complete core currently has 12 Rust unit
+native numeric/date conversion. The complete core at the reader milestone had 12 Rust unit
 tests, all passing with pinned Rust 1.85.1.
 
 The direct C/Rust harness passes 293,723,352 assertions/comparisons. It checks
@@ -156,7 +156,7 @@ Rust Test**), executable permissions, current binary hash, full module marker,
 metadata and Rust notices match. No account/settings files, sample catalog/art
 or developer symbols are packaged. The root IPK filename replaces the earlier
 text-batch artifact; the source commit, hashes and symbol archive identify
-this reader build. Local generated evidence is under `build/rust/validation/`
+this historical reader build, now superseded by the writer IPK. Local evidence is under `build/rust/validation/`
 and ignored by Git. Physical-TV execution remains pending.
 
 ## User validation
@@ -180,3 +180,7 @@ resume position is appropriate for this broadly used parser, even though the
 playback pipeline itself has not changed. A full codec/performance matrix is
 not required for this batch. Physical-TV execution of this reader remains
 pending until the user reports it.
+
+On October 11, 2026, the user reported that the Linux test looked fine and
+authorized the writer substep. No individual test results or new TV log were
+provided; physical-TV reader validation remains pending.

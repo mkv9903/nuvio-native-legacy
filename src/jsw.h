@@ -1,55 +1,53 @@
-// Escrita de JSON. O js.c le; este escreve.
-//
-// Nasceu com o sync: todo push do Supabase manda um array de objetos, e montar
-// isso com snprintf e como o app faria ate agora significa errar o escape na
-// primeira vez que um titulo tiver aspas ou uma barra invertida — e o servidor
-// recusa o corpo inteiro, nao a linha ruim. Um escritor de 100 linhas custa
-// menos que depurar um push que falha so para alguns usuarios.
-//
-// A virgula e automatica: quem escreve so diz "abre objeto, chave, valor". O
-// erro classico de montar JSON a mao e a virgula sobrando no ultimo elemento,
-// e ele desaparece quando ninguem escreve virgula.
+// Shared JSON writing with automatic separators and escaped string values.
+// Rust Test delegates emission to Rust; existing C entry points/layout remain.
 #ifndef NV_JSW_H
 #define NV_JSW_H
 #include <stddef.h>
 
-#define JSW_PROF 16   // profundidade maxima de aninhamento
+#define JSW_PROF 16   // Maximum nesting depth; retained compatibility name.
 
-typedef struct {
+// Caller-owned context. Legacy field names retain layout compatibility with
+// existing C callers; Rust uses buffer/length/capacity/error/depth/first.
+// Initialize before use, free before reinitializing a live context, and never
+// copy a live context by value: its native buffer has a single owner.
+typedef struct Jsw {
   char  *p;
   size_t n, cap;
-  int    erro;                 // 1 depois de qualquer falha; o resto vira no-op
-  int    prof;
-  char   primeiro[JSW_PROF];   // 1 enquanto o nivel atual nao tem elemento
+  int    erro;                 // Sticky error: no further output is emitted.
+  int    prof;                 // Depth bookkeeping retains the legacy rules.
+  char   primeiro[JSW_PROF];   // Whether the current level has no element yet.
 } Jsw;
 
-void jsw_iniciar(Jsw *w);
-void jsw_livre(Jsw *w);
+void jsw_iniciar(Jsw *writer);
+void jsw_livre(Jsw *writer);   // Free/reset; repeating this is valid.
 
-// Texto pronto (0 em falha). O buffer continua sendo do escritor: copie ou use
-// antes de jsw_livre.
-const char *jsw_texto_final(const Jsw *w);
+// Borrowed NUL-terminated output, or NULL for absent/failed output. Mutation
+// and free invalidate the result. May be wiped before free for password bodies.
+const char *jsw_texto_final(const Jsw *writer);
 
-void jsw_obj_ini(Jsw *w);
-void jsw_obj_fim(Jsw *w);
-void jsw_arr_ini(Jsw *w);
-void jsw_arr_fim(Jsw *w);
+void jsw_obj_ini(Jsw *writer);
+void jsw_obj_fim(Jsw *writer);
+void jsw_arr_ini(Jsw *writer);
+void jsw_arr_fim(Jsw *writer);
 
-// Chave dentro de um objeto. O proximo jsw_* escreve o valor dela.
-void jsw_chave(Jsw *w, const char *nome);
+// Write a key, with null meaning an empty key. The next operation writes its
+// value without a second separator. This API does not validate JSON structure.
+void jsw_chave(Jsw *writer, const char *key);
 
-void jsw_str(Jsw *w, const char *s);     // string com escape; NULL vira null
-void jsw_int(Jsw *w, long long v);
-void jsw_bool(Jsw *w, int v);
-void jsw_nulo(Jsw *w);
+// Inputs are NUL-terminated bytes disjoint from the context/output buffer.
+// Strings escape controls, quotes and backslashes; other bytes pass through.
+void jsw_str(Jsw *writer, const char *input);  // Null input emits JSON null.
+void jsw_int(Jsw *writer, long long value);
+void jsw_bool(Jsw *writer, int value);        // Nonzero means true.
+void jsw_nulo(Jsw *writer);
 
-// Valor JSON JA PRONTO (um objeto vindo do servidor, por exemplo). Existe para
-// o credential_json das credenciais, que o app repassa sem interpretar.
-void jsw_bruto(Jsw *w, const char *json);
+// Forward already-serialized JSON, including unknown credential fields.
+// No validation or escaping; null/empty input emits JSON null.
+void jsw_bruto(Jsw *writer, const char *json);
 
-// Atalhos de par chave/valor, que e o que quase todo chamador quer.
-void jsw_cs(Jsw *w, const char *chave, const char *valor);
-void jsw_ci(Jsw *w, const char *chave, long long valor);
-void jsw_cb(Jsw *w, const char *chave, int valor);
+// Key/value convenience operations.
+void jsw_cs(Jsw *writer, const char *key, const char *value);
+void jsw_ci(Jsw *writer, const char *key, long long value);
+void jsw_cb(Jsw *writer, const char *key, int value);
 
 #endif

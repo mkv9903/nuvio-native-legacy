@@ -3,6 +3,45 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef NV_RUST_CORE
+#include "rust_core.h"
+
+/* Shared storage layout: Rust emits into a native buffer owned by this Jsw. */
+_Static_assert(JSW_PROF == 16, "writer depth limit");
+_Static_assert(sizeof(Jsw) == (sizeof(void *) == 8 ? 48 : 36), "writer size");
+_Static_assert(_Alignof(Jsw) == _Alignof(void *), "writer alignment");
+_Static_assert(offsetof(Jsw, p) == 0, "writer buffer offset");
+_Static_assert(offsetof(Jsw, n) == sizeof(void *), "writer length offset");
+_Static_assert(offsetof(Jsw, cap) == sizeof(void *) * 2, "writer capacity offset");
+_Static_assert(offsetof(Jsw, erro) == sizeof(void *) * 3, "writer error offset");
+_Static_assert(offsetof(Jsw, prof) == sizeof(void *) * 3 + 4, "writer depth offset");
+_Static_assert(offsetof(Jsw, primeiro) == sizeof(void *) * 3 + 8, "writer flags offset");
+
+void jsw_iniciar(Jsw *writer) { nuvio_rust_json_writer_init(writer); }
+void jsw_livre(Jsw *writer) { nuvio_rust_json_writer_free(writer); }
+const char *jsw_texto_final(const Jsw *writer) { return nuvio_rust_json_writer_finish(writer); }
+void jsw_obj_ini(Jsw *writer) { nuvio_rust_json_writer_open(writer, '{'); }
+void jsw_obj_fim(Jsw *writer) { nuvio_rust_json_writer_close(writer, '}'); }
+void jsw_arr_ini(Jsw *writer) { nuvio_rust_json_writer_open(writer, '['); }
+void jsw_arr_fim(Jsw *writer) { nuvio_rust_json_writer_close(writer, ']'); }
+void jsw_chave(Jsw *writer, const char *key) { nuvio_rust_json_writer_key(writer, key); }
+void jsw_str(Jsw *writer, const char *input) { nuvio_rust_json_writer_string(writer, input); }
+void jsw_int(Jsw *writer, long long value) { nuvio_rust_json_writer_integer(writer, value); }
+void jsw_bool(Jsw *writer, int value) { nuvio_rust_json_writer_boolean(writer, value); }
+void jsw_nulo(Jsw *writer) { nuvio_rust_json_writer_null(writer); }
+void jsw_bruto(Jsw *writer, const char *input) { nuvio_rust_json_writer_raw(writer, input); }
+void jsw_cs(Jsw *writer, const char *key, const char *value) {
+  jsw_chave(writer, key); jsw_str(writer, value);
+}
+void jsw_ci(Jsw *writer, const char *key, long long value) {
+  jsw_chave(writer, key); jsw_int(writer, value);
+}
+void jsw_cb(Jsw *writer, const char *key, int value) {
+  jsw_chave(writer, key); jsw_bool(writer, value);
+}
+
+#else
+
 static void por(Jsw *w, const char *s, size_t n) {
   if (w->erro || !s) return;
   if (w->n + n + 1 > w->cap) {
@@ -147,3 +186,4 @@ void jsw_cb(Jsw *w, const char *chave, int valor) {
   jsw_chave(w, chave);
   jsw_bool(w, valor);
 }
+#endif

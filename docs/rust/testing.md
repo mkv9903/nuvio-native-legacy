@@ -155,7 +155,7 @@ The expected line on both platforms is:
 
 ```text
 [rust-core] app=space.mkv.nuvio.rusttest ABI=1 probe=PASS status=0 checks=7 checksum=522240
-[rust-core] modules=addon-url,stylized,text-cleanup,search-normalization,json-reader
+[rust-core] modules=addon-url,stylized,text-cleanup,search-normalization,json-reader,json-writer
 ```
 
 Use the red remote button or Settings > About and help > View the log on
@@ -179,4 +179,5 @@ truncating their files rather than removing them.
 Report the TV model/firmware, whether the probe passed, which check failed,
 and the test log/startup/crash details if relevant. Current core migration and
 its automated checks are recorded in [add-on URL helpers](addon-url.md),
-[text helpers](text-helpers.md) and the [JSON reader](json-reader.md).
+[text helpers](text-helpers.md), [JSON reader](json-reader.md) and
+[JSON writer](json-writer.md).

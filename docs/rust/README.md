@@ -25,6 +25,8 @@ Work branch: `rust-rewrite`, created from `main` at
   local search, the approved malformed UTF-8 correction and compatibility tests.
 - [JSON reader](json-reader.md): migrated tolerant scanning, C ABI, the approved
   Unicode-escape truncation fix and account/provider compatibility tests.
+- [JSON writer](json-writer.md): compatible native-buffer ownership, escaping,
+  allocation-failure coverage and account/sync/authentication consumers.
 - [Existing LG rendering research](../ux-render-lg.md): useful interaction,
   performance, and device validation requirements. Historical proposals need
   checking against the current LG-only fork.

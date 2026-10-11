@@ -90,4 +90,29 @@ const char *nuvio_rust_json_root_array(const char *body);
 int32_t nuvio_rust_json_raw(const char *start, const char *end, const char *key,
                           char *output, size_t capacity);
 int64_t nuvio_rust_json_iso_ms(const char *input);
+
+/* JSON writer: initialized caller-owned Jsw storage with the layout in jsw.h.
+ * init accepts uninitialized storage that owns no live buffer; free releases
+ * the buffer and resets storage, and may be repeated. Other calls require an
+ * initialized context exclusively accessible for mutation. Null contexts are
+ * accepted without writing; finish returns null for absent/failed output.
+ * Native realloc/free own the output buffer; Rust exports no Rust allocation.
+ * Inputs are NUL-terminated bytes, disjoint from the context and its buffer.
+ * Returned output is borrowed until mutation/free. A caller may wipe its
+ * bytes before free, matching the existing password-body cleanup contract.
+ * String controls are escaped; non-ASCII/raw JSON bytes are preserved.
+ * Maximum depth is 16; error is sticky until free/init. No JSON validation.
+ * No exceptions/unwinding cross the ABI; no input pointer is retained. */
+struct Jsw;
+void nuvio_rust_json_writer_init(struct Jsw *writer);
+void nuvio_rust_json_writer_free(struct Jsw *writer);
+const char *nuvio_rust_json_writer_finish(const struct Jsw *writer);
+void nuvio_rust_json_writer_open(struct Jsw *writer, uint8_t delimiter);
+void nuvio_rust_json_writer_close(struct Jsw *writer, uint8_t delimiter);
+void nuvio_rust_json_writer_key(struct Jsw *writer, const char *key);
+void nuvio_rust_json_writer_string(struct Jsw *writer, const char *input);
+void nuvio_rust_json_writer_integer(struct Jsw *writer, int64_t value);
+void nuvio_rust_json_writer_boolean(struct Jsw *writer, int32_t value);
+void nuvio_rust_json_writer_null(struct Jsw *writer);
+void nuvio_rust_json_writer_raw(struct Jsw *writer, const char *input);
 #endif

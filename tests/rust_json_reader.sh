@@ -20,8 +20,8 @@ for name in jscadeia js_limites; do
   bash "tests/$name.sh" --rust
 done
 
-# Neighboring modules retain their existing fixtures and C writer. Network and
-# disk dependencies are supplied by the tests; no actual account is accessed.
+# Neighboring modules retain their existing fixtures; Rust Test now exercises
+# both JSON modules. Network/disk doubles avoid accessing any real account.
 consumer_flags=(-O1 -g -Isrc -std=gnu11 -DNV_RUST_CORE=1 -Wall -Wno-deprecated-declarations)
 if [ "${SANITIZE:-0}" = 1 ]; then consumer_flags+=('-fsanitize=address,undefined' -fno-omit-frame-pointer); fi
 cc "${consumer_flags[@]}" src/profiles.c src/js.c src/jsw.c tests/perfilsel.c "${libraries[@]}" -o "$json_scratch/profiles"

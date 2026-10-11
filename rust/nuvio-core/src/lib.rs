@@ -1,9 +1,10 @@
 //! Rust application core, called by the existing C UI through a bounded C ABI.
 //!
-//! URL, text and JSON readers are migrated; the probe validates the hybrid build.
+//! URL, text and JSON helpers are migrated; the probe validates the hybrid build.
 
 mod addon_url;
 mod json_reader;
+mod json_writer;
 mod search_normalization;
 mod stylized;
 mod text_cleanup;
