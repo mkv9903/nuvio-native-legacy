@@ -69,9 +69,21 @@ bash tools/arm.sh --build
 bash tools/arm.sh --release --ipk --build
 ```
 
-Packaging requires `ares-package`. Configure server/API values through
-`local.properties` or the variables read by `tools/env.sh`; keep credentials out
-of version control. The SDK includes libass for styled subtitles.
+Packaging requires `ares-package`. Both LG and Linux builds read server/API
+configuration from `local.properties` in the repository root. Create it from
+[local.properties.example](local.properties.example) if you do not already have
+one; the example documents all nine supported properties. Use plain `NAME=value`
+lines without quotes or `export`. The real file is ignored by Git.
+
+The Supabase URL/client key configure account login and sync; the TV login page
+URL enables authorization from a phone. Trakt, Simkl, TMDB and Seekr values are
+optional integration settings. Values are compiled into the executable, so
+rebuild after changing them. To read a different configuration file, set
+`NUVIO_PROPERTIES=/absolute/path/local.properties` when running either build
+script. Individual property values exported in the shell are not read by
+`tools/env.sh`. App version comes from `deploy/app/appinfo.json`.
+
+The SDK includes libass for styled subtitles.
 See the [installation guide](INSTALL.md).
 
 webOS builds default to release mode: the app and subtitle libraries are optimized

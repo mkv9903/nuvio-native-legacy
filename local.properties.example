@@ -1,0 +1,48 @@
+# Build-time configuration for both LG webOS and Linux.
+# Copy to local.properties in the repository root if you do not already have one.
+# local.properties is ignored by Git. This example contains no credentials.
+#
+# Format: NAME=value, without quotes, spaces around '=', or 'export'.
+# Put comments on separate lines. Leave optional values empty when unused.
+# Values are compiled into the executable; rebuild after changing them.
+# Use NUVIO_PROPERTIES=/absolute/path/local.properties to read a different file.
+
+# Account backend and TV login
+# Configure these for normal account use; Linux --preview can run without them.
+# Supabase project base URL, for example https://your-project.supabase.co.
+# The project must provide the app's account/authentication and sync APIs.
+NUVIO_SUPABASE_URL=
+
+# Public Supabase anon/client key for the project specified above.
+NUVIO_SUPABASE_ANON_KEY=
+
+# Full URL of the TV login web page opened on a phone to authorize the TV.
+# This page must use the same account backend.
+TV_LOGIN_WEB_BASE_URL=
+
+# Optional Trakt integration
+# Application client ID for Trakt API requests and account linking.
+TRAKT_CLIENT_ID=
+
+# Application client secret for device-code login and token refresh.
+TRAKT_CLIENT_SECRET=
+
+# Optional Simkl integration
+# Application client ID for Simkl API requests and account linking.
+SIMKL_CLIENT_ID=
+
+# Application name sent to Simkl. Empty uses the existing 'nuvio' fallback.
+SIMKL_APP_NAME=
+
+# Optional TMDB metadata and artwork
+# Use the 32-character API v3 key for cast, title details, trailers and artwork.
+# A valid key saved in the user's account can override this package default.
+TMDB_API_KEY=
+
+# Optional Seekr timeline preview thumbnails
+# A personal key entered in Settings overrides this package default.
+SEEKR_API_KEY=
+
+# App version is read from deploy/app/appinfo.json, not from this file.
+# Build/deployment switches such as NUVIO_TV_IP and NUVIO_SDK_IMAGE are shell
+# environment variables; they are not properties read from this file.
