@@ -1,3 +1,14 @@
+// Rust Test adapter; retain the original C implementation as a reference.
+#include "limpa.h"
+#ifdef NV_RUST_CORE
+#include "rust_core.h"
+size_t nv_limpar_texto(const char *input, char *output, size_t capacity, int flags) {
+  return nuvio_rust_text_cleanup(input, output, capacity, flags);
+}
+size_t nv_aparar_separadores(char *buffer) {
+  return nuvio_rust_text_trim_separators(buffer);
+}
+#else
 // Ver limpa.h.
 #include "limpa.h"
 #include "dobra.h"
@@ -275,3 +286,5 @@ size_t nv_aparar_separadores(char *s) {
   *w = 0;
   return (size_t)(w - s);
 }
+
+#endif

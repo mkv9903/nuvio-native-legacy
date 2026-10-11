@@ -1,9 +1,9 @@
 #!/bin/bash
-# #144: texto de addon (emoji, bandeiras, versalete, matematicas...) sai so com
-# glifos da Inter embarcada. Ver tests/limpa.c.
-#   bash tests/limpa.sh
-set -eu
+# Bundled-font corpus, separators and UTF-8 truncation (#144).
+set -euo pipefail
 cd "$(dirname "$0")/.."
-python3 tools/glifos.py > /tmp/nuvio-limpa-inter.txt
-cc src/limpa.c src/dobra.c tests/limpa.c -Isrc -o /tmp/nuvio-limpa-tests -O1 -g -std=c11 -Wall -Wextra -fsanitize=address,undefined
-/tmp/nuvio-limpa-tests /tmp/nuvio-limpa-inter.txt tests/limpa_corpus.txt
+: "${SANITIZE:=1}"
+source tests/text_helpers_build.sh
+python3 tools/glifos.py > "$text_scratch/inter.txt"
+cc "${text_flags[@]}" src/limpa.c src/dobra.c tests/limpa.c "${text_libraries[@]}" -o "$text_scratch/test"
+"$text_scratch/test" "$text_scratch/inter.txt" tests/limpa_corpus.txt

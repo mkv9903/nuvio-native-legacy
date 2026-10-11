@@ -106,8 +106,9 @@ a full playback session is not required before the next bounded logic port.
 Repeat targeted TV testing for new runtime facilities/dependencies, networking,
 threading, storage/lifecycle, remote input, rendering or native playback changes.
 
-New builds print `[rust-core] modules=addon-url` after the startup probe so a
-Linux or TV log can distinguish this migration from the earlier probe-only IPK.
+Builds list `addon-url` in the `[rust-core] modules=...` line after the startup
+probe. The current list also includes the [text helper batch](text-helpers.md),
+so a Linux or TV log can distinguish migrations from the probe-only IPK.
 The previous package is retained locally under
 `build/rust/validation/initial-bridge/`; the root Rust Test IPK is the current
 iteration. Both use the same isolated test ID, separate from production.

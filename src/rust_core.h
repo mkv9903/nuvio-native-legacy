@@ -43,4 +43,25 @@ int32_t nuvio_rust_addon_id(char *output, size_t capacity, const char *input);
  * Truncated requests are emptied. Never send them to a provider. */
 int32_t nuvio_rust_addon_request(char *output, size_t capacity, const char *base,
                                const char *path, int32_t formatted_length);
+
+/* Text helpers: no allocation, I/O, threads or retained pointers.
+ * Strings are NUL-terminated bytes; null input means empty. Outputs are
+ * caller-owned. Null/zero-capacity output writes nothing. Capacity includes
+ * the NUL. Cleanup and search truncate before a complete output character.
+ * Cleanup inputs/outputs must not overlap. Search permits exact in-place
+ * normalization; partial overlap is unsupported. Invalid UTF-8 bytes drop
+ * during cleanup and become spaces during search. Valid content retains the
+ * original font, accent, case, flag/language and separator rules. */
+char nuvio_rust_fold_stylized_character(unsigned long codepoint);
+size_t nuvio_rust_text_cleanup(const char *input, char *output, size_t capacity,
+                              int32_t flags);
+/* In-place, readable/writable NUL-terminated buffer; never grows. Null = 0. */
+size_t nuvio_rust_text_trim_separators(char *buffer);
+void nuvio_rust_search_normalize(const char *input, char *output, size_t capacity);
+/* Counts non-continuation bytes, including for malformed input. Count must
+ * fit int32_t; null = 0. */
+int32_t nuvio_rust_search_codepoints(const char *input);
+/* buffer is writable through length inclusive; length is its current byte
+ * length. Delete the final character in place; return the new length. Null = 0. */
+size_t nuvio_rust_search_delete_last(char *buffer, size_t length);
 #endif

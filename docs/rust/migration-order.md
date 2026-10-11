@@ -1,6 +1,6 @@
 # Core migration order and test policy
 
-The next recommended batch is **text cleanup and search normalization**:
+The second migrated batch is **text cleanup and search normalization**:
 `dobra.c`, `limpa.c` and `buscanorm.c`. They total 455 lines in the current C
 source, have existing focused tests and require no network, storage, SDL or GL.
 They provide useful foundations for the later source/metadata flow without
@@ -8,8 +8,11 @@ introducing another Rust dependency.
 
 The current C baseline passes `tests/dobra.sh`, `tests/buscanorm.sh` and
 `tests/limpa.sh` (the latter with `ASAN_OPTIONS=detect_leaks=0` for the sandbox).
-Those results establish the starting behavior; this text group has not yet
-been ported to Rust.
+Those results established the starting behavior. This group is now ported to
+Rust with its translated tests, eight Rust unit cases and 4,611,963 comparisons;
+see [the module record](text-helpers.md). The user approved strict invalid UTF-8
+handling in search; all valid text retains the original rules.
+The next recommended milestone is JSON reading/writing, starting with the reader.
 
 The following inventory was inspected on October 11, 2026, after the add-on
 URL port. Counts include comments and blank lines in the named `.c` files;
@@ -20,7 +23,7 @@ behavior. This is a recommended sequence, not one large rewrite per table row.
 
 | Order | Module or related group | Current C size | Complexity and scope |
 | --- | --- | --- | --- |
-| 1 | Text cleanup/search: `dobra`, `limpa`, `buscanorm` | 66 + 277 + 112 = **455** | Low to medium: Unicode/buffer edges; good next batch. |
+| 1 | Text cleanup/search: `dobra`, `limpa`, `buscanorm` | 66 + 277 + 112 = **455** | Low to medium: migrated; original source counts before adapters. |
 | 2 | JSON reading/writing: `js`, `jsw` | 347 + 149 = **496** | Medium, broad reach: preserve tolerant reading, escaped Unicode, numeric behavior and writer ownership. Migrate the reader and writer as separate substeps in one milestone. |
 | 3 | Stream models/parsing/filtering: `stream_parse`, `naovideo`, badge detection | **425** plus extracted logic from the 391-line `badges` module | Medium: nested fields, exact byte sizes, proxy headers, torrent IDs and returned-record ownership. Retain badge drawing in C. |
 | 4 | Audio codec/channel labels: `audioinfo` | **64** | Low: pure formatting/tables; can accompany stream metadata work. Does not replace the native audio pipeline. |

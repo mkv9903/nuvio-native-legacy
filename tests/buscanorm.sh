@@ -1,8 +1,7 @@
 #!/bin/bash
-# Normalizacao da busca: latino, romeno, cirilico, UTF-8 (tests/buscanorm.c).
-#
-#   bash tests/buscanorm.sh
-set -eu
+# Local search folding, UTF-8 boundaries and backspace (#176).
+set -euo pipefail
 cd "$(dirname "$0")/.."
-cc tests/buscanorm.c src/buscanorm.c -Isrc -o /tmp/nuvio-buscanorm-tests -O1 -g -Wall -Wextra
-/tmp/nuvio-buscanorm-tests
+source tests/text_helpers_build.sh
+cc "${text_flags[@]}" tests/buscanorm.c src/buscanorm.c "${text_libraries[@]}" -o "$text_scratch/test"
+"$text_scratch/test"

@@ -611,7 +611,7 @@ int main(int argc, char **argv) {
          rustStatus, rustProbe.checks, (unsigned long long)rustProbe.checksum);
   fflush(stdout);
   if (!rustPassed) return 1;
-  printf("[rust-core] modules=addon-url\n");
+  printf("[rust-core] modules=addon-url,stylized,text-cleanup,search-normalization\n");
   fflush(stdout);
 #endif
   negcache_disco(dados_ler, dados_gravar_leve);   // 404 de API de metadados lembrado entre arranques

@@ -143,7 +143,7 @@ The expected line on both platforms is:
 
 ```text
 [rust-core] app=space.mkv.nuvio.rusttest ABI=1 probe=PASS status=0 checks=7 checksum=522240
-[rust-core] modules=addon-url
+[rust-core] modules=addon-url,stylized,text-cleanup,search-normalization
 ```
 
 Use the red remote button or Settings > About and help > View the log on

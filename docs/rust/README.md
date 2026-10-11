@@ -21,6 +21,8 @@ Work branch: `rust-rewrite`, created from `main` at
   map, C adapter, byte/buffer contracts and reproducible parity checks.
 - [Migration order and tests](migration-order.md): measured module sizes,
   dependency-based batches, the next text-helper group and test/translation policy.
+- [Text helpers](text-helpers.md): stylized character folding, provider cleanup,
+  local search, the approved malformed UTF-8 correction and compatibility tests.
 - [Existing LG rendering research](../ux-render-lg.md): useful interaction,
   performance, and device validation requirements. Historical proposals need
   checking against the current LG-only fork.
@@ -92,8 +94,10 @@ runtime facility needs validation rather than assuming full platform support.
 
 `--rust-test` builds **Nuvio Rust Test** (`space.mkv.nuvio.rusttest`) with
 separate data, logs, diagnostics, executables and symbol archives. TV builds
-always stop before deployment. Add-on URL rules are migrated; the broader
-add-on service and C UI remain in place. Broader service bridge contracts, dependency
+always stop before deployment. Add-on URL rules and text/search helpers are
+migrated; the broader add-on service and C UI remain in place. See the
+[text helper record](text-helpers.md) for validation and the approved invalid
+UTF-8 correction. Broader service bridge contracts, dependency
 versions, data migrations and UI redesign remain to be established.
 
 ## Proposed first milestones

@@ -1,6 +1,6 @@
-# Corpus de formatadores de addon (#144). Tres linhas por caso, separadas por
-# linha "--": entrada, saida em UMA linha, saida com \n mantido.
-# Escapes: \n \r \t e \xHH (bytes crus, para UTF-8 invalido).
+# Add-on formatter corpus (#144): input, single-line output, multiline output.
+# Three lines per case, separated by "--".
+# Escapes: \n \r \t and \xHH (raw bytes for malformed UTF-8).
 
 ⚡ 🎞️ 1080p 📦 4.2 GB
 1080p · 4.2 GB

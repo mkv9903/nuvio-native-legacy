@@ -1,8 +1,12 @@
 //! Rust application core, called by the existing C UI through a bounded C ABI.
 //!
-//! Add-on URL rules are migrated; the runtime probe validates the hybrid build.
+//! URL and text helpers are migrated; the probe validates the hybrid build.
 
 mod addon_url;
+mod search_normalization;
+mod stylized;
+mod text_cleanup;
+mod utf8;
 
 use std::ffi::{c_char, CStr};
 use std::fs::{self, OpenOptions};

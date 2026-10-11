@@ -1,3 +1,17 @@
+// Rust Test adapter; retain the original C implementation as a reference.
+#include "buscanorm.h"
+#ifdef NV_RUST_CORE
+#include "rust_core.h"
+void busca_normalizar(const char *input, char *output, size_t capacity) {
+  nuvio_rust_search_normalize(input, output, capacity);
+}
+int busca_codepoints(const char *input) {
+  return nuvio_rust_search_codepoints(input);
+}
+size_t busca_apagar_ultimo(char *buffer, size_t length) {
+  return nuvio_rust_search_delete_last(buffer, length);
+}
+#else
 #include "buscanorm.h"
 #include <string.h>
 
@@ -110,3 +124,5 @@ size_t busca_apagar_ultimo(char *s, size_t n) {
   s[n] = 0;
   return n;
 }
+
+#endif

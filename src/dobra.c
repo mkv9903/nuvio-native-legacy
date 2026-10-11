@@ -1,3 +1,11 @@
+// Rust Test adapter; retain the original C implementation as a reference.
+#include "dobra.h"
+#ifdef NV_RUST_CORE
+#include "rust_core.h"
+char nv_dobra_estilizada(unsigned long codepoint) {
+  return nuvio_rust_fold_stylized_character(codepoint);
+}
+#else
 // Ver dobra.h.
 #include "dobra.h"
 
@@ -64,3 +72,5 @@ char nv_dobra_estilizada(unsigned long cp) {
     if (MODIFICADORA[i].cp == cp) return MODIFICADORA[i].c;
   return 0;
 }
+
+#endif
