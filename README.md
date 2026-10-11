@@ -1,5 +1,13 @@
 # Nuvio Native — personal LG webOS fork
 
+On `rust-rewrite`, development now targets a **standalone Rust app** using
+SDL2 + GLES2, with the existing app's behavior and appearance as references.
+It uses the isolated `space.mkv.nuvio.rusttest` identity. See the
+[active rewrite plan](docs/rust/standalone-rewrite.md). The C application and
+hybrid migration remain historical reference code; the standalone app does
+not link either. Commands for the new project start with
+`bash tools/rust-app.sh`; the legacy build instructions below refer to the C app.
+
 This fork retains the LG webOS app and a Linux desktop preview for testing its UI.
 The native client uses C, SDL2 and GLES2. LG playback uses the TV's media pipeline;
 Linux playback is stubbed.

@@ -1,5 +1,12 @@
 # Rust rewrite
 
+**Active direction:** a [standalone Rust application](standalone-rewrite.md),
+written from scratch using the existing application's behavior and appearance
+as references. The user superseded the C/Rust bridge and module-by-module
+migration on October 11, 2026. The new app is in `standalone/`; it does not link
+the old application C code or `nuvio-core`. The older records below document
+the saved hybrid checkpoint, not the current implementation plan.
+
 Work branch: `rust-rewrite`, created from `main` at
 `eff1a0b9` (app version 2.1.0) on October 11, 2026.
 
