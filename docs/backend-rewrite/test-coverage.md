@@ -14,7 +14,7 @@ account credentials are used by these tests.
 | `perfilsel` profile fields, selection rules, startup cache, PIN outcomes, primary-addon inheritance and logout | `storage`, `service` and `account` profile cases |
 
 All five reference groups passed before integration. The current Rust suite
-passes 117 Rust tests and two native driver tests. Additional coverage includes
+passes 138 Rust tests and two native driver tests. Additional coverage includes
 late replies after cancellation or logout, stale refresh against a new account, disk-write failures, schema identity
 and version validation, isolated storage, private atomic writes, configuration
 key completeness, unverified PIN locks and shared-account owner handling.
@@ -147,3 +147,30 @@ The two native driver tests cover the retained account/profile screen behavior
 and all C/Rust addon view sizes/field offsets. C supplies layout measurements;
 the assertions are in Rust. The app's addon C consumers still need integration;
 these checks are not a manual TV or Linux account/catalog handoff.
+
+## Provider HTTP, catalog titles and private document loading
+
+Twenty-one additional Rust tests cover complete configured resource URLs and
+encoded extras, external redirects without Nuvio headers, oversized bodies and
+HTTP failures; root artwork precedence in both key orders, nested fallback,
+metadata objects, long image URLs/IDs, independent provider/IMDb IDs, root
+movie/series type precedence, English labels and metadata, missing/invalid
+entries, authoritative empties, safe TMDB backdrops, raster logo fallbacks,
+optional numbers, large catalogs, renderer quotas and whole-document syntax.
+
+The cache and loader cases cover private atomic JSON, hashed paths, member,
+owner and selected-profile isolation (including primary-addon inheritance),
+configuration/extras separation, confirmed empties, invalid/cancelled saves,
+corrupt versions/identity/symlinks, ignored legacy files, cleanup, cached values
+before network, same-scope outage fallback, repaired corrupt caches and stale
+responses after a profile round trip. These services are prepared for the C
+integration; they are not yet application runtime paths.
+
+Reference `tests/posterprov.sh` at `f8b4f72a` passes its poster-provider group,
+but its catalog-art driver cannot link normally: unused discovery functions
+reference missing `trakt_e_a_seguir`, `af_tmdb_logo` and
+`af_tmdb_fundo_padrao` helpers. The unchanged original catalog-art assertions
+pass with function/data sections and linker garbage collection, which drops
+those unrelated unused functions. No reference source/assertion was modified.
+Its root/nested artwork, metadata-object and long-URL cases are covered in Rust;
+the active C tests remain until their runtime parsing path is replaced.

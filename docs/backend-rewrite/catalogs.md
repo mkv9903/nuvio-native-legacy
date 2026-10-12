@@ -26,7 +26,7 @@ User-confirmed decisions:
   separately to fit the TV; never silently truncate a provider URL.
 - Read only this rewrite's versioned Rust JSON. Do not import old C caches.
 - Preserve unreadable pending edits and pause synchronization for that scope.
-  Display a valid same-scope cache and block uploads while recovery is pending.
+  Display a valid same-scope cache and block edits and uploads while recovery is pending.
   Retry transient read failures; never silently delete or
   overwrite the journal. A damaged cache alone can be replaced by a valid fetch.
 - Merge pending TV intentions into a newly fetched server list before every
@@ -122,18 +122,48 @@ five minutes while the app supplies frame steps. Only the latest queued profile
 request is retained. Drop detaches during an in-flight request and flushes local
 edits; logout hides state immediately and queues private addon-file cleanup.
 
-One UI behavior remains pending before binding actions: should an unreadable
-journal also block further addon changes, or permit temporary in-memory changes
-that cannot be saved/uploaded until recovery? The prepared backend currently
-blocks changes, and its tests verify that proposed behavior. The user has been
-asked to confirm that rule; it is not yet an application UI change.
+The user also confirmed blocking further addon changes while an unreadable
+journal awaits recovery. The prepared backend and tests enforce that rule;
+binding it to the retained C addon controls is still part of integration.
 
-Manifest/catalog HTTP and cache integration, C
-source/subtitle snapshot access and profile-change publication still need
-implementation. The application still uses the existing C addon
-loading/search data until that integration is complete. This checkpoint does
-not yet fix the profile-switch Home-row issue or remove the application's old
-addon count/URL limits. The new Rust models have no such fixed-buffer limits.
+Catalog title parsing now retains complete IDs, artwork URLs and other strings.
+The user confirmed adapting C consumers to those complete values, including
+related details, playback and cache data access, while keeping their UI design.
+If both a provider ID and an IMDb hint exist, provider requests use the provider
+ID; the IMDb value remains separate for artwork and tracking. A nonempty catalog
+with no usable entries is a failed load, retaining its valid cache. An explicit
+empty list remains authoritative. Mixed lists show their usable entries.
+
+Provider HTTP is isolated from account HTTP and has no account header inputs.
+Configured query/path values survive complete encoded resource URLs. Redirects
+are bounded, bodies are limited to 4 MiB, and catalog/manifest requests have
+8/12-second deadlines. Versioned original JSON documents are stored privately
+under hashed member/owner/selected-profile/provider/resource/extra keys. No C
+binary catalogs are imported. Cache writes reject invalid and cancelled replies;
+network failures can use only that request's own valid cache.
+
+The loader guards account/profile context before/after disk, network and decode
+work. A profile round trip cancels older requests before publication/cache
+replacement. A corrupt cache does not block a fresh valid reply. A valid network
+reply remains usable when caching fails, with a separate storage error.
+
+The pinned `serde_json` adds its `raw_value` feature, with no package-version
+changes. Catalog entries are borrowed as raw JSON and decoded one at a time;
+only the requested renderer quota is materialized. Full domain field lengths
+are independent of that quota. The entire JSON syntax is checked, including
+entries beyond the display quota.
+
+Pending decision: a manifest containing only ID/name and omitting both
+resources and catalogs may be incomplete. The user has been asked whether to
+retain its useful cache and retry, or accept it and remove previous catalog
+declarations. That rule is not yet enforced by the loader.
+
+C addon/source/subtitle access, complete C title-data ownership/access,
+manifest/catalog orchestration and profile-change Home publication still need
+integration. The application still uses the existing C addon/catalog data paths.
+This checkpoint does not yet fix the application profile-switch Home-row issue
+or remove its old count, ID or URL limits. Rust models have no fixed field/count
+limits; request and cache byte budgets remain explicit for TV resources.
 
 Implementation is in progress. This document is not a Linux or TV test handoff.
 The first account flow has user-confirmed Fedora QR and email/password login;

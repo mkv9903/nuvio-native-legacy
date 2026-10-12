@@ -16,3 +16,21 @@ pub struct ContentContext {
     pub addons: AddonScope,
     pub force_primary: bool,
 }
+
+/// Private Home/cache ownership uses the selected profile, even when its
+/// installed-addon list is inherited from the primary profile.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct ContentScope {
+    pub member: String,
+    pub owner: String,
+    pub profile: ProfileId,
+}
+impl From<&ContentContext> for ContentScope {
+    fn from(context: &ContentContext) -> Self {
+        Self {
+            member: context.addons.member.clone(),
+            owner: context.addons.owner.clone(),
+            profile: context.profile,
+        }
+    }
+}

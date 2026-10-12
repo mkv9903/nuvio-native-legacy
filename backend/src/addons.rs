@@ -88,6 +88,34 @@ impl AddonUrl {
         }
         self.append_path(&[resource, media_type, &format!("{id}.json")])
     }
+    pub fn resource_url_with_extras(
+        &self,
+        resource: &str,
+        media_type: &str,
+        id: &str,
+        extras: &[(&str, &str)],
+    ) -> Result<Url> {
+        let mut url = self.resource_url(resource, media_type, id)?;
+        if extras.is_empty() {
+            return Ok(url);
+        }
+        if extras
+            .iter()
+            .any(|(name, value)| name.is_empty() || name.contains('\0') || value.contains('\0'))
+        {
+            return Err(Error::InvalidData);
+        }
+        let encoded = url::form_urlencoded::Serializer::new(String::new())
+            .extend_pairs(extras.iter().copied())
+            .finish()
+            .replace('+', "%20");
+        let path = format!(
+            "{}/{encoded}.json",
+            url.path().strip_suffix(".json").expect("resource suffix")
+        );
+        url.set_path(&path);
+        Ok(url)
+    }
     fn append_path(&self, parts: &[&str]) -> Result<Url> {
         let mut url = Url::parse(self.as_str()).map_err(|_| Error::InvalidData)?;
         let mut path = url.path_segments_mut().map_err(|_| Error::InvalidData)?;

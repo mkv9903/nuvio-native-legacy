@@ -94,7 +94,7 @@ impl Transport for HttpTransport {
     }
 }
 
-fn map_transport_error(error: ureq::Error) -> Error {
+pub(crate) fn map_transport_error(error: ureq::Error) -> Error {
     // Library diagnostics can contain URLs or service text. Keep categories.
     match error {
         ureq::Error::Timeout(_) => Error::Timeout,
