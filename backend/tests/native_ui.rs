@@ -47,6 +47,8 @@ struct PickerState {
 }
 #[link(name = "nuvio_c_ui")]
 extern "C" {
+    fn rust_addons_test_view_size(kind: i32) -> usize;
+    fn rust_addons_test_view_offset(kind: i32, field: usize) -> usize;
     fn account_ui_test_attach(account: *mut c_void);
     fn data_init(directory: *const c_char);
     fn ajustes_dir(directory: *const c_char);
@@ -83,6 +85,66 @@ extern "C" {
     fn tex_novo_quadro();
     fn tex_bombear(count: i32);
     fn tex_encerrar();
+}
+
+#[test]
+fn addon_native_layout_matches_the_c_consumers() {
+    use nuvio_backend::addon_snapshot::{AddonSnapshotView, AddonView, CatalogView};
+    use std::mem::{offset_of, size_of};
+    let layouts = [
+        (
+            size_of::<AddonSnapshotView>(),
+            vec![
+                offset_of!(AddonSnapshotView, revision),
+                offset_of!(AddonSnapshotView, list_revision),
+                offset_of!(AddonSnapshotView, addons),
+                offset_of!(AddonSnapshotView, count),
+                offset_of!(AddonSnapshotView, profile),
+                offset_of!(AddonSnapshotView, addon_profile),
+                offset_of!(AddonSnapshotView, authoritative),
+                offset_of!(AddonSnapshotView, pending),
+                offset_of!(AddonSnapshotView, status),
+                offset_of!(AddonSnapshotView, error),
+            ],
+        ),
+        (
+            size_of::<AddonView>(),
+            vec![
+                offset_of!(AddonView, name),
+                offset_of!(AddonView, base),
+                offset_of!(AddonView, id),
+                offset_of!(AddonView, enabled),
+                offset_of!(AddonView, known),
+                offset_of!(AddonView, catalog),
+                offset_of!(AddonView, stream),
+                offset_of!(AddonView, subtitles),
+                offset_of!(AddonView, metadata),
+                offset_of!(AddonView, silent_queries),
+                offset_of!(AddonView, catalogs),
+                offset_of!(AddonView, catalog_count),
+            ],
+        ),
+        (
+            size_of::<CatalogView>(),
+            vec![
+                offset_of!(CatalogView, id),
+                offset_of!(CatalogView, media_type),
+                offset_of!(CatalogView, name),
+                offset_of!(CatalogView, searchable),
+                offset_of!(CatalogView, requires_search),
+                offset_of!(CatalogView, channel),
+            ],
+        ),
+    ];
+    for (kind, (size, offsets)) in layouts.into_iter().enumerate() {
+        assert_eq!(unsafe { rust_addons_test_view_size(kind as i32) }, size);
+        for (field, offset) in offsets.into_iter().enumerate() {
+            assert_eq!(
+                unsafe { rust_addons_test_view_offset(kind as i32, field) },
+                offset
+            );
+        }
+    }
 }
 #[link(name = "SDL2")]
 extern "C" {

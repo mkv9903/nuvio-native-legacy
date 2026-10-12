@@ -7,7 +7,7 @@ directory="$root/build/backend/native-ui"
 mkdir -p "$directory"
 read -r -a cflags <<< "$(pkg-config --cflags sdl2 SDL2_image SDL2_ttf glesv2 egl zlib)"
 read -r -a libraries <<< "$(pkg-config --libs sdl2 SDL2_image SDL2_ttf glesv2 egl zlib)"
-"${CC:-cc}" -shared -fPIC src/*.c -Isrc -o "$directory/libnuvio_c_ui.so" \
+"${CC:-cc}" -shared -fPIC src/*.c tests/support/rust_addon_views.c -Isrc -o "$directory/libnuvio_c_ui.so" \
   -O1 -g -DNV_LINUX_DESKTOP -DNV_NATIVE_UI_TEST -DNV_PROFILE_PICKER_TEST \
   '-DNV_APP_ID="space.mkv.nuvio.rusttest"' "${cflags[@]}" "${libraries[@]}" -ldl -pthread -lm
 export CARGO_TARGET_DIR="$root/build/backend/ui-target"

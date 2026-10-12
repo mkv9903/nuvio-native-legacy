@@ -19,6 +19,11 @@ impl PartialEq for AddonUrl {
     }
 }
 impl Eq for AddonUrl {}
+impl std::hash::Hash for AddonUrl {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        std::hash::Hash::hash(self.as_str(), state);
+    }
+}
 impl AddonUrl {
     pub fn parse(input: &str) -> Result<Self> {
         let input = input.trim();

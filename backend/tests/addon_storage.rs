@@ -1,5 +1,6 @@
 mod support;
 use nuvio_backend::{
+    addon_edits::AddonChange,
     addon_storage::{AddonEdit, AddonStorage, AddonStore},
     addons::{AddonUrl, InstalledAddon},
     content_context::AddonScope,
@@ -57,7 +58,11 @@ fn fresh_cache_and_edits_round_trip_large_lists_long_urls_and_empty_names() {
     .unwrap();
     let edit = AddonEdit {
         id: Uuid::new_v4(),
-        addons: list.clone(),
+        changes: list
+            .clone()
+            .into_iter()
+            .map(|addon| AddonChange::Install { addon })
+            .collect(),
     };
     store.save_cache(&identity, &list).unwrap();
     store.save_edit(&identity, &edit).unwrap();
@@ -88,7 +93,9 @@ fn account_owner_and_profile_are_isolated_and_paths_never_embed_private_values()
             &original,
             &AddonEdit {
                 id: Uuid::new_v4(),
-                addons: vec![addon("Edit")],
+                changes: vec![AddonChange::Install {
+                    addon: addon("Edit"),
+                }],
             },
         )
         .unwrap();
@@ -109,19 +116,23 @@ fn account_owner_and_profile_are_isolated_and_paths_never_embed_private_values()
 }
 
 #[test]
-fn confirmed_empty_cache_and_empty_pending_removal_are_valid() {
+fn confirmed_empty_cache_and_pending_removal_are_valid() {
     let directory = Directory::new();
     let store = AddonStore::open(&directory.path).unwrap();
     let identity = scope("member", "owner", 1);
     store.save_cache(&identity, &[]).unwrap();
     let edit = AddonEdit {
         id: Uuid::new_v4(),
-        addons: Vec::new(),
+        changes: vec![AddonChange::Remove {
+            url: addon("Removed").url,
+        }],
     };
     store.save_edit(&identity, &edit).unwrap();
     assert_eq!(store.load_cache(&identity).unwrap(), Some(Vec::new()));
     assert_eq!(store.load_edit(&identity).unwrap(), Some(edit.clone()));
-    assert!(store.acknowledge(&identity, edit.id).unwrap());
+    assert!(store
+        .acknowledge(&identity, edit.id, &edit.merge(&[]))
+        .unwrap());
     assert!(store.load_edit(&identity).unwrap().is_none());
     assert_eq!(store.load_cache(&identity).unwrap(), Some(Vec::new()));
 }
@@ -134,14 +145,21 @@ fn acknowledgement_promotes_the_edit_to_cache_before_removing_the_journal() {
     store.save_cache(&identity, &[addon("Before")]).unwrap();
     let edit = AddonEdit {
         id: Uuid::new_v4(),
-        addons: vec![addon("After")],
+        changes: vec![AddonChange::Install {
+            addon: addon("After"),
+        }],
     };
     store.save_edit(&identity, &edit).unwrap();
-    assert!(store.acknowledge(&identity, edit.id).unwrap());
+    assert!(store
+        .acknowledge(&identity, edit.id, &edit.merge(&[]))
+        .unwrap());
     drop(store);
     let restored = AddonStore::open(&directory.path).unwrap();
     assert!(restored.load_edit(&identity).unwrap().is_none());
-    assert_eq!(restored.load_cache(&identity).unwrap(), Some(edit.addons));
+    assert_eq!(
+        restored.load_cache(&identity).unwrap(),
+        Some(edit.merge(&[]))
+    );
 }
 
 #[test]
@@ -153,12 +171,16 @@ fn paired_restore_never_observes_old_cache_with_an_acknowledged_journal_missing(
     writer.save_cache(&identity, &[addon("Before")]).unwrap();
     let edit = AddonEdit {
         id: Uuid::new_v4(),
-        addons: vec![addon("After")],
+        changes: vec![AddonChange::Install {
+            addon: addon("After"),
+        }],
     };
     writer.save_edit(&identity, &edit).unwrap();
     std::thread::scope(|threads| {
         threads.spawn(|| {
-            assert!(writer.acknowledge(&identity, edit.id).unwrap());
+            assert!(writer
+                .acknowledge(&identity, edit.id, &edit.merge(&[]))
+                .unwrap());
         });
         threads.spawn(|| {
             for _ in 0..500 {
@@ -166,7 +188,7 @@ fn paired_restore_never_observes_old_cache_with_an_acknowledged_journal_missing(
                 if state.pending.is_none() {
                     assert_eq!(state.cached.as_ref().unwrap()[0].name, "After");
                 } else {
-                    assert_eq!(state.pending.as_ref().unwrap().addons[0].name, "After");
+                    assert_eq!(state.pending.as_ref().unwrap().merge(&[])[0].name, "After");
                 }
             }
         });
@@ -180,15 +202,21 @@ fn old_acknowledgements_cannot_delete_a_newer_persisted_edit() {
     let identity = scope("member", "owner", 1);
     let first = AddonEdit {
         id: Uuid::new_v4(),
-        addons: vec![addon("First")],
+        changes: vec![AddonChange::Install {
+            addon: addon("First"),
+        }],
     };
     let second = AddonEdit {
         id: Uuid::new_v4(),
-        addons: vec![addon("Second")],
+        changes: vec![AddonChange::Install {
+            addon: addon("Second"),
+        }],
     };
     store.save_edit(&identity, &first).unwrap();
     store.save_edit(&identity, &second).unwrap();
-    assert!(!store.acknowledge(&identity, first.id).unwrap());
+    assert!(!store
+        .acknowledge(&identity, first.id, &first.merge(&[]))
+        .unwrap());
     assert_eq!(store.load_edit(&identity).unwrap(), Some(second));
 }
 
@@ -204,13 +232,17 @@ fn concurrent_independent_store_handles_never_acknowledge_another_revision() {
             &identity,
             &AddonEdit {
                 id: old,
-                addons: vec![addon("Old")],
+                changes: vec![AddonChange::Install {
+                    addon: addon("Old"),
+                }],
             },
         )
         .unwrap();
     let fresh = AddonEdit {
         id: Uuid::new_v4(),
-        addons: vec![addon("Fresh")],
+        changes: vec![AddonChange::Install {
+            addon: addon("Fresh"),
+        }],
     };
     writer.save_edit(&identity, &fresh).unwrap();
     std::thread::scope(|threads| {
@@ -221,7 +253,7 @@ fn concurrent_independent_store_handles_never_acknowledge_another_revision() {
         });
         threads.spawn(|| {
             for _ in 0..300 {
-                assert!(!reader.acknowledge(&identity, old).unwrap());
+                assert!(!reader.acknowledge(&identity, old, &[]).unwrap());
             }
         });
     });
@@ -238,14 +270,16 @@ fn unknown_versions_corrupt_identity_and_invalid_pending_edits_stay_untouched() 
             &identity,
             &AddonEdit {
                 id: Uuid::new_v4(),
-                addons: vec![addon("Valid")],
+                changes: vec![AddonChange::Install {
+                    addon: addon("Valid"),
+                }],
             },
         )
         .unwrap();
     let file = payload_file(&directory, "addons-edit-");
     let original: serde_json::Value = serde_json::from_slice(&fs::read(&file).unwrap()).unwrap();
     for (field, value) in [
-        ("version", json!(2)),
+        ("version", json!(99)),
         ("app_id", json!("production")),
         (
             "scope",
@@ -269,7 +303,7 @@ fn unknown_versions_corrupt_identity_and_invalid_pending_edits_stay_untouched() 
             &identity,
             &AddonEdit {
                 id: Uuid::nil(),
-                addons: Vec::new()
+                changes: Vec::new()
             }
         ),
         Err(Error::InvalidData)
@@ -296,7 +330,9 @@ fn legacy_files_are_ignored_and_logout_clears_only_own_payloads() {
                 &identity,
                 &AddonEdit {
                     id: Uuid::new_v4(),
-                    addons: vec![addon("Edited")],
+                    changes: vec![AddonChange::Install {
+                        addon: addon("Edited"),
+                    }],
                 },
             )
             .unwrap();
@@ -329,7 +365,9 @@ fn symlinked_payloads_are_rejected_and_atomic_writes_do_not_modify_the_target() 
                 &identity,
                 &AddonEdit {
                     id: Uuid::new_v4(),
-                    addons: vec![addon("Valid")],
+                    changes: vec![AddonChange::Install {
+                        addon: addon("Valid"),
+                    }],
                 },
             )
             .unwrap();
@@ -339,16 +377,78 @@ fn symlinked_payloads_are_rejected_and_atomic_writes_do_not_modify_the_target() 
         fs::remove_file(&file).unwrap();
         symlink(&outside, &file).unwrap();
         assert!(store.load_edit(&identity).is_err());
-        assert!(store.acknowledge(&identity, Uuid::new_v4()).is_err());
+        assert!(store.acknowledge(&identity, Uuid::new_v4(), &[]).is_err());
         store
             .save_edit(
                 &identity,
                 &AddonEdit {
                     id: Uuid::new_v4(),
-                    addons: vec![addon("New")],
+                    changes: vec![AddonChange::Install {
+                        addon: addon("New"),
+                    }],
                 },
             )
-            .unwrap();
+            .unwrap_err();
+        assert!(fs::symlink_metadata(&file)
+            .unwrap()
+            .file_type()
+            .is_symlink());
         assert_eq!(fs::read_to_string(outside).unwrap(), "private");
     }
+}
+
+#[test]
+fn compare_and_replace_rejects_stale_writers_and_never_overwrites_unreadable_journals() {
+    let directory = Directory::new();
+    let store = AddonStore::open(&directory.path).unwrap();
+    let identity = scope("member", "owner", 1);
+    let first = AddonEdit::new(AddonChange::Install {
+        addon: addon("First"),
+    });
+    let second = AddonEdit::new(AddonChange::SetEnabled {
+        url: addon("First").url,
+        enabled: false,
+    });
+    assert!(store.replace_edit(&identity, None, &first).unwrap());
+    assert!(!store.replace_edit(&identity, None, &second).unwrap());
+    assert!(!store
+        .replace_edit(&identity, Some(Uuid::new_v4()), &second)
+        .unwrap());
+    assert_eq!(store.load_edit(&identity).unwrap(), Some(first.clone()));
+    assert!(store
+        .replace_edit(&identity, Some(first.id), &second)
+        .unwrap());
+    let file = payload_file(&directory, "addons-edit-");
+    fs::write(&file, "{").unwrap();
+    assert_eq!(
+        store.replace_edit(&identity, Some(second.id), &first),
+        Err(Error::AddonJournalUnreadable)
+    );
+    assert!(store.save_edit(&identity, &first).is_err());
+    assert_eq!(fs::read_to_string(&file).unwrap(), "{");
+}
+
+#[test]
+fn acknowledgement_caches_the_confirmed_merge_including_remote_additions() {
+    let directory = Directory::new();
+    let store = AddonStore::open(&directory.path).unwrap();
+    let identity = scope("member", "owner", 1);
+    let local = addon("Local");
+    let edit = AddonEdit::new(AddonChange::SetEnabled {
+        url: local.url.clone(),
+        enabled: false,
+    });
+    store.save_cache(&identity, &[local.clone()]).unwrap();
+    store.save_edit(&identity, &edit).unwrap();
+    let remote = InstalledAddon {
+        url: AddonUrl::parse("https://phone-added.invalid").unwrap(),
+        name: "Phone".into(),
+        enabled: true,
+    };
+    let confirmed = edit.merge(&[remote.clone(), local]);
+    assert!(store.acknowledge(&identity, edit.id, &confirmed).unwrap());
+    let restored = store.load_state(&identity).unwrap();
+    assert_eq!(restored.cached.as_ref().unwrap()[0], remote);
+    assert_eq!(restored.cached, Some(confirmed));
+    assert!(restored.pending.is_none());
 }

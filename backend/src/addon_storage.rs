@@ -11,15 +11,12 @@ use std::{fmt::Write, path::Path};
 use uuid::Uuid;
 use zeroize::Zeroizing;
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct AddonEdit {
-    pub id: Uuid,
-    pub addons: Vec<InstalledAddon>,
-}
+pub use crate::addon_edits::AddonEdit;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct StoredAddons {
     pub cached: Option<Vec<InstalledAddon>>,
     pub pending: Option<AddonEdit>,
+    pub cache_error: Option<Error>,
 }
 pub trait AddonStorage: Send + Sync {
     fn load_state(&self, scope: &AddonScope) -> Result<StoredAddons>;
@@ -27,7 +24,18 @@ pub trait AddonStorage: Send + Sync {
     fn save_cache(&self, scope: &AddonScope, addons: &[InstalledAddon]) -> Result<()>;
     fn load_edit(&self, scope: &AddonScope) -> Result<Option<AddonEdit>>;
     fn save_edit(&self, scope: &AddonScope, edit: &AddonEdit) -> Result<()>;
-    fn acknowledge(&self, scope: &AddonScope, id: Uuid) -> Result<bool>;
+    fn replace_edit(
+        &self,
+        scope: &AddonScope,
+        expected: Option<Uuid>,
+        edit: &AddonEdit,
+    ) -> Result<bool>;
+    fn acknowledge(
+        &self,
+        scope: &AddonScope,
+        id: Uuid,
+        confirmed: &[InstalledAddon],
+    ) -> Result<bool>;
     fn clear(&self) -> Result<()>;
 }
 #[derive(Serialize, Deserialize)]
@@ -79,14 +87,17 @@ impl AddonStore {
         };
         let envelope: Envelope<T> =
             serde_json::from_slice(&bytes).map_err(|_| Error::InvalidData)?;
-        if envelope.version != 1 || envelope.app_id != TEST_APP_ID || &envelope.scope != scope {
+        if envelope.version != if edit { 2 } else { 1 }
+            || envelope.app_id != TEST_APP_ID
+            || &envelope.scope != scope
+        {
             return Err(Error::InvalidData);
         }
         Ok(Some(envelope.data))
     }
     fn write<T: Serialize + ?Sized>(&self, scope: &AddonScope, edit: bool, data: &T) -> Result<()> {
         let envelope = Envelope {
-            version: 1,
+            version: if edit { 2 } else { 1 },
             app_id: TEST_APP_ID.into(),
             scope: scope.clone(),
             data,
@@ -106,12 +117,21 @@ impl AddonStore {
 impl AddonStorage for AddonStore {
     fn load_state(&self, scope: &AddonScope) -> Result<StoredAddons> {
         self.locked(scope, || {
-            let pending = self.read::<AddonEdit>(scope, true)?;
-            if pending.as_ref().is_some_and(|edit| edit.id.is_nil()) {
-                return Err(Error::InvalidData);
+            let pending = self
+                .read::<AddonEdit>(scope, true)
+                .map_err(|_| Error::AddonJournalUnreadable)?;
+            if let Some(edit) = &pending {
+                edit.validate().map_err(|_| Error::AddonJournalUnreadable)?;
             }
-            let cached = self.read(scope, false)?;
-            Ok(StoredAddons { cached, pending })
+            let (cached, cache_error) = match self.read(scope, false) {
+                Ok(cache) => (cache, None),
+                Err(error) => (None, Some(error)),
+            };
+            Ok(StoredAddons {
+                cached,
+                pending,
+                cache_error,
+            })
         })
     }
     fn load_cache(&self, scope: &AddonScope) -> Result<Option<Vec<InstalledAddon>>> {
@@ -123,27 +143,61 @@ impl AddonStorage for AddonStore {
     fn load_edit(&self, scope: &AddonScope) -> Result<Option<AddonEdit>> {
         self.locked(scope, || {
             let edit = self.read::<AddonEdit>(scope, true)?;
-            if edit.as_ref().is_some_and(|edit| edit.id.is_nil()) {
-                return Err(Error::InvalidData);
+            if let Some(edit) = &edit {
+                edit.validate()?;
             }
             Ok(edit)
         })
     }
     fn save_edit(&self, scope: &AddonScope, edit: &AddonEdit) -> Result<()> {
-        if edit.id.is_nil() {
-            return Err(Error::InvalidData);
-        }
-        self.locked(scope, || self.write(scope, true, edit))
+        edit.validate()?;
+        self.locked(scope, || {
+            // Never overwrite an unreadable journal, including a bad version.
+            if let Some(previous) = self.read::<AddonEdit>(scope, true)? {
+                previous.validate()?;
+            }
+            self.write(scope, true, edit)
+        })
     }
-    fn acknowledge(&self, scope: &AddonScope, id: Uuid) -> Result<bool> {
+    fn replace_edit(
+        &self,
+        scope: &AddonScope,
+        expected: Option<Uuid>,
+        edit: &AddonEdit,
+    ) -> Result<bool> {
+        edit.validate()?;
+        self.locked(scope, || {
+            let previous = self
+                .read::<AddonEdit>(scope, true)
+                .map_err(|_| Error::AddonJournalUnreadable)?;
+            if let Some(previous) = &previous {
+                previous
+                    .validate()
+                    .map_err(|_| Error::AddonJournalUnreadable)?;
+            }
+            if previous.as_ref().map(|edit| edit.id) != expected {
+                return Ok(false);
+            }
+            self.write(scope, true, edit)?;
+            Ok(true)
+        })
+    }
+    fn acknowledge(
+        &self,
+        scope: &AddonScope,
+        id: Uuid,
+        confirmed: &[InstalledAddon],
+    ) -> Result<bool> {
         self.locked(scope, || {
             if let Some(edit) = self
-                .read::<AddonEdit>(scope, true)?
+                .read::<AddonEdit>(scope, true)
+                .map_err(|_| Error::AddonJournalUnreadable)?
                 .filter(|edit| edit.id == id)
             {
-                // Promote the acknowledged edit before removing its journal.
-                // An offline restart must not restore the pre-edit cache.
-                self.write(scope, false, &edit.addons)?;
+                edit.validate().map_err(|_| Error::AddonJournalUnreadable)?;
+                // Cache the merged list actually uploaded, including phone changes.
+                // If promotion fails, retain the idempotent journal for retry.
+                self.write(scope, false, confirmed)?;
                 self.files.remove(&Self::name(scope, true)?)?;
                 Ok(true)
             } else {

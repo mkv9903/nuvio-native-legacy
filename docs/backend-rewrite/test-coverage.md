@@ -14,8 +14,8 @@ account credentials are used by these tests.
 | `perfilsel` profile fields, selection rules, startup cache, PIN outcomes, primary-addon inheritance and logout | `storage`, `service` and `account` profile cases |
 
 All five reference groups passed before integration. The current Rust suite
-passes 90 Rust tests and the native UI driver. Additional coverage includes late replies after cancellation or
-logout, stale refresh against a new account, disk-write failures, schema identity
+passes 117 Rust tests and two native driver tests. Additional coverage includes
+late replies after cancellation or logout, stale refresh against a new account, disk-write failures, schema identity
 and version validation, isolated storage, private atomic writes, configuration
 key completeness, unverified PIN locks and shared-account owner handling.
 
@@ -121,5 +121,29 @@ owned/encoded long request URLs and display NUL handling.
 The retained C account/profile screen driver passes after adding private-content
 generation tracking. The addon controller and C consumers are not yet bound to
 these new services; their application-level limits and profile-row behavior
-remain pending. Pending recovery and cross-device edit policies are recorded in
+remain pending. Confirmed recovery and cross-device edit policies are recorded in
 [the catalog implementation record](catalogs.md).
+
+## Addon edit policy and worker
+
+Twenty-seven additional Rust tests cover the confirmed merge policy, local
+journals and the native action flow. Cases preserve phone-added providers,
+remote names/order and removals; apply pending TV toggle conflicts; reinstall
+only through an explicit install; serialize full URLs and Unicode; reject
+unsupported actions; and retry intentions idempotently. Storage tests verify
+compare-and-replace, unreadable journal protection and promotion of the uploaded
+merged list, including additions absent from the original TV cache.
+
+Backend and worker cases cover offline restart, failed GET without upload,
+damaged journal with no network or file replacement, recovery retry, damaged
+cache with a valid journal, write/ack failures, retained RAM edits, edits saved
+after switching profiles, stale GET/POST replies, newer actions during upload,
+authoritative empty lists, separate manifest/list revisions, conflicts with
+another store handle, bounded latest-profile queuing, actions during in-flight
+work, detached drop and logout during upload. Native actions cover load, toggle,
+install, full URLs, stale/null/invalid inputs and held snapshot lifetime.
+
+The two native driver tests cover the retained account/profile screen behavior
+and all C/Rust addon view sizes/field offsets. C supplies layout measurements;
+the assertions are in Rust. The app's addon C consumers still need integration;
+these checks are not a manual TV or Linux account/catalog handoff.

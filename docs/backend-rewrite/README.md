@@ -60,18 +60,21 @@ owner and otherwise wait/retry rather than using the signed-in member's ID.
 ## Validation status
 
 The Rust account domain, HTTP client, worker, native boundary, platform helper,
-Home ordering, addon networking/storage and native addon snapshots pass 90 tests. The C login and profile screens also
-pass a Rust driver under Xvfb. The five relevant C reference groups passed
+Home ordering, addon networking/storage, edit merging and the native addon
+boundary pass 117 tests. The C login/profile screens and addon view layouts
+also pass two Rust driver tests under Xvfb. The five relevant C reference groups passed
 before their test cases moved to Rust. See [test coverage](test-coverage.md).
 The Linux app builds and starts under Xvfb using disposable isolated preview
 data. Retained C checks pass for Continue Watching/profile content, sync ordering,
 account settings, lists, saved tabs, retained playback and release text.
 
-The final ARM build and isolated `space.mkv.nuvio.rusttest_2.1.0_arm.ipk` pass
+The packaged Home-order checkpoint ARM build and isolated `space.mkv.nuvio.rusttest_2.1.0_arm.ipk` pass
 package verification: exact runtime allowlist, test identity, executable mode,
 no private/sample data or symbols, soft-float ABI and imported glibc versions
 no newer than 2.12. Matching symbols, hashes and application source commit are
-stored locally under `build/backend/webos`.
+stored locally under `build/backend/webos`. Addon-service and edit-worker
+compatibility builds are archived separately under its `checkpoints` directory;
+they are not new IPKs or manual-test handoffs.
 
 The user's Fedora check found a QR response-shape regression, which was corrected
 against the live anonymous service. The user has now confirmed that both QR and

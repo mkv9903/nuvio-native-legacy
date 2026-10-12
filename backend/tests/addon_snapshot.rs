@@ -35,6 +35,7 @@ fn snapshot() -> NativeAddonSnapshot {
     NativeAddonSnapshot::new(AddonSnapshot {
         context: None,
         revision: 7,
+        list_revision: 7,
         records,
         authoritative: true,
         pending: false,
@@ -172,6 +173,7 @@ fn display_nul_is_sanitized_without_truncating_valid_unicode() {
     let snapshot = NativeAddonSnapshot::new(AddonSnapshot {
         context: None,
         revision: 0,
+        list_revision: 0,
         records: vec![record].into(),
         authoritative: false,
         pending: true,

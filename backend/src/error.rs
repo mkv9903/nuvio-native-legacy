@@ -21,6 +21,8 @@ pub enum Error {
     WrongPin,
     ProfileUnverified,
     OwnerUnverified,
+    AddonEditsChanged,
+    AddonJournalUnreadable,
 }
 
 impl fmt::Display for Error {
@@ -45,6 +47,12 @@ impl fmt::Display for Error {
             Self::WrongPin => "The profile PIN is incorrect.",
             Self::ProfileUnverified => "The profile lock could not be confirmed. Please try again.",
             Self::OwnerUnverified => "The account owner could not be confirmed. Please try again.",
+            Self::AddonEditsChanged => {
+                "Saved addon edits changed in another app process. Synchronization is paused."
+            }
+            Self::AddonJournalUnreadable => {
+                "Saved addon edits could not be read. Synchronization is paused to preserve them."
+            }
             Self::Http(429) => "Too many requests. Wait a minute and try again.",
             Self::Http(status) => {
                 return write!(

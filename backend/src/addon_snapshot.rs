@@ -19,6 +19,7 @@ pub struct AddonRecord {
 pub struct AddonSnapshot {
     pub context: Option<ContentContext>,
     pub revision: u64,
+    pub list_revision: u64,
     pub records: Arc<[AddonRecord]>,
     pub authoritative: bool,
     pub pending: bool,
@@ -50,12 +51,15 @@ pub struct AddonView {
 #[repr(C)]
 pub struct AddonSnapshotView {
     pub revision: u64,
+    pub list_revision: u64,
     pub addons: *const AddonView,
     pub count: usize,
     pub profile: u32,
     pub addon_profile: u32,
     pub authoritative: i32,
     pub pending: i32,
+    pub status: i32,
+    pub error: *const c_char,
 }
 struct Projection {
     view: AddonSnapshotView,
@@ -74,6 +78,9 @@ pub struct NativeAddonSnapshot {
 }
 impl NativeAddonSnapshot {
     pub fn new(snapshot: AddonSnapshot) -> Self {
+        Self::with_status(snapshot, 0, "")
+    }
+    pub fn with_status(snapshot: AddonSnapshot, status: i32, error: &str) -> Self {
         let mut strings = Vec::new();
         let mut text = |value: &str| {
             strings.push(CString::new(value.replace('\0', " ")).expect("native addon text"));
@@ -144,6 +151,7 @@ impl NativeAddonSnapshot {
             .into_boxed_slice();
         let view = AddonSnapshotView {
             revision: snapshot.revision,
+            list_revision: snapshot.list_revision,
             addons: addons.as_ptr(),
             count: addons.len(),
             profile: snapshot
@@ -158,6 +166,8 @@ impl NativeAddonSnapshot {
                 .unwrap_or(0),
             authoritative: i32::from(snapshot.authoritative),
             pending: i32::from(snapshot.pending),
+            status,
+            error: text(error),
         };
         let projection = Arc::new(Projection {
             view,
@@ -174,17 +184,20 @@ impl NativeAddonSnapshot {
         &self.projection.view
     }
 }
+impl Clone for NativeAddonSnapshot {
+    fn clone(&self) -> Self {
+        Self {
+            snapshot: self.snapshot.clone(),
+            projection: self.projection.clone(),
+        }
+    }
+}
 #[no_mangle]
 pub unsafe extern "C" fn nuvio_addons_snapshot_clone(
     snapshot: *const NativeAddonSnapshot,
 ) -> *mut NativeAddonSnapshot {
     unsafe { snapshot.as_ref() }
-        .map(|snapshot| {
-            Box::into_raw(Box::new(NativeAddonSnapshot {
-                snapshot: snapshot.snapshot.clone(),
-                projection: snapshot.projection.clone(),
-            }))
-        })
+        .map(|snapshot| Box::into_raw(Box::new(snapshot.clone())))
         .unwrap_or(ptr::null_mut())
 }
 #[no_mangle]
