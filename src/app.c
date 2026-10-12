@@ -20,7 +20,7 @@
 #include "iconeapp.h"
 #include "logoapp.h"
 #include "registro.h"
-#include "addonsui.h"
+#include "addon_screen.h"
 #include "pluginsui.h"
 #include "login.h"
 #include "sessao.h"
@@ -96,6 +96,7 @@
 #include "fontepref.h"
 #include "video.h"
 #include "addons.h"
+#include "addon_registry.h"
 #include "idioma.h"
 #include "descoberta.h"
 #include "ilha_voo.h"
@@ -1932,7 +1933,7 @@ static void spotAtender(void) {
       break; }
     case SPOT_ADDONS:
       detail_fechar();
-      addonsui_abrir();
+      addon_screen_open();
       trocarTela(TELA_ADDONS);
       break;
     case SPOT_AJUSTE:
@@ -2220,7 +2221,7 @@ void app_evento(const SDL_Event *e) {
     case TELA_BUSCA:      busca_evento(e);      break;
     case TELA_BIBLIOTECA: biblioteca_evento(e); break;
     case TELA_PERFIL:     perfil_evento(e);     break;
-    case TELA_ADDONS:     addonsui_evento(e);   break;
+    case TELA_ADDONS:     addon_screen_event(e);   break;
     case TELA_PLUGINS:    pluginsui_evento(e);  break;
     case TELA_AJUSTES:    ajustes_evento(e);    break;
     case TELA_DIAGNOSTICO: diagnostico_evento(e); break;
@@ -2368,6 +2369,7 @@ static const char *homeTrailerBloqueio(void) {
 void app_atualizar(float dt, Uint32 agora) {
   /* Publish the Rust account snapshot once per frame on every screen. */
   session_step((unsigned)agora);
+  if (!uiPreview) addon_registry_step(ajustes_addons_do_principal(), !player_aberto());
   if (player_aberto() || player_mini_ativo()) diagnostico_cancelar_vazao();
   // Login e escolha de perfil retornam cedo; a atividade da conta anterior
   // precisa sair antes deles, junto de qualquer modal/pedido ja enfileirado.
@@ -2787,11 +2789,11 @@ void app_atualizar(float dt, Uint32 agora) {
   // A lista de addons foi aberta DE Ajustes, entao o Back dela volta para
   // Ajustes. Cair na home aqui faria a pessoa refazer o caminho inteiro so
   // para ligar dois addons seguidos.
-  if (tela == TELA_ADDONS && addonsui_quer_sair() && saiuPorEsquerda &&
+  if (tela == TELA_ADDONS && addon_screen_wants_exit() && saiuPorEsquerda &&
       sidebar_permitida()) {
     saiuPorEsquerda = 0;
     menu_abrir();
-  } else if (tela == TELA_ADDONS && addonsui_quer_sair()) {
+  } else if (tela == TELA_ADDONS && addon_screen_wants_exit()) {
     trocarTela(TELA_AJUSTES); menu_definir_destino(MENU_AJUSTES);
   }
   if (tela == TELA_AJUSTES) {
@@ -2801,7 +2803,7 @@ void app_atualizar(float dt, Uint32 agora) {
   }
 
   if (tela == TELA_AJUSTES && ajustes_pediu_addons()) {
-    addonsui_abrir();
+    addon_screen_open();
     trocarTela(TELA_ADDONS);
   }
   // Plugins (F09): o mesmo caminho da lista de addons (abre de Ajustes, volta a ela).
@@ -3964,7 +3966,7 @@ void app_atualizar(float dt, Uint32 agora) {
     }
   }
   pipintro_atualizar(dt, agora);
-  if(tela==TELA_ADDONS) addonsui_atualizar(dt, agora);
+  if(tela==TELA_ADDONS) addon_screen_update(dt, agora);
   if(tela==TELA_PLUGINS) pluginsui_atualizar(dt, agora);
 }
 
@@ -3992,7 +3994,7 @@ static void desenharAtrasDoPainel(void *ctx) {
       case TELA_BUSCA:      busca_desenhar(agora);      break;
       case TELA_BIBLIOTECA: biblioteca_desenhar(agora); break;
       case TELA_PERFIL:     perfil_desenhar(agora);     break;
-      case TELA_ADDONS:     addonsui_desenhar(agora);   break;
+      case TELA_ADDONS:     addon_screen_draw(agora);   break;
       case TELA_PLUGINS:    pluginsui_desenhar(agora);  break;
       case TELA_AJUSTES:    ajustes_desenhar(agora);    break;
       case TELA_DIAGNOSTICO: diagnostico_desenhar(agora); break;

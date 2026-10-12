@@ -22,6 +22,7 @@ serde = { version = "=1.0.228", features = ["derive"] }
 serde_json = { version = "=1.0.145", features = ["raw_value"] }
 ureq = { version = "=3.3.0", default-features = false, features = ["rustls", "gzip"] }
 url = "=2.5.8"
+percent-encoding = "=2.3.2"
 uuid = { version = "=1.11.1", features = ["v4", "serde"] }
 zeroize = "=1.8.1"
 libc = "=0.2.190"

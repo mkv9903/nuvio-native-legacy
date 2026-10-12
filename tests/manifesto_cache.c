@@ -32,7 +32,7 @@ static char *pedir(const char *url, unsigned versao) {
   if (corpo) return corpo;
   downloads++;
   { char buf[64];
-    snprintf(buf, sizeof buf, "{\"id\":\"addon-%u\"}", versao);
+    snprintf(buf, sizeof buf, "{\"id\":\"addon-%u\",\"resources\":[]}", versao);
     corpo = strdup(buf); }
   desc_manifesto_cache_guardar(url, versao, corpo);
   return corpo;
@@ -73,11 +73,11 @@ int main(void) {
   // desc_manifesto_cache_guardar NAO TOMA POSSE: quem chama continua dono do
   // corpo original e pode livre-lo na hora, sem que a cache fique com um
   // ponteiro pendurado (use-after-free se a copia nao fosse de verdade).
-  { char *original = strdup("{\"id\":\"x\"}");
+  { char *original = strdup("{\"id\":\"x\",\"resources\":[]}");
     desc_manifesto_cache_guardar("https://posse/manifest.json", 9, original);
     free(original);   // se guardar() tivesse tomado posse, isto seria duplo free adiante
     c = desc_manifesto_cache_obter("https://posse/manifest.json", 9);
-    assert(c && !strcmp(c, "{\"id\":\"x\"}"));
+    assert(c && !strcmp(c, "{\"id\":\"x\",\"resources\":[]}"));
     free(c); }
 
   // Corpo NULL ou vazio: guardar() nao registra nada (nem derruba o processo).

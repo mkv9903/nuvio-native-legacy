@@ -10,6 +10,7 @@
 #include "extras.h"
 #include "trakt.h"
 #include "addons.h"
+#include "support/addon_context.h"
 #include "rede.h"
 #include "detail.h"
 #include "home.h"
@@ -459,7 +460,12 @@ int main(int argc,char **argv) {
   if(argc<2)return 0;
   if(!strcmp(argv[1],"--live")) {
     rede_preparar();
-    addons_carregar("deploy/app/art");addons_buscar("tt14688458:2:4","series");
+    /* Optional live checks require an explicit JSON provider list. The Rust
+     * rewrite never imports the discarded packaged C addon file. */
+    const char *providers = getenv("NUVIO_TEST_ADDONS_JSON");
+    assert(providers && "set NUVIO_TEST_ADDONS_JSON for the optional live case");
+    test_addons_set(providers);
+    addons_buscar("tt14688458:2:4","series");
     for(int i=0;i<900 && addons_estado()==ADD_BUSCANDO;i++)SDL_Delay(100);
     assert(addons_estado()!=ADD_BUSCANDO);
     int dv=0,mp4dv=0;

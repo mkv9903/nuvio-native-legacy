@@ -1,6 +1,7 @@
 #!/bin/bash
 set -eu
 cd "$(dirname "$0")/.."
+source tools/addon-test-support.sh
 work=$(mktemp -d "${TMPDIR:-/tmp}/nuvio-addon-subtitles.XXXXXX")
 trap 'rm -rf "$work"' EXIT
 flags=()

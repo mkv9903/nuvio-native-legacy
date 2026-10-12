@@ -245,7 +245,7 @@ float ajustes_conteudo_x(void);
 float ajustes_ilha_x(void);
 // A tela de addons (addonsui.c) desenhada no arranjo de Ajustes: indice,
 // folha com os addons e o inspetor do manifesto do addon em `foco`.
-void  ajustes_desenhar_addons(int foco);
+void  settings_draw_addons(int foco);
 // A tela de plugins (pluginsui.c, F09) no mesmo arranjo. nivel 0 = lista
 // (liga/desliga, adicionar, repositorios); 1 = scrapers do repositorio `repo`.
 typedef struct { int nivel, foco, repo, armado; const char *aviso; } AjPluginsVista;

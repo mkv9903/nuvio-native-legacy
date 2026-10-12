@@ -1,5 +1,6 @@
 // Actual production subtitle worker; offline providers and measurements only.
 #include "../src/addons.c"
+#include "support/addon_context.h"
 #include <assert.h>
 static const char *responses[3];
 static char ultimaUrl[3][2048];
@@ -46,12 +47,16 @@ char *rede_baixar_trecho_st(const char *url, int segundos, long long ini, long l
 const char *i18n(const char *text) { return text; }
 static void run(int n, const char *id, const char *tipo) {
   const char *nomes[] = {"OpenSubtitles", "Subs.ro", "Community Subtitles"};
-  memset(addon, 0, sizeof addon); nAddon = n;
+  char json[2048] = "[";
   for (int i = 0; i < n; i++) {
-    addon[i].ativo = addon[i].legenda = 1;
-    snprintf(addon[i].base, sizeof addon[i].base, "https://fixture.invalid/provider%d", i);
-    snprintf(addon[i].nome, sizeof addon[i].nome, "%s", nomes[i]);
+    char entry[300];
+    snprintf(entry, sizeof entry, "%s{\"url\":\"https://fixture.invalid/provider%d\",\"name\":\"%s\",\"enabled\":true}", i ? "," : "", i, nomes[i]);
+    strncat(json, entry, sizeof json - strlen(json) - 1);
   }
+  strncat(json, "]", sizeof json - strlen(json) - 1);
+  test_addons_set(json);
+  nuvio_addons_snapshot_destroy(legSnapshot);
+  legSnapshot = addon_registry_capture();
   snprintf(legId, sizeof legId, "%s", id); snprintf(legTipo, sizeof legTipo, "%s", tipo);
   legParar = 0; fioLegVivo = 1; buscarLegendas(NULL); assert(!fioLegVivo);
 }
@@ -162,5 +167,7 @@ int main(void) {
       assert(nLegs == 1 && strstr(legs[0].url, "curto.srt")); }
   }
 
+  nuvio_addons_snapshot_destroy(legSnapshot); legSnapshot = NULL;
+  test_addons_release();
   puts("addon subtitles: provider fairness, real origin, ordered languages, empty/missing/HTTP and episode checks ok");
 }

@@ -1,19 +1,12 @@
-// O que addons_carregar tira de addons.txt fica USAVEL?
-//
-// Este teste existe por um defeito mudo: a leitura do arquivo preenchia nome,
-// base e as tres capacidades e NAO preenchia `ativo`. O vetor de addons e
-// estatico, nasce zerado, entao todo addon do arquivo ficava desligado — e
-// desligado, em addons.c, quer dizer "nao consultado" por fonte, por legenda e
-// por catalogo. Na tela ele aparecia; na busca de fontes ele nao existia, sem
-// uma linha de log dizendo por que. E a forma extrema do sintoma da issue #83
-// ("certain addons not showing").
-//
-// So o leitor: nada aqui vai a rede.
+/* Retained C source-status, channel fallback and retry checks.
+ * Addon model, storage and manifest assertions have moved to Rust tests. */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include "addons.h"
+#include "addon_registry.h"
+#include "support/addon_context.h"
 #include "fontecache.h"
 
 // Provider discovery is tested in ondever_lookup.c. This isolated addon
@@ -93,6 +86,7 @@ int  fontecache_pegar(const char *id, const char *tipo, Stream **l, int *n) {
 void fontecache_guardar(const char *id, const char *tipo, const Stream *l, int n) {
   (void)id; (void)tipo; (void)l; (void)n; }
 void fontecache_ceder(void) {}
+void fontecache_encerrar(void) {}
 void fontecache_avancar(void) {}
 unsigned fontecache_vod_geracao(void) { return 0; }
 void fontecache_vod_limpar(void) {}
@@ -136,43 +130,11 @@ static void conferirTexto(const char *o_que, const char *obtido, const char *esp
 }
 
 int main(void) {
-  char dir[] = "/tmp/nuvio-addonslista-XXXXXX";
-  char caminho[600];
-  FILE *f;
-  int n;
-
-  if (!mkdtemp(dir)) { printf("FALHOU: sem diretorio temporario\n"); return 1; }
-  snprintf(caminho, sizeof caminho, "%s/addons.txt", dir);
-  f = fopen(caminho, "w");
-  if (!f) { printf("FALHOU: sem %s\n", caminho); return 1; }
-  // Uma linha por forma que o arquivo aceita: com as tres colunas de
-  // capacidade, e sem elas (formato antigo, em que tudo vale 1 menos legenda).
-  fprintf(f, "# comentario ignorado\n");
-  fprintf(f, "So legenda\thttps://opensubtitles-v3.strem.io\t0\t0\t1\n");
-  fprintf(f, "Fonte e catalogo\thttps://exemplo.test/manifest.json\t1\t1\t0\n");
-  fprintf(f, "Formato antigo\thttps://antigo.test\n");
-  fclose(f);
-
-  n = addons_carregar(dir);
-  conferir("addons lidos", n, 3);
-
-  // O QUE ESTE TESTE GUARDA: os tres nascem LIGADOS.
-  conferir("ativo[0]", addons_ativo(0), 1);
-  conferir("ativo[1]", addons_ativo(1), 1);
-  conferir("ativo[2]", addons_ativo(2), 1);
-
-  // E as capacidades continuam vindo das colunas, como antes.
-  conferir("fonte[0]",   addons_fornece(0, ADD_STREAM),   0);
-  conferir("legenda[0]", addons_fornece(0, ADD_LEGENDA), 1);
-  conferir("fonte[1]",   addons_fornece(1, ADD_STREAM),   1);
-  conferir("catalogo[1] (ativo e catalogo)", addons_tem_catalogo(1), 1);
-  // Formato antigo: fonte e catalogo valem 1, legenda 0.
-  conferir("fonte[2]",   addons_fornece(2, ADD_STREAM),   1);
-  conferir("legenda[2]", addons_fornece(2, ADD_LEGENDA), 0);
-
-  // A base sai sem "/manifest.json" — a mesma regra de baseNormalizada.
-  conferirTexto("base[1]", addons_base(1), "https://exemplo.test");
-  conferirTexto("nome[1]", addons_nome(1), "Fonte e catalogo");
+  test_addons_set("[{\"name\":\"So legenda\",\"url\":\"https://opensubtitles-v3.strem.io\",\"enabled\":true},{\"name\":\"Fonte e catalogo\",\"url\":\"https://exemplo.test/manifest.json\",\"enabled\":true},{\"name\":\"Formato antigo\",\"url\":\"https://antigo.test\",\"enabled\":true}]");
+  addons_manifesto_lido(0, "{\"resources\":[\"subtitles\"]}");
+  addons_manifesto_lido(1, "{\"resources\":[\"catalog\",\"stream\"]}");
+  addons_manifesto_lido(2, "{\"resources\":[\"stream\"]}");
+  addon_registry_refresh();
 
   // ---- a causa da folha vazia
   // 1) id 1504 (#107): todos responderam {"streams":[]}
@@ -275,70 +237,9 @@ int main(void) {
       conferir("addon morto: requisicoes da consulta", chamadasLento - antes, esperado[k]);
     } }
 
-  // RESOURCE "meta" (#174/#175), num addon proprio no fim para nao mexer nos
-  // nomes e capacidades que as verificacoes acima leem. Duas formas do
-  // protocolo (objeto e string); quem nao declara fica sem.
-  { int a = addons_n(), b, c;
-    addons_adicionar("Meta A", "https://meta-a.test/manifest.json");
-    addons_adicionar("Meta B", "https://meta-b.test/manifest.json");
-    addons_adicionar("Meta C", "https://meta-c.test/manifest.json");
-    b = a + 1; c = a + 2;
-    addons_manifesto_lido(a, "{\"id\":\"m.a\",\"name\":\"Meta A\",\"resources\":"
-                             "[\"catalog\",{\"name\":\"meta\",\"types\":[\"series\"]}]}");
-    addons_manifesto_lido(b, "{\"id\":\"m.b\",\"name\":\"Meta B\",\"resources\":[\"meta\",\"subtitles\"]}");
-    addons_manifesto_lido(c, "{\"id\":\"m.c\",\"name\":\"Meta C\",\"resources\":[\"stream\"]}");
-    conferir("meta (objeto)", addons_fornece(a, ADD_META), 1);
-    conferir("meta (string)", addons_fornece(b, ADD_META), 1);
-    conferir("meta (nao declara)", addons_fornece(c, ADD_META), 0);
-    conferir("legenda segue lida do manifesto", addons_fornece(b, ADD_LEGENDA), 1); }
-
-  // idPrefixes/types DO RESOURCE "meta" (addons_aceita_id). A raiz do manifesto
-  // e o resource declaram; o do resource vence; o "idPrefixes" de OUTRO resource
-  // (stream) ou de um catalogo nao pode vazar para o meta.
-  { int a = addons_n(), b, c, d, e, f;
-    addons_adicionar("Pref A", "https://pref-a.test/manifest.json");
-    addons_adicionar("Pref B", "https://pref-b.test/manifest.json");
-    addons_adicionar("Pref C", "https://pref-c.test/manifest.json");
-    addons_adicionar("Pref D", "https://pref-d.test/manifest.json");
-    addons_adicionar("Pref E", "https://pref-e.test/manifest.json");
-    addons_adicionar("Pref F", "https://pref-f.test/manifest.json");
-    b = a + 1; c = a + 2; d = a + 3; e = a + 4; f = a + 5;
-    // A: no resource, com tipos ("anime" e o do Kitsu)
-    addons_manifesto_lido(a, "{\"id\":\"p.a\",\"name\":\"Pref A\",\"types\":[\"movie\",\"series\"],"
-                             "\"resources\":[\"catalog\",{\"name\":\"stream\",\"types\":[\"series\"],\"idPrefixes\":[\"tt\"]},"
-                             "{\"name\":\"meta\",\"types\":[\"Anime\",\"series\"],\"idPrefixes\":[\"kitsu:\",\"mal:\"]}],"
-                             "\"catalogs\":[{\"type\":\"anime\",\"id\":\"k\",\"idPrefixes\":[\"zzz:\"]}]}");
-    conferir("prefixo do resource casa", addons_aceita_id(a, "series", "kitsu:41370"), 1);
-    conferir("segundo prefixo casa", addons_aceita_id(a, "anime", "mal:456"), 1);
-    conferir("tipo declarado sem caixa", addons_aceita_id(a, "ANIME", "kitsu:1"), 1);
-    conferir("prefixo do stream nao vaza para o meta", addons_aceita_id(a, "series", "tt0111161"), 0);
-    conferir("prefixo do catalogo nao vaza", addons_aceita_id(a, "series", "zzz:1"), 0);
-    conferir("tipo fora dos declarados", addons_aceita_id(a, "movie", "kitsu:41370"), 0);
-    // B: so na raiz
-    addons_manifesto_lido(b, "{\"id\":\"p.b\",\"name\":\"Pref B\",\"idPrefixes\":[\"tt\"],"
-                             "\"types\":[\"movie\",\"series\"],\"resources\":[\"catalog\",\"meta\",\"stream\"]}");
-    conferir("raiz: tt casa", addons_aceita_id(b, "movie", "tt0111161"), 1);
-    conferir("raiz: kitsu nao", addons_aceita_id(b, "series", "kitsu:1"), 0);
-    // C: o resource declara e vence o da raiz
-    addons_manifesto_lido(c, "{\"id\":\"p.c\",\"name\":\"Pref C\",\"idPrefixes\":[\"tt\"],"
-                             "\"resources\":[{\"name\":\"meta\",\"idPrefixes\":[\"xperience:\"]}]}");
-    conferir("resource vence a raiz", addons_aceita_id(c, "series", "xperience:abc"), 1);
-    conferir("a raiz nao vale onde o resource declarou", addons_aceita_id(c, "series", "tt1"), 0);
-    conferir("sem tipos declarados, qualquer tipo", addons_aceita_id(c, "anime", "xperience:abc"), 1);
-    // D: meta sem nenhum prefixo -> nao da para saber
-    addons_manifesto_lido(d, "{\"id\":\"p.d\",\"name\":\"Pref D\",\"resources\":[\"meta\"]}");
-    conferir("sem idPrefixes: desconhecido", addons_aceita_id(d, "series", "kitsu:1"), -1);
-    // E: nao tem meta
-    addons_manifesto_lido(e, "{\"id\":\"p.e\",\"name\":\"Pref E\",\"idPrefixes\":[\"kitsu:\"],\"resources\":[\"stream\"]}");
-    conferir("sem o resource meta: nao serve", addons_aceita_id(e, "series", "kitsu:1"), 0);
-    // F: manifesto nunca lido -> desconhecido; indice ruim -> 0
-    conferir("nao sondado: desconhecido", addons_aceita_id(f, "series", "kitsu:1"), -1);
-    conferir("indice invalido", addons_aceita_id(999, "series", "kitsu:1"), 0);
-    conferir("id vazio", addons_aceita_id(a, "series", ""), 0); }
-
-  remove(caminho);
-  rmdir(dir);
+  addons_encerrar();
+  test_addons_release();
   if (falhas) { printf("%d falha(s)\n", falhas); return 1; }
-  printf("addonslista: ok\n");
+  printf("source status: ok\n");
   return 0;
 }

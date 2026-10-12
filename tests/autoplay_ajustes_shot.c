@@ -6,6 +6,7 @@
 //   NUVIO_SHOT_FONTE=3 bash tests/autoplay_ajustes_shot.sh /tmp/nv-202/aj
 #include "ajustes.h"
 #include "addons.h"
+#include "support/addon_context.h"
 #include "fonteregra.h"
 #include "gfx.h"
 #include "text.h"
@@ -57,7 +58,7 @@ int main(int argc, char **argv) {
   char nome[600];
   SDL_Window *w;
   SDL_GLContext gl;
-  AddonRemoto a[4];
+  char addon_list[2048] = "[";
   int opEscopo, opPadrao, opAddons;
   static const char *const NOMES[4] = { "Cuevana ES", "Torrentio Latino", "Torrentio", "AIOStreams" };
 
@@ -81,13 +82,13 @@ int main(int argc, char **argv) {
   ajustes_iniciar();
   if (getenv("NUVIO_SHOT_FONTE")) ajustes_teste_fonte_interface(atoi(getenv("NUVIO_SHOT_FONTE")));
 
-  memset(a, 0, sizeof a);
   for (int i = 0; i < 4; i++) {
-    snprintf(a[i].nome, sizeof a[i].nome, "%s", NOMES[i]);
-    snprintf(a[i].url, sizeof a[i].url, "http://127.0.0.1:1/a%d/manifest.json", i);
-    a[i].ativo = 1;
+    char entry[300];
+    snprintf(entry, sizeof entry, "%s{\"name\":\"%s\",\"url\":\"http://127.0.0.1:1/a%d/manifest.json\",\"enabled\":true}", i ? "," : "", NOMES[i], i);
+    strncat(addon_list, entry, sizeof addon_list - strlen(addon_list) - 1);
   }
-  addons_definir_lista(a, 4);
+  strncat(addon_list, "]", sizeof addon_list - strlen(addon_list) - 1);
+  test_addons_set(addon_list);
   fonteregra_limpar(0); fonteregra_limpar(1);
   fonteregra_alternar(0, "Cuevana ES");
   fonteregra_alternar(0, "Torrentio Latino");

@@ -50,6 +50,12 @@ extern "C" {
     fn rust_addons_test_view_size(kind: i32) -> usize;
     fn rust_addons_test_view_offset(kind: i32, field: usize) -> usize;
     fn account_ui_test_attach(account: *mut c_void);
+    fn addon_registry_test_attach(controller: *mut c_void);
+    fn addon_registry_refresh();
+    fn addon_screen_open();
+    fn addon_screen_update(dt: f32, now: u32);
+    fn addon_screen_draw(now: u32);
+    fn native_addons_test_key(key: i32);
     fn data_init(directory: *const c_char);
     fn ajustes_dir(directory: *const c_char);
     fn session_step(now: u32);
@@ -306,6 +312,15 @@ fn original_c_screens_use_rust_login_selection_pin_and_remote_actions() {
             response(200, auth("user", None, "user"))
         }
         "/rest/v1/rpc/get_sync_owner" => response(200, json!("owner")),
+        "/rest/v1/addons" => response(
+            200,
+            json!([
+                {"url":"https://first.invalid/manifest.json","name":"Catalog addon","enabled":true},
+                {"url":"https://second.invalid/manifest.json","name":"Source addon","enabled":true},
+                {"url":"https://third.invalid/manifest.json","name":"Subtitle addon","enabled":false}
+            ]),
+        ),
+        "/rest/v1/rpc/sync_push_addons" => response(200, json!(null)),
         "/rest/v1/rpc/sync_pull_profiles" => response(
             200,
             json!([
@@ -497,6 +512,128 @@ fn original_c_screens_use_rust_login_selection_pin_and_remote_actions() {
                 .get(),
             1
         );
+        {
+            use nuvio_backend::{addon_ffi::*, addon_snapshot::*};
+            let path = CString::new(directory.path.to_str().unwrap()).unwrap();
+            let addons = nuvio_addons_create(handle, path.as_ptr());
+            assert!(!addons.is_null());
+            addon_registry_test_attach(addons.cast());
+            nuvio_addons_step(addons, 0);
+            wait_until(|| {
+                (*addons).controller.backend.snapshot().status
+                    == nuvio_backend::addon_backend::AddonStatus::Ready
+            });
+            let snapshot = nuvio_addons_snapshot(addons);
+            for (index, resource) in ["catalog", "stream", "subtitles"].iter().enumerate() {
+                let body = CString::new(format!(
+                    r#"{{"id":"provider{index}","resources":["{resource}"],"types":["movie"]}}"#
+                ))
+                .unwrap();
+                assert_eq!(
+                    nuvio_addons_attach_manifest(addons, snapshot, index, body.as_ptr()),
+                    1
+                );
+            }
+            nuvio_addons_snapshot_destroy(snapshot);
+            addon_registry_refresh();
+            addon_screen_open();
+            for _ in 0..30 {
+                let now = SDL_GetTicks();
+                txt_novo_quadro();
+                tex_novo_quadro();
+                tex_bombear(6);
+                gfx_novo_quadro();
+                addon_screen_update(1.0 / 60.0, now);
+                addon_screen_draw(now);
+                SDL_GL_SwapWindow(window);
+            }
+            capture("addons-rust-backed.png");
+            native_addons_test_key(13);
+            assert!(
+                !(*addons).controller.backend.snapshot().addons.records[0]
+                    .installed
+                    .enabled
+            );
+            wait_until(|| !(*addons).controller.backend.snapshot().addons.pending);
+            // A damaged offline journal must leave the cached list visible and
+            // block the real remote action, without changing screen geometry.
+            let state = (*addons).controller.backend.snapshot();
+            let scope = state.addons.context.as_ref().unwrap().addons.clone();
+            let store = nuvio_backend::addon_storage::AddonStore::open(&directory.path).unwrap();
+            use nuvio_backend::{
+                addon_edits::{AddonChange, AddonEdit},
+                addon_storage::AddonStorage,
+            };
+            store
+                .save_edit(
+                    &scope,
+                    &AddonEdit::new(AddonChange::SetEnabled {
+                        url: state.addons.records[0].installed.url.clone(),
+                        enabled: true,
+                    }),
+                )
+                .unwrap();
+            let journal = fs::read_dir(directory.path.join("rust-backend-v1"))
+                .unwrap()
+                .map(|entry| entry.unwrap().path())
+                .find(|path| {
+                    path.file_name()
+                        .unwrap()
+                        .to_string_lossy()
+                        .starts_with("addons-edit-")
+                        && path
+                            .extension()
+                            .is_some_and(|extension| extension == "json")
+                })
+                .unwrap();
+            fs::write(&journal, "{damaged").unwrap();
+            addon_registry_test_attach(std::ptr::null_mut());
+            nuvio_addons_destroy(addons);
+            let paused = nuvio_addons_create(handle, path.as_ptr());
+            assert!(!paused.is_null());
+            addon_registry_test_attach(paused.cast());
+            nuvio_addons_step(paused, 0);
+            wait_until(|| {
+                (*paused).controller.backend.snapshot().status
+                    == nuvio_backend::addon_backend::AddonStatus::RecoveryPaused
+            });
+            let snapshot = nuvio_addons_snapshot(paused);
+            for (index, resource) in ["catalog", "stream", "subtitles"].iter().enumerate() {
+                let body = CString::new(format!(
+                    r#"{{"id":"provider{index}","resources":["{resource}"],"types":["movie"]}}"#
+                ))
+                .unwrap();
+                assert_eq!(
+                    nuvio_addons_attach_manifest(paused, snapshot, index, body.as_ptr()),
+                    1
+                );
+            }
+            nuvio_addons_snapshot_destroy(snapshot);
+            addon_registry_refresh();
+            addon_screen_open();
+            native_addons_test_key(13);
+            let state = (*paused).controller.backend.snapshot();
+            assert_eq!(state.addons.records.len(), 3);
+            assert!(!state.addons.records[0].installed.enabled);
+            assert_eq!(
+                state.status,
+                nuvio_backend::addon_backend::AddonStatus::RecoveryPaused
+            );
+            assert_eq!(fs::read_to_string(&journal).unwrap(), "{damaged");
+            for _ in 0..30 {
+                let now = SDL_GetTicks();
+                txt_novo_quadro();
+                tex_novo_quadro();
+                tex_bombear(6);
+                gfx_novo_quadro();
+                addon_screen_update(1.0 / 60.0, now);
+                addon_screen_draw(now);
+                SDL_GL_SwapWindow(window);
+            }
+            capture("addons-recovery-paused.png");
+            addon_registry_test_attach(std::ptr::null_mut());
+            nuvio_addons_destroy(paused);
+        }
         login_release();
         tex_encerrar();
         txt_encerrar();

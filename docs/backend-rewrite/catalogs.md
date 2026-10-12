@@ -24,6 +24,8 @@ User-confirmed decisions:
 - Remove the 32-addon and 2,047-character URL limits from Rust domain models
   and adapt the remaining C consumers. Bound network work and response bytes
   separately to fit the TV; never silently truncate a provider URL.
+- Limit retained subtitle fetching to four concurrent requests, independently
+  of provider count and the sheet's twelve-result display quota.
 - Read only this rewrite's versioned Rust JSON. Do not import old C caches.
 - Preserve unreadable pending edits and pause synchronization for that scope.
   Display a valid same-scope cache and block edits and uploads while recovery is pending.
@@ -98,8 +100,8 @@ feature for persisted edit IDs. No additional package versions were introduced.
 The addon backend and one bounded worker now implement the confirmed edit
 policies. Actions modify memory and enqueue I/O. Idempotent install, removal and
 set-enabled intentions use a version-2 JSON journal rather than a copied addon
-list. Cache JSON remains version 1. These prepared addon journals have not been
-used by the application; no legacy journal is imported or converted.
+list. Cache JSON remains version 1. The application now uses these Rust journals; no legacy journal is imported or
+converted.
 
 Compare-and-replace writes and exact-ID acknowledgements preserve newer edits.
 An action submitted during an upload stays pending after that upload completes.
@@ -123,8 +125,9 @@ request is retained. Drop detaches during an in-flight request and flushes local
 edits; logout hides state immediately and queues private addon-file cleanup.
 
 The user also confirmed blocking further addon changes while an unreadable
-journal awaits recovery. The prepared backend and tests enforce that rule;
-binding it to the retained C addon controls is still part of integration.
+journal awaits recovery. The backend and real C addon controls enforce that rule. The native UI driver
+verifies that cached addons remain visible, remote Enter cannot toggle them and
+the damaged journal is unchanged.
 
 Catalog title parsing now retains complete IDs, artwork URLs and other strings.
 The user confirmed adapting C consumers to those complete values, including
@@ -172,12 +175,55 @@ existing provider compatibility for catalog-only declarations and does not
 start requiring unrelated descriptive/version fields. Nuvio self-host defines
 account/profile/addon synchronization, rather than provider manifest semantics.
 
-C addon/source/subtitle access, complete C title-data ownership/access,
-manifest/catalog orchestration and profile-change Home publication still need
-integration. The application still uses the existing C addon/catalog data paths.
-This checkpoint does not yet fix the application profile-switch Home-row issue
-or remove its old count, ID or URL limits. Rust models have no fixed field/count
-limits; request and cache byte budgets remain explicit for TV resources.
+## Runtime addon integration checkpoint
+
+The app creates the Rust addon worker alongside the Rust account capability.
+Frame steps activate the verified content context and refresh the C frame view;
+selecting a profile activates its addon scope immediately. Automatic periodic
+refresh remains suspended during playback, preserving the previous policy.
+Accepted edit actions can still run, and logout hides addon state immediately.
+
+The C addon registry, custom registry/manifest parsing, C file imports, addon
+cache/journal and duplicate account read/upload paths have been removed. Small
+English C adapters expose immutable Rust-owned strings and arrays to consumers
+awaiting their own rewrites. The source and subtitle algorithms remain in C.
+Each request job and its retry workers retain a Rust snapshot for their entire
+lifetime. New context/list revisions cancel stale requests and prevent late
+publication, while old borrowed strings remain valid for their held readers.
+
+Source request URLs and subtitle provider request URLs come from Rust without
+the former provider-count/base/request buffer limits. Configured path/query
+values survive; title IDs and subtitle extras are encoded once. The retained
+subtitle helper's already-encoded extras are decoded with UTF-8 validation before
+Rust builds its request. Provider URLs stay out of the addon settings inspector;
+it displays only the parsed public host and port, excluding credentials, path
+and query. Source health counters belong to exact provider URLs and scopes.
+
+Four subtitle workers share a provider queue. Every enabled provider can be
+visited, even when the installed count exceeds 32; a busy set of four keeps the
+fifth request queued. Profile changes cancel queued work and hide old subtitle
+results. The existing language ordering, fairness, episode checks, subtitle
+extras/fallback, range hash and sheet limits are retained for their later rewrite.
+
+The complete touched addon screen controller and Settings addon renderer now use
+English names, comments and text, with their original geometry, styling and
+remote navigation. Guide addon action handlers also use English and reject
+blocked edits. The recovery notice occupies the existing subtitle text area.
+Screenshots and real remote actions are checked in the native Rust UI driver.
+
+The transitional C manifest cache also validates replies with Rust before
+replacement. A malformed or incomplete reply cannot evict a useful cached body.
+Same-key successful saves replace their earlier body rather than leaving duplicate
+entries. This cache and the remaining C catalog parsing will be removed when
+Rust catalog orchestration is connected.
+
+The remaining integration includes complete C title ownership/access, details
+and playback title ID access, artwork request/cache access, manifest/catalog
+orchestration and immediate target-profile Home publication. Discovery, guide
+and title consumers still have legacy buffers/quotas pending that work. The new
+Rust models have no fixed field/count limits; request/cache byte budgets remain
+explicit for TV resources. This checkpoint does not yet fix the Home-row
+profile-switch issue or claim that all title/guide/catalog URL limits are gone.
 
 Implementation is in progress. This document is not a Linux or TV test handoff.
 The first account flow has user-confirmed Fedora QR and email/password login;

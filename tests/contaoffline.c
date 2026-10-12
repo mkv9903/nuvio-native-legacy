@@ -1,22 +1,6 @@
-// O APP SOBREVIVE AO SERVIDOR DA CONTA FORA DO AR (#215).
-//
-// MEDIDO em 02/10/2026: api.nuvio.tv em 504 (depois 502) por horas. O log da
-// TCL: "[sync] leitura de addons: HTTP 504", colecoes/biblioteca/vistos 504,
-// "ordem de catalogos: HTTP 429", "[desc] 0 catalogos declarados pelos addons"
-// — home vazia. Este teste roda o sync.c REAL (fio, sync_iniciar/sync_passo/
-// sync_periodico) contra um servidor dublado que responde 200, 504, 429 ou
-// nada, com o disco dublado numa pasta de verdade (contacache.c de verdade):
-//
-//   1. sem copia: nenhum addon inventado, o estado diz "servidor fora", e o
-//      ciclo para de perguntar depois dos addons;
-//   2. servidor bom: a resposta vira copia em disco;
-//   3. servidor fora (504 / 429 / sem resposta): os addons da COPIA chegam a
-//      addons_definir_lista, e colecoes/biblioteca/vistos tambem saem dela;
-//   4. o servidor volta: a volta seguinte sai em SYNC_RETENTA_MS e o estado
-//      volta a "respondeu";
-//   5. a copia e da CONTA: outra conta nao a usa; logout apaga.
-//
-// Cada sessao e um processo (as estaticas de sync.c nao voltam a zero).
+/* Retained C collection/library/history sync survives account outages.
+ * Addon cache, edits, count/URL limits and restart cases now run in Rust.
+ * This fixture verifies only capabilities still implemented in C. */
 #include "sync.h"
 #include "addons.h"
 #include "catordem.h"
@@ -101,11 +85,7 @@ static int modo = 200;
 // so-leitura caem — caem uma a uma, cada uma para a sua copia).
 static int rpcModo = -1;
 static const char *usuario = "conta-a";
-static int rpcs, tabelas;
-
-static const char *ADDONS =
-  "[{\"url\":\"https://a.exemplo/manifest.json\",\"name\":\"A\",\"enabled\":true},"
-  "{\"url\":\"https://b.exemplo/manifest.json\",\"name\":\"B\",\"enabled\":false}]";
+static int rpcs, addon_tables;
 
 static char *falha(int *st) {
   *st = modo;
@@ -125,10 +105,10 @@ char *sessao_rpc(const char *funcao, const char *corpo, int *st) {
 }
 char *sessao_tabela(const char *t, const char *q, int *st) {
   (void)q;
-  tabelas++;
+  if (!strcmp(t, "addons")) addon_tables++;
   if (modo != 200) return falha(st);
   *st = 200;
-  return strdup(!strcmp(t, "addons") ? ADDONS : "[]");
+  (void)t; return strdup("[]");
 }
 int  sessao_logada(void)          { return 1; }
 const char *sessao_usuario(void)  { return usuario; }
@@ -139,37 +119,8 @@ void nuvem_url_escapar(const char *v, char *d, unsigned t) { snprintf(d, t, "%s"
 
 // ------------------------------------------------------------ o app dublado
 
-static int nAplicados, ativosAplicados;
-static char primeiraUrl[600];
-// #201 (sessao "longa"): a conta manda um addon de URL com 1500 caracteres e
-// outro acima de NV_ADDON_URL_MAX. O primeiro tem de chegar INTEIRO ao app; o
-// segundo nao pode chegar, nem cortado.
-static char urlLonga[1501], urlGrande[2601], contaLonga[5000];
-static int longaIntacta, grandeChegou;
-static void montarLonga(void) {
-  size_t k, i;
-  k = (size_t)snprintf(urlLonga, sizeof urlLonga, "https://longo.exemplo/SEGREDO");
-  for (i = 0; k < 1500 - 14; i++) urlLonga[k++] = (char)('a' + (int)((i * 7) % 26));
-  snprintf(urlLonga + k, 15, "/manifest.json");
-  k = (size_t)snprintf(urlGrande, sizeof urlGrande, "https://grande.exemplo/SEGREDO");
-  for (i = 0; k < 2600 - 14; i++) urlGrande[k++] = (char)('a' + (int)((i * 5) % 26));
-  snprintf(urlGrande + k, 15, "/manifest.json");
-  snprintf(contaLonga, sizeof contaLonga,
-           "[{\"url\":\"%s\",\"name\":\"Longo\",\"enabled\":true},"
-           "{\"url\":\"%s\",\"name\":\"Grande\",\"enabled\":true},"
-           "{\"url\":\"https://b.exemplo/manifest.json\",\"name\":\"B\",\"enabled\":false}]",
-           urlLonga, urlGrande);
-}
-int addons_definir_lista(const AddonRemoto *l, int n) {
-  int i;
-  nAplicados = n;
-  ativosAplicados = 0;
-  for (i = 0; i < n; i++) ativosAplicados += l[i].ativo;
-  snprintf(primeiraUrl, sizeof primeiraUrl, "%s", n > 0 ? l[0].url : "");
-  longaIntacta = n > 0 && !strcmp(l[0].url, urlLonga);
-  for (i = 0; i < n; i++) if (strstr(l[i].url, "grande.exemplo")) grandeChegou = 1;
-  return 1;
-}
+int addons_n(void) { return 0; }
+void fontecache_vod_limpar(void) {}
 static int colConta, bibConta, vistoConta;
 int  col_definir_json(const char *j) { if (j && strstr(j, "colecao-conta")) colConta++; return 0; }
 int  contalib_ler_biblioteca(const char *j) { if (j && strstr(j, "bib-conta")) bibConta++; return 0; }
@@ -202,9 +153,6 @@ void desc_tmdb_definir(const char *c) { (void)c; }
 
 // ------------------------------------------------------------ o resto, mudo
 
-void addons_marcar_da_conta(int perfil) { (void)perfil; }
-void addons_esquecer(void) {}
-int  addons_exportar(AddonRemoto *s, int m) { (void)s; (void)m; return 0; }
 void releaseinfo_forget(void) {}
 void lembrete_esquecer_todos(void) {}
 int  ajustes_aplicar_blob(const char *j) { (void)j; return 0; }
@@ -276,55 +224,34 @@ int main(int argc, char **argv) {
   setvbuf(stdout, NULL, _IOLBF, 0);
   modo = argc > 1 ? atoi(argv[1]) : 200;
   if (argc > 1 && !strcmp(argv[1], "parcial")) { modo = 200; rpcModo = 429; }
-  if (argc > 1 && !strcmp(argv[1], "longa")) { modo = 200; montarLonga(); ADDONS = contaLonga; }
   if (argc > 2 && strcmp(argv[2], "-")) usuario = argv[2];
   printf("-- sessao: servidor %d, conta %s%s%s\n", modo, usuario, *extra ? ", " : "", extra);
-  copia = existe("conta-addons-p1.json");
+  copia = existe("conta-colecoes-p1.json");
   sync_iniciar();
   ateTerminar();
 
-  if (rpcModo == 429) {
-    confere("parcial: addons da conta (resposta nova)", nAplicados == 2);
-    confere("parcial: colecoes, biblioteca e vistos da copia", colConta && bibConta && vistoConta);
-    confere("parcial: estado diz servidor fora (429) e usando copia",
-            sync_servidor_fora() == 429 && sync_usando_copia());
-    confere("parcial: os addons NAO sao da copia (sem aviso de addons)", sync_addons_fora() == 0);
-  } else if (modo == 200) {
-    confere("servidor bom: os 2 addons da conta aplicados", nAplicados == 2 && ativosAplicados == 1);
-    confere("estado: o servidor respondeu", sync_servidor_fora() == 0 && !sync_usando_copia());
-    confere("a resposta virou copia em disco (addons, colecoes, biblioteca, vistos)",
-            existe("conta-addons-p1.json") && existe("conta-colecoes-p1.json") &&
-            existe("conta-biblioteca-p1.json") && existe("conta-vistos-p1.json"));
-    { char *c = contacache_ler(CC_ADDONS, 1, usuario, NULL);
-      confere("a copia tem dono e perfil (outra conta nao le)",
-              c && !contacache_ler(CC_ADDONS, 1, "outra-conta", NULL));
-      free(c); }
+  if (modo == 200 && rpcModo != 429) {
+    confere("server responded", sync_servidor_fora() == 0 && !sync_usando_copia());
+    confere("collections, library and watched cache saved",
+            existe("conta-colecoes-p1.json") && existe("conta-biblioteca-p1.json") && existe("conta-vistos-p1.json"));
+    { char *c = contacache_ler(CC_COLECOES, 1, usuario, NULL);
+      char *other = contacache_ler(CC_COLECOES, 1, "other-account", NULL);
+      confere("cached collections belong to the correct account", c && !other);
+      free(c); free(other); }
   } else {
-    int esperado = modo ? modo : -1;
-    confere("estado: servidor fora com o HTTP certo", sync_servidor_fora() == esperado);
-    confere("o ciclo parou de perguntar depois dos addons", rpcs == 0 && tabelas == 1);
+    int expected = rpcModo == 429 ? 429 : modo ? modo : -1;
+    confere("outage status retains HTTP cause", sync_servidor_fora() == expected);
+    confere("retained capabilities make their own independent requests", rpcs > 0);
     if (copia && !strcmp(usuario, "conta-a")) {
-      confere("com copia: os addons DA COPIA chegaram ao app",
-              nAplicados == 2 && ativosAplicados == 1 &&
-              !strcmp(primeiraUrl, "https://a.exemplo/manifest.json"));
-      confere("com copia: colecoes, biblioteca e vistos tambem", colConta && bibConta && vistoConta);
-      confere("estado: usando a copia", sync_usando_copia() && sync_copia_quando() > 0);
-      confere("estado: addons da copia (aviso da ilha: usando seus addons salvos)", sync_addons_fora() == 1);
+      confere("cached collections, library and watched items applied", colConta && bibConta && vistoConta);
+      confere("cache-use status and timestamp published", sync_usando_copia() && sync_copia_quando() > 0);
     } else {
-      confere("sem copia (ou copia de outra conta): nenhum addon inventado", nAplicados == 0);
-      confere("estado: fora e SEM copia", !sync_usando_copia() && sync_addons_fora() == 2);
+      confere("no content invented without this account's cache", !colConta && !bibConta && !vistoConta);
+      confere("no cache-use status without a valid cache", !sync_usando_copia());
     }
   }
+  confere("C sync never fetches the Rust-owned addon table", addon_tables == 0);
 
-  if (ADDONS == contaLonga) {
-    confere("#201: a URL de 1500 caracteres chegou inteira ao app", longaIntacta);
-    confere("#201: a URL acima do limite nao chegou, nem cortada", nAplicados == 2 && !grandeChegou);
-    // A lista desta TV ficou menor que a da conta: uma edicao daqui NAO sobe
-    // (o push substituiria a lista da conta e apagaria o addon que nao coube).
-    sync_sujar_addons();
-    confere("#201: edicao com a lista incompleta nao vira pendencia em disco",
-            !existe("conta-addons-pend-636f6e74612d61-p1.txt"));
-  }
   if (!strcmp(extra, "volta")) {
     int r;
     modo = 200;
@@ -334,13 +261,13 @@ int main(int argc, char **argv) {
     confere("servidor fora: volta seguinte em SYNC_RETENTA_MS, nao em 5 min", r == 1);
     ateTerminar();
     confere("o servidor voltou: estado volta a respondeu",
-            sync_servidor_fora() == 0 && !sync_usando_copia() && sync_addons_fora() == 0);
-    confere("e a lista da conta substitui a copia", nAplicados == 2);
+            sync_servidor_fora() == 0 && !sync_usando_copia());
+    confere("fresh retained content applied after recovery", colConta && bibConta && vistoConta);
   }
   if (!strcmp(extra, "sair")) {
     sync_esquecer_usuario();
     confere("logout apaga as copias da conta",
-            !existe("conta-addons-p1.json") && !existe("conta-colecoes-p1.json") &&
+            !existe("conta-colecoes-p1.json") &&
             !existe("conta-biblioteca-p1.json") && !existe("conta-vistos-p1.json"));
     confere("logout zera o estado de servidor fora", sync_servidor_fora() == 0);
   }

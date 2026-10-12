@@ -20,6 +20,7 @@
 //   - no fim a lista NAO e substituida (mesmos indices, nada perdido).
 // Com um diretorio como argumento grava capturas BMP da folha enchendo.
 #include "addons.h"
+#include "support/addon_context.h"
 #include "streams.h"
 #include "ajustes.h"
 #include "fonteauto.h"
@@ -104,7 +105,7 @@ int main(int argc, char **argv) {
   const char *porta = getenv("NV_PORTA");
   const char *dados = getenv("NUVIO_DADOS");
   const char *shots = argc > 1 ? argv[1] : NULL;
-  AddonRemoto a[4];
+  char addon_list[2048] = "[";
   char nomes[256];
   int i, iA0, iA1, iL, falta, escolhida;
   Uint32 tPrimeira, tLento, tFim;
@@ -135,14 +136,14 @@ int main(int argc, char **argv) {
   } else assert(SDL_Init(SDL_INIT_TIMER) == 0);
   rede_preparar();
 
-  memset(a, 0, sizeof a);
   { const char *nm[4] = { "Lento", "Rapido", "Quebrado", "Tardio" };
     for (i = 0; i < 4; i++) {
-      snprintf(a[i].nome, sizeof a[i].nome, "%s", nm[i]);
-      snprintf(a[i].url, sizeof a[i].url, "http://127.0.0.1:%s/%s/manifest.json", porta, nm[i]);
-      a[i].ativo = 1;
+      char entry[400];
+      snprintf(entry, sizeof entry, "%s{\"name\":\"%s\",\"url\":\"http://127.0.0.1:%s/%s/manifest.json\",\"enabled\":true}", i ? "," : "", nm[i], porta, nm[i]);
+      strncat(addon_list, entry, sizeof addon_list - strlen(addon_list) - 1);
     } }
-  assert(addons_definir_lista(a, 4) == 1);
+  strncat(addon_list, "]", sizeof addon_list - strlen(addon_list) - 1);
+  test_addons_set(addon_list);
 
   // ---- 1. a lista enche aos poucos -------------------------------------
   t0 = SDL_GetTicks();
@@ -225,6 +226,7 @@ int main(int argc, char **argv) {
   ESPERA(addons_estado() != ADD_BUSCANDO, 8000);
 
   addons_encerrar();
+  test_addons_release();
   if (shots) { tex_encerrar(); txt_encerrar(); gfx_encerrar(); }
   SDL_Quit();
   puts("fontes_parcial: tudo ok");

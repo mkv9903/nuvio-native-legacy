@@ -1,6 +1,7 @@
 #!/bin/bash
 set -eu
 cd "$(dirname "$0")/.."
+source tools/addon-test-support.sh
 sources=()
 for source in src/*.c; do
   if [ "$source" != src/main.c ]; then sources+=("$source"); fi

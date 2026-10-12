@@ -711,8 +711,8 @@ static void sondaManifestos(void) {
     // addon, em serie, com 15 s de prazo cada — a maior parte da espera para o
     // guia abrir numa conta com 10-20 addons (a maioria sem canal nenhum).
     // So cai na rede quando aquele manifesto ainda nao chegou.
-    { AddCatCanal cc[ADD_CANAL_MAX];
-      int nc = addons_catalogos_canal(a, cc, ADD_CANAL_MAX), k;
+    { AddCatCanal cc[G_MAX_FONTE];
+      int nc = addons_catalogos_canal(a, cc, G_MAX_FONTE), k;
       if (nc >= 0) {
         if (sb) sb->canal = nc > 0;
         if (!ativo) continue;
@@ -1790,41 +1790,29 @@ static void painelFechar(void) {
   }
 }
 
-static void instalar(int k) {
-  // addons_adicionar em vez de exportar-acrescentar-definir.
-  //
-  // O caminho antigo funcionava, com dois efeitos colaterais: addons_definir_lista
-  // REFAZ a lista e com isso zera o `sondado` e o `id` de manifesto de TODOS os
-  // addons — e esse id e a chave que as colecoes da conta usam, entao perde-lo
-  // faz colecao abrir vazia ate a proxima sonda. E o log registrava "vindos da
-  // conta" para uma lista que veio daqui.
+static void install_recommended_addon(int index) {
   paErro = -1; paErroCheio = 0;
-  if (k < 0 || k >= nRec) return;
-  if (!addons_adicionar(rec[k].nome, rec[k].url)) {
-    paErro = paN + k;
-    paErroCheio = (addons_n() >= 16);
+  if (index < 0 || index >= nRec) return;
+  if (!addons_adicionar(rec[index].nome, rec[index].url)) {
+    paErro = paN + index;
     return;
   }
-  sync_sujar_addons();
   paMexeu = 1;
-  paLigou = 1;   // instalar e ligar: precisa baixar o manifesto e o catalogo
-  // O recem-instalado entra na secao de cima (ainda "nao conferido") e o
-  // foco segue o mesmo item, que desceu uma linha.
+  paLigou = 1;
   painelMontar();
   if (paFoco < paN + nRec - 1) paFoco++;
   painelAplicar(addons_n() - 1);
 }
-
-static void painelOk(void) {
+static void addon_panel_activate(void) {
   if (paFoco < paN) {
-    int i = paIdx[paFoco];
-    int ligado = addons_alternar(i);
-    sync_sujar_addons();   // desligar aqui e desligar no celular tambem
+    int index = paIdx[paFoco];
+    int enabled = addons_alternar(index);
+    if (enabled < 0) return;
     paMexeu = 1;
-    if (ligado) paLigou = 1;   // ligou (ou acabou de instalar): fechar pede ciclo
-    painelAplicar(i);
+    if (enabled) paLigou = 1;
+    painelAplicar(index);
   } else if (paFoco - paN < nRec && !recInstalado(&rec[paFoco - paN])) {
-    instalar(paFoco - paN);
+    install_recommended_addon(paFoco - paN);
   }
 }
 
@@ -1837,7 +1825,7 @@ static void painelEvento(SDL_Keycode k, Uint32 agora) {
   if (k == SDLK_UP)   { if (paFoco > 0) paFoco--; return; }
   if (k == SDLK_DOWN) { if (paFoco + 1 < n) paFoco++; return; }
   if (k == SDLK_RETURN || k == SDLK_KP_ENTER) {
-    if (n > 0 && agora - paOkTick >= G_REP_MS) { paOkTick = agora; painelOk(); }
+    if (n > 0 && agora - paOkTick >= G_REP_MS) { paOkTick = agora; addon_panel_activate(); }
     return;
   }
 }

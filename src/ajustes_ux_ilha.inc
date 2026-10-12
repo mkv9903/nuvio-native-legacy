@@ -802,71 +802,68 @@ static void ajDesenharTela(void) {
   ajDesenharModais();
 }
 
-// --- ADDONS (addonsui.c) COMO UMA CATEGORIA DE AJUSTES ------------------------------
-// A tela de addons no mesmo arranjo: indice com Contas aberta, a folha com os
-// addons (rosto neutro, o que fornecem embaixo do nome, o chip Ligado) e o
-// inspetor com o que o manifesto declara.
-static const char *ajAddonFornece(int i) {
+/* Addons keep the existing Settings sheet and inspector geometry. */
+static const char *addon_capability_label(int i) {
   static char b[96];
-  if (!addons_sondado(i)) return i18n("conferindo o manifesto…");
+  if (!addons_sondado(i)) return i18n("Checking the manifest…");
   b[0] = 0;
-  if (addons_fornece(i, ADD_CATALOGO)) strcat(b, i18n("Catálogo"));
-  if (addons_fornece(i, ADD_STREAM)) { if (b[0]) strcat(b, " · "); strcat(b, i18n("Fontes")); }
-  if (addons_fornece(i, ADD_LEGENDA)) { if (b[0]) strcat(b, " · "); strcat(b, i18n("Legendas")); }
-  if (!b[0]) snprintf(b, sizeof b, "%s", i18n("não fornece nada que este app use"));
+  if (addons_fornece(i, ADD_CATALOGO)) strcat(b, i18n("Catalogs"));
+  if (addons_fornece(i, ADD_STREAM)) { if (b[0]) strcat(b, " · "); strcat(b, i18n("Sources")); }
+  if (addons_fornece(i, ADD_LEGENDA)) { if (b[0]) strcat(b, " · "); strcat(b, i18n("Subtitles")); }
+  if (!b[0]) snprintf(b, sizeof b, "%s", i18n("No resources used by this app"));
   return b;
 }
-static void ajRosto(const char *nome, float x, float y, float lado, float raio, float vidA, float tinta, int estilo) {
-  char ini[8] = "?";
+static void draw_addon_initial(const char *name, float x, float y, float side, float radius, float glass_alpha, float tint, int style) {
+  char initial[8] = "?";
   TxtLinha l;
-  if (nome && nome[0]) {
-    unsigned char c0 = (unsigned char)nome[0];
+  if (name && name[0]) {
+    unsigned char c0 = (unsigned char)name[0];
     int nb = c0 >= 0xF0 ? 4 : c0 >= 0xE0 ? 3 : c0 >= 0xC0 ? 2 : 1;
-    snprintf(ini, sizeof ini, "%.*s", nb, nome);
-    if (ini[0] >= 'a' && ini[0] <= 'z') ini[0] = (char)(ini[0] - 32);
+    snprintf(initial, sizeof initial, "%.*s", nb, name);
+    if (initial[0] >= 'a' && initial[0] <= 'z') initial[0] = (char)(initial[0] - 32);
   }
-  ajNeutro((GfxRect){ x, y, lado, lado }, raio, vidA, 0.141f, 0.149f, 0.173f, 1);
-  l = ajTxt((TxtEstilo)estilo, ini);
-  txt_desenhar_alpha(l, x + (lado - l.w) * 0.5f, y + (lado - l.h) * 0.5f, tinta);
+  ajNeutro((GfxRect){ x, y, side, side }, radius, glass_alpha, 0.141f, 0.149f, 0.173f, 1);
+  l = ajTxt((TxtEstilo)style, initial);
+  txt_desenhar_alpha(l, x + (side - l.w) * 0.5f, y + (side - l.h) * 0.5f, tint);
 }
-static void ajDesenharAddons(int foco);
-void ajustes_desenhar_addons(int foco) {
+static void draw_addon_sheet(int focus);
+void settings_draw_addons(int focus) {
   AJ_ESCALA_INI();
-  ajDesenharAddons(foco);
+  draw_addon_sheet(focus);
   AJ_ESCALA_FIM();
 }
-static void ajDesenharAddons(int foco) {
-  int n = addons_n(), i, lig = 0, salvoIdx = uxIndice, salvoFoco = focoIndice;
+static void draw_addon_sheet(int focus) {
+  int n = addons_n(), i, enabled_count = 0, saved_section = uxIndice, saved_focus = focoIndice;
   GfxRect fr, ir;
-  float topo, base = NV_VTELA_H - 40.0f / ajustes_tamanho_ajustes(), y, alvo;
-  char sub[96];
+  float top, bottom = NV_VTELA_H - 40.0f / ajustes_tamanho_ajustes(), y, target;
+  char subtitle[96];
   montarTela();
-  for (i = 0; i < n; i++) if (addons_ativo(i)) lig++;
+  for (i = 0; i < n; i++) if (addons_ativo(i)) enabled_count++;
   ajFundo();
   uxIndice = uxSecaoDe(AJ_ADDONS) + 2; focoIndice = 0;
   ajDesenharIndice();
-  uxIndice = salvoIdx; focoIndice = salvoFoco;
+  uxIndice = saved_section; focoIndice = saved_focus;
   fr = ajFolhaR(); ir = ajInspR();
   ajIlha(fr, 36, 1, 0);
-  snprintf(sub, sizeof sub, i18n("%d de %d ligados nesta TV"), lig, n);
-  topo = ajCabecalhoFolha(fr, "Fontes e addons", "Addons", n ? sub : "Nenhum addon nesta conta.", 0, 1);
-  if (foco >= n) foco = n - 1;
-  alvo = foco * 84.0f - (base - topo - 80.0f) * 0.5f;
-  if (alvo > n * 84.0f - (base - topo)) alvo = n * 80.0f - (base - topo);
-  if (alvo < 0) alvo = 0;
-  gfx_recorte(fr.x, topo, fr.w, base - topo);
-  y = topo - alvo;
+  snprintf(subtitle, sizeof subtitle, i18n("%d of %d enabled on this TV"), enabled_count, n);
+  top = ajCabecalhoFolha(fr, "Sources and addons", "Addons", addon_registry_view()->status == RUST_ADDONS_RECOVERY_PAUSED ? addon_registry_view()->error : (n ? subtitle : "No addons in this account."), 0, 1);
+  if (focus >= n) focus = n - 1;
+  target = focus * 84.0f - (bottom - top - 80.0f) * 0.5f;
+  if (target > n * 84.0f - (bottom - top)) target = n * 80.0f - (bottom - top);
+  if (target < 0) target = 0;
+  gfx_recorte(fr.x, top, fr.w, bottom - top);
+  y = top - target;
   for (i = 0; i < n; i++, y += 84) {
     GfxRect r = { fr.x + 18, y, fr.w - 36, 80 };
-    float a = ajMascara(y + 40, topo, base);
-    int ligado = addons_ativo(i), f = i == foco;
+    float a = ajMascara(y + 40, top, bottom);
+    int enabled = addons_ativo(i), f = i == focus;
     TxtLinha t, c;
-    if (y + 80 < topo || y > base) continue;
+    if (y + 80 < top || y > bottom) continue;
     if (f) ajFocoLinha(r, 22, 1, a);
-    ajRosto(addons_nome(i), r.x + 22, y + 16, 48, 14, 0.09f, 0.85f * a, TXT_ILHA_INICIAL);
-    { float cw = ajChipLiga(r.x + r.w - 22, y + 40, ligado, a);
+    draw_addon_initial(addons_nome(i), r.x + 22, y + 16, 48, 14, 0.09f, 0.85f * a, TXT_ILHA_INICIAL);
+    { float cw = ajChipLiga(r.x + r.w - 22, y + 40, enabled, a);
       t = ajTxtC(TXT_AJ_ROTULO, addons_nome(i), r.w - 22 - 64 - cw - 40);
-      c = ajTxtC(TXT_ILHA_GENERO, ajAddonFornece(i), r.w - 22 - 64 - cw - 40); }
+      c = ajTxtC(TXT_ILHA_GENERO, addon_capability_label(i), r.w - 22 - 64 - cw - 40); }
     txt_desenhar_alpha(t, r.x + 22 + 48 + 16, y + 40 - (t.h + 4 + c.h) * 0.5f, (f ? 1.0f : 0.86f) * a);
     txt_desenhar_alpha(c, r.x + 22 + 48 + 16, y + 40 - (t.h + 4 + c.h) * 0.5f + t.h + 4, 0.42f * a);
   }
@@ -875,48 +872,44 @@ static void ajDesenharAddons(int foco) {
   ajIlha(ir, 36, 1, 0);
   if (n > 0) {
     float x = ir.x + 32, w = ir.w - 64, py = ir.y + 32, ix = x + 26;
-    static const int REC[3] = { ADD_CATALOGO, ADD_STREAM, ADD_LEGENDA };
-    static const char *const NOME[3] = { "Catálogo", "Fontes", "Legendas" };
-    const char *base0 = addons_base(foco);
-    char host[160] = "";
+    static const int RESOURCES[3] = { ADD_CATALOGO, ADD_STREAM, ADD_LEGENDA };
+    static const char *const RESOURCE_NAMES[3] = { "Catalogs", "Sources", "Subtitles" };
+    const char *base0 = addons_base(focus);
+    char *host = nuvio_addon_public_host(base0);
     float h = 26 + 64 + 24 + 18 + 12 + 44 + 22 + 2 * 42.5f + 22;
-    if (base0) {
-      const char *p = strstr(base0, "://");
-      p = p ? p + 3 : base0;
-      snprintf(host, sizeof host, "%.*s", (int)strcspn(p, "/"), p);
-    }
     ajNeutro((GfxRect){ x, py, w, h }, 22, 0.04f, 0.106f, 0.110f, 0.129f, 1);
     py += 26;
-    ajRosto(addons_nome(foco), ix, py, 64, 20, 0.10f, 1, TXT_AJ_TIT28);
-    { TxtLinha nm = ajTxtC(TXT_AJ_NOME, addons_nome(foco), w - 52 - 80);
-      TxtLinha st = ajTxt(TXT_ILHA_GENERO, addons_sondado(foco) ? "manifesto conferido" : "conferindo o manifesto…");
+    draw_addon_initial(addons_nome(focus), ix, py, 64, 20, 0.10f, 1, TXT_AJ_TIT28);
+    { TxtLinha nm = ajTxtC(TXT_AJ_NOME, addons_nome(focus), w - 52 - 80);
+      TxtLinha st = ajTxt(TXT_ILHA_GENERO, addons_sondado(focus) ? "Manifest checked" : "Checking the manifest…");
       float ty = py + 32 - (nm.h + 4 + st.h) * 0.5f;
       txt_desenhar(nm, ix + 80, ty);
       txt_desenhar_alpha(st, ix + 80, ty + nm.h + 4, 0.55f); }
     py += 64 + 24;
-    ajKicker("Fornece", ix, py, 1);
+    ajKicker("Provides", ix, py, 1);
     py += 18 + 12;
     { float cx = ix;
       for (i = 0; i < 3; i++) {
-        int sim = addons_fornece(foco, REC[i]);
-        TxtLinha l = ajTxt(TXT_ILHA_GENERO, NOME[i]);
+        int provided = addons_fornece(focus, RESOURCES[i]);
+        TxtLinha l = ajTxt(TXT_ILHA_GENERO, RESOURCE_NAMES[i]);
         float cw = 16 + 18 + 10 + l.w + 16;
         ajNeutro((GfxRect){ cx, py, cw, 44 }, 22, 0.08f, AJ_CHIP_SOL, 1);
-        ajIcone(sim ? "aj_check" : "aj_x", cx + 16, py + 13, 18, sim ? 0.85f : 0.4f);
-        txt_desenhar_alpha(l, cx + 16 + 18 + 10, py + (44 - l.h) * 0.5f, sim ? 0.85f : 0.4f);
+        ajIcone(provided ? "aj_check" : "aj_x", cx + 16, py + 13, 18, provided ? 0.85f : 0.4f);
+        txt_desenhar_alpha(l, cx + 16 + 18 + 10, py + (44 - l.h) * 0.5f, provided ? 0.85f : 0.4f);
         cx += cw + 10;
       } }
     py += 44 + 22;
-    py += ajMeta(i18n("Nesta TV"), i18n(addons_ativo(foco) ? "Ligado" : "Desligado"), ix, py, w - 52, 1) - 4;
-    ajMeta(i18n("Endereço"), host, ix, py, w - 52, 1);
+    py += ajMeta(i18n("On this TV"), i18n(addons_ativo(focus) ? "Enabled" : "Disabled"), ix, py, w - 52, 1) - 4;
+    ajMeta(i18n("Address"), host ? host : "", ix, py, w - 52, 1);
+    nuvio_text_destroy(host);
     { float yy = ir.y + 32 + h + 26, tx = x + 6, tw = w - 12;
       ajIcone("aj_puzzle", tx, yy - 1, 20, 0.45f);
-      ajCaps(TXT_MINI, "Ligar ou desligar", 2.1f, tx + 30, yy, 0.45f);
+      ajCaps(TXT_MINI, "Enable or disable", 2.1f, tx + 30, yy, 0.45f);
       yy += 28;
-      yy += ajBloco(TXT_AJ_INSP, addons_nome(foco), tx, yy, tw, 38.4f, 1, 2) + 12;
-      ajBloco(TXT_AJ_SUB, "A lista de addons da sua conta, para ligar e desligar cada um nesta TV.", tx, yy, tw, 28.5f, 0.62f, 5); }
+      yy += ajBloco(TXT_AJ_INSP, addons_nome(focus), tx, yy, tw, 38.4f, 1, 2) + 12;
+      ajBloco(TXT_AJ_SUB, "Your account addons. Enable or disable each addon on this TV.", tx, yy, tw, 28.5f, 0.62f, 5); }
   }
-  { AjDica d[2] = { { "OK", "Ligar ou desligar" }, { "Voltar", "Ajustes" } };
+  { AjDica d[2] = { { "OK", "Enable or disable" }, { "Back", "Settings" } };
     ajDicas(d, 2, ir.x + 32, ir.y + ir.h - 32, ir.w - 64, 1); }
 }
 
@@ -962,7 +955,7 @@ static void desenhaFolhaPermitidos(void) {
     if (i == 0) {
       ajNeutro((GfxRect){ r.x + 22, y + 16, 48, 48 }, 14, 0.09f, 0.141f, 0.149f, 0.173f, 1);
       ajIcone(plugin ? "aj_plug" : "aj_puzzle", r.x + 22 + 14, y + 16 + 14, 20, 0.85f);
-    } else ajRosto(nome, r.x + 22, y + 16, 48, 14, 0.09f, 0.85f, TXT_ILHA_INICIAL);
+    } else draw_addon_initial(nome, r.x + 22, y + 16, 48, 14, 0.09f, 0.85f, TXT_ILHA_INICIAL);
     cw = ajChipLiga(r.x + r.w - 22, y + 40, lig, 1);
     tw = r.w - 22 - 64 - cw - 40;
     // O nome do add-on e do usuario: nao passa por i18n.
@@ -1022,7 +1015,7 @@ static void desenhaFolhaOrdem(void) {
       TxtLinha cap = ajTxtC(TXT_ILHA_GENERO, apoio[0] ? i18n(apoio) : "", tw);
       float ty = y + 40 - (t.h + (apoio[0] ? 4 + cap.h : 0)) * 0.5f;
       snprintf(pos, sizeof pos, "%d", i);
-      ajRosto(nome, r.x + 22, y + 16, 48, 14, 0.09f, 0.85f, TXT_ILHA_INICIAL);
+      draw_addon_initial(nome, r.x + 22, y + 16, 48, 14, 0.09f, 0.85f, TXT_ILHA_INICIAL);
       txt_desenhar_alpha(t, r.x + 22 + 48 + 16, ty, f ? 1.0f : 0.86f);
       if (apoio[0]) txt_desenhar_alpha(cap, r.x + 22 + 48 + 16, ty + t.h + 4, 0.42f);
       for (c = 0; c < 2; c++) {
@@ -1139,7 +1132,7 @@ static void ajDesenharPlugins(const AjPluginsVista *v) {
     if (icone) {
       ajNeutro((GfxRect){ r.x + 22, y + 16, 48, 48 }, 14, 0.09f, 0.141f, 0.149f, 0.173f, a);
       ajIcone(icone, r.x + 22 + 14, y + 16 + 14, 20, 0.85f * a);
-    } else ajRosto(nome, r.x + 22, y + 16, 48, 14, 0.09f, 0.85f * a, TXT_ILHA_INICIAL);
+    } else draw_addon_initial(nome, r.x + 22, y + 16, 48, 14, 0.09f, 0.85f * a, TXT_ILHA_INICIAL);
     if (chip >= 0) cw = ajChipLiga(r.x + r.w - 22, y + 40, chip, a);
     else if (v->nivel == 0 && i >= 2) cw = 0;
     { TxtLinha t = ajTxtC(TXT_AJ_ROTULO, nome, r.w - 22 - 64 - cw - 40);

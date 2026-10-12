@@ -34,19 +34,31 @@ typedef struct {
 RustAddons *nuvio_addons_create(const RustAccount *account, const char *directory);
 void nuvio_addons_destroy(RustAddons *addons);
 void nuvio_addons_step(const RustAddons *addons, int force_primary);
+void nuvio_addons_step_controlled(const RustAddons *addons, int force_primary, int allow_periodic);
 void nuvio_addons_refresh(const RustAddons *addons);
 /* Call after account logout; cleanup runs on the addon worker. */
 void nuvio_addons_logout(const RustAddons *addons);
 uint64_t nuvio_addons_revision(const RustAddons *addons);
+uint64_t nuvio_addons_list_revision(const RustAddons *addons);
 RustAddonSnapshot *nuvio_addons_snapshot(const RustAddons *addons);
 RustAddonSnapshot *nuvio_addons_snapshot_clone(const RustAddonSnapshot *snapshot);
 const RustAddonSnapshotView *nuvio_addons_snapshot_view(const RustAddonSnapshot *snapshot);
 void nuvio_addons_snapshot_destroy(RustAddonSnapshot *snapshot);
 int nuvio_addons_set_enabled(const RustAddons *addons, const RustAddonSnapshot *snapshot, size_t index, int enabled);
 int nuvio_addons_install(const RustAddons *addons, const RustAddonSnapshot *snapshot, const char *name, const char *url);
+int nuvio_addons_snapshot_current(const RustAddons *addons, const RustAddonSnapshot *snapshot);
+int nuvio_addons_attach_manifest(const RustAddons *addons, const RustAddonSnapshot *snapshot, size_t index, const char *body);
+/* Returns the scoped silent-query count, or -1 for a stale/invalid reader. */
+int64_t nuvio_addons_report_response(const RustAddons *addons, const RustAddonSnapshot *snapshot, size_t index, int responded);
 /* Returns -1 while capabilities are unknown, otherwise 0/1. Resource kinds
  * are catalog=0, stream=1, subtitles=2, metadata=3. */
 int nuvio_addons_snapshot_accepts(const RustAddonSnapshot *snapshot, size_t index, int kind, const char *media_type, const char *id);
 /* Returned request URLs are independently owned; use nuvio_text_destroy. */
 char *nuvio_addons_snapshot_url(const RustAddonSnapshot *snapshot, size_t index, const char *resource, const char *media_type, const char *id);
+char *nuvio_addons_snapshot_manifest_url(const RustAddonSnapshot *snapshot, size_t index);
+int nuvio_addons_snapshot_has_manifest(const RustAddonSnapshot *snapshot, size_t index);
+char *nuvio_addon_normalize_url(const char *url);
+char *nuvio_addon_public_host(const char *url);
+int nuvio_addon_manifest_valid(const char *body);
+char *nuvio_addons_snapshot_url_encoded_extras(const RustAddonSnapshot *snapshot, size_t index, const char *resource, const char *media_type, const char *id, const char *extras);
 #endif

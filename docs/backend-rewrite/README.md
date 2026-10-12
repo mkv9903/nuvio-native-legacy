@@ -61,12 +61,16 @@ owner and otherwise wait/retry rather than using the signed-in member's ID.
 
 The Rust account domain, HTTP client, worker, native boundary, platform helper,
 Home ordering, addon networking/storage, edit merging and the native addon
-boundary, provider loading and complete catalog title models pass 141 tests. The C login/profile screens and addon view layouts
-also pass two Rust driver tests under Xvfb. The five relevant C reference groups passed
+boundary, provider loading and complete catalog title models pass 145 tests.
+Seven additional Rust driver tests cover the retained C account/addon screens,
+view layouts and actual source/subtitle workers under Xvfb. The five relevant C reference groups passed
 before their test cases moved to Rust. See [test coverage](test-coverage.md).
 The Linux app builds and starts under Xvfb using disposable isolated preview
-data. Retained C checks pass for Continue Watching/profile content, sync ordering,
-account settings, lists, saved tabs, retained playback and release text.
+data. The addon runtime checkpoint also checks retained sync ordering, account
+outages, source cache/status/retries, progressive source publication, subtitle
+selection and transitional manifest cache behavior. Earlier checkpoints checked
+Continue Watching/profile content, account settings, lists, saved tabs, retained
+playback and release text.
 
 The packaged Home-order checkpoint ARM build and isolated `space.mkv.nuvio.rusttest_2.1.0_arm.ipk` pass
 package verification: exact runtime allowlist, test identity, executable mode,
@@ -94,3 +98,10 @@ The user approved grouping account addon loading and edit persistence, manifest
 and catalog loading, Home catalog order and profile isolation. Playback-source
 and subtitle searches and general settings remain C capabilities; their data
 access can adapt to Rust-owned results. See [the implementation record](catalogs.md).
+
+Addon account state and edits now run in Rust in the actual app. The retained C
+addon screen, guide actions and source/subtitle workers read pinned Rust
+snapshots. The old C registry, file loader, account addon parsing and whole-list
+uploads have been removed. Subtitle work is limited to four concurrent requests,
+as confirmed by the user. Complete title ownership and Home catalog orchestration
+are still being integrated; the profile-switch Home-row fix is not complete.

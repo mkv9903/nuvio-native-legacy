@@ -23,6 +23,8 @@ pub mod ffi;
 pub mod http;
 mod json_store;
 pub mod model;
+#[cfg(feature = "native-ui-tests")]
+mod native_addon_fixture;
 mod platform;
 pub mod provider_http;
 pub mod provider_loader;

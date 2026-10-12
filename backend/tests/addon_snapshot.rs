@@ -1,8 +1,46 @@
 use nuvio_backend::{
+    addon_ffi::{nuvio_addon_manifest_valid, nuvio_addon_normalize_url, nuvio_addon_public_host},
     addon_snapshot::*,
     addons::{AddonUrl, InstalledAddon, Manifest},
     ffi::nuvio_text_destroy,
 };
+
+#[test]
+fn native_manifest_validation_and_public_addresses_reject_bad_input_without_exposing_secrets() {
+    unsafe {
+        assert_eq!(nuvio_addon_manifest_valid(ptr::null()), 0);
+        for body in [r#"{"id":"partial"}"#, r#"{"resources":null}"#, "not-json"] {
+            assert_eq!(
+                nuvio_addon_manifest_valid(CString::new(body).unwrap().as_ptr()),
+                0
+            );
+        }
+        assert_eq!(
+            nuvio_addon_manifest_valid(CString::new(r#"{"resources":[]}"#).unwrap().as_ptr()),
+            1
+        );
+        let url = CString::new(
+            "https://user:password@addon.invalid:8443/private/config/manifest.json?secret=value",
+        )
+        .unwrap();
+        let public = nuvio_addon_public_host(url.as_ptr());
+        assert!(!public.is_null());
+        assert_eq!(
+            CStr::from_ptr(public).to_str().unwrap(),
+            "addon.invalid:8443"
+        );
+        nuvio_text_destroy(public);
+        let normalized = nuvio_addon_normalize_url(url.as_ptr());
+        assert!(!normalized.is_null());
+        assert_eq!(
+            CStr::from_ptr(normalized).to_str().unwrap(),
+            "https://user:password@addon.invalid:8443/private/config?secret=value"
+        );
+        nuvio_text_destroy(normalized);
+        assert!(nuvio_addon_normalize_url(ptr::null()).is_null());
+        assert!(nuvio_addon_public_host(ptr::null()).is_null());
+    }
+}
 use serde_json::json;
 use std::{
     ffi::{CStr, CString},
@@ -184,4 +222,49 @@ fn display_nul_is_sanitized_without_truncating_valid_unicode() {
             .unwrap(),
         "日   long"
     );
+}
+
+#[test]
+fn manifest_and_extra_urls_are_owned_complete_and_encode_inputs_once() {
+    let snapshot = snapshot();
+    let resource = CString::new("subtitles").unwrap();
+    let kind = CString::new("series").unwrap();
+    let id = CString::new("kitsu:41370:7 / 日").unwrap();
+    let extras =
+        CString::new("filename=A%20%26%20B%2B.mkv&videoSize=123&videoHash=abcdef").unwrap();
+    unsafe {
+        let manifest = nuvio_addons_snapshot_manifest_url(&snapshot, 0);
+        let manifest_text = CStr::from_ptr(manifest).to_str().unwrap();
+        assert!(manifest_text.len() > 4096);
+        assert!(manifest_text.ends_with("/manifest.json?key=keep/"));
+        assert_eq!(nuvio_addons_snapshot_has_manifest(&snapshot, 0), 1);
+        assert_eq!(nuvio_addons_snapshot_has_manifest(&snapshot, 79), 0);
+        assert_eq!(nuvio_addons_snapshot_has_manifest(&snapshot, usize::MAX), 0);
+        let request = nuvio_addons_snapshot_url_encoded_extras(
+            &snapshot,
+            0,
+            resource.as_ptr(),
+            kind.as_ptr(),
+            id.as_ptr(),
+            extras.as_ptr(),
+        );
+        let text = CStr::from_ptr(request).to_str().unwrap();
+        assert!(text.len() > 4096);
+        assert!(text.contains("filename=A%20%26%20B%2B.mkv&videoSize=123&videoHash=abcdef.json"));
+        assert!(text.contains("%2F%20%E6%97%A5/"));
+        assert!(text.ends_with("?key=keep/"));
+        assert!(!text.contains("%2520"));
+        nuvio_text_destroy(manifest);
+        nuvio_text_destroy(request);
+        let invalid = CString::new("filename=%FF").unwrap();
+        assert!(nuvio_addons_snapshot_url_encoded_extras(
+            &snapshot,
+            0,
+            resource.as_ptr(),
+            kind.as_ptr(),
+            id.as_ptr(),
+            invalid.as_ptr()
+        )
+        .is_null());
+    }
 }

@@ -12,6 +12,7 @@
 #include <SDL2/SDL.h>
 #include "catalogo.h"
 #include "addons.h"
+#include "addon_registry.h"
 #include "rede.h"
 #include "nuvem.h"
 #include "cwordem.h"
@@ -1551,6 +1552,13 @@ static int maniCacheAchar(const char *url, unsigned versao) {
 static int maniCacheColocar(const char *url, unsigned versao, char *corpo) {
   int i, alvo = -1;
   if (!corpo) return 0;
+  if (!nuvio_addon_manifest_valid(corpo)) { free(corpo); return 0; }
+  alvo = maniCacheAchar(url, versao);
+  if (alvo >= 0) {
+    free(maniCache[alvo].corpo);
+    maniCache[alvo].corpo = corpo;
+    return 1;
+  }
   for (i = 0; i < MANI_MAX; i++) {
     if (!maniCache[i].corpo) { alvo = i; break; }
     // Entrada com versao diferente e stale: reutiliza.
@@ -1624,6 +1632,7 @@ static void *fioManifesto(void *u) {
     snprintf(url, sizeof url, "%s", mani[meu].url);
     pthread_mutex_unlock(&maniTrava);
     corpo = rede_baixar(url, 20);
+    if (corpo && !nuvio_addon_manifest_valid(corpo)) { free(corpo); corpo = NULL; }
     pthread_mutex_lock(&maniTrava);
     if (minha != maniGeracao) {
       pthread_mutex_unlock(&maniTrava); free(corpo); return NULL;
@@ -2048,7 +2057,11 @@ static int lerManifesto(int iAddon, const char *base, Decl *saida, int max,
   // linha o id e as capacidades do addon so eram aprendidos por quem abrisse a
   // tela de addons nos Ajustes, e sem o id nenhuma colecao da conta encontrava
   // a URL do proprio addon (issue #10).
-  addons_manifesto_lido(iAddon, corpo);
+  if (!addons_manifesto_lido(iAddon, corpo)) {
+    free(corpo);
+    if (ativo) nManiFalhouVolta++;
+    return 0;
+  }
   // Chave da RAIZ: um manifesto tem "id" tambem dentro de catalogs[] e de
   // behaviorHints, e ha addon que escreve "catalogs" antes de "id" — a leitura
   // crua trazia o id de um CATALOGO como se fosse o do addon. Ver js_texto_raiz.
@@ -3571,6 +3584,7 @@ static void publicarParcial(CatItem **lote, int *cap, int n,
 }
 
 static void *montar(void *u) {
+  addon_registry_refresh();
   // O lote tambem cresce: era dimensionado por CAT_MAX e por isso herdava o
   // mesmo teto arbitrario.
   int cap = 128;

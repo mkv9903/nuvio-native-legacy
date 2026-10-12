@@ -284,3 +284,69 @@ pub unsafe extern "C" fn nuvio_addons_snapshot_url(
         .map(CString::into_raw)
         .unwrap_or(ptr::null_mut())
 }
+
+#[no_mangle]
+pub unsafe extern "C" fn nuvio_addons_snapshot_manifest_url(
+    snapshot: *const NativeAddonSnapshot,
+    index: usize,
+) -> *mut c_char {
+    unsafe { snapshot.as_ref() }
+        .and_then(|snapshot| snapshot.snapshot.records.get(index))
+        .and_then(|record| CString::new(record.installed.url.manifest_url().to_string()).ok())
+        .map(CString::into_raw)
+        .unwrap_or(ptr::null_mut())
+}
+#[no_mangle]
+pub unsafe extern "C" fn nuvio_addons_snapshot_has_manifest(
+    snapshot: *const NativeAddonSnapshot,
+    index: usize,
+) -> i32 {
+    i32::from(
+        unsafe { snapshot.as_ref() }
+            .and_then(|snapshot| snapshot.snapshot.records.get(index))
+            .is_some_and(|record| record.manifest.is_some()),
+    )
+}
+
+/// The retained subtitle helper supplies a form-encoded extra segment. Decode
+/// those pairs before the Rust URL builder encodes the full request once.
+#[no_mangle]
+pub unsafe extern "C" fn nuvio_addons_snapshot_url_encoded_extras(
+    snapshot: *const NativeAddonSnapshot,
+    index: usize,
+    resource: *const c_char,
+    media_type: *const c_char,
+    id: *const c_char,
+    extras: *const c_char,
+) -> *mut c_char {
+    let result = (|| {
+        let snapshot = unsafe { snapshot.as_ref() }?;
+        let record = snapshot.snapshot.records.get(index)?;
+        let text = |pointer: *const c_char| {
+            if pointer.is_null() {
+                None
+            } else {
+                unsafe { CStr::from_ptr(pointer) }.to_str().ok()
+            }
+        };
+        let (resource, media_type, id, extras) =
+            (text(resource)?, text(media_type)?, text(id)?, text(extras)?);
+        // Reject broken encoded UTF-8 instead of form_urlencoded's lossy
+        // replacement, which would silently change a filename or hash input.
+        percent_encoding::percent_decode_str(extras)
+            .decode_utf8()
+            .ok()?;
+        let pairs: Vec<_> = url::form_urlencoded::parse(extras.as_bytes()).collect();
+        let borrowed: Vec<_> = pairs
+            .iter()
+            .map(|(name, value)| (name.as_ref(), value.as_ref()))
+            .collect();
+        let url = record
+            .installed
+            .url
+            .resource_url_with_extras(resource, media_type, id, &borrowed)
+            .ok()?;
+        CString::new(url.to_string()).ok()
+    })();
+    result.map(CString::into_raw).unwrap_or(ptr::null_mut())
+}

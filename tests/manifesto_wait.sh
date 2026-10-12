@@ -1,6 +1,7 @@
 #!/bin/bash
 set -eu
 cd "$(dirname "$0")/.."
+source tools/test-support.sh
 flags=(-O1 -g -Isrc -ffunction-sections -fdata-sections -Wl,--gc-sections \
        -DNV_LINUX_DESKTOP $(pkg-config --cflags sdl2 SDL2_image SDL2_ttf)  \
        -Wno-deprecated-declarations -Wno-macro-redefined)
@@ -11,5 +12,5 @@ if [ "${SANITIZE:-0}" = 1 ]; then flags+=(-fsanitize=address,undefined -fno-omit
 # secoes por funcao descarta o resto que este teste nao alcanca, entao nenhum
 # desses modulos precisa de stub (mesma receita de tests/homepos.sh).
 cc "${flags[@]}" src/cwordem.c tests/manifesto_wait.c \
-  -o /tmp/nuvio-manifesto-wait-tests
+  "$NUVIO_TEST_BACKEND_LIB" -ldl -pthread -lm -o /tmp/nuvio-manifesto-wait-tests
 /tmp/nuvio-manifesto-wait-tests

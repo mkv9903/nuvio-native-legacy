@@ -7,6 +7,7 @@
 #   bash tests/fontes_parcial.sh /tmp/dir   # e grava capturas BMP da folha
 set -eu
 cd "$(dirname "$0")/.."
+source tools/addon-test-support.sh
 dir=$(mktemp -d "${TMPDIR:-/tmp}/nuvio-fontes-parcial.XXXXXX")
 NUVIO_DADOS="$dir/dados"; mkdir -p "$NUVIO_DADOS"; export NUVIO_DADOS
 cat > "$dir/addons.py" <<'PY'

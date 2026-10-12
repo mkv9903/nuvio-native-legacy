@@ -7,6 +7,7 @@
 #include <string.h>
 #include <unistd.h>
 #include "../src/fontecache.c"
+#include "support/addon_context.h"
 
 // Regional provider discovery has its own harness; keep this cache fixture
 // limited to its mocked addon transport.
@@ -111,10 +112,7 @@ static size_t bytesCache(void) {
   return bytes;
 }
 static void listaAddon(void) {
-  AddonRemoto a = {0};
-  strcpy(a.url, "https://addon.invalid/manifest.json");
-  strcpy(a.nome, "Fixture"); a.ativo = 1;
-  addons_definir_lista(&a, 1);
+  test_addons_set("[{\"url\":\"https://addon.invalid/manifest.json\",\"name\":\"Fixture\",\"enabled\":true}]");
 }
 int main(void) {
   FontecacheEscopo e;
@@ -210,12 +208,14 @@ int main(void) {
   assert(bytesCache() == 0);
   fontecache_vod_guardar("tt200", "movie", NULL, &e, grande, 1, SDL_GetTicks());
   assert(bytesCache() > 0);
-  addons_esquecer();
+  test_addons_set("[]");
+  fontecache_vod_limpar();
   assert(bytesCache() == 0);
   fontecache_vod_guardar("tt201", "movie", NULL, &e, grande, 1, SDL_GetTicks());
   assert(bytesCache() == 0);
   free(grande); free(listaAtiva); listaAtiva = NULL;
   addons_encerrar();
+  test_addons_release();
   puts("fontecache VOD: PASS (HTTP, TTL, conta/perfil/episodio/config, respostas tardias, memoria)");
   return 0;
 }

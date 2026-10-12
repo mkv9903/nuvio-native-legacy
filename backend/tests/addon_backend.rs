@@ -701,3 +701,83 @@ fn logout_during_upload_hides_content_and_cleans_journal_after_the_old_request_f
     assert!(store.load_cache(&context.addons).unwrap().is_none());
     assert!(displayed(&backend).is_empty());
 }
+
+#[test]
+fn native_manifest_and_source_reports_validate_context_and_list_without_mutating_readers() {
+    let directory = Directory::new();
+    let (backend, account, _, ctx) = setup(&directory);
+    account.list(&ctx, vec![addon("a", true)]);
+    backend.synchronize(&ctx).unwrap();
+    let held = backend.snapshot();
+    let manifest =
+        Manifest::decode(br#"{"id":"provider","resources":["stream"],"types":["movie"]}"#).unwrap();
+    backend
+        .attach_snapshot_manifest(&held.addons, 0, manifest.clone())
+        .unwrap();
+    let revision = backend.snapshot().addons.revision;
+    backend
+        .attach_snapshot_manifest(&held.addons, 0, manifest.clone())
+        .unwrap();
+    assert_eq!(backend.snapshot().addons.revision, revision);
+    assert_eq!(
+        backend
+            .report_source_response(&held.addons, 0, false)
+            .unwrap(),
+        1
+    );
+    assert_eq!(
+        backend
+            .report_source_response(&held.addons, 0, false)
+            .unwrap(),
+        2
+    );
+    assert_eq!(held.addons.records[0].silent_queries, 0);
+    assert!(held.addons.records[0].manifest.is_none());
+    assert_eq!(backend.snapshot().addons.records[0].silent_queries, 2);
+    assert_eq!(
+        backend.snapshot().addons.list_revision,
+        held.addons.list_revision
+    );
+    assert!(backend.snapshot_current(&held.addons));
+    assert_eq!(
+        backend
+            .report_source_response(&held.addons, 0, true)
+            .unwrap(),
+        0
+    );
+    backend.set_enabled(&held.addons, 0, false).unwrap();
+    assert!(!backend.snapshot_current(&held.addons));
+    assert_eq!(
+        backend.attach_snapshot_manifest(&held.addons, 0, manifest),
+        Err(Error::Cancelled)
+    );
+    assert_eq!(
+        backend.report_source_response(&held.addons, 0, false),
+        Err(Error::Cancelled)
+    );
+}
+
+#[test]
+fn an_unchanged_provider_after_a_profile_round_trip_cannot_receive_old_manifest_or_telemetry() {
+    let directory = Directory::new();
+    let (backend, account, _, ctx) = setup(&directory);
+    account.list(&ctx, vec![addon("a", true)]);
+    backend.synchronize(&ctx).unwrap();
+    let held = backend.snapshot();
+    account.select(Some(context(2, 2)));
+    backend.activate(false);
+    account.select(Some(context(1, 3)));
+    backend.activate(false);
+    assert!(!backend.snapshot_current(&held.addons));
+    let manifest = Manifest::decode(br#"{"resources":["meta"]}"#).unwrap();
+    assert_eq!(
+        backend.attach_snapshot_manifest(&held.addons, 0, manifest),
+        Err(Error::Cancelled)
+    );
+    assert_eq!(
+        backend.report_source_response(&held.addons, 0, false),
+        Err(Error::Cancelled)
+    );
+    assert!(backend.snapshot().addons.records[0].manifest.is_none());
+    assert_eq!(backend.snapshot().addons.records[0].silent_queries, 0);
+}

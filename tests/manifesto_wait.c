@@ -41,7 +41,7 @@ int main(void) {
   fixtureAddons = 3;
   for (int i = 0; i < fixtureAddons; i++) {
     char u[100]; snprintf(u, sizeof u, "%s/manifest.json", addons_base(i));
-    desc_manifesto_cache_guardar(u, 1, "{\"id\":\"cached\"}");
+    desc_manifesto_cache_guardar(u, 1, "{\"id\":\"cached\",\"resources\":[]}");
   }
   int before = requests;
   maniLargar();

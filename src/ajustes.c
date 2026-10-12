@@ -20,6 +20,7 @@
 #include "idiomaauto.h"
 #include "linguas.h"
 #include "addons.h"
+#include "addon_registry.h"
 #include "plugins.h"
 #include "gfx.h"
 #include "escala.h"
@@ -6035,7 +6036,7 @@ static void ajDesenharTudo(Uint32 agora) {
   // A TELA E DONA DO PROPRIO FUNDO (Glass UI): a arte do titulo com o veu, e
   // as tres ilhas por cima. Ver ajustes_ux_desenho.inc.
 #ifdef AJUSTES_TESTE
-  if (ajQuadroAddons) { ajustes_desenhar_addons(ajQuadroAddons - 1); return; }
+  if (ajQuadroAddons) { settings_draw_addons(ajQuadroAddons - 1); return; }
 #endif
   montarTela();
   ajDesenharTela();

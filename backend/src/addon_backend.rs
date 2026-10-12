@@ -41,6 +41,7 @@ struct ProfileState {
     pending: Option<AddonEdit>,
     persisted: Option<Uuid>,
     manifests: HashMap<AddonUrl, Arc<Manifest>>,
+    silent_queries: HashMap<AddonUrl, u32>,
     status: AddonStatus,
     error: Option<Error>,
 }
@@ -52,6 +53,7 @@ impl ProfileState {
             pending: None,
             persisted: None,
             manifests: HashMap::new(),
+            silent_queries: HashMap::new(),
             status: AddonStatus::Loading,
             error: None,
         }
@@ -89,8 +91,11 @@ impl State {
                 manifest: profile
                     .and_then(|profile| profile.manifests.get(&installed.url))
                     .cloned(),
+                silent_queries: profile
+                    .and_then(|profile| profile.silent_queries.get(&installed.url))
+                    .copied()
+                    .unwrap_or(0),
                 installed,
-                silent_queries: 0,
             })
             .collect::<Vec<_>>()
             .into();
@@ -167,6 +172,82 @@ impl AddonBackend {
     }
     pub fn snapshot(&self) -> Arc<AddonBackendSnapshot> {
         self.state().published.clone()
+    }
+    fn snapshot_matches(&self, state: &State, snapshot: &AddonSnapshot) -> bool {
+        snapshot.context.as_ref().is_some_and(|context| {
+            state.active.as_ref() == Some(context)
+                && self.0.account.is_current(context)
+                && state.published.addons.list_revision == snapshot.list_revision
+                && state
+                    .published
+                    .addons
+                    .records
+                    .iter()
+                    .map(|record| &record.installed)
+                    .eq(snapshot.records.iter().map(|record| &record.installed))
+        })
+    }
+    pub fn snapshot_current(&self, snapshot: &AddonSnapshot) -> bool {
+        self.snapshot_matches(&self.state(), snapshot)
+    }
+    /// Source search remains native. Its retry counters belong to the exact
+    /// provider URL and scope, rather than a mutable array slot.
+    pub fn report_source_response(
+        &self,
+        snapshot: &AddonSnapshot,
+        index: usize,
+        responded: bool,
+    ) -> Result<u32> {
+        let mut state = self.state();
+        if !self.snapshot_matches(&state, snapshot) {
+            return Err(Error::Cancelled);
+        }
+        let record = snapshot.records.get(index).ok_or(Error::InvalidData)?;
+        let context = snapshot.context.as_ref().ok_or(Error::Cancelled)?;
+        let count = state
+            .profiles
+            .get_mut(&context.addons)
+            .expect("active addon scope")
+            .silent_queries
+            .entry(record.installed.url.clone())
+            .or_default();
+        *count = if responded {
+            0
+        } else {
+            count.saturating_add(1)
+        };
+        let result = *count;
+        state.publish();
+        Ok(result)
+    }
+    pub fn attach_snapshot_manifest(
+        &self,
+        snapshot: &AddonSnapshot,
+        index: usize,
+        manifest: Manifest,
+    ) -> Result<()> {
+        let mut state = self.state();
+        if !self.snapshot_matches(&state, snapshot) {
+            return Err(Error::Cancelled);
+        }
+        let record = snapshot.records.get(index).ok_or(Error::InvalidData)?;
+        let context = snapshot.context.as_ref().ok_or(Error::Cancelled)?;
+        let profile = state
+            .profiles
+            .get_mut(&context.addons)
+            .expect("active addon scope");
+        if profile
+            .manifests
+            .get(&record.installed.url)
+            .is_some_and(|current| **current == manifest)
+        {
+            return Ok(());
+        }
+        profile
+            .manifests
+            .insert(record.installed.url.clone(), Arc::new(manifest));
+        state.publish();
+        Ok(())
     }
     fn current(&self, context: &ContentContext) -> Result<()> {
         if self.0.account.is_current(context) && self.state().active.as_ref() == Some(context) {

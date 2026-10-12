@@ -4,6 +4,7 @@
 #   bash tests/legendas_shot.sh <dir>
 set -eu
 cd "$(dirname "$0")/.."
+source tools/test-support.sh
 sources=()
 for source in src/*.c; do [ "$source" != src/main.c ] && sources+=("$source"); done
 bin="${TMPDIR:-/tmp}/nuvio-legendas-shot"

@@ -14,7 +14,7 @@ account credentials are used by these tests.
 | `perfilsel` profile fields, selection rules, startup cache, PIN outcomes, primary-addon inheritance and logout | `storage`, `service` and `account` profile cases |
 
 All five reference groups passed before integration. The current Rust suite
-passes 141 Rust tests and two native driver tests. Additional coverage includes
+passes 145 Rust tests and seven native driver tests. Additional coverage includes
 late replies after cancellation or logout, stale refresh against a new account, disk-write failures, schema identity
 and version validation, isolated storage, private atomic writes, configuration
 key completeness, unverified PIN locks and shared-account owner handling.
@@ -89,8 +89,8 @@ redacted diagnostics; authoritative empty lists and whole-list rejection;
 root identities; exact resource names; root/string filters and independent
 object-resource filters; long/many prefixes; 703 catalogs with late search
 targets; required search versus required genre; channel types; malformed and
-oversized responses. These models are not yet connected to the C addon/search
-consumers, which still have their old limits until integration completes.
+oversized responses. These models now feed the C addon screen and source/subtitle workers. C catalog,
+guide and complete title ownership integration remains pending.
 
 Retained C integration checks pass for `syncordem`, `synccolecoes`,
 `colfileiras_sync`, `home_hero_layout`, `homepos`, `snapshot_falha` and
@@ -119,9 +119,9 @@ shared snapshot lifetime after parent release, independent resource filters,
 owned/encoded long request URLs and display NUL handling.
 
 The retained C account/profile screen driver passes after adding private-content
-generation tracking. The addon controller and C consumers are not yet bound to
-these new services; their application-level limits and profile-row behavior
-remain pending. Confirmed recovery and cross-device edit policies are recorded in
+generation tracking. The addon controller, screen/actions and source/subtitle readers now use these
+services; complete catalog/title integration and profile-row behavior remain
+pending. Confirmed recovery and cross-device edit policies are recorded in
 [the catalog implementation record](catalogs.md).
 
 ## Addon edit policy and worker
@@ -145,8 +145,8 @@ install, full URLs, stale/null/invalid inputs and held snapshot lifetime.
 
 The two native driver tests cover the retained account/profile screen behavior
 and all C/Rust addon view sizes/field offsets. C supplies layout measurements;
-the assertions are in Rust. The app's addon C consumers still need integration;
-these checks are not a manual TV or Linux account/catalog handoff.
+the assertions are in Rust. These layout/account checks now include the real addon screen and remote
+toggle/recovery behavior. They are not a manual TV or Linux catalog handoff.
 
 ## Provider HTTP, catalog titles and private document loading
 
@@ -177,5 +177,49 @@ the active C tests remain until their runtime parsing path is replaced.
 
 Manifest policy regression coverage checks incomplete/failed replies preserving
 cache, explicit empty and source-only replies removing old catalogs, legacy
-catalog-only providers, and independent full-resource type filters. All 141
-Rust tests pass after this correction.
+catalog-only providers, and independent full-resource type filters. That checkpoint passed 141 Rust tests; the subsequent runtime boundary adds
+further coverage.
+
+
+## Addon runtime and retained native workers
+
+The runtime checkpoint passes 145 Rust backend tests and seven additional native
+Rust tests (five addon worker/reader cases and two layout/screen drivers).
+Coverage includes complete configured provider URLs beyond 7 KiB, eighty source
+and subtitle providers, title IDs beyond the former C request buffer through the
+synchronous source interface, independent HTTP headers, source retries retaining
+their originating snapshot, pinned strings after profile changes, rejected late
+source responses, four busy subtitle requests with the fifth queued, and cancelled
+queued/late subtitles. The real remote UI action saves/uploads a toggle. An
+unreadable-journal restart displays valid cached addons, blocks Enter and retains
+the damaged bytes. Captures include `addons-rust-backed.png` and
+`addons-recovery-paused.png` under the ignored native UI screens directory.
+
+New backend/boundary tests guard manifest and source-health publications against
+stale lists and profile round trips; distinguish metadata and list revisions;
+preserve owned full manifest/subtitle URLs; reject malformed encoded UTF-8; and
+verify native null/invalid inputs and public-host displays without credentials.
+
+The removed C addon model/URL test programs are replaced by `addons`,
+`addon_snapshot`, `addon_backend`, service/storage/edit/worker tests and the
+native worker tests. Historical shell entry points call the Rust coverage.
+The source-status, channel fallback and retry assertions remain in
+`tests/source_status.c` until source search itself is rewritten. Retained C
+source-cache, progressive-source and subtitle algorithm fixtures configure the
+real Rust backend through a feature-gated fake account transport; they do not
+recreate a mutable C addon registry. That support is excluded from app builds.
+
+The retained checks pass for `syncordem`, `contaoffline`, `addonslista`,
+`fontecache_vod`, `fontes_parcial`, `addons_legendas`, `manifesto_cache` and
+`manifesto_wait`. Addon journal/cache/upload assertions were removed from the C
+sync/outage fixtures because Rust owns those behaviors. The retained outage
+fixture checks collection/library/watched fallback, ownership, retry/recovery
+and logout, and proves C sync no longer requests the addon table. Transitional
+C manifest fixtures now declare explicit resources instead of using deliberately
+incomplete ID-only replies.
+
+These checks caught and corrected a missing snapshot in the native source retry
+job. The original retry, timeout and progressive-list assertions then passed.
+The C manifest cache/orchestrator, complete title/guide data access and immediate
+profile-change Home publication remain the next integration work. This checkpoint
+is not a manual-test handoff and does not count TV runtime as verified.

@@ -1,60 +1,16 @@
-// Ponte com os addons (protocolo Stremio) — as fontes de verdade.
-//
-// Um addon e uma URL base; as fontes de um titulo saem de
-//   <base>/stream/<movie|series>/<id>.json
-// e vem como {"streams":[{name,title|description,url,behaviorHints},...]}.
-// Nao ha autenticacao propria: a chave, quando existe, ja vem embutida no
-// caminho da URL do addon (por isso addons.txt e conteudo sensivel do dono e
-// nao deve ir para repositorio nenhum).
-//
-// A busca BLOQUEIA e roda num fio proprio. O resultado entra por
-// stream_definir_lista, e a tela so precisa olhar addons_estado().
+/* Retained C source/subtitle searches consume Rust-owned addon state.
+ * Provider URLs can contain private configuration; access them through pinned
+ * snapshots and never truncate them into registry buffers or import C files.
+ * Search results retain the existing C screens and playback interfaces. */
 #ifndef NV_ADDONS_H
 #define NV_ADDONS_H
 #include "addonurl.h"
 
 typedef enum { ADD_PARADO = 0, ADD_BUSCANDO, ADD_PRONTO, ADD_VAZIO } AddEstado;
 
-// Le art/addons.txt (nome<TAB>url por linha). Sem ele a lista fica vazia.
-int  addons_carregar(const char *dirArte);
-
-// Lista vinda da CONTA, substituindo o arquivo. E isto que torna o pacote
-// distribuivel: enquanto a lista sair de art/addons.txt, o .ipk carrega as
-// chaves de debrid de quem o montou embutidas nas URLs.
-//
-// Uma lista VAZIA e ignorada de proposito. O servidor pode responder vazio por
-// perfil errado, 401 mal tratado ou queda — e nenhum desses e "o usuario
-// removeu todos os addons". Trocar por vazio deixaria a pessoa sem fonte
-// nenhuma e sem entender por que.
-// `url` com NV_ADDON_URL_MAX (addonurl.h), e nao 600: a URL do Comet tem 870
-// e era cortada aqui, antes de qualquer outro modulo ve-la (#201).
-typedef struct { char nome[64]; char url[NV_ADDON_URL_MAX]; int ativo; } AddonRemoto;
-// Devolve 1 quando a lista MUDOU e foi aplicada; 0 quando nada mudou, quando
-// veio vazia, ou quando nada nela era utilizavel. Quem chama usa isso para
-// decidir se vale remontar o catalogo — e nao para saber quantos addons ha.
-int  addons_definir_lista(const AddonRemoto *lista, int n);
-
-// DE QUEM E A LISTA DE AGORA. O sync chama addons_marcar_da_conta(perfil) toda
-// vez que a resposta da conta para o perfil ATIVO foi aplicada — mudando a
-// lista ou nao —; addons_carregar (o art/addons.txt do pacote) e
-// addons_esquecer voltam a 0. addons_perfil_da_lista devolve esse perfil, 0
-// quando a lista nao veio da conta.
-//
-// Existe para a poda de fileiras (fil_podar_catalogos): no arranque a primeira
-// volta da descoberta roda com a lista do PACOTE, e podar com ela apagava as
-// escolhas do perfil sobre os addons que so a conta dele tem.
-void addons_marcar_da_conta(int perfil);
-int  addons_perfil_da_lista(void);
-
-// Lista atual, para o sync poder empurrar de volta o que este aparelho tem.
-int  addons_exportar(AddonRemoto *saida, int max);
-
-// Esquece a lista da conta. Chamado ao SAIR: sem isto, a proxima pessoa a usar
-// esta TV navega com os addons da anterior — e como as chaves de debrid vao
-// embutidas nas URLs, ela tambem consome a assinatura da anterior — ate o
-// primeiro sync terminar. Ficar sem fonte por alguns segundos e o
-// comportamento correto de "ninguem logado".
-void addons_esquecer(void);
+/* Account loading, edits and storage are Rust-owned. No C addon files are
+ * loaded or imported. These compatibility names read pinned native views. */
+int addons_perfil_da_lista(void);
 int  addons_n(void);
 // Numero que sobe a cada mudanca na lista de addons (conta, liga/desliga,
 // adicao). app.c refaz a busca de fontes do titulo aberto quando ele muda —
@@ -207,9 +163,9 @@ enum { ADD_CATALOGO = 0, ADD_STREAM, ADD_LEGENDA, ADD_META };
 
 const char *addons_nome(int i);
 int  addons_ativo(int i);
-int  addons_alternar(int i);          // devolve o estado NOVO
-// Acrescenta um addon sem refazer a lista (ver a nota em addons.c). 1 = entrou,
-// 0 = lista cheia, ja instalado ou URL que nao cabe (addonurl.h). Quem chama deve chamar sync_sujar_addons().
+int  addons_alternar(int i);          // -1 rejected; otherwise new 0/1 state
+/* Submit an install intention to Rust. Returns 1 when accepted; no separate
+ * C synchronization call is needed. Complete URLs are validated in Rust. */
 int  addons_adicionar(const char *nome, const char *urlManifest);
 // O addon fornece este recurso? Ate a sonda responder e uma suposicao
 // otimista; addons_sondado() diz qual dos dois casos e.
@@ -233,32 +189,12 @@ int  addons_aceita_id(int i, const char *tipo, const char *id);
 // pareciam culpadas. O caminho normal agora e addons_manifesto_lido, abaixo.
 void addons_sondar_manifestos(void);
 
-// O MANIFESTO DO ADDON `i`, JA BAIXADO POR OUTRO. Preenche id, nome e
-// capacidades a partir de `corpo`.
-//
-// Existe para nao baixar o mesmo arquivo duas vezes: descoberta.c ja le o
-// manifesto de todo addon no arranque, para enumerar os catalogos. Antes desta
-// funcao havia dois leitores do mesmo arquivo com propositos diferentes, e o
-// que rodava sempre (o da descoberta) jogava fora exatamente o dado que faltava
-// ao outro.
-//
-// CONCORRENCIA, dita e nao escondida: escreve em `addon[i]` do fio de quem
-// chama, e outros fios leem esse vetor sem trava — o que ja era verdade da
-// sonda. O pior caso e uma leitura de `id` pela metade num quadro; quem depende
-// dele (vertudo.c) reconfere por quadro. `base`, que e o campo que os fios de
-// busca usam, nao e tocado aqui.
-void addons_manifesto_lido(int i, const char *corpo);
-
-// OS CATALOGOS DE CANAL QUE O MANIFESTO DECLARA (type tv/channel/channels/
-// live/iptv), lidos pela mesma passagem de addons_manifesto_lido. Existe para
-// o Guia de TV NAO baixar o manifesto de novo: a descoberta ja leu todos no
-// arranque, em paralelo, e o guia refazia os mesmos GETs em serie — MEDIDO
-// como a maior parte da espera para o guia abrir. Devolve quantos copiou para
-// `saida`; -1 quando o manifesto deste addon ainda nao foi lido (ai o guia
-// baixa ele mesmo, como antes).
-typedef struct { char tipo[16], id[96], nome[96]; } AddCatCanal;
-#define ADD_CANAL_MAX 4
-int addons_catalogos_canal(int i, AddCatCanal *saida, int max);
+/* Attaches a validated manifest to the reader's exact Rust context/list.
+ * Returns 0 for damaged data or an obsolete reader, retaining valid state. */
+int addons_manifesto_lido(int index, const char *body);
+/* Borrowed complete strings, valid for this reader's pinned snapshot. */
+typedef struct { const char *tipo, *id, *nome; } AddCatCanal;
+int addons_catalogos_canal(int index, AddCatCanal *output, int capacity);
 
 // POR QUE A ULTIMA BUSCA NAO TROUXE FONTE, em frase curta ja traduzida
 // ("4 add-ons responderam: nenhum tem este título", "Comet não respondeu",

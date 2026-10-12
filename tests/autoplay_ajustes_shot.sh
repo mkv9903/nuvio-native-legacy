@@ -4,6 +4,7 @@
 #   mkdir -p /tmp/nv-202 && NUVIO_SHOT_FONTE=3 bash tests/autoplay_ajustes_shot.sh /tmp/nv-202/aj
 set -eu
 cd "$(dirname "$0")/.."
+source tools/addon-test-support.sh
 export NUVIO_DADOS=$(mktemp -d "${TMPDIR:-/tmp}/nuvio-autoplay-dados.XXXXXX")
 trap 'rm -rf "$NUVIO_DADOS"' EXIT
 sources=()

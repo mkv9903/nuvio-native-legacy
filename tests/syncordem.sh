@@ -57,18 +57,6 @@ echo "$SAIDA" | grep -qF 'nao tento de novo por 7 dias' \
 sessao credencial-reabrir
 echo "$SAIDA" | grep -qF 'recusa lembrada do disco' \
   || { echo "FALHOU: recusa nao sobreviveu ao arranque"; exit 1; }
-sessao addons
-# Fila de addon entre PROCESSOS: uma sessao cai em 500 e termina; a seguinte
-# parte so do disco. O nome vazio e estado desligado tambem devem sobreviver.
-export NV_T_DIR="$dir/addons-boot/space.mkv.nuvio.rusttest"; mkdir -p "$NV_T_DIR"
-sessao addons-gravar
-sessao addons-reabrir
-sessao addons-boot-leitura
-sessao addons-ack
-sessao addons-limpo
-for caso in identidade ack-perfil disco ram8 teto; do
-  export NV_T_DIR="$dir/addons-$caso/space.mkv.nuvio.rusttest"; mkdir -p "$NV_T_DIR"
-  sessao "addons-$caso"
-done
+# Addon edits, offline journals and acknowledgements now run in Rust tests.
 echo "$SAIDA" | grep -q 'FALHOU' && exit 1
 echo "syncordem.sh: ok"

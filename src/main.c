@@ -595,9 +595,8 @@ int main(int argc, char **argv) {
   // so sai do padrao depois desta chamada. Sem ela a opcao existia na tela,
   // gravava no arquivo e nao fazia efeito nenhum — o pior tipo de ajuste.
   //
-  // A chamada de sempre, la embaixo, FICA: ela roda depois de addons_carregar
-  // e e a que estabelece o idioma e o espelho do limite de fileiras. Reler o
-  // mesmo arquivo duas vezes e barato e deixa aquele bloco intacto.
+  // The later settings load establishes the interface language and row limit.
+  // This earlier read makes the initial display settings available at startup.
   ajustes_dir(dados_dir());
   // MODO SEGURO, LOGO DEPOIS DE LER OS AJUSTES e antes de qualquer coisa que os
   // use para decidir peso: a superficie 4K (logo abaixo) e o teto de fileiras
@@ -867,10 +866,8 @@ int main(int argc, char **argv) {
   // image caching stay disabled rather than using files in the artwork root.
   const char *dirDados = dados_dir();
 
-  // A configuracao de addons mora junto da arte. Ausente, o app segue com a
-  // lista de exemplo — nunca fica sem nada para mostrar. addons.c olha a pasta
-  // gravavel primeiro: a lista da CONTA e guardada la e sobrevive a recarga.
-  addons_carregar(dirArte);
+  /* The Rust account addon worker supplies data; packaged C addon files are
+   * never loaded or imported by this test app. */
   // Plugins Nuvio (F09, desligados por padrao): estado da conta+perfil e a
   // ligacao como mais uma origem da busca de fontes.
   plugins_iniciar();

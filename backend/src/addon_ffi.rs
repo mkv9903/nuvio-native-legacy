@@ -4,7 +4,7 @@ use crate::{
     addon_controller::AddonController,
     addon_snapshot::NativeAddonSnapshot,
     addon_storage::AddonStore,
-    addons::{AddonUrl, InstalledAddon},
+    addons::{AddonUrl, InstalledAddon, Manifest},
     controller::AccountController,
     error::{Error, Result},
 };
@@ -95,6 +95,50 @@ pub unsafe extern "C" fn nuvio_addons_step(
     }
 }
 #[no_mangle]
+pub unsafe extern "C" fn nuvio_addons_step_controlled(
+    handle: *const NativeAddonController,
+    force_primary: i32,
+    allow_periodic: i32,
+) {
+    if let Some(handle) = unsafe { handle.as_ref() } {
+        handle
+            .controller
+            .step_controlled(force_primary != 0, allow_periodic != 0);
+    }
+}
+#[no_mangle]
+pub unsafe extern "C" fn nuvio_addon_normalize_url(url: *const c_char) -> *mut c_char {
+    unsafe { text(url) }
+        .and_then(AddonUrl::parse)
+        .ok()
+        .and_then(|url| std::ffi::CString::new(url.as_str()).ok())
+        .map(std::ffi::CString::into_raw)
+        .unwrap_or(ptr::null_mut())
+}
+#[no_mangle]
+pub unsafe extern "C" fn nuvio_addon_public_host(url: *const c_char) -> *mut c_char {
+    let result = (|| {
+        let parsed = url::Url::parse(unsafe { text(url).ok()? }).ok()?;
+        let host = parsed.host()?.to_string();
+        let host = parsed
+            .port()
+            .map(|port| format!("{host}:{port}"))
+            .unwrap_or(host);
+        std::ffi::CString::new(host).ok()
+    })();
+    result
+        .map(std::ffi::CString::into_raw)
+        .unwrap_or(ptr::null_mut())
+}
+#[no_mangle]
+pub unsafe extern "C" fn nuvio_addon_manifest_valid(body: *const c_char) -> i32 {
+    i32::from(
+        unsafe { text(body) }
+            .and_then(|body| Manifest::decode(body.as_bytes()))
+            .is_ok(),
+    )
+}
+#[no_mangle]
 pub unsafe extern "C" fn nuvio_addons_refresh(handle: *const NativeAddonController) {
     if let Some(handle) = unsafe { handle.as_ref() } {
         handle.controller.refresh();
@@ -119,6 +163,62 @@ pub unsafe extern "C" fn nuvio_addons_revision(handle: *const NativeAddonControl
     unsafe { handle.as_ref() }
         .map(|handle| handle.controller.backend.snapshot().addons.revision)
         .unwrap_or(0)
+}
+#[no_mangle]
+pub unsafe extern "C" fn nuvio_addons_list_revision(handle: *const NativeAddonController) -> u64 {
+    unsafe { handle.as_ref() }
+        .map(|handle| handle.controller.backend.snapshot().addons.list_revision)
+        .unwrap_or(0)
+}
+#[no_mangle]
+pub unsafe extern "C" fn nuvio_addons_snapshot_current(
+    handle: *const NativeAddonController,
+    snapshot: *const NativeAddonSnapshot,
+) -> i32 {
+    match (unsafe { handle.as_ref() }, unsafe { snapshot.as_ref() }) {
+        (Some(handle), Some(snapshot)) => i32::from(
+            handle
+                .controller
+                .backend
+                .snapshot_current(&snapshot.snapshot),
+        ),
+        _ => 0,
+    }
+}
+#[no_mangle]
+pub unsafe extern "C" fn nuvio_addons_attach_manifest(
+    handle: *const NativeAddonController,
+    snapshot: *const NativeAddonSnapshot,
+    index: usize,
+    body: *const c_char,
+) -> i32 {
+    let result = (|| {
+        let handle = unsafe { handle.as_ref() }.ok_or(Error::Configuration)?;
+        let snapshot = unsafe { snapshot.as_ref() }.ok_or(Error::InvalidData)?;
+        let manifest = Manifest::decode(unsafe { text(body)? }.as_bytes())?;
+        handle
+            .controller
+            .backend
+            .attach_snapshot_manifest(&snapshot.snapshot, index, manifest)
+    })();
+    i32::from(result.is_ok())
+}
+#[no_mangle]
+pub unsafe extern "C" fn nuvio_addons_report_response(
+    handle: *const NativeAddonController,
+    snapshot: *const NativeAddonSnapshot,
+    index: usize,
+    responded: i32,
+) -> i64 {
+    match (unsafe { handle.as_ref() }, unsafe { snapshot.as_ref() }) {
+        (Some(handle), Some(snapshot)) if matches!(responded, 0 | 1) => handle
+            .controller
+            .backend
+            .report_source_response(&snapshot.snapshot, index, responded != 0)
+            .map(i64::from)
+            .unwrap_or(-1),
+        _ => -1,
+    }
 }
 #[no_mangle]
 pub unsafe extern "C" fn nuvio_addons_set_enabled(

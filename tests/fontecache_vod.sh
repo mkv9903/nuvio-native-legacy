@@ -2,6 +2,7 @@
 # Cache VOD de metadados, com addons.c real e HTTP/video/debrid dublados.
 set -eu
 cd "$(dirname "$0")/.."
+source tools/addon-test-support.sh
 dir=$(mktemp -d "${TMPDIR:-/tmp}/nuvio-fontecache-vod.XXXXXX")
 trap 'rm -rf "$dir"' EXIT
 flags=(-O1 -g -Isrc -pthread -DNV_LINUX_DESKTOP $(pkg-config --cflags sdl2 SDL2_image SDL2_ttf)

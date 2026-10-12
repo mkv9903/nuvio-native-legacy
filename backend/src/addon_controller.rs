@@ -112,6 +112,9 @@ impl AddonController {
     }
     /// Constant-time queue bookkeeping at each frame, after context selection.
     pub fn step(&self, force_primary: bool) {
+        self.step_controlled(force_primary, true);
+    }
+    pub fn step_controlled(&self, force_primary: bool, allow_periodic: bool) {
         let context = self.backend.activate(force_primary);
         let mut queue = self
             .worker
@@ -124,7 +127,8 @@ impl AddonController {
             queue.flush = true;
             queue.next_request = Instant::now() + REFRESH_INTERVAL;
             self.worker.ready.notify_one();
-        } else if queue.context.is_some()
+        } else if allow_periodic
+            && queue.context.is_some()
             && queue.pending.is_none()
             && Instant::now() >= queue.next_request
         {
