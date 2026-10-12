@@ -65,7 +65,8 @@ impl Session {
     /// Inspect claims to schedule requests; the server verifies the signature.
     pub fn from_tokens(access: Secret, refresh: Secret, anonymous: bool) -> Result<Self> {
         let parts: Vec<_> = access.expose().split('.').collect();
-        if parts.len() != 3
+        if refresh.is_empty()
+            || parts.len() != 3
             || parts
                 .iter()
                 .any(|part| part.is_empty() || part.chars().any(char::is_whitespace))

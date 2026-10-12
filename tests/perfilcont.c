@@ -57,10 +57,11 @@ static void zerar(void) {
   free(arquivo); arquivo = NULL;
   prog_invalidar(); perfil = 1; catConhece = 0;
   memset(lista, 0, sizeof lista);
-  lista[0].indice = 1; snprintf(lista[0].nome, sizeof lista[0].nome, "Henrique");
-  lista[1].indice = 2; snprintf(lista[1].nome, sizeof lista[1].nome, "Alvaro");
-  lista[2].indice = 3; snprintf(lista[2].nome, sizeof lista[2].nome, "Kids"); lista[2].temPin = 1;
-  lista[3].indice = 4; snprintf(lista[3].nome, sizeof lista[3].nome, "Visitas");
+  lista[0].index = 1; lista[0].name = "Henrique";
+  lista[1].index = 2; lista[1].name = "Alvaro";
+  lista[2].index = 3; lista[2].name = "Kids"; lista[2].has_pin = 1;
+  lista[3].index = 4; lista[3].name = "Visitas";
+  for (int i = 0; i < 4; i++) lista[i].lock_verified = 1;
   nLista = 4;
 }
 

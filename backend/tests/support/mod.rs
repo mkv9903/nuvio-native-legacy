@@ -36,6 +36,9 @@ impl Directory {
     pub fn store(&self) -> AccountStore {
         AccountStore::open(&self.path, TEST_APP_ID).unwrap()
     }
+    pub fn account_file(&self) -> PathBuf {
+        self.path.join("rust-backend-v1/account.json")
+    }
 }
 impl Drop for Directory {
     fn drop(&mut self) {

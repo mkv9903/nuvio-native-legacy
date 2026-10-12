@@ -6,6 +6,7 @@
 #   salvospainel_perf              -> per-frame metric to compare tree structures;
 #                                     does not pass/fail (gate is salvospainel.sh)
 cd "$(dirname "$0")/.." || exit 1
+source tools/test-support.sh || exit 1
 LOGS=$(mktemp -d "${TMPDIR:-/tmp}/nuvio-testes.XXXXXX") || exit 1
 failed=0
 passed=0

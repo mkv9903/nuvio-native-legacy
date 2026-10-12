@@ -7,6 +7,7 @@
 # reais do dono; a guarda esta nos dois lados de proposito.
 set -eu
 cd "$(dirname "$0")/.."
+source tools/test-support.sh
 tmp="$(mktemp -d "${TMPDIR:-/tmp}/nuvio-listas-XXXXXX")"
 trap 'rm -rf "$tmp"' EXIT
 sources=()

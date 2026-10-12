@@ -293,8 +293,7 @@ fn storage_failure_keeps_a_successful_login_usable_in_memory() {
         service(|_| response(200, auth("user", None, "new"))),
         &directory,
     );
-    fs::remove_file(directory.path.join("account.json")).unwrap();
-    fs::create_dir(directory.path.join("account.json")).unwrap();
+    fs::create_dir(directory.account_file()).unwrap();
     let generation = backend.begin_email();
     backend
         .finish_email(generation, Secret::new("a@b.test"), Secret::new("password"))
@@ -373,7 +372,7 @@ fn profiles_preserve_baseline_selection_pin_and_primary_addon_rules() {
     let restored = directory.store().load().unwrap();
     assert!(restored.selection.needs_selection());
     assert!(!restored.selection.can_dismiss());
-    assert!(!fs::read_to_string(directory.path.join("account.json"))
+    assert!(!fs::read_to_string(directory.account_file())
         .unwrap()
         .contains("4271"));
     backend.logout();
@@ -493,4 +492,244 @@ fn tv_polling_uses_server_interval_timeout_and_retries_exchange_outages() {
     clock.0.store(1610, Ordering::SeqCst);
     assert!(backend.claim_poll().is_none());
     assert_eq!(backend.snapshot().error, Some(Error::CodeExpired));
+}
+
+#[test]
+fn tv_polling_and_code_expiry_ignore_wall_clock_changes() {
+    struct IndependentClock {
+        wall: AtomicU64,
+        elapsed: AtomicU64,
+    }
+    impl nuvio_backend::account::Clock for IndependentClock {
+        fn seconds(&self) -> u64 {
+            self.wall.load(Ordering::SeqCst)
+        }
+        fn monotonic_millis(&self) -> u64 {
+            self.elapsed.load(Ordering::SeqCst)
+        }
+    }
+    let directory = Directory::new();
+    let clock = Arc::new(IndependentClock {
+        wall: AtomicU64::new(1000),
+        elapsed: AtomicU64::new(0),
+    });
+    let service = service(|request| match request.url.path() {
+        "/auth/v1/signup" => response(200, auth("anon", None, "anon")),
+        "/rest/v1/rpc/start_tv_login_session" => response(
+            200,
+            json!({"code":"code","web_url":"https://login.invalid/tv","poll_interval_seconds":5}),
+        ),
+        "/rest/v1/rpc/poll_tv_login_session" => response(200, json!({"status":"pending"})),
+        _ => panic!("unexpected request"),
+    });
+    let backend = AccountBackend::new(service, Some(directory.store()), clock.clone());
+    let generation = backend.begin_tv();
+    backend.finish_tv_start(generation).unwrap();
+    clock.wall.store(1_000_000, Ordering::SeqCst);
+    clock.elapsed.store(4999, Ordering::SeqCst);
+    assert!(backend.claim_poll().is_none());
+    assert_eq!(backend.snapshot().login, LoginState::Waiting);
+    clock.wall.store(1, Ordering::SeqCst);
+    clock.elapsed.store(5000, Ordering::SeqCst);
+    assert_eq!(backend.claim_poll(), Some(generation));
+    backend.finish_poll(generation).unwrap();
+    clock.elapsed.store(600_000, Ordering::SeqCst);
+    assert!(backend.claim_poll().is_none());
+    assert_eq!(backend.snapshot().error, Some(Error::CodeExpired));
+}
+
+#[test]
+fn anonymous_rust_session_restores_without_a_signed_in_user() {
+    let directory = Directory::new();
+    let mut anonymous = session("anonymous", None, "anon");
+    anonymous.anonymous = true;
+    directory
+        .store()
+        .save(&AccountData {
+            session: Some(anonymous),
+            ..AccountData::default()
+        })
+        .unwrap();
+    let backend = backend(
+        service(|_| panic!("startup must not make an HTTP request")),
+        &directory,
+    );
+    assert_eq!(backend.snapshot().login, LoginState::LoggedOut);
+    assert!(backend.user_token().is_none());
+    assert!(backend.user_id().is_empty());
+    assert!(!backend.needs_selection());
+}
+
+#[test]
+fn concurrent_expired_requests_refresh_before_sending_the_operation() {
+    let directory = Directory::new();
+    seed(&directory, "user", Some(999));
+    let refreshes = Arc::new(AtomicUsize::new(0));
+    let count = refreshes.clone();
+    let backend = backend(
+        service(move |request| {
+            if request.url.query() == Some("grant_type=refresh_token") {
+                count.fetch_add(1, Ordering::SeqCst);
+                response(200, auth("user", Some(5000), "new"))
+            } else {
+                assert_eq!(
+                    request.authorization.expose(),
+                    token("user", Some(5000), "new")
+                );
+                response(200, json!({}))
+            }
+        }),
+        &directory,
+    );
+    let start = Barrier::new(8);
+    thread::scope(|scope| {
+        let start = &start;
+        let mut handles = Vec::new();
+        for _ in 0..8 {
+            let backend = &backend;
+            handles.push(scope.spawn(move || {
+                start.wait();
+                backend.rpc("test_rpc", b"{}")
+            }));
+        }
+        for handle in handles {
+            assert_eq!(handle.join().unwrap().unwrap().status, 200);
+        }
+    });
+    assert_eq!(refreshes.load(Ordering::SeqCst), 1);
+}
+
+#[test]
+fn malformed_successful_refresh_response_does_not_delete_a_valid_session() {
+    let directory = Directory::new();
+    seed(&directory, "user", Some(999));
+    let backend = backend(
+        service(|_| response(200, auth("different-user", None, "wrong"))),
+        &directory,
+    );
+    assert_eq!(
+        backend.rpc("test_rpc", b"{}").err(),
+        Some(Error::InvalidData)
+    );
+    assert_eq!(backend.user_id(), "user");
+    assert_eq!(
+        directory
+            .store()
+            .load()
+            .unwrap()
+            .session
+            .unwrap()
+            .refresh
+            .expose(),
+        "refresh-old"
+    );
+}
+
+#[test]
+fn cancelled_correct_pin_never_commits_profile_selection() {
+    let directory = Directory::new();
+    seed(&directory, "user", None);
+    let started = Arc::new(Barrier::new(2));
+    let release = Arc::new(Barrier::new(2));
+    let ready = started.clone();
+    let finish = release.clone();
+    let backend = backend(
+        service(move |request| match request.url.path() {
+            "/rest/v1/rpc/get_sync_owner" => response(200, json!("owner")),
+            "/rest/v1/rpc/sync_pull_profiles" => {
+                response(200, json!([{"profile_index":1},{"profile_index":2}]))
+            }
+            "/rest/v1/rpc/sync_pull_profile_locks" => response(
+                200,
+                json!([{"profile_id":1,"pin_enabled":false},{"profile_id":2,"pin_enabled":true}]),
+            ),
+            "/rest/v1/rpc/verify_profile_pin" => {
+                ready.wait();
+                finish.wait();
+                response(200, json!(true))
+            }
+            _ => panic!("unexpected request"),
+        }),
+        &directory,
+    );
+    backend.load_profiles().unwrap();
+    backend
+        .select_profile(ProfileId::new(1).unwrap(), None)
+        .unwrap();
+    let action = backend.begin_selection();
+    thread::scope(|scope| {
+        let handle = scope.spawn(|| {
+            backend.finish_selection(
+                action,
+                ProfileId::new(2).unwrap(),
+                Some(Secret::new("4271")),
+            )
+        });
+        started.wait();
+        backend.cancel_selection();
+        release.wait();
+        assert_eq!(handle.join().unwrap(), Err(Error::Cancelled));
+    });
+    assert_eq!(backend.active_id(), 1);
+    assert_eq!(
+        directory
+            .store()
+            .load()
+            .unwrap()
+            .selection
+            .selected
+            .unwrap()
+            .get(),
+        1
+    );
+}
+
+#[test]
+fn changed_owner_and_removed_profiles_invalidate_the_previous_selection() {
+    let directory = Directory::new();
+    seed(&directory, "member", None);
+    let mode = Arc::new(AtomicUsize::new(0));
+    let state = mode.clone();
+    let backend = backend(
+        service(move |request| match request.url.path() {
+            "/rest/v1/rpc/get_sync_owner" => response(
+                200,
+                if state.load(Ordering::SeqCst) < 2 {
+                    json!("owner")
+                } else {
+                    json!("another-owner")
+                },
+            ),
+            "/rest/v1/rpc/sync_pull_profiles" => response(
+                200,
+                if state.load(Ordering::SeqCst) == 0 {
+                    json!([{"profile_index":1},{"profile_index":2}])
+                } else {
+                    json!([{"profile_index":1},{"profile_index":3}])
+                },
+            ),
+            "/rest/v1/rpc/sync_pull_profile_locks" => response(
+                200,
+                json!([{"profile_id":1,"pin_enabled":false},{"profile_id":2,"pin_enabled":false},{"profile_id":3,"pin_enabled":false}]),
+            ),
+            _ => panic!("unexpected request"),
+        }),
+        &directory,
+    );
+    backend.load_profiles().unwrap();
+    backend
+        .select_profile(ProfileId::new(2).unwrap(), None)
+        .unwrap();
+    mode.store(1, Ordering::SeqCst);
+    backend.load_profiles().unwrap();
+    assert!(backend.snapshot().selection.selected.is_none());
+    assert!(backend.needs_selection());
+    backend
+        .select_profile(ProfileId::new(3).unwrap(), None)
+        .unwrap();
+    mode.store(2, Ordering::SeqCst);
+    backend.load_profiles().unwrap();
+    assert!(backend.snapshot().selection.selected.is_none());
+    assert_eq!(backend.snapshot().owner.as_deref(), Some("another-owner"));
+    assert!(backend.needs_selection());
 }

@@ -16,8 +16,9 @@ No implementation from either discarded rewrite is carried into this branch.
   C capabilities that have not yet been rewritten.
 - Keep the isolated Nuvio Rust Test name and `space.mkv.nuvio.rusttest` identity.
   Production-app data must remain separate.
-- Use versioned Rust JSON storage and migrate each rewritten area's existing
-  test-app data. Migration must not read production-app data.
+- Use fresh versioned Rust JSON for each rewritten area. Restore only this
+  rewrite's own data. Do not import C files or discarded standalone files;
+  this replaces the earlier migration decision.
 - Write all new Rust code, tests, logs, comments, documentation and filenames in
   English. Translate complete C UI components when touched; translate only the
   affected UI component in a large mixed file. C backend areas awaiting
@@ -46,7 +47,7 @@ Before replacing code, establish the `main` behavior and translate its relevant
 tests into an English case inventory. Cover password escaping and error mapping;
 server outage versus rejected credentials; incomplete saved sessions; concurrent
 refresh; token readers; retry; late login/refresh replies; shared-account owner;
-profile selection and PIN rules; account/profile isolation; and storage migration.
+profile selection and PIN rules; account/profile isolation; and versioned storage.
 
 Profile-specific Home catalogs remain the next related capability. The known
 profile-switch catalog issue is addressed when Rust owns catalog loading and its
@@ -58,9 +59,15 @@ owner and otherwise wait/retry rather than using the signed-in member's ID.
 
 ## Validation status
 
-Clean restart and scope decisions are recorded. The Rust account domain,
-service client and versioned storage pass 26 tests. The five relevant C
-reference groups also pass. See [test coverage](test-coverage.md).
-C UI integration, worker/boundary verification and platform builds are next.
-No newly rewritten flow is ready for TV testing yet. Previous TV evidence
-validates the earlier experiment only.
+The Rust account domain, HTTP client, worker, native boundary, platform helper
+and fresh versioned storage pass 40 tests. The C login and profile screens also
+pass a Rust driver under Xvfb. The five relevant C reference groups passed
+before their test cases moved to Rust. See [test coverage](test-coverage.md).
+The Linux app builds, and the first ARM link passes. Retained Continue Watching,
+profile content, sync ordering and account-settings tests pass. Remaining integration checks and
+the final isolated package are in progress. No newly rewritten flow is ready for TV testing yet.
+Previous TV evidence validates the earlier experiment only.
+
+The user approved a correction to a stale retained C settings fixture. Its
+cause and the cases to replace in Rust are recorded in
+[settings follow-up](settings-follow-up.md).

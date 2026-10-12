@@ -212,19 +212,10 @@ fn configuration_covers_every_property_in_the_repository_template() {
             line.split_once('=').map(|(key, _)| key.trim())
         })
         .collect();
-    let compiled: std::collections::BTreeSet<_> = [
-        "NUVIO_SUPABASE_URL",
-        "NUVIO_SUPABASE_ANON_KEY",
-        "TV_LOGIN_WEB_BASE_URL",
-        "TRAKT_CLIENT_ID",
-        "TRAKT_CLIENT_SECRET",
-        "SIMKL_CLIENT_ID",
-        "SIMKL_APP_NAME",
-        "TMDB_API_KEY",
-        "SEEKR_API_KEY",
-    ]
-    .into_iter()
-    .collect();
+    let compiled: std::collections::BTreeSet<_> = nuvio_backend::config::built::CONFIGURATION_KEYS
+        .iter()
+        .copied()
+        .collect();
     assert_eq!(properties, compiled);
     let _ = (
         nuvio_backend::config::built::TMDB_API_KEY,

@@ -1244,6 +1244,14 @@ static void *rodar(void *u) {
   addonsCiclo = 0;
   copiaQuandoCiclo = 0;
   perfis_puxar();
+  /* A shared-account owner must be verified before any account-dependent
+   * loading. Rust retains a confirmed owner during temporary outages. */
+  if (!perfis_dono()[0]) {
+    resumoFixo("Unable to confirm the account owner. Press OK to retry.");
+    estado = SYNC_FALHOU;
+    PRONTO_PUBLICAR(fioPronto, 1);
+    return NULL;
+  }
   if (!contaDoCicloAtual()) {
     estado = SYNC_PRONTO;
     PRONTO_PUBLICAR(fioPronto, 1);

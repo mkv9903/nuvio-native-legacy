@@ -72,9 +72,9 @@ impl AccountService {
             },
         )?;
         response.success()?;
-        let fresh = decode_session(&response, session.anonymous)?;
+        let fresh = decode_session(&response, session.anonymous).map_err(|_| Error::InvalidData)?;
         if fresh.subject != session.subject {
-            return Err(Error::InvalidSession);
+            return Err(Error::InvalidData);
         }
         Ok(fresh)
     }

@@ -1,5 +1,6 @@
 #!/bin/bash
-# Native Linux UI preview. Video playback is stubbed for desktop UI testing.
+# Original C UI with the Rust account backend and isolated test-app data.
+# Video playback is stubbed for desktop UI testing.
 #   bash tools/linux.sh           # build and run
 #   bash tools/linux.sh --build   # build only
 #   bash tools/linux.sh --preview # browse UI without an account
@@ -24,7 +25,7 @@ fi
 ENVF=$(mktemp)
 trap 'rm -f "$ENVF"' EXIT
 bash tools/env.sh --env-file "$ENVF"
-DEFINES=(-DNV_LINUX_DESKTOP)
+DEFINES=(-DNV_LINUX_DESKTOP '-DNV_APP_ID="space.mkv.nuvio.rusttest"' '-DNV_APP_TITLE="Nuvio Rust Test"')
 while IFS='=' read -r name value; do
   # Pass each definition as one argument, including literal C string quotes.
   value=${value//\\/\\\\}
@@ -34,17 +35,20 @@ done < "$ENVF"
 read -r -a DEP_CFLAGS <<< "$(pkg-config --cflags "${DEPS[@]}")"
 read -r -a DEP_LIBS <<< "$(pkg-config --libs "${DEPS[@]}")"
 mkdir -p build/linux
-"$CC" src/*.c -Isrc -o build/linux/nuvio-native -O1 -g \
-  "${DEFINES[@]}" "${DEP_CFLAGS[@]}" "${DEP_LIBS[@]}" -ldl -pthread -lm
-echo "Linux UI build: $PWD/build/linux/nuvio-native"
+export CARGO_TARGET_DIR="$PWD/build/backend/target"
+bash tools/backend.sh --build
+"$CC" src/*.c -Isrc -o build/linux/nuvio-rusttest -O1 -g \
+  "${DEFINES[@]}" "${DEP_CFLAGS[@]}" "$CARGO_TARGET_DIR/debug/libnuvio_backend.a" \
+  "${DEP_LIBS[@]}" -ldl -pthread -lm
+echo "Linux UI build: $PWD/build/linux/nuvio-rusttest"
 if [ "$BUILD_ONLY" = 1 ]; then exit 0; fi
 
-DEFAULT_DATA="${XDG_DATA_HOME:-$HOME/.local/share}/space.mkv.nuvio.native"
+DEFAULT_DATA="${XDG_DATA_HOME:-$HOME/.local/share}"
 if [ "${NUVIO_UI_PREVIEW:-0}" = 1 ]; then
-  DEFAULT_DATA="${DEFAULT_DATA}-preview"
+  DEFAULT_DATA="${DEFAULT_DATA}/nuvio-rust-preview"
 fi
 export NUVIO_DADOS="${NUVIO_DATA:-${NUVIO_DADOS:-$DEFAULT_DATA}}"
 mkdir -p "$NUVIO_DADOS"
 rm -f "$ENVF"
 trap - EXIT
-exec build/linux/nuvio-native "$PWD/deploy/app/art" "$@"
+exec build/linux/nuvio-rusttest "$PWD/deploy/app/art" "$@"

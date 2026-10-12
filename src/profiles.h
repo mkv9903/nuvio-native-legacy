@@ -16,12 +16,13 @@
 
 typedef struct {
   union { int index; int indice; };                // profile_index (1..n) — passes in p_profile_id
-  union { char name[64]; char nome[64]; };
-  union { char color_hex[10]; char corHex[10]; };  // avatar_color_hex, "#1E88E5"
-  union { char avatar_url[300]; char avatarUrl[300]; };
-  union { char background_url[300]; char fundoUrl[300]; };
+  union { const char *name; const char *nome; };
+  union { const char *color_hex; const char *corHex; };  // avatar_color_hex, "#1E88E5"
+  union { const char *avatar_url; const char *avatarUrl; };
+  union { const char *background_url; const char *fundoUrl; };
   union { int is_primary; int primario; };          // is_primary
   union { int has_pin; int temPin; };               // from sync_pull_profile_locks
+  int lock_verified;
   union { int uses_primary_addons; int usaAddonsDoPrimario; }; // uses_primary_addons
 } AccountProfile;
 
@@ -30,7 +31,8 @@ typedef AccountProfile ContaPerfil;
 typedef enum {
   PROFILE_ACTION_NONE = 0,   // non-existent slot
   PROFILE_ACTION_ENTER,      // enter directly
-  PROFILE_ACTION_PIN         // locked: prompt for PIN first
+  PROFILE_ACTION_PIN,        // locked: prompt for PIN first
+  PROFILE_ACTION_RETRY       // lock not verified: retry account request
 } ProfileAction;
 
 typedef ProfileAction PerfilAcao;
@@ -53,7 +55,6 @@ int  profiles_active(void);                      // profile_index; 1 when none c
 // Profile from which ADDONS are loaded: equal to profiles_active(), unless
 // profile inherits primary (uses_primary_addons), in which case it is 1.
 int  profiles_active_addons(void);
-void profiles_set_active(int index);
 // Reads active profile AND PROFILE LIST OF LAST SESSION from disk. Call once on startup.
 void profiles_load_active(void);
 
@@ -75,10 +76,6 @@ int  profiles_suggested_index(void);
 // Action on pressing OK on slot `i`.
 ProfileAction profiles_action(int i);
 
-// Validates PIN of locked profile. BLOCKS.
-// Returns 1 (accepted), 0 (wrong PIN), -1 (network/server error).
-int  profiles_verify_pin(int index, const char *pin);
-
 // Clears profiles, owner and saved choice on logout.
 void profiles_forget(void);
 
@@ -90,7 +87,6 @@ const ContaPerfil *perfis_item_ativo(void);
 const char *perfis_dono(void);
 int perfis_ativo(void);
 int perfis_ativo_addons(void);
-void perfis_definir_ativo(int indice);
 void perfis_carregar_ativo(void);
 int perfis_precisa_escolher(void);
 int perfis_sem_escolha(void);
@@ -98,7 +94,6 @@ int perfis_pode_dispensar(void);
 void perfis_manter_ativo(void);
 int perfis_indice_sugerido(void);
 PerfilAcao perfis_acao(int i);
-int perfis_verificar_pin(int indice, const char *pin);
 void perfis_esquecer(void);
 
 #endif

@@ -1,23 +1,7 @@
-// The account: tokens on disk, TV code login, refresh and logout.
-//
-// This is the module that replaces the owner's secret files (art/trakt.txt,
-// art/addons.txt) with a real session. Without this module, the .ipk
-// cannot be distributed: it delivers the Trakt token and debrid keys of
-// whoever built it.
-//
-// FLOW, read from js/core/auth/qrLoginService.js. Not the email and password
-// login of web, and not by preference: the search keyboard only has "a-z0-9",
-// no uppercase, no "@" and no dot. An email is not typable in this app today.
-//   1. ANONYMOUS session (POST /auth/v1/signup; if rejected, /auth/v1/token?
-//      grant_type=anonymous). Without it the server responds 401 to the two
-//      subsequent RPCs.
-//   2. start_tv_login_session -> returns a CODE.
-//   3. The user opens the URL on mobile and enters the code.
-//   4. poll_tv_login_session until authorized.
-//   5. /functions/v1/tv-logins-exchange -> access_token + refresh_token.
-//
-// Step 1 is the most surprising: it looks like login starts from scratch, but
-// the TV already needs to be authenticated as SOMEONE to request a code.
+// Transitional C callers for the Rust-owned account capability.
+// QR and email login, session refresh, cancellation and versioned JSON
+// persistence are implemented and tested in backend/. The UI reads immutable
+// snapshots; blocking authenticated requests are for existing C workers only.
 #ifndef NV_SESSION_H
 #define NV_SESSION_H
 
@@ -48,13 +32,14 @@ void session_init(void);
 
 SessionState session_state(void);
 int          session_is_logged_in(void);    // 1 only with USER session
+int          session_available(void);       // Rust account service initialized
 const char  *session_code(void);            // code to display; "" outside flow
 const char  *session_login_url(void);       // URL to display
 const char  *session_error(void);           // last failure, for screen display
 const char  *session_user(void);            // `sub` of JWT; "" when logged out
 
-// Copy the user access token under the session lock. Returns 0 and an empty
-// string for anonymous/logged-out sessions; 3000 bytes hold the complete token.
+// Copy the complete user access token under the session lock. Returns 0 and
+// an empty string if logged out, anonymous, or the supplied buffer is too small.
 // The caller must not write the token to disk or logs. Raw shared pointers are
 // unsafe while refresh runs in other threads.
 int session_copy_token(char *dst, size_t size);
@@ -71,17 +56,13 @@ void session_cancel(void);
 
 // EMAIL AND PASSWORD LOGIN (#216), identical to web app (authManager.js
 // signInWithEmail): POST /auth/v1/token?grant_type=password with anonymous
-// key. The session is saved IDENTICAL to QR (sessao.txt). Interrupts QR flow.
+// key. The session uses the same Rust JSON storage as QR. Interrupts QR flow.
 // Non-blocking: result appears in session_state() (LOGGED_IN) or in
 // session_error_email() when returning to LOGGED_OUT. Email, password and token
 // NEVER go to logs; internal copies are zeroed immediately after request.
 void session_login_email(const char *email, const char *password);
 // Last failure of email login, already translated; "" without failure.
 const char *session_error_email(void);
-
-// Pure, for tests/sessao_email.c: screen phrase for an error response
-// from /auth/v1/token (status + body). Writes to dst.
-void session_email_error_from(int status, const char *body, char *dst, unsigned size);
 
 // Deletes tokens from disk and memory. After this the app returns to having no
 // account at all — which is what the user expects from "logout".

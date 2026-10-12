@@ -662,9 +662,9 @@ int main(int argc, char **argv) {
     if (quer4k) { printf("[4k] pedindo %dx%d — a linha `janela=` abaixo diz o "
                          "que a TV concedeu\n", pedeW, pedeH); fflush(stdout); } }
   SDL_Window *win;
-  const char *windowTitle = "Nuvio Native";
+  const char *windowTitle = "Nuvio Rust Test";
 #ifdef NV_LINUX_DESKTOP
-  windowTitle = "Nuvio Native - Linux UI preview";
+  windowTitle = "Nuvio Rust Test - Linux UI preview";
 #endif
   NV_ETAPA("SDL_CreateWindow");
   win = SDL_CreateWindow(windowTitle, SDL_WINDOWPOS_CENTERED,

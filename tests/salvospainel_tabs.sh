@@ -1,6 +1,7 @@
 #!/bin/bash
 set -eu
 cd "$(dirname "$0")/.."
+source tools/test-support.sh
 test_dir=$(mktemp -d "${TMPDIR:-/tmp}/nuvio-spainel-tabs-XXXXXX")
 trap 'rm -rf "$test_dir"' EXIT
 sources=()

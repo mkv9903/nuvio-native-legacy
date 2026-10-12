@@ -30,7 +30,7 @@
 #include "aquecer.h"
 #include "addonstats.h"
 #include "inicio.h"
-#include "perfilsel.h"
+#include "profile_picker.h"
 #include "sync.h"
 #include "traktauth.h"
 #include "simklauth.h"
@@ -1775,7 +1775,7 @@ int app_iniciar(const char *dirArte) {
   uiPreview = preview && !strcmp(preview, "1");
 #endif
   ajustes_recursos(dirArte);
-  login_recursos(dirArte);
+  login_set_assets(dirArte);
   diagnostico_recuperar_checkpoint();
   stream_fit_fonte_metadados(fitRuntimeMeta);
   home_iniciar(dirArte);
@@ -1836,21 +1836,21 @@ int app_iniciar(const char *dirArte) {
     if (perfis_precisa_escolher()) {
       tela = TELA_ESCOLHA_PERFIL;
       perfilAntes = perfis_ativo();
-      perfilsel_iniciar();
+      profile_picker_init();
     } else {
       // NO CHOOSER = THE CHOICE IS ALREADY MADE (#228). A restored session
       // with one profile never passed through perfilsel, so its `concluido`
       // stayed 0 for the whole session, and home_trailer_passo (which requires
-      // perfilsel_concluido) logged "autoplay gate=top-overlay" forever: the
+      // profile_picker_complete) logged "autoplay gate=top-overlay" forever: the
       // hero and focused-poster trailers never started, while the title page
       // (no such guard) played. Registros 23154 (Q80A) and 41271 (S90C): one
       // profile, gate stuck on top-overlay. If the sync later finds a second
-      // profile, the chooser opens via perfilsel_iniciar, which resets this.
-      perfilsel_continuar_ativo();
+      // profile, the chooser opens via profile_picker_init, which resets this.
+      profile_picker_keep_active();
     }
   } else {
     tela = TELA_LOGIN;
-    login_iniciar();
+    login_init();
   }
   return 1;
 }
@@ -2047,7 +2047,7 @@ void app_evento(const SDL_Event *e) {
   // do dono. Uma tecla que vai direto elimina a classe inteira de acidente.
   // Nao ha F10 em controle de TV, entao isto nao muda nada para quem usa.
   if (e->type == SDL_KEYDOWN && e->key.keysym.sym == SDLK_F10 &&
-      login_concluido() && perfilsel_concluido() && !player_aberto()) {
+      login_complete() && profile_picker_complete() && !player_aberto()) {
     menu_fechar();
     trocarTela(TELA_GUIA);
     menu_definir_destino(MENU_GUIA);
@@ -2057,8 +2057,8 @@ void app_evento(const SDL_Event *e) {
   // O login vem antes de tudo, inclusive do player: enquanto nao ha conta o
   // resto do app nao tem dado nenhum para operar. A escolha de perfil vem logo
   // depois, porque e ela que define para QUEM o resto do app vai sincronizar.
-  if (tela == TELA_LOGIN)          { login_evento(e);     return; }
-  if (tela == TELA_ESCOLHA_PERFIL) { perfilsel_evento(e); return; }
+  if (tela == TELA_LOGIN)          { login_event(e);     return; }
+  if (tela == TELA_ESCOLHA_PERFIL) { profile_picker_event(e); return; }
 
   // O SPOTLIGHT ABERTO e dono de todo o teclado: e uma caixa modal por cima da
   // tela, e o que ele escolhe so e feito depois de ele fechar.
@@ -2349,8 +2349,8 @@ static void legendasDaFonte(void) {
 // escolha de perfil que nunca concluia (#228).
 static const char *homeTrailerBloqueio(void) {
   if (tela != TELA_HOME) return "screen";
-  if (!login_concluido()) return "login";
-  if (!perfilsel_concluido()) return "profile-choice";
+  if (!login_complete()) return "login";
+  if (!profile_picker_complete()) return "profile-choice";
   if (player_aberto() || player_retido() || player_mini_ativo()) return "player";
   if (detail_aberto()) return "detail";
   if (spainel_aberto()) return "saved-panel";
@@ -2366,6 +2366,8 @@ static const char *homeTrailerBloqueio(void) {
 }
 
 void app_atualizar(float dt, Uint32 agora) {
+  /* Publish the Rust account snapshot once per frame on every screen. */
+  session_step((unsigned)agora);
   if (player_aberto() || player_mini_ativo()) diagnostico_cancelar_vazao();
   // Login e escolha de perfil retornam cedo; a atividade da conta anterior
   // precisa sair antes deles, junto de qualquer modal/pedido ja enfileirado.
@@ -2409,11 +2411,11 @@ void app_atualizar(float dt, Uint32 agora) {
   video_bombear();
   player_validar_retido(agora);
   if (tela == TELA_LOGIN) {
-    login_atualizar(dt, agora);
+    login_update(dt, agora);
     // A troca so acontece AQUI, quando a sessao existe de verdade — nao no
     // instante em que o servidor respondeu. Assim a home nunca abre com uma
     // sessao pela metade.
-    if (login_concluido()) {
+    if (login_complete()) {
       // Logo apos entrar, o primeiro ciclo de sync: e ele que descobre quantos
       // perfis a conta tem, e sem isso a tela de escolha nao teria o que
       // mostrar.
@@ -2421,7 +2423,7 @@ void app_atualizar(float dt, Uint32 agora) {
       sync_iniciar();
       tela = TELA_ESCOLHA_PERFIL;
       perfilAntes = perfis_ativo();
-      perfilsel_iniciar();
+      profile_picker_init();
       menu_definir_destino(MENU_INICIO);
     }
     return;
@@ -2437,7 +2439,7 @@ void app_atualizar(float dt, Uint32 agora) {
      ) {
     invalidarPerfil();
     tela = TELA_LOGIN;
-    login_iniciar();
+    login_init();
     return;
   }
 
@@ -2461,15 +2463,15 @@ void app_atualizar(float dt, Uint32 agora) {
     // atualizacao sem desenho: a tela de escolha e opaca e a home nao e pintada
     // aqui (ver desenharTelas).
     home_atualizar(dt, agora);
-    perfilsel_atualizar(dt, agora);
-    if (perfilsel_pediu_repetir()) { sync_iniciar(); return; }
-    if (perfilsel_quer_sair()) {
+    profile_picker_update(dt, agora);
+    if (profile_picker_wants_retry()) { sync_iniciar(); return; }
+    if (profile_picker_wants_logout()) {
       // Voltar = "segue com quem ja estava". So vale quando ha uma escolha
       // gravada e ela nao esta atras de um PIN — senao o Voltar entraria no
       // perfil 1 por acidente, ou seria a chave da fechadura.
       if (perfis_pode_dispensar()) {
         perfis_manter_ativo();
-        perfilsel_continuar_ativo();
+        profile_picker_keep_active();
         // A tela de escolha pode ter parado o primeiro ciclo enquanto ainda
         // aguardava uma resposta. Idempotente quando ele ja esta rodando.
         sync_iniciar();
@@ -2478,7 +2480,7 @@ void app_atualizar(float dt, Uint32 agora) {
       }
       return;
     }
-    if (perfilsel_concluido() && perfilsel_preparando()) {
+    if (profile_picker_complete() && profile_picker_preparing()) {
       // A HOME DO PERFIL NOVO SE MONTA AQUI ATRAS, e so aparece pronta. Antes a
       // home abria no instante da escolha e se reconstruia duas ou tres vezes
       // na frente da pessoa: a do perfil anterior, depois a dos addons novos,
@@ -2493,13 +2495,13 @@ void app_atualizar(float dt, Uint32 agora) {
                (sync_perfil_pronto() && !desc_montando()) ? "pronta" : "aberta pelo teto",
                (unsigned)(agora - trocaPerfilDesde));
         fflush(stdout);
-        perfilsel_preparar(0, agora);
+        profile_picker_prepare(0, agora);
         home_ir_topo();
         tela = TELA_HOME;
       }
       return;
     }
-    if (perfilsel_concluido()) {
+    if (profile_picker_complete()) {
       int trocou = perfis_ativo() != perfilAntes;
       // O perfil mudou o destino do sync: rodar de novo traz os addons e o
       // progresso DESTE perfil, e nao os do perfil anterior que o primeiro
@@ -2577,7 +2579,7 @@ void app_atualizar(float dt, Uint32 agora) {
         // a dele.
         perfilAntes = perfis_ativo();
         trocaPerfilDesde = agora;
-        perfilsel_preparar(1, agora);
+        profile_picker_prepare(1, agora);
         return;
       }
       tela = TELA_HOME;
@@ -2587,7 +2589,7 @@ void app_atualizar(float dt, Uint32 agora) {
 
   // O fundo das listras (login e escolha de perfil) sai da memoria quando a
   // pessoa passa das duas telas. Sem textura carregada, e um teste e nada mais.
-  login_soltar();
+  login_release();
 
   // Um ciclo por vez, e so quando a conta existe. O passo e barato: sem fio
   // terminado ele nao faz nada.
@@ -2625,7 +2627,7 @@ void app_atualizar(float dt, Uint32 agora) {
     player_descartar_retido();
     tela = TELA_ESCOLHA_PERFIL;
     perfilAntes = perfis_ativo();
-    perfilsel_iniciar();
+    profile_picker_init();
     return;
   }
   // AVISO DE PRIMEIRA EXECUCAO, e AQUI e nao antes.
@@ -2894,7 +2896,7 @@ void app_atualizar(float dt, Uint32 agora) {
     invalidarPerfil();
     tela = TELA_ESCOLHA_PERFIL;
     perfilAntes = perfis_ativo();
-    perfilsel_iniciar();
+    profile_picker_init();
     return;
   }
 
@@ -4052,8 +4054,8 @@ static void desenharAtrasDoPainel(void *ctx) {
 }
 
 static void desenharTelas(Uint32 agora) {
-  if (tela == TELA_LOGIN)          { login_desenhar(agora);     return; }
-  if (tela == TELA_ESCOLHA_PERFIL) { perfilsel_desenhar(agora); return; }
+  if (tela == TELA_LOGIN)          { login_draw(agora);     return; }
+  if (tela == TELA_ESCOLHA_PERFIL) { profile_picker_draw(agora); return; }
 
   // O player cobre tudo; desenhar o que esta atras dele e trabalho jogado fora
   // — a mesma conta que ja valia para o cartao de detalhe esticado.
@@ -4212,7 +4214,7 @@ void app_desenhar(Uint32 agora) {
   // A central so aparece com a pessoa DENTRO do app: no login e na escolha de
   // perfil nao ha para quem avisar, e o relogio do toast so comeca a contar
   // no primeiro quadro em que ele pode ser visto (ver avisos.c).
-  // (perfilsel_concluido NAO serve de guarda: "Voltar: continuar como X" sai
+  // (profile_picker_complete NAO serve de guarda: "Voltar: continuar como X" sai
   // da escolha com `sair`, nunca com `concluido`, e a central ficaria muda.)
   if (!registro_aberto() && !player_aberto() && sessao_logada() &&
       tela != TELA_LOGIN && tela != TELA_ESCOLHA_PERFIL)
@@ -4305,8 +4307,8 @@ int app_zap_ativo(void) {
 }
 int app_central_pode(void) {
   if (central_aberta()) return 1;   // o CH+ que fecha passa pelo mesmo caminho
-  return tela != TELA_LOGIN && tela != TELA_ESCOLHA_PERFIL && login_concluido() &&
-         perfilsel_concluido() && !registro_aberto() && !spot_aberto() &&
+  return tela != TELA_LOGIN && tela != TELA_ESCOLHA_PERFIL && login_complete() &&
+         profile_picker_complete() && !registro_aberto() && !spot_aberto() &&
          !teclado_aberto() && !diagnostico_intro_aberto();
 }
 

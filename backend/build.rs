@@ -13,9 +13,14 @@ const PROPERTIES: [&str; 9] = [
 ];
 
 fn main() {
+    println!("cargo:rerun-if-env-changed=NUVIO_PROPERTIES");
     println!("cargo:rerun-if-changed=../local.properties");
     println!("cargo:rerun-if-changed=../local.properties.example");
-    let properties: BTreeMap<_, _> = fs::read_to_string("../local.properties")
+    let property_path = env::var_os("NUVIO_PROPERTIES")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from("../local.properties"));
+    println!("cargo:rerun-if-changed={}", property_path.display());
+    let properties: BTreeMap<_, _> = fs::read_to_string(property_path)
         .unwrap_or_default()
         .lines()
         .filter_map(|line| {
@@ -29,6 +34,9 @@ fn main() {
         .collect();
     let mut source =
         String::from("// Generated build configuration. Never log credential values.\n");
+    source.push_str(&format!(
+        "pub const CONFIGURATION_KEYS: &[&str] = &{PROPERTIES:?};\n"
+    ));
     for name in PROPERTIES {
         println!("cargo:rerun-if-env-changed={name}");
         let value = env::var(name)

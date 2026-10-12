@@ -588,7 +588,7 @@ int main(int argc, char **argv) {
   else if (tarde) { int i; for (i = 0; i < 2000 && sync_estado() == SYNC_RODANDO; i++) usleep(1000); }
   else { ateTerminar(); quadros(2); }  // "[sync] ciclo interrompido"
 
-  escolher(alvo);                      // perfilsel_concluido()
+  escolher(alvo);                      // profile_picker_complete()
   sync_iniciar();                      // app.c, ramo da escolha
 
   if (!frio) {

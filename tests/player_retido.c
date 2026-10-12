@@ -1,3 +1,4 @@
+#include "support/profile_context.h"
 // O backend falso conta os custos que o retorno rapido deve eliminar. Nenhuma
 // janela, conta ou fonte real: o estado de pausa e confirmado separadamente.
 #include "player.h"
@@ -53,7 +54,7 @@ int main(void) {
   setvbuf(stdout, NULL, _IONBF, 0);
   puts("player_retido: inicio");
   assert(SDL_Init(SDL_INIT_TIMER) == 0);
-  perfis_definir_ativo(1);
+  test_select_profile(1);
 
   // De fabrica (sem ajustes.txt, instalacao antiga ou nova) nao retem.
   assert(!ajustes_manter_video());
@@ -87,8 +88,8 @@ int main(void) {
   puts("ok teto de 120 s libera pipeline");
 
   abrir("movie"); guardar(); p = paradas;
-  perfis_definir_ativo(2); player_validar_retido(SDL_GetTicks());
-  assert(!player_retido() && paradas == p + 1); perfis_definir_ativo(1);
+  test_select_profile(2); player_validar_retido(SDL_GetTicks());
+  assert(!player_retido() && paradas == p + 1); test_select_profile(1);
   abrir("movie"); guardar(); p = paradas;
   snprintf(conta, sizeof conta, "fixture-conta-b"); player_validar_retido(SDL_GetTicks());
   assert(!player_retido() && paradas == p + 1);
@@ -127,7 +128,7 @@ int main(void) {
     snprintf(st.url, sizeof st.url, "https://example.invalid/fixture.mp4");
     snprintf(st.cabecalhos, sizeof st.cabecalhos, "Referer: https://example.invalid/");
     st.mp4 = 1;
-    snprintf(conta, sizeof conta, "fixture-conta-a"); perfis_definir_ativo(1);
+    snprintf(conta, sizeof conta, "fixture-conta-a"); test_select_profile(1);
     fontevolta_esquecer("teste");
     stream_definir_lista(&st, 1); stream_definir_atual(0);
     abrir("movie"); stream_definir_atual(0); guardar();

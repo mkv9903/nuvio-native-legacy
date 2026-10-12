@@ -35,6 +35,10 @@
 # "libcurl.so.4 => not found" with no visible error message on screen.
 set -e
 cd "$(dirname "$0")/.."
+if [ -f backend/Cargo.toml ]; then
+  # The backend rewrite always uses its isolated build and never deploys.
+  exec bash tools/backend-webos.sh "$@"
+fi
 
 TV_IP="${NUVIO_TV_IP:-192.168.1.32}"
 TV_PASS="${NUVIO_TV_PASS:-alpine}"

@@ -43,7 +43,7 @@
 #include "home.h"
 #include "layout.h"
 #include "perfis.h"    // perfis_carregar_ativo (cena perfil)
-#include "perfilsel.h"  // a tela de escolha, medida (#2 do handoff 1.8)
+#include "profile_picker.h"  // a tela de escolha, medida (#2 do handoff 1.8)
 #include "tex_cache.h"
 #include "text.h"
 #include <SDL2/SDL.h>
@@ -419,8 +419,8 @@ static void cenario(SDL_Window *w, const char *cen) {
       "4\t0\t0\t0\t#EF4444\tPapo\tdeploy/app/art/04.jpg\tdeploy/app/art/15.jpg\n");
     fclose(f);
     perfis_carregar_ativo();
-    perfilsel_iniciar();
-    { static const Tela pf = { perfilsel_evento, perfilsel_atualizar, perfilsel_desenhar, 0 };
+    profile_picker_init();
+    { static const Tela pf = { profile_picker_event, profile_picker_update, profile_picker_draw, 0 };
       telaAtual = &pf;
       for (i = 0; i < 180; i++) { quadro(w, NULL, t); t += 16; }   // entrada + burst assenta
       for (i = 0; i < n; i++) {

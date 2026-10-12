@@ -1,6 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
+source tools/test-support.sh
 dir=$(mktemp -d "${TMPDIR:-/tmp}/nuvio-player-retido.XXXXXX")
 trap 'rm -rf "$dir"' EXIT
 export NUVIO_DADOS="$dir/dados"

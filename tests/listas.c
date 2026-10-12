@@ -1,3 +1,4 @@
+#include "support/profile_context.h"
 // LISTAS: leitura das respostas, o que fica gravado e o que chega na Home.
 //
 // ONDE ESTE TESTE ESCREVE, e por que isso e a PRIMEIRA coisa que ele confere.
@@ -109,7 +110,7 @@ static LstLista listaTrakt(long id, const char *nome) {
 static void testeFixarSobrevive(void) {
   LstLista l = listaTrakt(1049904, "Clássicos do terror");
   printf("\n[4] fixar sobrevive a um reinicio\n");
-  perfis_definir_ativo(1);
+  test_select_profile(1);
   lst_iniciar();
   CONFERE(!lst_fixada(&l), "comeca sem nada fixado");
   CONFERE(lst_alternar_fixada(&l) == 1, "fixa e devolve 1");
@@ -133,14 +134,14 @@ static void testeIsolamentoPerfil(void) {
   LstLista a = listaTrakt(1049904, "Clássicos do terror");
   LstLista b = listaTrakt(8842211, "A24 — tudo");
   printf("\n[5] cada perfil tem as suas\n");
-  perfis_definir_ativo(2);
+  test_select_profile(2);
   lst_esquecer();
   lst_iniciar();
   CONFERE(!lst_fixada(&a), "o perfil 2 nao herda a fixada do perfil 1");
   CONFERE(lst_alternar_fixada(&b) == 1, "o perfil 2 fixa a sua");
   CONFERE(lst_fixada(&b) && !lst_fixada(&a), "o perfil 2 ve so a dele");
 
-  perfis_definir_ativo(1);
+  test_select_profile(1);
   lst_esquecer();
   lst_iniciar();
   CONFERE(lst_fixada(&a), "o perfil 1 continua com a dele");
@@ -173,7 +174,7 @@ static void testeAdicionarNaHome(void) {
   ColFolder f;
   char chave[192];
   printf("\n[6] adicionar a Home produz a fileira\n");
-  perfis_definir_ativo(1);
+  test_select_profile(1);
   lst_esquecer();
   lst_iniciar();
   lst_alternar_fixada(&l);
@@ -220,7 +221,7 @@ static void testeAdicionarNaHome(void) {
 static void testeLogout(void) {
   LstLista l = listaTrakt(1049904, "Clássicos do terror");
   printf("\n[7] o logout esquece as fixadas\n");
-  perfis_definir_ativo(1);
+  test_select_profile(1);
   lst_esquecer();
   lst_iniciar();
   lst_alternar_fixada(&l);

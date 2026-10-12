@@ -7,11 +7,14 @@ use crate::{
 };
 use std::{
     sync::{Arc, Condvar, Mutex, MutexGuard},
-    time::{SystemTime, UNIX_EPOCH},
+    time::{Instant, SystemTime, UNIX_EPOCH},
 };
 
 pub trait Clock: Send + Sync {
     fn seconds(&self) -> u64;
+    fn monotonic_millis(&self) -> u64 {
+        self.seconds().saturating_mul(1000)
+    }
 }
 pub struct SystemClock;
 impl Clock for SystemClock {
@@ -20,6 +23,14 @@ impl Clock for SystemClock {
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default()
             .as_secs()
+    }
+    fn monotonic_millis(&self) -> u64 {
+        static START: std::sync::OnceLock<Instant> = std::sync::OnceLock::new();
+        START
+            .get_or_init(Instant::now)
+            .elapsed()
+            .as_millis()
+            .min(u64::MAX as u128) as u64
     }
 }
 
@@ -48,6 +59,8 @@ pub struct AccountSnapshot {
     pub persistence_error: bool,
     pub owner: Option<String>,
     pub selection: crate::model::ProfileSelection,
+    pub selection_action: u64,
+    pub selection_result: Option<Result<()>>,
 }
 
 struct State {
@@ -65,6 +78,8 @@ struct State {
     refreshing: bool,
     refresh_sequence: u64,
     refresh_result: Result<()>,
+    selection_action: u64,
+    selection_result: Option<Result<()>>,
 }
 struct Inner {
     state: Mutex<State>,
@@ -115,6 +130,8 @@ impl AccountBackend {
                     refreshing: false,
                     refresh_sequence: 0,
                     refresh_result: Ok(()),
+                    selection_action: 0,
+                    selection_result: None,
                 }),
                 refreshed: Condvar::new(),
                 service,
@@ -157,7 +174,46 @@ impl AccountBackend {
             persistence_error: state.persistence_error,
             owner: state.data.owner.clone(),
             selection: state.data.selection.clone(),
+            selection_action: state.selection_action,
+            selection_result: state.selection_result.clone(),
         }
+    }
+    pub fn revision(&self) -> u64 {
+        self.state().revision
+    }
+    pub fn active_id(&self) -> u32 {
+        self.state()
+            .data
+            .selection
+            .selected
+            .map(ProfileId::get)
+            .unwrap_or(1)
+    }
+    pub fn user_id(&self) -> String {
+        self.state()
+            .data
+            .session
+            .as_ref()
+            .filter(|session| !session.anonymous)
+            .map(|session| session.subject.clone())
+            .unwrap_or_default()
+    }
+    pub fn logged_in(&self) -> bool {
+        self.state()
+            .data
+            .session
+            .as_ref()
+            .is_some_and(|session| !session.anonymous)
+    }
+    pub fn needs_selection(&self) -> bool {
+        let state = self.state();
+        state.data.selection.needs_selection()
+            || (state
+                .data
+                .session
+                .as_ref()
+                .is_some_and(|session| !session.anonymous)
+                && state.data.selection.profiles.is_empty())
     }
 
     pub fn user_token(&self) -> Option<Secret> {
@@ -176,6 +232,14 @@ impl AccountBackend {
         self.begin_flow(LoginState::RequestingCode)
     }
     fn begin_flow(&self, login: LoginState) -> u64 {
+        eprintln!(
+            "[account] Rust login started: {}",
+            if login == LoginState::Email {
+                "email"
+            } else {
+                "TV code"
+            }
+        );
         let mut state = self.state();
         state.generation = state.generation.wrapping_add(1);
         state.login = login;
@@ -183,6 +247,8 @@ impl AccountBackend {
         state.error = None;
         state.email_error = None;
         state.polling = false;
+        state.selection_action = state.selection_action.wrapping_add(1);
+        state.selection_result = None;
         state.revision = state.revision.wrapping_add(1);
         state.generation
     }
@@ -198,10 +264,12 @@ impl AccountBackend {
         }
         match result {
             Ok(session) => {
+                eprintln!("[account] Rust email login completed");
                 self.install_session(&mut state, session);
                 Ok(())
             }
             Err(error) => {
+                eprintln!("[account] Rust email login failed: {error}");
                 state.login = LoginState::LoggedOut;
                 state.email_error = Some(error.clone());
                 state.revision = state.revision.wrapping_add(1);
@@ -240,13 +308,13 @@ impl AccountBackend {
         }
         match result {
             Ok((session, code)) => {
-                let now = self.inner.clock.seconds();
+                let now = self.inner.clock.monotonic_millis();
                 state.data = AccountData {
                     session: Some(session),
                     ..AccountData::default()
                 };
-                state.next_poll = now.saturating_add(code.interval_seconds);
-                state.code_deadline = now.saturating_add(600);
+                state.next_poll = now.saturating_add(code.interval_seconds.saturating_mul(1000));
+                state.code_deadline = now.saturating_add(600_000);
                 state.code = Some(code);
                 state.login = LoginState::Waiting;
                 state.error = None;
@@ -266,8 +334,11 @@ impl AccountBackend {
     /// The UI schedules work without performing network calls in its frame.
     pub fn claim_poll(&self) -> Option<u64> {
         let mut state = self.state();
-        let now = self.inner.clock.seconds();
-        if state.login != LoginState::Waiting || state.polling || now < state.next_poll {
+        if state.login != LoginState::Waiting || state.polling {
+            return None;
+        }
+        let now = self.inner.clock.monotonic_millis();
+        if now < state.next_poll {
             return None;
         }
         if now >= state.code_deadline {
@@ -317,8 +388,8 @@ impl AccountBackend {
         state.next_poll = self
             .inner
             .clock
-            .seconds()
-            .saturating_add(code.interval_seconds);
+            .monotonic_millis()
+            .saturating_add(code.interval_seconds.saturating_mul(1000));
         match result {
             Ok((_, Some(session))) => {
                 self.install_session(&mut state, session);
@@ -351,6 +422,8 @@ impl AccountBackend {
     pub fn cancel(&self) {
         let mut state = self.state();
         state.generation = state.generation.wrapping_add(1);
+        state.selection_action = state.selection_action.wrapping_add(1);
+        state.selection_result = None;
         state.code = None;
         state.polling = false;
         state.login = if state
@@ -368,8 +441,11 @@ impl AccountBackend {
         state.revision = state.revision.wrapping_add(1);
     }
     pub fn logout(&self) {
+        eprintln!("[account] Rust logout requested");
         let mut state = self.state();
         state.generation = state.generation.wrapping_add(1);
+        state.selection_action = state.selection_action.wrapping_add(1);
+        state.selection_result = None;
         state.data = AccountData::default();
         state.login = LoginState::LoggedOut;
         state.code = None;
@@ -386,6 +462,7 @@ impl AccountBackend {
     }
 
     fn install_session(&self, state: &mut State, session: Session) {
+        eprintln!("[account] Rust authenticated session committed");
         if state
             .data
             .session
@@ -458,12 +535,14 @@ impl AccountBackend {
         } else {
             match result {
                 Ok(session) => {
+                    eprintln!("[account] Rust session refresh completed");
                     state.data.session = Some(session);
                     self.persist(&mut state);
                     state.revision = state.revision.wrapping_add(1);
                     Ok(())
                 }
                 Err(error) => {
+                    eprintln!("[account] Rust session refresh failed: {error}");
                     // Only an actual authentication rejection deletes a valid
                     // session. Invalid payloads and transport failures retain it.
                     if matches!(error, Error::Http(400 | 401 | 403) | Error::InvalidSession) {
@@ -566,6 +645,17 @@ impl AccountBackend {
         if state.generation != generation {
             return Err(Error::Cancelled);
         }
+        if owner.as_ref().is_ok_and(|owner| {
+            state
+                .data
+                .owner
+                .as_ref()
+                .is_some_and(|previous| previous != owner)
+        }) {
+            state.data.selection = Default::default();
+            state.selection_action = state.selection_action.wrapping_add(1);
+            state.selection_result = None;
+        }
         let previous = &state.data.selection.profiles;
         let profiles = profiles
             .into_iter()
@@ -589,6 +679,19 @@ impl AccountBackend {
             state.data.owner = Some(owner);
         }
         state.data.selection.profiles = profiles;
+        if state.data.selection.selected.is_some_and(|id| {
+            !state
+                .data
+                .selection
+                .profiles
+                .iter()
+                .any(|profile| profile.id == id)
+        }) {
+            state.data.selection.selected = None;
+            state.data.selection.confirmed = false;
+            state.selection_action = state.selection_action.wrapping_add(1);
+            state.selection_result = None;
+        }
         if state.data.selection.selected.is_none()
             && state.data.selection.profiles.len() == 1
             && state.data.selection.profiles[0].lock == ProfileLock::Unlocked
@@ -596,6 +699,7 @@ impl AccountBackend {
             state.data.selection.selected = Some(state.data.selection.profiles[0].id);
         }
         let count = state.data.selection.profiles.len();
+        eprintln!("[account] Rust profiles loaded: {count}");
         self.persist(&mut state);
         state.revision = state.revision.wrapping_add(1);
         if state.data.owner.is_none() {
@@ -617,8 +721,37 @@ impl AccountBackend {
     /// PIN verification and selection are one Rust action. No caller can
     /// claim that a locked profile was verified by setting a C flag.
     pub fn select_profile(&self, id: ProfileId, pin: Option<Secret>) -> Result<()> {
+        let action = self.begin_selection();
+        self.finish_selection(action, id, pin)
+    }
+    pub fn begin_selection(&self) -> u64 {
+        let mut state = self.state();
+        state.selection_action = state.selection_action.wrapping_add(1);
+        state.selection_result = None;
+        state.revision = state.revision.wrapping_add(1);
+        state.selection_action
+    }
+    pub fn cancel_selection(&self) {
+        let mut state = self.state();
+        state.selection_action = state.selection_action.wrapping_add(1);
+        state.selection_result = None;
+        state.revision = state.revision.wrapping_add(1);
+    }
+    pub fn finish_selection(&self, action: u64, id: ProfileId, pin: Option<Secret>) -> Result<()> {
+        let result = self.select_checked(action, id, pin);
+        let mut state = self.state();
+        if state.selection_action == action {
+            state.selection_result = Some(result.clone());
+            state.revision = state.revision.wrapping_add(1);
+        }
+        result
+    }
+    fn select_checked(&self, action: u64, id: ProfileId, pin: Option<Secret>) -> Result<()> {
         let (generation, needs_pin) = {
             let state = self.state();
+            if state.selection_action != action {
+                return Err(Error::Cancelled);
+            }
             let profile = state
                 .data
                 .selection
@@ -641,7 +774,7 @@ impl AccountBackend {
             }
         }
         let mut state = self.state();
-        if state.generation != generation {
+        if state.generation != generation || state.selection_action != action {
             return Err(Error::Cancelled);
         }
         state.data.selection.select(id, needs_pin)?;

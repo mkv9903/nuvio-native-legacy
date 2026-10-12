@@ -1,3 +1,4 @@
+#include "support/profile_context.h"
 // Retained title release text: dates, persistence, legacy migration and profiles.
 #include "../src/releaseinfo.c"
 #include "ajustes.h"
@@ -85,12 +86,12 @@ int main(void) {
   restart();
   assert(cache[0].status == RI_ENDED && !cache[0].next_date[0]);
 
-  perfis_definir_ativo(2);
+  test_select_profile(2);
   assert(!releaseinfo_phrase("tt10986410", actual, sizeof actual));
   releaseinfo_record("tt1520211", "Canceled", 0, 0, "", "");
   assert(releaseinfo_phrase("tt1520211", actual, sizeof actual));
   assert(!strcmp(actual, i18n("Série cancelada")));
-  perfis_definir_ativo(1);
+  test_select_profile(1);
   assert(releaseinfo_phrase("tt10986410", actual, sizeof actual));
   assert(!releaseinfo_phrase("tt1520211", actual, sizeof actual));
 

@@ -13,6 +13,7 @@
 #include <string.h>
 #include <unistd.h>   // mkdtemp
 #include "ajustes.h"
+#include "data.h"
 
 static int falhas;
 static void confere(const char *o_que, int obtido, int esperado) {
@@ -188,10 +189,13 @@ int main(void) {
     FILE *f;
     int n;
     if (!mkdtemp(dir)) { falhas++; goto fim; }
-    snprintf(cam, sizeof cam, "%s/ajustes.txt", dir);
+    /* Settings read the data directory, independently of the asset directory. */
+    setenv("NUVIO_DATA", dir, 1);
+    data_init(NULL);
+    snprintf(cam, sizeof cam, "%s/ajustes.txt", data_dir());
     f = fopen(cam, "w");
     fputs("selected_theme 12\n", f); fclose(f);        // Da arte (13, Dinâmica estilizada, saiu em b6e14d69)
-    ajustes_dir(dir);
+    ajustes_dir(data_dir());
     confere("local = Da arte", ajustes_cor_viva(), 1);   // CORVIVA_SIMPLES
     ajustes_aplicar_blob(CONTA_JADE);
     confere("JADE da conta nao desfaz o dinamico", ajustes_cor_viva(), 1);
@@ -202,7 +206,7 @@ int main(void) {
     // Tema FIXO aqui: a conta volta a mandar, e a subida volta a valer.
     f = fopen(cam, "w");
     fputs("selected_theme 2\n", f); fclose(f);         // Oceano
-    ajustes_dir(dir);
+    ajustes_dir(data_dir());
     confere("local = tema fixo", ajustes_cor_viva(), 0);
     ajustes_aplicar_blob(CONTA_JADE);
     { float r, g, b; ajustes_acento(&r, &g, &b);

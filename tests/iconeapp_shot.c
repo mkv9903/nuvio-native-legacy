@@ -39,7 +39,7 @@ static void quadros(SDL_Window *w, int tela, const char *nome) {
     menu_atualizar(1.0f / 60.0f, SDL_GetTicks());
     glClearColor(0.05f, 0.05f, 0.06f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
-    if (tela == 0) login_desenhar(SDL_GetTicks());
+    if (tela == 0) login_draw(SDL_GetTicks());
     else menu_desenhar(SDL_GetTicks());
     if (i == 59) grava(nome);
     SDL_GL_SwapWindow(w);
@@ -74,7 +74,7 @@ int main(int argc, char **argv) {
   ajustes_teste_op_icone(1);
   assert(iconeapp_atual() == 1);
 
-  login_iniciar();
+  login_init();
   for (int k = 0; k < 3; k++) {
     ajustes_teste_op_icone(esc[k]);
     snprintf(nome, sizeof nome, "%s-login-%s.png", saida, iconeapp_id(esc[k]));

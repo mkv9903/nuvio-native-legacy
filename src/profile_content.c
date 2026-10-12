@@ -82,7 +82,7 @@ static int from_catalog(const ProgressRecord *r) {
 int profile_content_from(const AccountProfile *p, ProfileContent *out) {
   ProgressRecord r;
   int i;
-  if (!p || !out || p->has_pin) return 0;
+  if (!p || !out || p->has_pin || !p->lock_verified) return 0;
   if (!progress_continue_from_profile(p->index, ajustes_cw_concluido(), &r)) return 0;
   memset(out, 0, sizeof *out);
   if (from_catalog(&r)) {
@@ -116,7 +116,7 @@ void profile_content_register(void) {
     ProgressRecord r;
     ProfileSnapshot s;
     int k;
-    if (!p || p->has_pin || !progress_continue_from_profile(p->index, ajustes_cw_concluido(), &r) ||
+    if (!p || p->has_pin || !p->lock_verified || !progress_continue_from_profile(p->index, ajustes_cw_concluido(), &r) ||
         !from_catalog(&r) || strlen(catalog_scratch.poster) >= sizeof s.poster) continue;
     memset(&s, 0, sizeof s);
     s.profile = p->index; s.season = r.season; s.episode = r.episode;
