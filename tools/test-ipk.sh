@@ -1,8 +1,8 @@
 #!/bin/bash
 # Verifies that .ipk does NOT contain user credentials — without requiring docker.
 #
-# Packages the same allowlisted payload as arm.sh, using the executable already
-# present in deploy/app, without recompiling or contacting a TV.
+# Verify an existing IPK, or package the allowlisted payload without compiling
+# or contacting a TV. Backend branches use their isolated test executable.
 #
 # TWO PITFALLS this test prevents:
 #   1. `ares-package deploy/app` includes entire directory, and art/ contains Trakt
@@ -11,8 +11,12 @@
 #      debian-binary / control.tar.gz / data.tar.gz without error.
 #      A check written this way always passes even when secrets are inside.
 #      Must unpack `ar` and inspect data.tar.gz.
-set -e
+set -euo pipefail
 cd "$(dirname "$0")/.."
+if [ "$#" -gt 1 ]; then
+  echo 'Usage: bash tools/test-ipk.sh [existing.ipk]' >&2
+  exit 2
+fi
 if [ -n "${NUVIO_ARES_PACKAGE:-}" ]; then
   ARES="$NUVIO_ARES_PACKAGE"
 elif [ -x "../NuvioWeb-0.3.38-beta/node_modules/.bin/ares-package" ]; then
@@ -22,16 +26,34 @@ else
 fi
 STAGING=$(mktemp -d)
 trap 'rm -rf "$STAGING"' EXIT
-bash tools/stage-webos.sh deploy/app "$STAGING/app"
-
-OUTPUT_DIR="$STAGING/packages"
-mkdir "$OUTPUT_DIR"
-"$ARES" "$STAGING/app" -o "$OUTPUT_DIR" >/dev/null
-PACKAGES=("$OUTPUT_DIR/"*.ipk)
-if [ "${#PACKAGES[@]}" -ne 1 ] || [ ! -f "${PACKAGES[0]}" ]; then
-  echo 'ABORTED: expected exactly one generated IPK' >&2; exit 1
+executable=deploy/app/nuvio-proto
+if [ -f backend/Cargo.toml ]; then
+  executable=build/backend/webos/nuvio-rusttest
 fi
-IPK=${PACKAGES[0]}
+bash tools/stage-webos.sh deploy/app "$STAGING/app" "$executable"
+if [ -f backend/Cargo.toml ]; then
+  python3 - "$STAGING/app/appinfo.json" <<'PY'
+import json, pathlib, sys
+path = pathlib.Path(sys.argv[1])
+info = json.loads(path.read_text())
+info.update(id='space.mkv.nuvio.rusttest', title='Nuvio Rust Test')
+path.write_text(json.dumps(info, indent=2)+'\n')
+PY
+fi
+
+if [ "$#" = 1 ]; then
+  IPK=$(realpath "$1")
+  [ -f "$IPK" ] || { echo 'ABORTED: package is missing' >&2; exit 1; }
+else
+  OUTPUT_DIR="$STAGING/packages"
+  mkdir "$OUTPUT_DIR"
+  "$ARES" "$STAGING/app" -o "$OUTPUT_DIR" >/dev/null
+  PACKAGES=("$OUTPUT_DIR/"*.ipk)
+  if [ "${#PACKAGES[@]}" -ne 1 ] || [ ! -f "${PACKAGES[0]}" ]; then
+    echo 'ABORTED: expected exactly one generated IPK' >&2; exit 1
+  fi
+  IPK=${PACKAGES[0]}
+fi
 
 PKG_LIST=$(cd "$STAGING" && ar x "$IPK" 2>/dev/null && tar tzf data.tar.gz 2>/dev/null)
 [ -z "$PKG_LIST" ] && { echo "ABORTED: could not read package to verify"; exit 1; }
@@ -40,10 +62,10 @@ echo "test package: $(du -h "$IPK" | cut -f1)"
 python3 - "$STAGING/app" "$STAGING/data.tar.gz" <<'PY'
 import json, pathlib, sys, tarfile
 source = pathlib.Path(sys.argv[1])
-prefix = 'usr/palm/applications/space.mkv.nuvio.native/'
-expected = {prefix + p.relative_to(source).as_posix(): p for p in source.rglob('*') if p.is_file()}
-package_info = 'usr/palm/packages/space.mkv.nuvio.native/packageinfo.json'
 app_info = json.loads((source / 'appinfo.json').read_text())
+prefix = 'usr/palm/applications/' + app_info['id'] + '/'
+expected = {prefix + p.relative_to(source).as_posix(): p for p in source.rglob('*') if p.is_file()}
+package_info = 'usr/palm/packages/' + app_info['id'] + '/packageinfo.json'
 found_info = False
 # Stream once; repeatedly seeking in gzip would decompress the app hundreds of times.
 with tarfile.open(sys.argv[2], mode='r|gz') as archive:

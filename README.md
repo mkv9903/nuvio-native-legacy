@@ -70,6 +70,9 @@ Both use fake accounts; no credentials are needed for automated tests.
 The isolated TV build is `bash tools/backend-webos.sh --ipk`. It uses the
 existing SDK image and Rust target `armv7-unknown-linux-gnueabi`. It never
 installs or launches the app; packages are written to `build/backend/webos`.
+Verify an existing package with `bash tools/test-ipk.sh path/to/package.ipk`.
+For the first account milestone, follow the
+[Linux and TV check steps](docs/backend-rewrite/first-tv-check.md).
 
 The executable is `build/linux/nuvio-rusttest`. Local data defaults to
 `${XDG_DATA_HOME:-$HOME/.local/share}/space.mkv.nuvio.rusttest`; preview mode uses
