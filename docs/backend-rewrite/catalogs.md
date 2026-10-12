@@ -153,10 +153,24 @@ only the requested renderer quota is materialized. Full domain field lengths
 are independent of that quota. The entire JSON syntax is checked, including
 entries beyond the display quota.
 
-Pending decision: a manifest containing only ID/name and omitting both
-resources and catalogs may be incomplete. The user has been asked whether to
-retain its useful cache and retry, or accept it and remove previous catalog
-declarations. That rule is not yet enforced by the loader.
+The user delegated incomplete-manifest handling to standard Stremio behavior
+and the recommended cache-preserving rule. Replies omitting both resources and
+catalogs, null declarations and non-null error replies fail validation. They
+cannot replace a useful cached manifest. Explicit empty declarations clear old
+catalogs, and source-only manifests can omit catalogs. Legacy catalog-only
+providers remain supported. Full object resources use their own type filters;
+omitted object types do not inherit root types or authorize requests.
+
+References checked on 2026-10-12:
+- [Stremio manifest protocol](https://github.com/Stremio/stremio-addon-sdk/blob/master/docs/api/responses/manifest.md)
+- [Stremio client manifest implementation](https://github.com/Stremio/stremio-core/blob/master/src/types/addon/manifest.rs)
+- [Nuvio self-host architecture](https://github.com/NuvioMedia/self-host/blob/main/docs/architecture.md)
+
+The protocol lists resources/types as required. The client defaults omitted
+catalogs to an empty list, allowing source-only addons. This rewrite keeps
+existing provider compatibility for catalog-only declarations and does not
+start requiring unrelated descriptive/version fields. Nuvio self-host defines
+account/profile/addon synchronization, rather than provider manifest semantics.
 
 C addon/source/subtitle access, complete C title-data ownership/access,
 manifest/catalog orchestration and profile-change Home publication still need

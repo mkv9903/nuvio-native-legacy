@@ -14,7 +14,7 @@ account credentials are used by these tests.
 | `perfilsel` profile fields, selection rules, startup cache, PIN outcomes, primary-addon inheritance and logout | `storage`, `service` and `account` profile cases |
 
 All five reference groups passed before integration. The current Rust suite
-passes 138 Rust tests and two native driver tests. Additional coverage includes
+passes 141 Rust tests and two native driver tests. Additional coverage includes
 late replies after cancellation or logout, stale refresh against a new account, disk-write failures, schema identity
 and version validation, isolated storage, private atomic writes, configuration
 key completeness, unverified PIN locks and shared-account owner handling.
@@ -174,3 +174,8 @@ pass with function/data sections and linker garbage collection, which drops
 those unrelated unused functions. No reference source/assertion was modified.
 Its root/nested artwork, metadata-object and long-URL cases are covered in Rust;
 the active C tests remain until their runtime parsing path is replaced.
+
+Manifest policy regression coverage checks incomplete/failed replies preserving
+cache, explicit empty and source-only replies removing old catalogs, legacy
+catalog-only providers, and independent full-resource type filters. All 141
+Rust tests pass after this correction.

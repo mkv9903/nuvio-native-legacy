@@ -279,3 +279,52 @@ fn manifests_have_their_own_request_deadline_and_invalid_resource_kinds_do_no_wo
         Error::InvalidData
     );
 }
+
+#[test]
+fn incomplete_manifests_retain_useful_cache_and_explicit_declarations_replace_it() {
+    let original = br#"{"id":"provider","resources":["catalog","stream"],"catalogs":[{"id":"top","type":"movie"}]}"#;
+    for failed in [
+        br#"{"id":"provider","name":"Provider"}"#.as_slice(),
+        br#"{}"#,
+        br#"{"resources":[],"catalogs":[],"error":"outage"}"#,
+        br#"{"catalogs":null}"#,
+    ] {
+        let directory = Directory::new();
+        let cache = Arc::new(CatalogCache::open(&directory.path).unwrap());
+        let ctx = context(1);
+        let key = ProviderLoader::key(&ctx, &provider(), ProviderResource::Manifest);
+        cache.save(&key, original, &|| true).unwrap();
+        let failed = failed.to_vec();
+        let service = loader(
+            Arc::new(Account(Mutex::new(ctx.clone()))),
+            cache.clone(),
+            move |_, _| response(&failed),
+        );
+        let loaded = service.manifest(&ctx, &provider()).unwrap();
+        assert_eq!(loaded.origin, LoadOrigin::Cache);
+        assert_eq!(loaded.request_error, Some(Error::InvalidData));
+        assert_eq!(loaded.value.catalogs[0].id, "top");
+        assert_eq!(cache.load(&key).unwrap().unwrap().as_slice(), original);
+    }
+    for replacement in [
+        br#"{"id":"provider","resources":[],"catalogs":[]}"#.as_slice(),
+        br#"{"id":"provider","resources":["stream"],"types":["movie"]}"#,
+        br#"{"id":"provider","catalogs":[]}"#,
+    ] {
+        let directory = Directory::new();
+        let cache = Arc::new(CatalogCache::open(&directory.path).unwrap());
+        let ctx = context(1);
+        let key = ProviderLoader::key(&ctx, &provider(), ProviderResource::Manifest);
+        cache.save(&key, original, &|| true).unwrap();
+        let bytes = replacement.to_vec();
+        let service = loader(
+            Arc::new(Account(Mutex::new(ctx.clone()))),
+            cache.clone(),
+            move |_, _| response(&bytes),
+        );
+        let loaded = service.manifest(&ctx, &provider()).unwrap();
+        assert_eq!(loaded.origin, LoadOrigin::Network);
+        assert!(loaded.value.catalogs.is_empty());
+        assert_eq!(cache.load(&key).unwrap().unwrap().as_slice(), replacement);
+    }
+}

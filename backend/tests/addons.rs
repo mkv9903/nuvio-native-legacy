@@ -293,3 +293,43 @@ fn malformed_manifests_and_oversized_replies_are_rejected() {
         Err(Error::ResponseLimit)
     );
 }
+
+#[test]
+fn incomplete_manifests_fail_but_declared_empty_and_source_only_manifests_are_valid() {
+    for value in [
+        json!({}),
+        json!({"id":"provider", "name":"Provider"}),
+        json!({"id":"provider", "catalogs":null}),
+        json!({"resources":null, "catalogs":[]}),
+        json!({"resources":[], "error":"unavailable"}),
+        json!({"catalogs":[], "error":{"message":"unavailable"}}),
+    ] {
+        let body = serde_json::to_vec(&value).unwrap();
+        assert_eq!(Manifest::decode(&body), Err(Error::InvalidData));
+        assert!(serde_json::from_slice::<Manifest>(&body).is_err());
+    }
+    let source_only = manifest(json!({"resources":["stream"], "types":["movie"]}));
+    assert!(source_only.catalogs.is_empty());
+    assert_eq!(source_only.provides(ResourceKind::Stream), Some(true));
+    let declared_empty = manifest(json!({"resources":[], "catalogs":[], "error":null}));
+    assert!(declared_empty.catalogs.is_empty());
+    assert_eq!(declared_empty.provides(ResourceKind::Stream), Some(false));
+    // Existing providers can declare catalogs without a resources array.
+    let legacy = manifest(json!({"catalogs":[{"id":"top", "type":"movie"}]}));
+    assert_eq!(legacy.catalogs.len(), 1);
+}
+
+#[test]
+fn full_resource_types_are_independent_of_root_types() {
+    let manifest = manifest(json!({
+        "types":["movie"], "resources":[{"name":"meta"}]
+    }));
+    assert_eq!(
+        manifest.accepts(ResourceKind::Metadata, "movie", "tt123"),
+        Some(false)
+    );
+    assert_eq!(
+        manifest.accepts(ResourceKind::Metadata, "series", "kitsu:123"),
+        Some(false)
+    );
+}

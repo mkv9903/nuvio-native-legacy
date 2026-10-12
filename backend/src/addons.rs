@@ -216,10 +216,14 @@ impl Resource {
             // Omitted prefixes accept all IDs, as specified by Stremio.
             Self::Definition {
                 types, id_prefixes, ..
-            } => (
-                types.as_deref().or(manifest.types.as_deref()),
-                id_prefixes.as_deref(),
-            ),
+            } => {
+                // Full resource declarations have their own types as well as
+                // prefixes. Missing types cannot authorize a request.
+                let Some(types) = types.as_deref() else {
+                    return false;
+                };
+                (Some(types), id_prefixes.as_deref())
+            }
         };
         types.is_none_or(|types| {
             types
@@ -290,6 +294,7 @@ impl Catalog {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(try_from = "ManifestDocument")]
 pub struct Manifest {
     #[serde(default)]
     pub id: String,
@@ -302,12 +307,49 @@ pub struct Manifest {
     #[serde(default)]
     pub catalogs: Vec<Catalog>,
 }
-impl Manifest {
-    pub fn decode(bytes: &[u8]) -> Result<Self> {
-        if bytes.len() > ADDON_RESPONSE_LIMIT {
-            return Err(Error::ResponseLimit);
+
+#[derive(Deserialize)]
+struct ManifestDocument {
+    #[serde(default)]
+    id: String,
+    #[serde(default)]
+    name: String,
+    #[serde(default, deserialize_with = "declared_array")]
+    resources: Option<Vec<Resource>>,
+    types: Option<Vec<String>>,
+    #[serde(rename = "idPrefixes")]
+    id_prefixes: Option<Vec<String>>,
+    #[serde(default, deserialize_with = "declared_array")]
+    catalogs: Option<Vec<Catalog>>,
+    error: Option<serde::de::IgnoredAny>,
+}
+
+// A missing declaration is distinct from an explicit empty array. Null and
+// wrong-typed declarations are damaged data, never an instruction to clear.
+fn declared_array<'de, D, T>(deserializer: D) -> std::result::Result<Option<Vec<T>>, D::Error>
+where
+    D: Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    Vec::deserialize(deserializer).map(Some)
+}
+
+impl TryFrom<ManifestDocument> for Manifest {
+    type Error = &'static str;
+
+    fn try_from(document: ManifestDocument) -> std::result::Result<Self, Self::Error> {
+        if document.error.is_some() || (document.resources.is_none() && document.catalogs.is_none())
+        {
+            return Err("incomplete or failed addon manifest");
         }
-        let result: Self = serde_json::from_slice(bytes).map_err(|_| Error::InvalidData)?;
+        let result = Self {
+            id: document.id,
+            name: document.name,
+            resources: document.resources,
+            types: document.types,
+            id_prefixes: document.id_prefixes,
+            catalogs: document.catalogs.unwrap_or_default(),
+        };
         if result.id.contains('\0')
             || result.catalogs.iter().any(|catalog| {
                 catalog.id.is_empty()
@@ -316,9 +358,18 @@ impl Manifest {
                     || catalog.media_type.contains('\0')
             })
         {
-            return Err(Error::InvalidData);
+            return Err("invalid addon manifest identity");
         }
         Ok(result)
+    }
+}
+
+impl Manifest {
+    pub fn decode(bytes: &[u8]) -> Result<Self> {
+        if bytes.len() > ADDON_RESPONSE_LIMIT {
+            return Err(Error::ResponseLimit);
+        }
+        serde_json::from_slice(bytes).map_err(|_| Error::InvalidData)
     }
     /// None retains optimistic discovery when the manifest omits resources.
     pub fn provides(&self, kind: ResourceKind) -> Option<bool> {
