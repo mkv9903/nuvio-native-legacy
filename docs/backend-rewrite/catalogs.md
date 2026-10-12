@@ -26,8 +26,8 @@ User-confirmed decisions:
   separately to fit the TV; never silently truncate a provider URL.
 - Read only this rewrite's versioned Rust JSON. Do not import old C caches.
 - Preserve unreadable pending edits and pause synchronization for that scope.
-  Display a valid same-scope cache, but block further edits and uploads while
-  recovery is pending. Retry transient read failures; never silently delete or
+  Display a valid same-scope cache and block uploads while recovery is pending.
+  Retry transient read failures; never silently delete or
   overwrite the journal. A damaged cache alone can be replaced by a valid fetch.
 - Merge pending TV intentions into a newly fetched server list before every
   upload. TV enabled/disabled changes win for matching provider URLs. Remote
@@ -121,6 +121,12 @@ The worker retries failures after 30 seconds and refreshes valid lists after
 five minutes while the app supplies frame steps. Only the latest queued profile
 request is retained. Drop detaches during an in-flight request and flushes local
 edits; logout hides state immediately and queues private addon-file cleanup.
+
+One UI behavior remains pending before binding actions: should an unreadable
+journal also block further addon changes, or permit temporary in-memory changes
+that cannot be saved/uploaded until recovery? The prepared backend currently
+blocks changes, and its tests verify that proposed behavior. The user has been
+asked to confirm that rule; it is not yet an application UI change.
 
 Manifest/catalog HTTP and cache integration, C
 source/subtitle snapshot access and profile-change publication still need
