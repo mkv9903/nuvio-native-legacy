@@ -240,7 +240,7 @@ fn original_c_screens_use_rust_login_selection_pin_and_remote_actions() {
         "/auth/v1/token" => {
             let body: Value = serde_json::from_slice(&request.body).unwrap();
             assert_eq!(body["email"], "person@example.test");
-            assert_eq!(body["password"], "test-password");
+            assert_eq!(body["password"], " MiX pAss\"word\\! #9 ");
             response(200, auth("user", None, "user"))
         }
         "/rest/v1/rpc/get_sync_owner" => response(200, json!("owner")),
@@ -317,7 +317,7 @@ fn original_c_screens_use_rust_login_selection_pin_and_remote_actions() {
         login_test_email_keyboard_start();
         st_teste_evento(CString::new("Dperson@example.test").unwrap().as_ptr());
         login_update(1.0 / 60.0, SDL_GetTicks());
-        st_teste_evento(CString::new("Dtest-password").unwrap().as_ptr());
+        st_teste_evento(CString::new("D MiX pAss\"word\\! #9 ").unwrap().as_ptr());
         login_update(1.0 / 60.0, SDL_GetTicks());
         login_test_sign_in();
         st_teste_ligar(0);

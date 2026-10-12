@@ -62,5 +62,8 @@ The first Fedora user check exposed an RPC record-format gap in the initial
 fixtures. New cases cover the live one-row QR creation/polling arrays, object
 variants, empty/ambiguous/scalar replies, authorization-code URL fallback,
 HTTP 400 classification and configuration-source diagnostics. The anonymous
-live probe succeeds; user email login remains pending diagnostic retest. See
+live probe and real Linux app QR startup succeed. The native input case preserves
+mixed case, quotes, backslashes and surrounding password spaces. The rebuilt ARM
+IPK passes packaging and compatibility checks. User email login remains pending
+diagnostic retest. See
 [the regression record](login-regression.md).
