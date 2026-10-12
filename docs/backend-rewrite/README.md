@@ -60,7 +60,7 @@ owner and otherwise wait/retry rather than using the signed-in member's ID.
 ## Validation status
 
 The Rust account domain, HTTP client, worker, native boundary, platform helper,
-Home ordering and addon/manifest models pass 69 tests. The C login and profile screens also
+Home ordering, addon networking/storage and native addon snapshots pass 90 tests. The C login and profile screens also
 pass a Rust driver under Xvfb. The five relevant C reference groups passed
 before their test cases moved to Rust. See [test coverage](test-coverage.md).
 The Linux app builds and starts under Xvfb using disposable isolated preview

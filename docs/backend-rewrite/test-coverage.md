@@ -14,7 +14,7 @@ account credentials are used by these tests.
 | `perfilsel` profile fields, selection rules, startup cache, PIN outcomes, primary-addon inheritance and logout | `storage`, `service` and `account` profile cases |
 
 All five reference groups passed before integration. The current Rust suite
-passes the original 45 account tests plus 24 Home-order/addon-model tests and the native UI driver. Additional coverage includes late replies after cancellation or
+passes 90 Rust tests and the native UI driver. Additional coverage includes late replies after cancellation or
 logout, stale refresh against a new account, disk-write failures, schema identity
 and version validation, isolated storage, private atomic writes, configuration
 key completeness, unverified PIN locks and shared-account owner handling.
@@ -102,3 +102,24 @@ fast worker. The isolated sync cache fixtures use a temporary Rust Test director
 and account-journal doubles. The same missing symbols occur at the unchanged
 reference `f8b4f72a`; it is not counted as a passing check here. Its unmigrated
 C fixture needs repair when that coverage is used for subsequent integration.
+
+## Account-addon service, storage and native snapshots
+
+Twenty-one new Rust tests cover owner/effective-profile requests, pagination beyond
+500 addons, complete Serde pushes, disabled entries and empty removals; stale
+replies after switching profiles away and back; independent and primary-addon
+contexts; failures on later pages; and unknown-owner/unverified-profile gates.
+
+Storage cases cover fresh private JSON, long names and URLs, restart, separate
+member/owner/profile identities, hashed filenames, explicit empty data, exact
+edit acknowledgements, concurrent store handles, cache promotion on ack,
+unknown versions and corrupt files, legacy-file exclusion, logout cleanup and
+symlink rejection and consistent paired cache/journal restoration. Native cases cover large lists, late manifest catalogs,
+shared snapshot lifetime after parent release, independent resource filters,
+owned/encoded long request URLs and display NUL handling.
+
+The retained C account/profile screen driver passes after adding private-content
+generation tracking. The addon controller and C consumers are not yet bound to
+these new services; their application-level limits and profile-row behavior
+remain pending. Pending recovery and cross-device edit policies are recorded in
+[the catalog implementation record](catalogs.md).

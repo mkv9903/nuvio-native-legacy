@@ -68,9 +68,32 @@ are Rust tests; the C implementations and their C test programs were removed.
 Rust addon/manifest models are implemented and tested, including long URLs,
 large lists, resource filters and catalogs outside the Home quota.
 
-Account addon networking/edit persistence, manifest/catalog HTTP and cache
-integration, C source/subtitle snapshot access and profile-change publication
-still need implementation. The application still uses the existing C addon
+Context-bound account addon networking, private cache/pending-edit storage and
+immutable native addon snapshots are implemented and tested. Requests use the
+confirmed owner and effective addon profile, use Serde for pushes, paginate
+large lists, reject incomplete multi-page results, and reject old work after a
+profile round trip. Saved edits carry unique revision IDs. Acknowledgement
+promotes the edit into cache before removing its pending record. Independent
+store handles use advisory file locks to protect read/check/removal.
+
+The C account/profile UI regression driver still passes. Native snapshot tests
+cover large lists, complete URLs, resource filters, catalogs outside the Home
+quota, shared readers, parent release and separately owned request URLs.
+`ring` is a direct dependency for SHA-256 scope filenames; its exact version
+was already present in the pinned TLS dependency graph. `uuid` adds its Serde
+feature for persisted edit IDs. No additional package versions were introduced.
+
+Pending user decisions before binding addon actions and synchronization:
+
+- Pause on an unreadable/corrupt pending-edit file, or discard that edit and
+  reload from the server. No recovery policy has been selected or bound.
+- Merge TV edits into the latest server list, or preserve C's whole-list
+  replacement. Merging changes the pending-edit model and acknowledgement data;
+  do not wire the snapshot replacement primitive as the final policy yet.
+
+The application controller, manifest/catalog HTTP and cache integration, C
+source/subtitle snapshot access and profile-change publication still need
+implementation. The application still uses the existing C addon
 loading/search data until that integration is complete. This checkpoint does
 not yet fix the profile-switch Home-row issue or remove the application's old
 addon count/URL limits. The new Rust models have no such fixed-buffer limits.

@@ -115,6 +115,33 @@ impl JsonStore {
             })
             .collect()
     }
+    pub fn with_lock<T>(&self, name: &str, operation: impl FnOnce() -> Result<T>) -> Result<T> {
+        let mut options = OpenOptions::new();
+        options.read(true).write(true).create(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            options
+                .mode(0o600)
+                .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC);
+        }
+        let file = options.open(self.path(name)?).map_err(|_| Error::Storage)?;
+        #[cfg(unix)]
+        {
+            use std::os::fd::AsRawFd;
+            loop {
+                if unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX) } == 0 {
+                    break;
+                }
+                if std::io::Error::last_os_error().kind() != std::io::ErrorKind::Interrupted {
+                    return Err(Error::Storage);
+                }
+            }
+        }
+        let result = operation();
+        drop(file); // Closing also releases the advisory lock.
+        result
+    }
 }
 fn is_test_directory(path: &Path) -> bool {
     path.file_name()

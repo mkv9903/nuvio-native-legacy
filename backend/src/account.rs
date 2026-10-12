@@ -1,4 +1,5 @@
 use crate::{
+    content_context::{AddonScope, ContentContext},
     error::{Error, Result},
     http::Response,
     model::{ProfileId, ProfileLock, Secret, Session},
@@ -67,6 +68,7 @@ struct State {
     data: AccountData,
     revision: u64,
     generation: u64,
+    content_generation: u64,
     login: LoginState,
     code: Option<LoginCode>,
     code_deadline: u64,
@@ -119,6 +121,7 @@ impl AccountBackend {
                     data,
                     revision: 0,
                     generation: 0,
+                    content_generation: 0,
                     login,
                     code: None,
                     code_deadline: 0,
@@ -223,6 +226,41 @@ impl AccountBackend {
             .as_ref()
             .filter(|session| !session.anonymous)
             .map(|session| session.access.clone())
+    }
+
+    pub fn content_context(&self, force_primary: bool) -> Option<ContentContext> {
+        let state = self.state();
+        if state.login != LoginState::LoggedIn || state.data.selection.needs_selection() {
+            return None;
+        }
+        let session = state
+            .data
+            .session
+            .as_ref()
+            .filter(|session| !session.anonymous)?;
+        let owner = state
+            .data
+            .owner
+            .as_ref()
+            .filter(|owner| !owner.is_empty())?;
+        let profile = state.data.selection.active()?;
+        if profile.lock == ProfileLock::Unknown {
+            return None;
+        }
+        Some(ContentContext {
+            account_generation: state.generation,
+            content_generation: state.content_generation,
+            profile: profile.id,
+            addons: AddonScope {
+                member: session.subject.clone(),
+                owner: owner.clone(),
+                profile: state.data.selection.addon_profile(force_primary)?,
+            },
+            force_primary,
+        })
+    }
+    pub fn content_context_current(&self, context: &ContentContext) -> bool {
+        self.content_context(context.force_primary).as_ref() == Some(context)
     }
 
     pub fn begin_email(&self) -> u64 {
@@ -580,8 +618,19 @@ impl AccountBackend {
         operation: impl Fn(&AccountService, &Secret) -> Result<T>,
         unauthorized: impl Fn(&T) -> bool,
     ) -> Result<T> {
+        self.authenticated_generation(None, operation, unauthorized)
+    }
+    fn authenticated_generation<T>(
+        &self,
+        expected_generation: Option<u64>,
+        operation: impl Fn(&AccountService, &Secret) -> Result<T>,
+        unauthorized: impl Fn(&T) -> bool,
+    ) -> Result<T> {
         let (session, generation) = {
             let state = self.state();
+            if expected_generation.is_some_and(|expected| expected != state.generation) {
+                return Err(Error::Cancelled);
+            }
             (
                 state
                     .data
@@ -634,6 +683,44 @@ impl AccountBackend {
             |response| response.status == 401,
         )
     }
+    pub fn content_table(
+        &self,
+        context: &ContentContext,
+        name: &str,
+        query: &str,
+    ) -> Result<Response> {
+        if !self.content_context_current(context) {
+            return Err(Error::Cancelled);
+        }
+        let result = self.authenticated_generation(
+            Some(context.account_generation),
+            |service, token| service.table(name, query, token),
+            |response| response.status == 401,
+        );
+        if !self.content_context_current(context) {
+            return Err(Error::Cancelled);
+        }
+        result
+    }
+    pub fn content_rpc(
+        &self,
+        context: &ContentContext,
+        name: &str,
+        body: &[u8],
+    ) -> Result<Response> {
+        if !self.content_context_current(context) {
+            return Err(Error::Cancelled);
+        }
+        let result = self.authenticated_generation(
+            Some(context.account_generation),
+            |service, token| service.raw_rpc(name, body, token),
+            |response| response.status == 401,
+        );
+        if !self.content_context_current(context) {
+            return Err(Error::Cancelled);
+        }
+        result
+    }
 
     pub fn load_profiles(&self) -> Result<usize> {
         let generation = self.state().generation;
@@ -652,6 +739,7 @@ impl AccountBackend {
         if state.generation != generation {
             return Err(Error::Cancelled);
         }
+        let previous_context = (state.data.owner.clone(), state.data.selection.selected);
         if owner.as_ref().is_ok_and(|owner| {
             state
                 .data
@@ -706,6 +794,9 @@ impl AccountBackend {
             state.data.selection.selected = Some(state.data.selection.profiles[0].id);
         }
         let count = state.data.selection.profiles.len();
+        if previous_context != (state.data.owner.clone(), state.data.selection.selected) {
+            state.content_generation = state.content_generation.wrapping_add(1);
+        }
         eprintln!("[account] Rust profiles loaded: {count}");
         self.persist(&mut state);
         state.revision = state.revision.wrapping_add(1);
@@ -784,7 +875,11 @@ impl AccountBackend {
         if state.generation != generation || state.selection_action != action {
             return Err(Error::Cancelled);
         }
+        let previous = state.data.selection.selected;
         state.data.selection.select(id, needs_pin)?;
+        if previous != Some(id) {
+            state.content_generation = state.content_generation.wrapping_add(1);
+        }
         self.persist(&mut state);
         state.revision = state.revision.wrapping_add(1);
         Ok(())

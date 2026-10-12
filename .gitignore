@@ -34,6 +34,7 @@ POST-REDDIT.md
 
 # Build directory
 build/
+/backend/target/
 *.wgt
 
 # TV screen photos, taken to read diagnostics panel.
