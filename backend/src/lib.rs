@@ -3,11 +3,15 @@
 
 pub const TEST_APP_ID: &str = "space.mkv.nuvio.rusttest";
 pub mod account;
+pub mod addons;
+pub mod catalog_order;
+pub mod catalog_order_ffi;
 pub mod config;
 pub mod controller;
 pub mod error;
 pub mod ffi;
 pub mod http;
+mod json_store;
 pub mod model;
 mod platform;
 pub mod service;

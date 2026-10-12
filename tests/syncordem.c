@@ -165,6 +165,7 @@ static const char *ORDEM_B =
   "{\"addon_id\":\"xperience\",\"type\":\"movie\",\"catalog_id\":\"foryou\",\"order\":1}]}}]";
 
 static volatile int rpcCatHome;
+static int hold_home_order;
 static int rpcCredencial;
 static int modoAddons, pushSt = 500, pushes, aplicacoesAddons, segurandoPush, noPush;
 static char addonLocal[120] = "https://local-a.example/manifest.json";
@@ -195,7 +196,10 @@ char *sessao_rpc(const char *funcao, const char *corpo, int *st) {
     return strdup(p1 ? "[{\"marca\":\"perfil1\"}]" : "[{\"marca\":\"perfil2\"}]");
   }
   if (!strcmp(funcao, "sync_pull_home_catalog_settings")) {
+    pthread_mutex_lock(&trava);
+    while (hold_home_order) pthread_cond_wait(&sinal, &trava);
     rpcCatHome++;
+    pthread_mutex_unlock(&trava);
     // A conta guarda uma ordem por perfil: o 2 tem ORDEM_A, o 1 ORDEM_B.
     return strdup(strstr(corpo, "\"p_profile_id\":2") ? ORDEM_A : ORDEM_B);
   }
@@ -589,6 +593,11 @@ int main(int argc, char **argv) {
   else { ateTerminar(); quadros(2); }  // "[sync] ciclo interrompido"
 
   escolher(alvo);                      // profile_picker_complete()
+  /* Keep the fake server behind an explicit gate until the cache assertions
+   * finish. A fast worker must not race the cache-before-network check. */
+  pthread_mutex_lock(&trava);
+  hold_home_order = 1;
+  pthread_mutex_unlock(&trava);
   sync_iniciar();                      // app.c, ramo da escolha
 
   if (!frio) {
@@ -600,6 +609,10 @@ int main(int argc, char **argv) {
   }
   remAntes = remontagens;
   rpcAntes = rpcCatHome;
+  pthread_mutex_lock(&trava);
+  hold_home_order = 0;
+  pthread_cond_broadcast(&sinal);
+  pthread_mutex_unlock(&trava);
   if (segura) soltar();
   ateTerminar();
   // O ciclo interrompido nao pode engolir o ciclo do perfil escolhido: se o

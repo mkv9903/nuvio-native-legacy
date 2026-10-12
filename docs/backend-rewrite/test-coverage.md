@@ -14,7 +14,7 @@ account credentials are used by these tests.
 | `perfilsel` profile fields, selection rules, startup cache, PIN outcomes, primary-addon inheritance and logout | `storage`, `service` and `account` profile cases |
 
 All five reference groups passed before integration. The current Rust suite
-passes 45 tests plus the native UI driver. Additional coverage includes late replies after cancellation or
+passes the original 45 account tests plus 24 Home-order/addon-model tests and the native UI driver. Additional coverage includes late replies after cancellation or
 logout, stale refresh against a new account, disk-write failures, schema identity
 and version validation, isolated storage, private atomic writes, configuration
 key completeness, unverified PIN locks and shared-account owner handling.
@@ -64,6 +64,41 @@ variants, empty/ambiguous/scalar replies, authorization-code URL fallback,
 HTTP 400 classification and configuration-source diagnostics. The anonymous
 live probe and real Linux app QR startup succeed. The native input case preserves
 mixed case, quotes, backslashes and surrounding password spaces. The rebuilt ARM
-IPK passes packaging and compatibility checks. User email login remains pending
-diagnostic retest. See
+IPK passes packaging and compatibility checks. The user confirmed both QR and
+email/password login on Fedora. See
 [the regression record](login-regression.md).
+
+## Home catalog checkpoint
+
+`backend/tests/catalog_order.rs` replaces the migrated C `catordem` and
+`catordemcache` test programs. Its 11 Rust tests cover their reference cases plus
+over 2,048 remote entries, over 6,144 local rows, complete Unicode/escaped/long
+keys, malformed input, atomic private versioned JSON, ownership checks,
+untrusted versions, symlinks and held native snapshots. C parser and persistence
+implementations are removed; retained C consumers use small adapters.
+
+The native text projection is shared per revision. C readers retain owned
+snapshots instead of allocating every key on every renderer query. Account
+storage now reuses the same private atomic-file helper; all account storage
+tests still pass.
+
+`backend/tests/addons.rs` adds 13 tests for the upcoming addon/manifest boundary:
+80 installed addons with URLs beyond 2,047 bytes and names beyond 64 bytes;
+canonical URLs with complete path/query configuration; resource URL escaping;
+redacted diagnostics; authoritative empty lists and whole-list rejection;
+root identities; exact resource names; root/string filters and independent
+object-resource filters; long/many prefixes; 703 catalogs with late search
+targets; required search versus required genre; channel types; malformed and
+oversized responses. These models are not yet connected to the C addon/search
+consumers, which still have their old limits until integration completes.
+
+Retained C integration checks pass for `syncordem`, `synccolecoes`,
+`colfileiras_sync`, `home_hero_layout`, `homepos`, `snapshot_falha` and
+`desc_iniciar_corrida`. The sync fixture now gates its fake Home-order response
+explicitly before testing cache-before-network behavior; it previously raced a
+fast worker. The isolated sync cache fixtures use a temporary Rust Test directory.
+
+`contaoffline_limites` cannot link because its retained fixture lacks saved-list
+and account-journal doubles. The same missing symbols occur at the unchanged
+reference `f8b4f72a`; it is not counted as a passing check here. Its unmigrated
+C fixture needs repair when that coverage is used for subsequent integration.

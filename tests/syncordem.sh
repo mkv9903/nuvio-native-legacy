@@ -6,15 +6,17 @@
 #   bash tests/syncordem.sh
 set -eu
 cd "$(dirname "$0")/.."
+source tools/test-support.sh
 flags=(-O1 -g -Isrc -pthread -DNV_LINUX_DESKTOP $(pkg-config --cflags sdl2 SDL2_image SDL2_ttf)  \
        -Wall -Wno-deprecated-declarations -Wno-macro-redefined)
 if [ "${SANITIZE:-0}" = 1 ]; then flags+=(-fsanitize=address,undefined -fno-omit-frame-pointer); fi
 bin="${TMPDIR:-/tmp}/nuvio-syncordem-tests"
-cc "${flags[@]}" src/sync.c tests/stub_contapend.c src/catordem.c src/catordemcache.c src/contacache.c src/js.c src/jsw.c \
+cc "${flags[@]}" src/sync.c tests/stub_contapend.c src/catalog_order_adapter.c src/catalog_order_cache_adapter.c src/contacache.c src/js.c src/jsw.c \
   tests/syncordem.c -o "$bin"
 dir="$(mktemp -d "${TMPDIR:-/tmp}/nuvio-syncordem.XXXXXXXX")"
 trap 'rm -rf "$dir"' EXIT
-export NV_T_DIR="$dir"
+export NV_T_DIR="$dir/space.mkv.nuvio.rusttest"
+mkdir -p "$NV_T_DIR"
 
 sessao() {
   local saida
@@ -25,11 +27,11 @@ sessao() {
 
 # 1. Primeira vez nesta TV: nada salvo, escolhe o 2, a conta manda a ordem.
 sessao 2 livre frio
-echo "$SAIDA" | grep -qF '[catordem] ordem guardada no cache local (perfil 2)' \
+echo "$SAIDA" | grep -qF '[catalogs] Saved Home order for profile 2' \
   || { echo "FALHOU: sessao 1 nao gravou o cache"; exit 1; }
 # 2. Abertura seguinte, mesma pessoa, respondendo depois do ciclo interrompido.
 sessao 2
-echo "$SAIDA" | grep -qF '[catordem] ordem restaurada do cache local (perfil 2)' \
+echo "$SAIDA" | grep -qF '[catalogs] Restored Home order for profile 2' \
   || { echo "FALHOU: sessao 2 nao restaurou o cache"; exit 1; }
 # 3. Mesma pessoa respondendo com o primeiro ciclo ainda no ar.
 sessao 2 segura
@@ -37,7 +39,7 @@ sessao 2 segura
 sessao 1 livre frio
 # 5. O caso do log de campo: salvo 1, a pessoa escolhe 2 com o fio vivo.
 sessao 2 segura
-echo "$SAIDA" | grep -qF '[catordem] ordem restaurada do cache local (perfil 2)' \
+echo "$SAIDA" | grep -qF '[catalogs] Restored Home order for profile 2' \
   || { echo "FALHOU: sessao 5 nao restaurou o cache do perfil escolhido"; exit 1; }
 # 6. Salvo 2, escolhe 1 no quadro em que o fio interrompido acabou: o ciclo
 #    completo nao pode ficar para o sync_periodico (5 min).
@@ -58,14 +60,14 @@ echo "$SAIDA" | grep -qF 'recusa lembrada do disco' \
 sessao addons
 # Fila de addon entre PROCESSOS: uma sessao cai em 500 e termina; a seguinte
 # parte so do disco. O nome vazio e estado desligado tambem devem sobreviver.
-export NV_T_DIR="$dir/addons-boot"; mkdir "$NV_T_DIR"
+export NV_T_DIR="$dir/addons-boot/space.mkv.nuvio.rusttest"; mkdir -p "$NV_T_DIR"
 sessao addons-gravar
 sessao addons-reabrir
 sessao addons-boot-leitura
 sessao addons-ack
 sessao addons-limpo
 for caso in identidade ack-perfil disco ram8 teto; do
-  export NV_T_DIR="$dir/addons-$caso"; mkdir "$NV_T_DIR"
+  export NV_T_DIR="$dir/addons-$caso/space.mkv.nuvio.rusttest"; mkdir -p "$NV_T_DIR"
   sessao "addons-$caso"
 done
 echo "$SAIDA" | grep -q 'FALHOU' && exit 1

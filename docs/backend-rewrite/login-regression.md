@@ -38,8 +38,9 @@ The native regression now enters email and password through the retained C
 keyboard completion/update path before dispatching the Rust action. Its request
 assertions verify the complete input values using fake credentials. This passes,
 including mixed case, quotes, backslashes and surrounding password spaces,
-but the cause of the user's real email failure remains unconfirmed until their
-retest supplies the new diagnostics.
+The user subsequently confirmed that both QR and email/password login work on
+Fedora with the corrected build. The initial email error's exact cause was not
+independently established; the QR response-shape cause was reproduced.
 
 ## Validation and retest
 
@@ -48,8 +49,8 @@ live-service probe succeeds. The rebuilt real Linux app also creates a QR code
 against the live service under Xvfb, with disposable isolated Rust session data
 and matching C/Rust configuration. The ARM rebuild and IPK pass the exact runtime
 allowlist, test-identity, executable-mode and glibc compatibility checks.
-Retest Linux first, including both QR and email/password, before the first TV
-runtime check. No user password is needed for diagnostics.
+The Linux retest is complete: the user confirmed both login methods. The first
+TV runtime check remains outstanding. No user password is needed for diagnostics.
 
 ```bash
 git pull --ff-only

@@ -4,7 +4,8 @@
 # trabalho do Codex. Ver tests/homejanelas.c.
 set -eu
 cd "$(dirname "$0")/.."
+source tools/test-support.sh
 flags=(-O1 -g -Isrc -DNV_LINUX_DESKTOP $(pkg-config --cflags sdl2 SDL2_image SDL2_ttf)  -Wno-macro-redefined -Wno-deprecated-declarations)
 if [ "${SANITIZE:-0}" = 1 ]; then flags+=(-fsanitize=address,undefined -fno-omit-frame-pointer); fi
-cc ${flags[@]+"${flags[@]}"} src/cwordem.c tests/homejanelas.c src/cotacat.c src/js.c src/metaprov.c src/colecoes.c src/net_url.c src/catordem.c -o /tmp/nuvio-homejanelas-tests
+cc ${flags[@]+"${flags[@]}"} src/cwordem.c tests/homejanelas.c src/cotacat.c src/js.c src/metaprov.c src/colecoes.c src/net_url.c src/catalog_order_adapter.c -o /tmp/nuvio-homejanelas-tests
 /tmp/nuvio-homejanelas-tests

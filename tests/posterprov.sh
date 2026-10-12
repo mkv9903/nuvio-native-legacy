@@ -5,6 +5,7 @@
 #   bash tests/posterprov.sh
 set -eu
 cd "$(dirname "$0")/.."
+source tools/test-support.sh
 cc -O1 -g -Wall -Wextra -Isrc -DNV_LINUX_DESKTOP $(pkg-config --cflags sdl2 SDL2_image SDL2_ttf)  \
   -Wno-deprecated-declarations -Wno-macro-redefined \
   src/posterprov.c src/net_url.c tests/posterprov.c -lpthread -o /tmp/nuvio-posterprov-tests
@@ -14,7 +15,7 @@ cc -O1 -g -Wall -Wextra -Isrc -DNV_LINUX_DESKTOP $(pkg-config --cflags sdl2 SDL2
 # aninhado que o AIOMetadata manda antes dele (tests/posteraddon.c inclui
 # descoberta.c, com o conjunto de link de tests/detalheanime.sh).
 cc src/catalogo.c src/cwordem.c tests/posteraddon.c src/cotacat.c \
-  src/js.c src/metaprov.c src/colecoes.c src/net_url.c src/catordem.c \
+  src/js.c src/metaprov.c src/colecoes.c src/net_url.c src/catalog_order_adapter.c \
   -Isrc -Itests -DNV_LINUX_DESKTOP $(pkg-config --cflags sdl2 SDL2_image SDL2_ttf)  \
   -o /tmp/nuvio-posteraddon-tests -O1 -g \
   -Wall -Wno-deprecated-declarations -Wno-macro-redefined

@@ -6,12 +6,13 @@
 #   bash tests/montagem_cedo.sh        (SANITIZE=1 para ASan/UBSan)
 set -eu
 cd "$(dirname "$0")/.."
+source tools/test-support.sh
 flags=()
 if [ "${SANITIZE:-0}" = 1 ]; then flags+=(-fsanitize=address,undefined -fno-omit-frame-pointer); fi
 # Tetos de espera do catalogo lento encurtados: o caso 6 nao precisa de 4 s.
 cc ${flags[@]+"${flags[@]}"} -DCAT_ESPERA_SILENCIO_MS=300 -DCAT_ESPERA_MIN_MS=600 \
   src/cwordem.c tests/montagem_cedo.c src/homeestado.c src/catalogo.c \
-  src/progress.c src/js.c src/metaprov.c src/colecoes.c src/net_url.c src/catordem.c src/cotacat.c \
+  src/progress.c src/js.c src/metaprov.c src/colecoes.c src/net_url.c src/catalog_order_adapter.c src/cotacat.c \
   -Isrc -DNV_LINUX_DESKTOP $(pkg-config --cflags sdl2 SDL2_image SDL2_ttf)  \
   -o /tmp/nuvio-montagem-cedo-tests -O1 -g -pthread \
   -Wall -Wno-deprecated-declarations -Wno-macro-redefined -Wno-unused-function

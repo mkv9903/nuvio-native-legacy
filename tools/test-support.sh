@@ -11,7 +11,7 @@ cc() {
   local has_backend=0 profile_fixture=0 argument
   local fixture_flags=()
   for argument in "$@"; do
-    case "$argument" in *src/account_ui_adapter.c) has_backend=1 ;; esac
+    case "$argument" in *src/account_ui_adapter.c|*src/catalog_order_adapter.c|*src/catalog_order_cache_adapter.c) has_backend=1 ;; esac
     case "$argument" in tests/listas.c|tests/salvospainel_tabs.c|tests/player_retido.c|tests/releaseinfo.c) profile_fixture=1 ;; esac
   done
   if [ "$has_backend" = 1 ]; then
