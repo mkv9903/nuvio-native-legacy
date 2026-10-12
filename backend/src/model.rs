@@ -125,11 +125,28 @@ pub struct Profile {
     pub share_primary_addons: bool,
 }
 
+/// Some service records also carry an opaque database identifier. It must not
+/// invalidate a separate numeric profile index or become an application ID.
+#[derive(Deserialize)]
+#[serde(untagged)]
+pub(crate) enum RemoteProfileId {
+    Index(u32),
+    Other(serde::de::IgnoredAny),
+}
+impl RemoteProfileId {
+    pub fn numeric(self) -> Option<ProfileId> {
+        match self {
+            Self::Index(id) => ProfileId::new(id),
+            Self::Other(_) => None,
+        }
+    }
+}
+
 /// Wire names belong to the service protocol; storage uses the domain model.
 #[derive(Deserialize)]
 pub(crate) struct RemoteProfile {
     profile_index: Option<u32>,
-    id: Option<u32>,
+    id: Option<RemoteProfileId>,
     name: Option<String>,
     avatar_color_hex: Option<String>,
     avatar_url: Option<String>,
@@ -146,7 +163,7 @@ impl TryFrom<RemoteProfile> for Profile {
         let id = value
             .profile_index
             .and_then(ProfileId::new)
-            .or_else(|| value.id.and_then(ProfileId::new))
+            .or_else(|| value.id.and_then(RemoteProfileId::numeric))
             .ok_or(Error::InvalidData)?;
         Ok(Self {
             id,

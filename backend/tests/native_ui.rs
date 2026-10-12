@@ -242,14 +242,14 @@ fn original_c_screens_use_rust_login_selection_pin_and_remote_actions() {
         "/rest/v1/rpc/sync_pull_profiles" => response(
             200,
             json!([
-            {"profile_index":1,"name":"Primary","avatar_color_hex":"#1E88E5"},
+            {"profile_index":1,"id":"primary-database-key","name":"Primary","avatar_color_hex":"#1E88E5"},
             {"profile_index":2,"name":"Second","avatar_color_hex":"#E53935","uses_primary_addons":true},
             {"profile_index":3,"name":"Kids"}]),
         ),
         "/rest/v1/rpc/sync_pull_profile_locks" => response(
             200,
             json!([
-            {"profile_id":1,"pin_enabled":false},{"profile_id":2,"pin_enabled":false},{"profile_id":3,"pin_enabled":true}]),
+            {"profile_id":"primary-database-key","profile_index":1,"pin_enabled":false},{"profile_id":2,"pin_enabled":false},{"profile_id":3,"pin_enabled":true}]),
         ),
         "/rest/v1/rpc/verify_profile_pin" => {
             let body: Value = serde_json::from_slice(&request.body).unwrap();

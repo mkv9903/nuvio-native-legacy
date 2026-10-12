@@ -110,7 +110,7 @@ fn profile_fields_fallback_ids_legacy_sharing_and_unverified_locks() {
             200,
             json!([
                 {"profile_index":1,"name":"Primary","avatar_color_hex":"#123456","profile_background_url":"https://image.invalid/background"},
-                {"profile_index":2,"name":"Second","avatar_id":"avatar","uses_primary_plugins":true},
+                {"profile_index":2,"id":"database-profile-key","name":"Second","avatar_id":"avatar","uses_primary_plugins":true},
                 {"profile_index":0,"id":3,"name":"Third","uses_primary_addons":false,"uses_primary_plugins":true,"pin_enabled":true},
                 {"name":"No valid ID"}, {"profile_index":0}, {"profile_index":-1}, {"profile_index":2,"name":"duplicate"}
             ]),
@@ -124,6 +124,29 @@ fn profile_fields_fallback_ids_legacy_sharing_and_unverified_locks() {
     assert!(profiles[1].share_primary_addons);
     assert!(!profiles[2].share_primary_addons);
     assert_eq!(profiles[2].lock, ProfileLock::Locked);
+}
+
+#[test]
+fn profile_locks_use_the_numeric_profile_index_when_another_identifier_is_opaque() {
+    let service = service(|_| {
+        response(
+            200,
+            json!([
+                {"profile_id":"database-profile-key","profile_index":2,"pin_enabled":true},
+                {"profile_id":3,"profile_index":8,"pin_enabled":false}
+            ]),
+        )
+    });
+    let locks = service.locks(&Secret::new("token")).unwrap();
+    assert_eq!(
+        locks.get(&nuvio_backend::model::ProfileId::new(2).unwrap()),
+        Some(&ProfileLock::Locked)
+    );
+    assert_eq!(
+        locks.get(&nuvio_backend::model::ProfileId::new(3).unwrap()),
+        Some(&ProfileLock::Unlocked)
+    );
+    assert!(!locks.contains_key(&nuvio_backend::model::ProfileId::new(8).unwrap()));
 }
 
 #[test]

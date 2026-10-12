@@ -2,7 +2,7 @@ use crate::{
     config::AccountConfig,
     error::{Error, Result},
     http::{Method, Request, Response, Transport, ACCOUNT_RESPONSE_LIMIT, REQUEST_RESPONSE_LIMIT},
-    model::{Profile, ProfileId, ProfileLock, RemoteProfile, Secret, Session},
+    model::{Profile, ProfileId, ProfileLock, RemoteProfile, RemoteProfileId, Secret, Session},
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -266,7 +266,7 @@ impl AccountService {
         response.success()?;
         #[derive(Deserialize)]
         struct Lock {
-            profile_id: Option<u32>,
+            profile_id: Option<RemoteProfileId>,
             profile_index: Option<u32>,
             pin_enabled: bool,
         }
@@ -276,7 +276,7 @@ impl AccountService {
             .filter_map(|record| {
                 record
                     .profile_id
-                    .and_then(ProfileId::new)
+                    .and_then(RemoteProfileId::numeric)
                     .or_else(|| record.profile_index.and_then(ProfileId::new))
                     .map(|id| {
                         (
