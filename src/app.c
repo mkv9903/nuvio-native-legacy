@@ -2369,7 +2369,10 @@ static const char *homeTrailerBloqueio(void) {
 void app_atualizar(float dt, Uint32 agora) {
   /* Publish the Rust account snapshot once per frame on every screen. */
   session_step((unsigned)agora);
-  if (!uiPreview) addon_registry_step(ajustes_addons_do_principal(), !player_aberto());
+#ifdef NV_LINUX_DESKTOP
+  if (!uiPreview)
+#endif
+    addon_registry_step(ajustes_addons_do_principal(), !player_aberto());
   if (player_aberto() || player_mini_ativo()) diagnostico_cancelar_vazao();
   // Login e escolha de perfil retornam cedo; a atividade da conta anterior
   // precisa sair antes deles, junto de qualquer modal/pedido ja enfileirado.
