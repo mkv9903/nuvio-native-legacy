@@ -154,6 +154,7 @@ pub struct HomeRow {
     pub titles: Vec<Title>,
     pub loaded: bool,
     pub loading: bool,
+    pub exhausted: bool,
     pub error: Option<AppError>,
 }
 
@@ -638,6 +639,7 @@ impl HomeOrder {
                     titles: Vec::new(),
                     loaded: false,
                     loading: false,
+                    exhausted: false,
                     error: None,
                 });
             }

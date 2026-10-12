@@ -1,5 +1,9 @@
 # Rust rewrite
 
+**Archived branch:** the active effort restarted from clean `main` on
+`codex/rust-backend`. See [the archive record](restart-archive.md).
+The plans and implementations below describe superseded attempts.
+
 **Active direction:** a [standalone Rust application](standalone-rewrite.md),
 written from scratch using the existing application's behavior and appearance
 as references. The user superseded the C/Rust bridge and module-by-module

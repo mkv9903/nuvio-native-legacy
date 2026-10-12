@@ -12,11 +12,12 @@ case "$standalone_command" in
   check)
     rustup run "$standalone_toolchain" cargo test --locked "$@"
     ;;
-  build|linux)
+  build)
     rustup run "$standalone_toolchain" cargo build --locked "$@"
-    if [ "$standalone_command" = linux ]; then
-      exec "$CARGO_TARGET_DIR/debug/nuvio-rust-app"
-    fi
+    ;;
+  linux)
+    rustup run "$standalone_toolchain" cargo build --locked
+    exec "$CARGO_TARGET_DIR/debug/nuvio-rust-app" "$@"
     ;;
   arm)
     mkdir -p "$standalone_root/build/standalone/tmp"
@@ -28,7 +29,7 @@ case "$standalone_command" in
     rustup run "$standalone_toolchain" cargo build --locked --release --features webos --target armv7-unknown-linux-gnueabi "$@"
     ;;
   *)
-    echo 'Usage: bash tools/rust-app.sh {check|build|linux|arm} [Cargo arguments]' >&2
+    echo 'Usage: bash tools/rust-app.sh {check|build|arm} [Cargo arguments] | linux [app arguments]' >&2
     exit 2
     ;;
 esac

@@ -2,11 +2,14 @@
 pub mod account;
 pub mod catalog;
 pub mod error;
+#[cfg(debug_assertions)]
+pub mod fixtures;
 pub mod http;
 pub mod platform;
 pub mod profile;
 pub mod secret;
 pub mod storage;
+pub mod ui;
 
 pub mod service_config {
     include!(concat!(env!("OUT_DIR"), "/service_config.rs"));

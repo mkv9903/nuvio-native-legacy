@@ -435,6 +435,7 @@ impl CloudClient {
             return Err(AppError::InvalidResponse);
         }
         Ok(DeviceLogin {
+            qr: qrcode::QrCode::new(web_url.as_str()).ok(),
             code: code.code,
             web_url: web_url.to_string(),
             poll_interval_seconds: code.poll_interval_seconds.unwrap_or(3).clamp(1, 60),
@@ -481,6 +482,7 @@ struct LoginCode {
 }
 
 pub struct DeviceLogin {
+    pub qr: Option<qrcode::QrCode>,
     pub code: String,
     pub web_url: String,
     pub poll_interval_seconds: u64,

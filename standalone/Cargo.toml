@@ -18,6 +18,7 @@ base64 = "=0.22.1"
 glow = "=0.13.1"
 image = { version = "=0.24.9", default-features = false, features = ["jpeg", "png", "webp"] }
 libloading = "=0.8.9"
+qrcode = { version = "=0.14.1", default-features = false }
 sdl2 = { version = "=0.35.2", default-features = false }
 serde = { version = "=1.0.228", features = ["derive"] }
 serde_json = "=1.0.145"

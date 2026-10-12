@@ -11,8 +11,11 @@ pub struct Profile {
     pub is_primary: bool,
     pub uses_primary_addons: bool,
     pub avatar_url: String,
+    #[serde(rename = "profile_background_url")]
     pub background_url: String,
+    #[serde(rename = "avatar_color_hex")]
     pub color_hex: String,
+    #[serde(rename = "pin_enabled")]
     pub has_pin: bool,
 }
 
