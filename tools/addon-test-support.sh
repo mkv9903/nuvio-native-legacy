@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Retained C algorithms consume real Rust data in these test fixtures.
 test_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+export test_root
 test_backend_target=${CARGO_TARGET_DIR:-$test_root/build/backend/target}
 export CARGO_TARGET_DIR="$test_backend_target"
 CARGO_TARGET_DIR="$test_backend_target" cargo build --locked --manifest-path "$test_root/backend/Cargo.toml" --features native-ui-tests || return

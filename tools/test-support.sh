@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Link retained C capability tests to the Rust backend when they build the app.
 # Test assertions remain in the appropriate language for their capability.
+test_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+export test_root
 if [ -z "${NUVIO_TEST_BACKEND_LIB:-}" ]; then
-  test_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
   test_backend_target=${CARGO_TARGET_DIR:-$test_root/build/backend/target}
   bash "$test_root/tools/backend.sh" --build || return
   export NUVIO_TEST_BACKEND_LIB="$test_backend_target/debug/libnuvio_backend.a"

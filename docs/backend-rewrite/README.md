@@ -78,7 +78,9 @@ no private/sample data or symbols, soft-float ABI and imported glibc versions
 no newer than 2.12. Matching symbols, hashes and application source commit are
 stored locally under `build/backend/webos`. Addon-service and edit-worker
 compatibility builds are archived separately under its `checkpoints` directory;
-they are not new IPKs or manual-test handoffs.
+they are not new IPKs or manual-test handoffs. The addon-runtime compatibility
+build at `0869329b` also passes ARM/ABI/glibc checks; it is archived without an
+IPK, with the earlier matching package/runtime/symbol set restored.
 
 The user's Fedora check found a QR response-shape regression, which was corrected
 against the live anonymous service. The user has now confirmed that both QR and

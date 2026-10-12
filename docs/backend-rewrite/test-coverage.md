@@ -223,3 +223,29 @@ job. The original retry, timeout and progressive-list assertions then passed.
 The C manifest cache/orchestrator, complete title/guide data access and immediate
 profile-change Home publication remain the next integration work. This checkpoint
 is not a manual-test handoff and does not count TV runtime as verified.
+
+
+The standalone retained `legendas_shot` capture is not counted as passing. Its
+second-subtitle top-band pixel assertion fails under this host's Xvfb/llvmpipe
+renderer with zero near-white pixels both before and after adding the second
+subtitle. The unchanged C sources and assertions at `0aa01ab3` reproduce the
+same failure. The temporary reference runner needed the existing Rust linking
+helper enabled; no reference C assertions were changed. Reference/current
+captures and logs are retained locally. This result does not establish a new
+addon-runtime regression, and the capture fixture needs a separate investigation
+before it can be used as a passing visual check. Synthetic subtitle capture
+hooks remain available only in capture builds; normal app results still require
+their current Rust context.
+
+The ARM compatibility check caught a Linux-only preview variable used outside
+its compile guard. `0869329b` corrects that guard; the webOS build then succeeds
+with ARM soft-float, imported glibc versions no newer than 2.12 and matching
+executable/full/debug build IDs. Its build-only artifacts and source/hash record
+are archived under `build/backend/webos/checkpoints/0869329b`. No new IPK was
+created. The existing matched `3d5ef46f` IPK/runtime/symbol set was restored and
+its hashes verified. TV runtime and full Home/profile integration remain pending.
+
+Retained test helpers now initialize/export their repository path even when a
+parent runner supplies the already-built Rust library. The sync-order fixture
+also passes with that prebuilt-library path, avoiding a missing registry source
+in nested test runs.
