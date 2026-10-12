@@ -168,6 +168,22 @@ pub unsafe extern "C" fn nuvio_text_destroy(text: *mut c_char) {
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn nuvio_account_configuration_matches(
+    base: *const c_char,
+    public_key: *const c_char,
+    login_base: *const c_char,
+) -> i32 {
+    match (unsafe { text(base) }, unsafe { text(public_key) }, unsafe {
+        text(login_base)
+    }) {
+        (Ok(base), Ok(key), Ok(login)) => {
+            i32::from(AccountConfig::matches_compiled(base, key, login))
+        }
+        _ => 0,
+    }
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn nuvio_account_create(
     directory: *const c_char,
     app_id: *const c_char,

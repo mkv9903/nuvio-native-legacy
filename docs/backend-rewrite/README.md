@@ -60,7 +60,7 @@ owner and otherwise wait/retry rather than using the signed-in member's ID.
 ## Validation status
 
 The Rust account domain, HTTP client, worker, native boundary, platform helper
-and fresh versioned storage pass 41 tests. The C login and profile screens also
+and fresh versioned storage pass 45 tests. The C login and profile screens also
 pass a Rust driver under Xvfb. The five relevant C reference groups passed
 before their test cases moved to Rust. See [test coverage](test-coverage.md).
 The Linux app builds and starts under Xvfb using disposable isolated preview
@@ -73,9 +73,13 @@ no private/sample data or symbols, soft-float ABI and imported glibc versions
 no newer than 2.12. Matching symbols, hashes and application source commit are
 stored locally under `build/backend/webos`.
 
-The first capability is ready for the user's Linux and TV checks. Follow
-[the first flow check](first-tv-check.md). The new HTTP/TLS runtime has not yet
-been verified on the TV; previous TV evidence validates the earlier experiment only.
+The user's Fedora check found a QR response-shape regression. It is reproduced
+and corrected against the live anonymous service. The revised native driver
+checks QR exchange and the real keyboard-to-Rust email handoff. The user's
+email failure still needs the new diagnostic log. See
+[the regression record](login-regression.md) and retest Linux before TV.
+The new HTTP/TLS runtime has not yet been verified on the TV; previous TV evidence
+validates the earlier experiment only.
 
 The user approved a correction to a stale retained C settings fixture. Its
 cause and the cases to replace in Rust are recorded in

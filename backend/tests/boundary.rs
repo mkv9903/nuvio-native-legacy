@@ -45,6 +45,10 @@ fn null_handles_and_small_token_buffers_fail_without_partial_secrets() {
         .unwrap();
     let handle = Box::into_raw(Box::new(AccountController::new(backend).unwrap()));
     unsafe {
+        assert_eq!(
+            nuvio_account_configuration_matches(ptr::null(), ptr::null(), ptr::null()),
+            0
+        );
         assert!(nuvio_account_snapshot(ptr::null()).is_null());
         assert!(nuvio_account_snapshot_view(ptr::null()).is_null());
         nuvio_account_snapshot_destroy(ptr::null_mut());
@@ -64,6 +68,26 @@ fn null_handles_and_small_token_buffers_fail_without_partial_secrets() {
             token("user", None, "new")
         );
         nuvio_account_destroy(handle);
+    }
+}
+
+#[test]
+fn configuration_diagnostics_detect_mismatched_sources_without_exposing_values() {
+    use nuvio_backend::config::{built, AccountConfig};
+    let configured = i32::from(AccountConfig::built().is_ok());
+    let base = CString::new(built::NUVIO_SUPABASE_URL).unwrap();
+    let key = CString::new(built::NUVIO_SUPABASE_ANON_KEY).unwrap();
+    let login = CString::new(built::TV_LOGIN_WEB_BASE_URL).unwrap();
+    let different = CString::new(format!("mismatch-{}", built::NUVIO_SUPABASE_ANON_KEY)).unwrap();
+    unsafe {
+        assert_eq!(
+            nuvio_account_configuration_matches(base.as_ptr(), key.as_ptr(), login.as_ptr()),
+            configured
+        );
+        assert_eq!(
+            nuvio_account_configuration_matches(base.as_ptr(), different.as_ptr(), login.as_ptr()),
+            0
+        );
     }
 }
 

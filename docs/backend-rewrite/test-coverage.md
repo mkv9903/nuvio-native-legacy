@@ -14,7 +14,7 @@ account credentials are used by these tests.
 | `perfilsel` profile fields, selection rules, startup cache, PIN outcomes, primary-addon inheritance and logout | `storage`, `service` and `account` profile cases |
 
 All five reference groups passed before integration. The current Rust suite
-passes 41 tests plus the native UI driver. Additional coverage includes late replies after cancellation or
+passes 45 tests plus the native UI driver. Additional coverage includes late replies after cancellation or
 logout, stale refresh against a new account, disk-write failures, schema identity
 and version validation, isolated storage, private atomic writes, configuration
 key completeness, unverified PIN locks and shared-account owner handling.
@@ -33,7 +33,7 @@ and discarded standalone files; there is no migration implementation.
 
 Real HTTP transport fixtures, worker scheduling and native ownership now have
 Rust tests. The C login and profile screens also pass a Rust driver under Xvfb:
-QR rendering, email actions, profile/PIN selection, number keys, blank-cell
+QR rendering and poll/exchange, keyboard-to-Rust email actions, profile/PIN selection, number keys, blank-cell
 navigation, pointer actions, preparation guards, cancellation and stale identity.
 Preserved visual behavior checks cover focus and light interpolation, clamped
 resume intervals, paused PIN-background clocks, sustained frame-pressure
@@ -57,3 +57,10 @@ The final ARM build succeeds with imported glibc versions no newer than 2.12.
 The generated IPK passes `tools/test-ipk.sh` against the exact runtime allowlist,
 test identity and executable permissions. The first user TV test remains pending;
 see [the first flow check](first-tv-check.md).
+
+The first Fedora user check exposed an RPC record-format gap in the initial
+fixtures. New cases cover the live one-row QR creation/polling arrays, object
+variants, empty/ambiguous/scalar replies, authorization-code URL fallback,
+HTTP 400 classification and configuration-source diagnostics. The anonymous
+live probe succeeds; user email login remains pending diagnostic retest. See
+[the regression record](login-regression.md).

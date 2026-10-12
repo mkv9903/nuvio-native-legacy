@@ -70,6 +70,17 @@ fn email_errors_cover_new_legacy_confirmation_rate_limit_and_outage_formats() {
         ),
         (503, json!({}), Error::Http(503)),
         (
+            400,
+            json!({"error_code":"bad_json","message":"sensitive server message"}),
+            Error::Http(400),
+        ),
+        (
+            400,
+            json!({"error_code":"validation_failed"}),
+            Error::Http(400),
+        ),
+        (400, json!({}), Error::Http(400)),
+        (
             403,
             json!({"message":"sensitive server message"}),
             Error::Http(403),
@@ -203,6 +214,87 @@ fn tv_code_nonce_old_server_retry_poll_and_exchange() {
         "user"
     );
     assert_eq!(count.load(Ordering::SeqCst), 6);
+}
+
+#[test]
+fn tv_code_and_poll_accept_single_row_rpc_arrays_and_objects() {
+    for rows in [false, true] {
+        for (status, expected) in [
+            ("pending", PollResult::Pending),
+            ("authorized", PollResult::Authorized),
+            ("expired", PollResult::Expired),
+            ("cancelled", PollResult::Expired),
+        ] {
+            let service = service(move |request| {
+                let record = match request.url.path() {
+                    "/rest/v1/rpc/start_tv_login_session" => json!({
+                        "code":"code", "web_url":"https://login.invalid/tv?code=code",
+                        "poll_interval_seconds":5
+                    }),
+                    "/rest/v1/rpc/poll_tv_login_session" => json!({"status":status}),
+                    _ => panic!("unexpected request"),
+                };
+                response(200, if rows { json!([record]) } else { record })
+            });
+            let anonymous = session("anonymous", None, "anon");
+            let code = service.request_code(&anonymous).unwrap();
+            assert_eq!(code.interval_seconds, 5);
+            assert_eq!(code.code, "code");
+            assert_eq!(service.poll_code(&code, &anonymous).unwrap(), expected);
+        }
+    }
+}
+
+#[test]
+fn tv_rpc_rejects_empty_ambiguous_and_non_record_replies() {
+    let anonymous = session("anonymous", None, "anon");
+    let code = nuvio_backend::service::LoginCode {
+        code: "code".to_owned(),
+        web_url: "https://login.invalid/tv".to_owned(),
+        interval_seconds: 3,
+        nonce: Secret::new("nonce"),
+    };
+    for invalid in [
+        json!([]),
+        json!([{}, {}]),
+        json!(null),
+        json!(["pending"]),
+        json!({"unknown":true}),
+    ] {
+        let service = service(move |_| response(200, invalid.clone()));
+        assert_eq!(
+            service.request_code(&anonymous).err(),
+            Some(Error::InvalidData)
+        );
+        assert_eq!(
+            service.poll_code(&code, &anonymous).err(),
+            Some(Error::InvalidData)
+        );
+    }
+}
+
+#[test]
+fn missing_or_empty_tv_url_falls_back_to_the_configured_page_with_the_code() {
+    for web_url in [Value::Null, json!("")] {
+        let service = service(move |_| {
+            response(
+                200,
+                json!([{
+                    "code":"one&two/日本", "web_url":web_url
+                }]),
+            )
+        });
+        let code = service
+            .request_code(&session("anonymous", None, "anon"))
+            .unwrap();
+        let url = url::Url::parse(&code.web_url).unwrap();
+        assert_eq!(url.host_str(), Some("login.invalid"));
+        assert_eq!(url.path(), "/tv");
+        assert_eq!(
+            url.query_pairs().collect::<Vec<_>>(),
+            [("code".into(), "one&two/日本".into())]
+        );
+    }
 }
 
 #[test]

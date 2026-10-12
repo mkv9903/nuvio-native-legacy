@@ -10,6 +10,16 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifndef NV_SUPABASE_URL
+#define NV_SUPABASE_URL ""
+#endif
+#ifndef NV_SUPABASE_ANON_KEY
+#define NV_SUPABASE_ANON_KEY ""
+#endif
+#ifndef NV_TV_LOGIN_BASE
+#define NV_TV_LOGIN_BASE ""
+#endif
+
 void fontepref_definir_perfil(int profile);
 void arteesc_definir_perfil(int profile);
 void plugins_perfil_mudou(void);
@@ -92,6 +102,8 @@ void session_init(void) {
   account = nuvio_account_create(data_dir(), NV_APP_ID);
   refresh_view();
   printf("[account] Rust backend %s\n", account ? "initialized" : "unavailable");
+  printf("[account] Compiled C/Rust account configuration matches: %s\n",
+         nuvio_account_configuration_matches(NV_SUPABASE_URL, NV_SUPABASE_ANON_KEY, NV_TV_LOGIN_BASE) ? "yes" : "no");
 }
 SessionState session_state(void) { const RustAccountView *view = current_view(); return view ? (SessionState)view->login : SESSION_ERROR; }
 int session_is_logged_in(void) { return nuvio_account_logged_in(account); }

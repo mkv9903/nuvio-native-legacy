@@ -296,6 +296,7 @@ impl AccountBackend {
                 Some(session) => session,
                 None => self.inner.service.anonymous()?,
             };
+            eprintln!("[account] Rust anonymous authentication completed");
             if self.state().generation != generation {
                 return Err(Error::Cancelled);
             }
@@ -308,6 +309,10 @@ impl AccountBackend {
         }
         match result {
             Ok((session, code)) => {
+                eprintln!(
+                    "[account] Rust TV code ready; polling every {} seconds",
+                    code.interval_seconds
+                );
                 let now = self.inner.clock.monotonic_millis();
                 state.data = AccountData {
                     session: Some(session),
@@ -323,6 +328,7 @@ impl AccountBackend {
                 Ok(())
             }
             Err(error) => {
+                eprintln!("[account] Rust TV code login failed: {error}");
                 state.login = LoginState::Error;
                 state.error = Some(error.clone());
                 state.revision = state.revision.wrapping_add(1);
@@ -407,6 +413,7 @@ impl AccountBackend {
                 Ok(())
             }
             Err(error) => {
+                eprintln!("[account] Rust TV code poll/exchange failed: {error}");
                 state.login = if is_outage(&error) {
                     LoginState::Waiting
                 } else {

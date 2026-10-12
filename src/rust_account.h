@@ -30,6 +30,8 @@ typedef struct { int status; const unsigned char *data; size_t length; } RustRep
 /* The backend copies action inputs before returning. Snapshots and replies
  * remain valid until their explicit destroy call, including their strings. */
 RustAccount *nuvio_account_create(const char *directory, const char *app_id);
+/* Diagnostic equality only; no credentials are returned or logged. */
+int nuvio_account_configuration_matches(const char *base, const char *public_key, const char *login_base);
 void nuvio_account_destroy(RustAccount *account);
 RustAccountSnapshot *nuvio_account_snapshot(const RustAccount *account);
 const RustAccountView *nuvio_account_snapshot_view(const RustAccountSnapshot *snapshot);

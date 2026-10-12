@@ -132,13 +132,18 @@ impl AccountService {
             web_url: Option<String>,
             poll_interval_seconds: Option<u64>,
         }
-        let code: Code = decode(&response)?;
+        let code: Code = decode_record(&response)?;
         if code.code.is_empty() {
             return Err(Error::InvalidData);
         }
         let web_url = code
             .web_url
-            .unwrap_or_else(|| self.config.login_base.to_string());
+            .filter(|url| !url.is_empty())
+            .unwrap_or_else(|| {
+                let mut url = self.config.login_base.clone();
+                url.query_pairs_mut().append_pair("code", &code.code);
+                url.to_string()
+            });
         let url = Url::parse(&web_url).map_err(|_| Error::InvalidData)?;
         if !matches!(url.scheme(), "https" | "http") {
             return Err(Error::InvalidData);
@@ -173,7 +178,7 @@ impl AccountService {
         struct Status {
             status: String,
         }
-        match decode::<Status>(&response)?.status.as_str() {
+        match decode_record::<Status>(&response)?.status.as_str() {
             "pending" => Ok(PollResult::Pending),
             "expired" | "cancelled" => Ok(PollResult::Expired),
             "" => Err(Error::InvalidData),
@@ -382,6 +387,21 @@ pub fn decode<T: DeserializeOwned>(response: &Response) -> Result<T> {
     serde_json::from_slice(&response.body).map_err(|_| Error::InvalidData)
 }
 
+/// PostgREST single-row functions return a one-element array. JSON-returning
+/// variants return the object directly. Accept both explicit record shapes,
+/// rejecting missing or ambiguous records rather than selecting an arbitrary row.
+fn decode_record<T: DeserializeOwned>(response: &Response) -> Result<T> {
+    let value = decode::<Value>(response)?;
+    let record = match value {
+        Value::Object(_) => value,
+        Value::Array(mut rows) if rows.len() == 1 && rows[0].is_object() => {
+            rows.pop().ok_or(Error::InvalidData)?
+        }
+        _ => return Err(Error::InvalidData),
+    };
+    serde_json::from_value(record).map_err(|_| Error::InvalidData)
+}
+
 fn decode_session(response: &Response, anonymous: bool) -> Result<Session> {
     #[derive(Deserialize)]
     struct Tokens {
@@ -417,9 +437,6 @@ pub fn email_error(response: &Response) -> Error {
         #[serde(default)]
         message: String,
     }
-    if response.status >= 500 {
-        return Error::Http(response.status);
-    }
     let body: Failure = decode(response).unwrap_or_default();
     let code = if body.error_code.is_empty() {
         body.error
@@ -433,7 +450,27 @@ pub fn email_error(response: &Response) -> Error {
     } else {
         body.message
     };
-    if response.status == 429
+    // Only report recognized, fixed diagnostic categories. Service messages
+    // and unknown codes can contain sensitive text and are never logged.
+    let category = match code.as_str() {
+        "invalid_credentials" | "invalid_grant" => "invalid_credentials",
+        "email_not_confirmed" => "email_not_confirmed",
+        "over_request_rate_limit" | "over_email_send_rate_limit" => "rate_limit",
+        "bad_json" | "validation_failed" | "unexpected_audience" | "invalid_request" => {
+            "invalid_request"
+        }
+        "bad_jwt" | "no_authorization" => "authorization",
+        _ if description.contains("Invalid login credentials") => "legacy_invalid_credentials",
+        _ if description.contains("not confirmed") => "legacy_email_not_confirmed",
+        _ => "unrecognized",
+    };
+    eprintln!(
+        "[account] Rust email authentication rejected: HTTP {}, category={category}",
+        response.status
+    );
+    if response.status >= 500 {
+        Error::Http(response.status)
+    } else if response.status == 429
         || matches!(
             code.as_str(),
             "over_request_rate_limit" | "over_email_send_rate_limit"
@@ -442,8 +479,7 @@ pub fn email_error(response: &Response) -> Error {
         Error::Http(429)
     } else if code == "email_not_confirmed" || description.contains("not confirmed") {
         Error::EmailUnconfirmed
-    } else if response.status == 400
-        || matches!(code.as_str(), "invalid_credentials" | "invalid_grant")
+    } else if matches!(code.as_str(), "invalid_credentials" | "invalid_grant")
         || description.contains("Invalid login credentials")
     {
         Error::InvalidCredentials

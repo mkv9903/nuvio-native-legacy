@@ -452,10 +452,9 @@ void login_draw(Uint32 now) {
 int login_complete(void) { return session_is_logged_in(); }
 #ifdef NV_NATIVE_UI_TEST
 int login_test_qr_ready(void) { return qr_texture != 0; }
-void login_test_email_input(const char *input_email, const char *input_password) {
-  snprintf(email, sizeof email, "%s", input_email);
-  snprintf(password, sizeof password, "%s", input_password);
+void login_test_email_keyboard_start(void) {
   open_email();
-  submit_email();
+  open_input(LE_EMAIL);
 }
+void login_test_sign_in(void) { submit_email(); }
 #endif

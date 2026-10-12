@@ -56,8 +56,11 @@ extern "C" {
     fn login_update(dt: f32, now: u32);
     fn login_draw(now: u32);
     fn login_release();
-    fn login_test_email_input(email: *const c_char, password: *const c_char);
+    fn login_test_email_keyboard_start();
+    fn login_test_sign_in();
     fn login_test_qr_ready() -> i32;
+    fn st_teste_ligar(enabled: i32);
+    fn st_teste_evento(event: *const c_char);
     fn logoapp_iniciar(directory: *const c_char);
     fn iconeapp_iniciar(directory: *const c_char);
     fn profile_picker_init();
@@ -230,8 +233,10 @@ fn original_c_screens_use_rust_login_selection_pin_and_remote_actions() {
         "/auth/v1/signup" => response(200, auth("anonymous", None, "anon")),
         "/rest/v1/rpc/start_tv_login_session" => response(
             200,
-            json!({"code":"0123456789abcdef0123456789abcdef","web_url":"https://login.invalid/tv/test","poll_interval_seconds":3}),
+            json!([{"code":"0123456789abcdef0123456789abcdef","web_url":"https://login.invalid/tv/test","poll_interval_seconds":3}]),
         ),
+        "/rest/v1/rpc/poll_tv_login_session" => response(200, json!([{"status":"authorized"}])),
+        "/functions/v1/tv-logins-exchange" => response(200, auth("user", None, "user")),
         "/auth/v1/token" => {
             let body: Value = serde_json::from_slice(&request.body).unwrap();
             assert_eq!(body["email"], "person@example.test");
@@ -263,7 +268,7 @@ fn original_c_screens_use_rust_login_selection_pin_and_remote_actions() {
         }
         _ => panic!("unexpected UI fixture request"),
     });
-    let backend = AccountBackend::new(service, Some(directory.store()), clock);
+    let backend = AccountBackend::new(service, Some(directory.store()), clock.clone());
     let handle = Box::into_raw(Box::new(AccountController::new(backend.clone()).unwrap()));
     unsafe {
         assert_eq!(SDL_Init(0x21), 0);
@@ -298,10 +303,24 @@ fn original_c_screens_use_rust_login_selection_pin_and_remote_actions() {
         frames(window, false);
         assert_ne!(login_test_qr_ready(), 0);
         capture("login-qr.png");
-        login_test_email_input(
-            CString::new("person@example.test").unwrap().as_ptr(),
-            CString::new("test-password").unwrap().as_ptr(),
-        );
+        // Complete the array-shaped QR poll/exchange through the UI worker.
+        clock.0.store(1003, Ordering::SeqCst);
+        wait_until(|| {
+            session_step(SDL_GetTicks());
+            backend.snapshot().login == LoginState::LoggedIn
+        });
+        backend.logout();
+        session_step(SDL_GetTicks());
+        // Drive field completion through the retained keyboard and login
+        // update path. Do not bypass the input handoff with static field writes.
+        st_teste_ligar(1);
+        login_test_email_keyboard_start();
+        st_teste_evento(CString::new("Dperson@example.test").unwrap().as_ptr());
+        login_update(1.0 / 60.0, SDL_GetTicks());
+        st_teste_evento(CString::new("Dtest-password").unwrap().as_ptr());
+        login_update(1.0 / 60.0, SDL_GetTicks());
+        login_test_sign_in();
+        st_teste_ligar(0);
         wait_until(|| {
             session_step(SDL_GetTicks());
             backend.snapshot().login == LoginState::LoggedIn

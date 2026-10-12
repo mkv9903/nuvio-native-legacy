@@ -35,6 +35,18 @@ impl AccountConfig {
             login_base,
         })
     }
+    /// A diagnostic comparison for C capabilities awaiting migration. Only
+    /// equality is exposed; keys and service URLs never cross back to the UI.
+    pub fn matches_compiled(base: &str, public_key: &str, login_base: &str) -> bool {
+        Self::new(base, public_key, login_base)
+            .ok()
+            .zip(Self::built().ok())
+            .is_some_and(|(other, built)| {
+                other.base == built.base
+                    && other.login_base == built.login_base
+                    && other.public_key.expose() == built.public_key.expose()
+            })
+    }
 }
 
 fn parse_url(value: &str) -> Result<Url> {
