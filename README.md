@@ -1,5 +1,10 @@
 # Nuvio Native — personal LG webOS fork
 
+On `codex/rust-backend`, complete backend capabilities are being rewritten in
+idiomatic Rust while preserving the cleaned C UI's design. C models and callers
+adapt to Rust-owned state and results. See the
+[active backend rewrite plan](docs/backend-rewrite/README.md).
+
 This fork retains the LG webOS app and a Linux desktop preview for testing its UI.
 The native client uses C, SDL2 and GLES2. LG playback uses the TV's media pipeline;
 Linux playback is stubbed.
