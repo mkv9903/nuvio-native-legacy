@@ -8,6 +8,7 @@
 # glibc num free qualquer, depois — que e exatamente a queda da 2.0.0 na LG.
 set -eu
 cd "$(dirname "$0")/.."
+source tools/test-support.sh
 flags=()
 if [ "${SANITIZE:-1}" = 1 ]; then flags+=(-fsanitize=address,undefined -fno-omit-frame-pointer); fi
 cc ${flags[@]+"${flags[@]}"} -DNV_CAT_TEST_CACHE_MEIO=nv_cat_teste_cache_meio \

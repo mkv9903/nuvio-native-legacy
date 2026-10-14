@@ -13,6 +13,7 @@
 # teste falharia no link em vez de falhar na assercao, que e o que interessa.
 set -eu
 cd "$(dirname "$0")/.."
+source tools/test-support.sh
 flags=()
 if [ "${SANITIZE:-0}" = 1 ]; then flags+=(-fsanitize=address,undefined -fno-omit-frame-pointer); fi
 cc ${flags[@]+"${flags[@]}"} ${NUVIO_CFLAGS:-} src/catalogo.c tests/catcache.c \

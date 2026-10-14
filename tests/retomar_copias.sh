@@ -4,6 +4,7 @@
 #   SANITIZE=1 bash tests/retomar_copias.sh
 set -eu
 cd "$(dirname "$0")/.."
+source tools/test-support.sh
 flags=()
 if [ "${SANITIZE:-0}" = 1 ]; then flags+=(-fsanitize=address,undefined -fno-omit-frame-pointer); fi
 cc ${flags[@]+"${flags[@]}"} src/catalogo.c tests/retomar_copias.c \

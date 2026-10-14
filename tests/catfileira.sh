@@ -7,6 +7,7 @@
 # depende de SDL, de rede nem da descoberta.
 set -eu
 cd "$(dirname "$0")/.."
+source tools/test-support.sh
 flags=()
 if [ "${SANITIZE:-0}" = 1 ]; then flags+=(-fsanitize=address,undefined -fno-omit-frame-pointer); fi
 cc ${flags[@]+"${flags[@]}"} src/catalogo.c tests/catfileira.c \

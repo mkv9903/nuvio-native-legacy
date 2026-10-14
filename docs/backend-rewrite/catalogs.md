@@ -263,6 +263,13 @@ This completes Home ordering, not catalog/title ownership. The broader profile
 switch bug involving previous-profile title rows still awaits Rust catalog
 publication.
 
+The user approved keeping all existing title/catalog features and fixing the
+perfect-score rating conversion. The native title ownership foundation now has
+complete immutable Rust strings and independently retained C catalog copies.
+The application producer, scene cache and remaining C consumers are still being
+adapted; see [title ownership](title-ownership.md). This foundation does not yet
+switch application catalog loading to Rust.
+
 Implementation is in progress. This document is not a Linux or TV test handoff.
 The first account flow has user-confirmed Fedora QR and email/password login;
 the new Rust runtime has not yet been verified on the TV.

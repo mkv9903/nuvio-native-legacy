@@ -13,8 +13,8 @@ account credentials are used by these tests.
 | `sessao_parcial` malformed/truncated saves, anonymous sessions, malformed authentication and TLS failure | `storage` versioned JSON validation; `service` authentication cases; `account` TLS outage cases |
 | `perfilsel` profile fields, selection rules, startup cache, PIN outcomes, primary-addon inheritance and logout | `storage`, `service` and `account` profile cases |
 
-All five reference groups passed before integration. The current Rust suite
-passes 145 Rust tests and seven native driver tests. Additional coverage includes
+All five reference groups passed before integration. The earlier addon checkpoint
+passed 145 Rust tests and seven native driver tests. Additional coverage includes
 late replies after cancellation or logout, stale refresh against a new account, disk-write failures, schema identity
 and version validation, isolated storage, private atomic writes, configuration
 key completeness, unverified PIN locks and shared-account owner handling.
@@ -271,3 +271,27 @@ Retained test helpers now initialize/export their repository path even when a
 parent runner supplies the already-built Rust library. The sync-order fixture
 also passes with that prebuilt-library path, avoiding a missing registry source
 in nested test runs.
+
+## Native title ownership foundation
+
+The current backend suite passes 164 tests; the separate native Rust/C suite
+passes 11. Five title tests verify complete values and separate provider/IMDb
+identity, UTF-8 projection boundaries, null/malformed input, concurrent readers,
+and perfect-score/near-perfect rating scaling. Three native title tests use the
+actual C catalog and verify independent copies, release of final owners,
+held selections through replacement, C artwork enrichment overlays and borrowed
+text surviving in-place updates until frame retirement. No field-size or buffer
+constant is used as a Rust domain limit.
+
+The Linux application builds and remains running during a ten-second Xvfb
+startup check with disposable preview data. Retained C `catcache`, `canaisidx`,
+`catvida`, `catcorrida`, `retomar_copias`, `catconsistencia`, `cateps_corrida`,
+`catfileira`, `catcachecorrida` and `psfundo` pass. `catvida`, `cateps_corrida`
+and `catcachecorrida` also pass with AddressSanitizer/UndefinedBehaviorSanitizer.
+The latter two initially reached LeakSanitizer's sandbox/ptrace restriction;
+their unchanged checks pass outside that restriction, with sanitizers enabled.
+
+These C assertions remain because the application catalog producer and scene
+cache have not yet moved to Rust. Raw binary writing refuses Rust-owned titles
+so opaque addresses cannot reach disk. This foundation is not a complete
+catalog rewrite or a Linux/TV handoff; see [title ownership](title-ownership.md).

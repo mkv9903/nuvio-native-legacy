@@ -9,6 +9,7 @@
 # cat_definir_episodios), TSAN aponta 7 corridas; sem sanitizador passa.
 set -eu
 cd "$(dirname "$0")/.."
+source tools/test-support.sh
 flags=()
 case "${SANITIZE:-1}" in
   1) flags+=(-fsanitize=address,undefined -fno-omit-frame-pointer) ;;

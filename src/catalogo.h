@@ -8,6 +8,7 @@
 #ifndef NV_CATALOGO_H
 #define NV_CATALOGO_H
 #include "addonurl.h"
+#include "rust_title.h"
 
 // 40 titulos hoje (14 do historico do dono + 26 dos catalogos). A folga evita
 // o corte silencioso que ja aconteceu: com 32 os oito ultimos sumiam sem aviso.
@@ -138,6 +139,8 @@ typedef struct {
   // conheceu. Vazio = origem desconhecida (Trakt, Salvos, progresso, pacote).
   // Mudar o tamanho invalida o cache em disco sozinho (ver sizeof(CatItem)).
   char origem[96];
+  /* Independently retained complete Rust title, separate from legacy overlays. */
+  const RustTitleSnapshot *rust_title;
 } CatItem;
 
 // Um episodio de serie. Vem de art/episodios.txt, gerado a partir do campo
@@ -267,9 +270,9 @@ int  cat_blocos_aposentados(void);
 void cat_dir_gravacao(const char *dir);
 
 int cat_indice_por_imdb(const char *imdb);
-// Copia independente por id base + tipo, sob a trava dos publicadores.
-// Para fios que precisam reaproveitar metadados sem guardar cat_item().
-// Prefere a copia com poster; 0 quando o titulo ainda nao esta no catalogo.
+// An owned copy by base ID and type, taken under the publisher lock.
+// The destination must be uninitialized; clear a successful copy with
+// catalog_item_clear. Prefer an entry with a poster; return 0 when absent.
 int cat_copiar_por_id(const char *id, const char *tipo, CatItem *saida);
 // Como cat_indice_por_imdb, mas fica em `preferido` enquanto ele for o mesmo
 // titulo e prefere uma copia COM episodios (#151; ver catalogo.c).
@@ -423,6 +426,8 @@ const CatFileira *cat_fileira(int r);   // NULL fora da faixa
 // as they arrive. Any other row, saved-list marker or unassigned item is warm.
 // One coherent snapshot under the publication mutex; no transient n==0 read.
 int cat_home_apenas_fixas(void);
+// Output items are owned copies in uninitialized slots. Clear them with
+// catalog_items_clear before reusing or freeing the output array.
 int cat_copiar_fileira(const char *chave, CatItem *itens, int max,
                        CatFileira *meta);
 

@@ -1,4 +1,5 @@
 #include "catalogo.h"
+#include "catalog_item.h"
 #include "idbase.h"
 #include "tendencia.h"
 #include "artereserva.h"
@@ -103,11 +104,12 @@ extern void NV_CAT_TEST_CACHE_MEIO(void);
 // folga de uma troca que ja tinha. O teto existe para a memoria nao crescer se
 // o desenho parar de virar quadro; bate-lo e sinal de algo muito errado.
 #define CAT_APOSENTADOS_MAX 16
-static CatItem *aposentados[CAT_APOSENTADOS_MAX];
+typedef struct { CatItem *items; int count; } RetiredItems;
+static RetiredItems aposentados[CAT_APOSENTADOS_MAX];
 static int nAposentados;
 
 // Sob pubTrava.
-static void aposentar(CatItem *bloco) {
+static void aposentar(CatItem *bloco, int count) {
   if (!bloco) return;
   if (nAposentados == CAT_APOSENTADOS_MAX) {
     static int avisou;
@@ -117,12 +119,13 @@ static void aposentar(CatItem *bloco) {
              CAT_APOSENTADOS_MAX);
       fflush(stdout);
     }
-    free(aposentados[0]);
+    catalog_items_clear(aposentados[0].items, (size_t)aposentados[0].count);
+    free(aposentados[0].items);
     memmove(aposentados, aposentados + 1,
             sizeof aposentados[0] * (size_t)(CAT_APOSENTADOS_MAX - 1));
     nAposentados--;
   }
-  aposentados[nAposentados++] = bloco;
+  aposentados[nAposentados++] = (RetiredItems){bloco, count};
 }
 
 // Roda no comeco do quadro, entao tudo que esta na lista foi trocado durante um
@@ -132,11 +135,15 @@ void cat_quadro(void) {
   if (!catFioPrincipalOk) { catFioPrincipal = pthread_self(); catFioPrincipalOk = 1; }
   catTravar();
   if (nAposentados > 1) {
-    for (k = 0; k < nAposentados - 1; k++) free(aposentados[k]);
+    for (k = 0; k < nAposentados - 1; k++) {
+      catalog_items_clear(aposentados[k].items, (size_t)aposentados[k].count);
+      free(aposentados[k].items);
+    }
     aposentados[0] = aposentados[nAposentados - 1];
     nAposentados = 1;
   }
   pthread_mutex_unlock(&pubTrava);
+  nuvio_titles_next_frame();
 }
 
 int cat_blocos_aposentados(void) {
@@ -419,7 +426,7 @@ int cat_historico_definir_se_geracao(const char *imdb, const char *tipo,
 int cat_visto(const CatItem *c) {
   int h;
   if (!c) return 0;
-  h = c->imdb[0] ? cat_historico_estado_id(c->imdb, c->tipo) : -1;
+  h = catalog_title_id(c)[0] ? cat_historico_estado_id(catalog_title_id(c), c->tipo) : -1;
   if (h >= 0) return h;
   // SERIE sem historico: nao visto. O progresso de um item de serie e de UM
   // episodio, nao da serie; quem decide a serie inteira e o historico, que
@@ -941,6 +948,9 @@ int cat_gravar_cache_se_identidade(const char *dirArte, const char *donoEsperado
   if (!copia || !copiaFils) {
     pthread_mutex_unlock(&pubTrava); free(copia); free(copiaFils); return 0;
   }
+  for (int index = 0; index < qtd; index++) if (itens[index].rust_title) {
+    pthread_mutex_unlock(&pubTrava); free(copia); free(copiaFils); return 0;
+  }
   if (qtd > 0) memcpy(copia, itens, sizeof(CatItem) * (size_t)qtd);
   if (qf > 0) memcpy(copiaFils, fils, sizeof(CatFileira) * (size_t)qf);
   pthread_mutex_unlock(&pubTrava);
@@ -1075,6 +1085,7 @@ int cat_ler_cache(const char *dirArte) {
   fclose(f);
   // Reaproveita o caminho de troca de bloco, que ja e o seguro para o fio de
   // desenho — e o que corta as janelas de fileira pelo tamanho real.
+  for (int index = 0; index < (int)c.nItens; index++) novo[index].rust_title = NULL;
   cat_definir_tudo(novo, c.nItens, lidas, nLidas);
   veioDoCache = 1;
   free(novo);
@@ -1106,11 +1117,11 @@ unsigned long cat_assinatura_de(const CatItem *lista, int qtd,
     h ^= (unsigned long)fl[i].estado; h *= 16777619UL;
   }
   for (i = 0; i < qtd; i++) {
-    MIX(lista[i].imdb); MIX(lista[i].tipo); MIX(lista[i].titulo);
-    MIX(lista[i].poster); MIX(lista[i].backdrop); MIX(lista[i].logo);
+    MIX(catalog_title_text(&lista[i], TITLE_ID)); MIX(catalog_title_text(&lista[i], TITLE_MEDIA_TYPE)); MIX(catalog_title_text(&lista[i], TITLE_NAME));
+    MIX(catalog_title_text(&lista[i], TITLE_POSTER)); MIX(catalog_title_text(&lista[i], TITLE_BACKGROUND)); MIX(catalog_title_text(&lista[i], TITLE_LOGO));
     MIX(lista[i].backdropCatalogo); MIX(lista[i].backdropTmdb);
-    MIX(lista[i].backdropTrakt); MIX(lista[i].genero); MIX(lista[i].meta);
-    MIX(lista[i].classificacao); MIX(lista[i].sinopse);
+    MIX(lista[i].backdropTrakt); MIX(catalog_title_text(&lista[i], TITLE_GENRE_TEXT)); MIX(catalog_title_text(&lista[i], TITLE_METADATA_TEXT));
+    MIX(lista[i].classificacao); MIX(catalog_title_text(&lista[i], TITLE_DESCRIPTION));
   }
 #undef MIX
   return h;
@@ -1188,7 +1199,7 @@ int cat_indice_por_imdb(const char *imdb) {
   if (!imdb || !imdb[0]) return -1;
   for (i = 0; i < cat_n(); i++) {
     const CatItem *c = cat_item(i);
-    if (c && c->imdb[0] && mesmoTitulo(c->imdb, imdb)) return i;
+    if (c && catalog_title_id(c)[0] && mesmoTitulo(catalog_title_id(c), imdb)) return i;
   }
   return -1;
 }
@@ -1209,13 +1220,13 @@ int cat_indice_titulo(const char *imdb, int preferido) {
   const CatItem *c;
   if (!imdb || !imdb[0] || m < 1) return -1;
   if (preferido >= 0 && preferido < m && (c = cat_item(preferido)) &&
-      c->imdb[0] && mesmoTitulo(c->imdb, imdb)) {
+      catalog_title_id(c)[0] && mesmoTitulo(catalog_title_id(c), imdb)) {
     if (cat_n_episodios(preferido) > 0) return preferido;
     prefOk = 1;
   }
   for (i = 0; i < m && comEps < 0; i++) {
     c = cat_item(i);
-    if (!c || !c->imdb[0] || !mesmoTitulo(c->imdb, imdb)) continue;
+    if (!c || !catalog_title_id(c)[0] || !mesmoTitulo(catalog_title_id(c), imdb)) continue;
     if (primeiro < 0) primeiro = i;
     if (cat_n_episodios(i) > 0) comEps = i;
   }
@@ -1226,7 +1237,7 @@ int cat_indice_titulo(const char *imdb, int preferido) {
 int cat_indice_vivo(int indice, const char *imdb) {
   const CatItem *c;
   if (!imdb || !imdb[0]) return indice;
-  if (indice >= 0 && indice < cat_n() && (c = cat_item(indice)) && !strcmp(c->imdb, imdb))
+  if (indice >= 0 && indice < cat_n() && (c = cat_item(indice)) && !strcmp(catalog_title_id(c), imdb))
     return indice;
   return cat_indice_titulo(imdb, indice);
 }
@@ -1442,9 +1453,12 @@ static void tirarDaJanela(int r, int indice) {
   f->n--;
   quantos = f->ini + f->n - indice;
   orfao = f->ini + f->n;
+  nuvio_title_retire(itens[indice].rust_title);
   if (quantos > 0) {
     memmove(&itens[indice], &itens[indice + 1], sizeof(CatItem) * (size_t)quantos);
   }
+  /* Preserve the existing orphan slot while giving its duplicate a reference. */
+  itens[orfao].rust_title = nuvio_title_retain(itens[orfao].rust_title);
   pthread_mutex_lock(&epTrava);
   if (quantos > 0 && epIni && epQtd && orfao < nFaixas) {
     memmove(&epIni[indice], &epIni[indice + 1], sizeof(int) * (size_t)quantos);
@@ -1517,7 +1531,7 @@ static int podarContinuar(int (*quer)(const CatItem *, const void *), const void
 
 static int mesmaObraQue(const CatItem *c, const void *u) {
   char a[32], b[32];
-  id_base(c->imdb, a, sizeof a);
+  id_base(catalog_title_id(c), a, sizeof a);
   id_base((const char *)u, b, sizeof b);
   return a[0] && !strcmp(a, b);
 }
@@ -1527,7 +1541,7 @@ static int mesmaObraQue(const CatItem *c, const void *u) {
 // registro local para o caso "assistiu de novo aqui".
 static int removidoVence(const CatItem *c, const void *u) {
   (void)u;
-  return c->imdb[0] && prog_removido_vence(c->imdb, c->retomadoMs);
+  return catalog_title_id(c)[0] && prog_removido_vence(catalog_title_id(c), c->retomadoMs);
 }
 
 // "TIRAR DE CONTINUAR ASSISTINDO", NA HORA E POR IDENTIDADE.
@@ -1622,10 +1636,10 @@ int cat_id_stream(int indiceItem, int t, int e, char *dst, unsigned tam) {
   int i, n;
   if (!dst || !tam) return 0;
   dst[0] = 0;
-  if (!c || !c->imdb[0]) return 0;
-  idbase_copiar(c->imdb, base, sizeof base);
-  if (t <= 0 || e <= 0) { snprintf(dst, tam, "%s", c->imdb); return 1; }
-  if (!idbase_e_imdb(c->imdb)) {
+  if (!c || !catalog_title_id(c)[0]) return 0;
+  idbase_copiar(catalog_title_id(c), base, sizeof base);
+  if (t <= 0 || e <= 0) { snprintf(dst, tam, "%s", catalog_title_id(c)); return 1; }
+  if (!idbase_e_imdb(catalog_title_id(c))) {
     n = cat_n_episodios(indiceItem);
     for (i = 0; i < n; i++) {
       const CatEp *ep = cat_episodio(indiceItem, i);
@@ -1649,11 +1663,11 @@ int cat_copiar_por_id(const char *id, const char *tipo, CatItem *saida) {
   tam = idbase_len(id);
   catTravar();
   for (i = 0; itens && i < n; i++) {
-    if (idbase_len(itens[i].imdb) != tam || strncmp(itens[i].imdb, id, tam) ||
+    if (idbase_len(catalog_title_id(&itens[i])) != tam || strncmp(catalog_title_id(&itens[i]), id, tam) ||
         (tipo && *tipo && strcmp(tipo_base(itens[i].tipo), tipo_base(tipo)))) continue;
     if (melhor < 0 || (!itens[melhor].poster[0] && itens[i].poster[0])) melhor = i;
   }
-  if (melhor >= 0) *saida = itens[melhor];
+  if (melhor >= 0) catalog_item_copy(saida, &itens[melhor]);
   pthread_mutex_unlock(&pubTrava);
   return melhor >= 0;
 }
@@ -1693,7 +1707,7 @@ int cat_copiar_fileira(const char *chave, CatItem *saida, int max,
     if (strcmp(f->chave, chave) || f->n < 1) continue;
     qtd = f->n < max ? f->n : max;
     if (f->ini < 0 || f->ini + qtd > n || !itens) break;
-    memcpy(saida, itens + f->ini, sizeof(CatItem) * (size_t)qtd);
+    catalog_items_copy(saida, itens + f->ini, (size_t)qtd);
     if (meta) *meta = *f;
     pthread_mutex_unlock(&pubTrava);
     return qtd;
@@ -1733,26 +1747,30 @@ void cat_definir_na_lista(int i, int naLista) {
 // marca pertencem ao mesmo bloco publicado durante toda a varredura.
 int cat_definir_na_lista_imdb(const char *imdb, int naLista) {
   int i, k = 0;
-  char id[64];
+  char *id;
   if (!imdb || !imdb[0]) return 0;
-  snprintf(id, sizeof id, "%s", imdb);
+  id = strdup(imdb);
+  if (!id) return 0;
   CAT_TESTE_ANTES_TRAVA();
   catTravar();
   for (i = 0; itens && i < n; i++)
-    if (!strcmp(itens[i].imdb, id)) { definir_na_lista(i, naLista); k++; }
+    if (!strcmp(catalog_title_id(&itens[i]), id)) { definir_na_lista(i, naLista); k++; }
   pthread_mutex_unlock(&pubTrava);
+  free(id);
   return k;
 }
 int cat_imdb_na_lista(const char *imdb) {
   int i, achou = 0;
-  char id[64];
+  char *id;
   if (!imdb || !imdb[0]) return 0;
-  snprintf(id, sizeof id, "%s", imdb);
+  id = strdup(imdb);
+  if (!id) return 0;
   CAT_TESTE_ANTES_TRAVA();
   catTravar();
   for (i = 0; itens && i < n; i++)
-    if (itens[i].naLista && !strcmp(itens[i].imdb, id)) { achou = 1; break; }
+    if (itens[i].naLista && !strcmp(catalog_title_id(&itens[i]), id)) { achou = 1; break; }
   pthread_mutex_unlock(&pubTrava);
+  free(id);
   return achou;
 }
 
@@ -1761,16 +1779,20 @@ int cat_imdb_na_lista(const char *imdb) {
 void cat_atualizar_item(int i, const CatItem *item) {
   CatItem copia;
   if (!item) return;
-  copia = *item;
+  catalog_item_copy(&copia, item);
   CAT_TESTE_ANTES_TRAVA();
   catTravar();
   if (itens && i >= 0 && i < n &&
-      !strcmp(itens[i].imdb, copia.imdb) &&
+      !strcmp(catalog_title_id(&itens[i]), catalog_title_id(&copia)) &&
       (!tipo_certo(itens[i].tipo) || !strcmp(tipo_base(itens[i].tipo), tipo_base(copia.tipo)))) {
-    itens[i] = copia;   // an uncertain stored type may be resolved to movie/series
+    /* Keep the previous native reference alive until frame retirement. */
+    nuvio_title_retire(itens[i].rust_title);
+    memcpy(&itens[i], &copia, sizeof copia);
+    copia.rust_title = NULL;
     mudou();
   }
   pthread_mutex_unlock(&pubTrava);
+  catalog_item_clear(&copia);
 }
 
 // Acrescenta N de UMA VEZ. cat_acrescentar copia o catalogo inteiro a cada
@@ -1799,13 +1821,13 @@ int cat_acrescentar_lote(const CatItem *v, int qtd, int *saidaIdx) {
   novoN = n + qtd;
   novo = malloc(sizeof(CatItem) * (size_t)novoN);
   if (!novo) { pthread_mutex_unlock(&pubTrava); return 0; }
-  memcpy(novo, itens, sizeof(CatItem) * (size_t)n);
-  memcpy(&novo[n], v, sizeof(CatItem) * (size_t)qtd);
+  catalog_items_copy(novo, itens, (size_t)n);
+  catalog_items_copy(&novo[n], v, (size_t)qtd);
   { int k; for (k = 0; k < qtd; k++) {
-      if (v[k].poster[0])   arte_reserva_registrar(v[k].poster,   v[k].imdb, 1);
-      if (v[k].backdrop[0]) arte_reserva_registrar(v[k].backdrop, v[k].imdb, 0); } }
+      if (v[k].poster[0])   arte_reserva_registrar(v[k].poster,   catalog_title_id(&v[k]), 1);
+      if (v[k].backdrop[0]) arte_reserva_registrar(v[k].backdrop, catalog_title_id(&v[k]), 0); } }
   if (saidaIdx) for (k = 0; k < qtd; k++) saidaIdx[k] = n + k;
-  aposentar(itens);
+  aposentar(itens, n);
   __atomic_store_n(&itens, novo, __ATOMIC_RELEASE);
   nAlocado = novoN;
   // Faixas ANTES de `n` subir: um leitor que ve o `n` novo acha a faixa dele.
@@ -1833,9 +1855,9 @@ int cat_mesclar_listas(const CatItem *v, int qtd) {
   { int falta = 0;
     for (k = 0; k < qtd && !falta; k++) {
       int achou = 0;
-      if (!v[k].imdb[0]) continue;
+      if (!catalog_title_id(&v[k])[0]) continue;
       for (i = 0; i < n && !achou; i++)
-        if (!strcmp(itens[i].imdb, v[k].imdb) &&
+        if (!strcmp(catalog_title_id(&itens[i]), catalog_title_id(&v[k])) &&
             (!v[k].naLista || itens[i].naLista) &&
             (!v[k].naColecao || itens[i].naColecao)) achou = 1;
       if (!achou) falta = 1;
@@ -1843,25 +1865,25 @@ int cat_mesclar_listas(const CatItem *v, int qtd) {
     if (!falta) { pthread_mutex_unlock(&pubTrava); return 0; } }
   novo = malloc(sizeof(CatItem) * (size_t)(n + qtd > 0 ? n + qtd : 1));
   if (!novo) { pthread_mutex_unlock(&pubTrava); return 0; }
-  if (n > 0) memcpy(novo, itens, sizeof(CatItem) * (size_t)n);
+  if (n > 0) catalog_items_copy(novo, itens, (size_t)n);
   m = n;
   for (k = 0; k < qtd; k++) {
     int achou = 0;
-    if (!v[k].imdb[0]) continue;
+    if (!catalog_title_id(&v[k])[0]) continue;
     for (i = 0; i < m; i++) {
-      if (strcmp(novo[i].imdb, v[k].imdb)) continue;
+      if (strcmp(catalog_title_id(&novo[i]), catalog_title_id(&v[k]))) continue;
       if (v[k].naLista)   novo[i].naLista = 1;
       if (v[k].naColecao) novo[i].naColecao = 1;
       achou = 1;
     }
     if (achou) { marcados++; continue; }
     if (m >= CAT_MAX) continue;
-    novo[m] = v[k];
-    if (v[k].poster[0])   arte_reserva_registrar(v[k].poster,   v[k].imdb, 1);
-    if (v[k].backdrop[0]) arte_reserva_registrar(v[k].backdrop, v[k].imdb, 0);
+    catalog_item_copy(&novo[m], &v[k]);
+    if (v[k].poster[0])   arte_reserva_registrar(v[k].poster,   catalog_title_id(&v[k]), 1);
+    if (v[k].backdrop[0]) arte_reserva_registrar(v[k].backdrop, catalog_title_id(&v[k]), 0);
     m++; novos++;
   }
-  aposentar(itens);
+  aposentar(itens, n);
   __atomic_store_n(&itens, novo, __ATOMIC_RELEASE);
   nAlocado = m;
   pthread_mutex_lock(&epTrava);
@@ -1886,9 +1908,9 @@ int cat_acrescentar(const CatItem *item) {
   novoN = n + 1;
   novo = malloc(sizeof(CatItem) * (size_t)novoN);
   if (!novo) { pthread_mutex_unlock(&pubTrava); return -1; }
-  memcpy(novo, itens, sizeof(CatItem) * (size_t)n);
-  memcpy(&novo[n], item, sizeof(CatItem));
-  aposentar(itens);
+  catalog_items_copy(novo, itens, (size_t)n);
+  catalog_item_copy(&novo[n], item);
+  aposentar(itens, n);
   __atomic_store_n(&itens, novo, __ATOMIC_RELEASE);
   nAlocado = novoN;
   pthread_mutex_lock(&epTrava);
@@ -1896,8 +1918,8 @@ int cat_acrescentar(const CatItem *item) {
   pthread_mutex_unlock(&epTrava);
   __atomic_store_n(&n, novoN, __ATOMIC_RELEASE);
   mudou();
-  if (novo[novoN - 1].poster[0]) arte_reserva_registrar(novo[novoN - 1].poster, novo[novoN - 1].imdb, 1);
-  if (novo[novoN - 1].backdrop[0]) arte_reserva_registrar(novo[novoN - 1].backdrop, novo[novoN - 1].imdb, 0);
+  if (novo[novoN - 1].poster[0]) arte_reserva_registrar(novo[novoN - 1].poster, catalog_title_id(&novo[novoN - 1]), 1);
+  if (novo[novoN - 1].backdrop[0]) arte_reserva_registrar(novo[novoN - 1].backdrop, catalog_title_id(&novo[novoN - 1]), 0);
   pthread_mutex_unlock(&pubTrava);
   return novoN - 1;
 }
@@ -1996,7 +2018,7 @@ void cat_definir_tudo(const CatItem *lista, int qtd,
     int novoN = qtd > CAT_MAX ? CAT_MAX : qtd;
     CatItem *novo = malloc(sizeof(CatItem) * (size_t)(novoN > 0 ? novoN : 1));
     if (!novo) return;
-    if (novoN > 0) memcpy(novo, lista, sizeof(CatItem) * (size_t)novoN);
+    if (novoN > 0) catalog_items_copy(novo, lista, (size_t)novoN);
     // Historico de ORDEM por fileira (tendencia.h), ANTES da troca e sobre os
     // parametros — le e grava arquivo, e depois da troca `novo` pode ser
     // liberado por uma publicacao seguinte.
@@ -2029,9 +2051,10 @@ void cat_definir_tudo(const CatItem *lista, int qtd,
     tFora = cat_relogio_ms() - tIni;
     catTravar();
     tTrava = cat_relogio_ms();
+    int previous_count = n;
     __atomic_store_n(&n, 0, __ATOMIC_RELEASE);
     nFils = 0;
-    aposentar(itens);
+    aposentar(itens, previous_count);
     __atomic_store_n(&itens, novo, __ATOMIC_RELEASE);
     nAlocado = novoN;
     // Episodios do catalogo anterior nao valem para o novo: os indices mudaram.
@@ -2111,11 +2134,10 @@ void cat_trocar_continuar(const CatItem *lista, int qtd) {
   if (novoN < 0) { pthread_mutex_unlock(&pubTrava); free(regs); return; }
   novo = malloc(sizeof(CatItem) * (size_t)(novoN > 0 ? novoN : 1));
   if (!novo) { pthread_mutex_unlock(&pubTrava); free(regs); return; }
-  if (cwIni) memcpy(novo, itens, sizeof(CatItem) * (size_t)cwIni);
-  if (qtd) memcpy(novo + cwIni, lista, sizeof(CatItem) * (size_t)qtd);
+  if (cwIni) catalog_items_copy(novo, itens, (size_t)cwIni);
+  if (qtd) catalog_items_copy(novo + cwIni, lista, (size_t)qtd);
   if (n - cwIni - cwN > 0)
-    memcpy(novo + cwIni + qtd, itens + cwIni + cwN,
-           sizeof(CatItem) * (size_t)(n - cwIni - cwN));
+    catalog_items_copy(novo + cwIni + qtd, itens + cwIni + cwN, (size_t)(n - cwIni - cwN));
   for (r = 0; r < nFils; r++) {
     CatFileira f = fils[r];
     if (r == cw) { f.n = qtd; }
@@ -2137,9 +2159,10 @@ void cat_trocar_continuar(const CatItem *lista, int qtd) {
   tProg = cat_relogio_ms();
   aplicarProgressoEm(novo, novoN, regs, nRegs);
   tProg = cat_relogio_ms() - tProg;
+  int previous_count = n;
   __atomic_store_n(&n, 0, __ATOMIC_RELEASE);
   nFils = 0;
-  aposentar(itens);
+  aposentar(itens, previous_count);
   __atomic_store_n(&itens, novo, __ATOMIC_RELEASE);
   nAlocado = novoN;
   // Os indices andaram: nenhuma faixa de episodio vale para o item novo.

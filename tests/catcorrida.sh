@@ -7,6 +7,7 @@
 # for calculado fora de pubTrava (queda "free(): invalid pointer", 1.7.0 .tpk).
 set -eu
 cd "$(dirname "$0")/.."
+source tools/test-support.sh
 flags=()
 if [ "${SANITIZE:-0}" = 1 ]; then flags+=(-fsanitize=address,undefined -fno-omit-frame-pointer); fi
 cc ${flags[@]+"${flags[@]}"} -DNV_CAT_TEST_ANTES_TRAVA=nv_cat_teste_antes_trava \
