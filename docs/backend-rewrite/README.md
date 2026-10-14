@@ -32,6 +32,12 @@ No implementation from either discarded rewrite is carried into this branch.
   dependency, runtime, playback and platform changes.
 - Push checkpoints regularly. Build and push an isolated IPK before a TV handoff.
   Do not deploy automatically.
+- Before rewriting or integrating each capability, describe its existing
+  features and pause for the user's keep/remove decision. Apply confirmed
+  removals as part of that capability's rewrite.
+- Retain the existing playback and subtitle features for now, including styled
+  ASS/SSA, AutoSync, dual subtitles, PiP and seek thumbnails. The simplification
+  discussion did not authorize removing them.
 
 ## First capability: account, sessions and profiles
 
