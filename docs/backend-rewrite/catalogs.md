@@ -76,9 +76,11 @@ profile/account ownership and cache removal. These backend cases move to Rust.
 
 ## Progress
 
-Home-order parsing, sorting, hidden choices, union and versioned cache now run
-in Rust through the retained C sync/rendering interfaces. Their backend tests
-are Rust tests; the C implementations and their C test programs were removed.
+Home-order parsing, sorting, hidden choices, union, account fetching and
+versioned cache now run in Rust. Frame publication feeds retained C rendering
+interfaces; C no longer fetches, restores or writes Home-order data. Their
+backend tests are Rust tests; the C implementations and their C test programs
+were removed.
 Rust addon/manifest models are implemented and tested, including long URLs,
 large lists, resource filters and catalogs outside the Home quota.
 
@@ -224,6 +226,42 @@ and title consumers still have legacy buffers/quotas pending that work. The new
 Rust models have no fixed field/count limits; request/cache byte budgets remain
 explicit for TV resources. This checkpoint does not yet fix the Home-row
 profile-switch issue or claim that all title/guide/catalog URL limits are gone.
+
+## Runtime Home-order checkpoint
+
+The user confirmed keeping account row ordering, disabled-row visibility,
+collection-row placement, hide-unreleased preferences and hide-underline
+preferences. The existing renderer has no catalog underline; the preference
+remains preserved without adding a new visual element.
+
+The app creates a separate Rust Home-order worker with the account capability.
+Each frame selects the verified context and publishes immutable results.
+Profile selection immediately replaces the previous order with that selected
+profile's in-memory order or an empty snapshot. The worker restores its private
+disk cache before waiting for the account RPC. Disk and network work stay off
+the rendering thread. Refresh runs every five minutes when playback permits;
+failed work is eligible for retry after thirty seconds. Explicit sync requests
+also request Home-order refresh. One worker retains only the latest queued
+context, and logout hides memory immediately before background cache cleanup.
+
+Version-two envelopes and hashed filenames include the signed-in member,
+confirmed owner and selected profile, independently of primary-addon sharing.
+Earlier owner-less files are not imported. Context generations guard cache
+restoration, account requests, writes and publication, including profile round
+trips. Missing or malformed configuration retains valid same-scope ordering;
+explicit empty configuration clears row ordering/visibility. Omitted boolean
+preferences inherit only from that same scope, and the resolved preferences are
+persisted so a restart cannot lose them.
+
+Retained C sync observes the Rust order revision even while its own worker is
+busy. It rebuilds rows without repeating catalog requests, coalesces order and
+collection changes when both arrive in the same frame, and skips an extra
+rebuild for identical accepted settings. The old C RPC, delivery buffer,
+profile-only restore gate and cache adapter have been removed.
+
+This completes Home ordering, not catalog/title ownership. The broader profile
+switch bug involving previous-profile title rows still awaits Rust catalog
+publication.
 
 Implementation is in progress. This document is not a Linux or TV test handoff.
 The first account flow has user-confirmed Fedora QR and email/password login;

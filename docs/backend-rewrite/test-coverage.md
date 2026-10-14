@@ -92,11 +92,33 @@ targets; required search versus required genre; channel types; malformed and
 oversized responses. These models now feed the C addon screen and source/subtitle workers. C catalog,
 guide and complete title ownership integration remains pending.
 
-Retained C integration checks pass for `syncordem`, `synccolecoes`,
+The earlier Home-order checkpoint passed retained C `syncordem`, `synccolecoes`,
 `colfileiras_sync`, `home_hero_layout`, `homepos`, `snapshot_falha` and
-`desc_iniciar_corrida`. The sync fixture now gates its fake Home-order response
-explicitly before testing cache-before-network behavior; it previously raced a
-fast worker. The isolated sync cache fixtures use a temporary Rust Test directory.
+`desc_iniciar_corrida`. Its C cache-before-network assertions have now moved to
+Rust, with explicit barriers rather than scheduling-dependent sleeps.
+
+Fourteen additional tests in `backend/tests/home_order.rs` cover the runtime
+account RPC and selected profile despite primary-addon sharing; cache publication
+before a held network reply; outages; immediate profile/owner/member isolation;
+late replies and cache reads after context changes; authoritative empty rows;
+same-scope optional preference merging and restart; damaged cache replacement;
+usable results despite storage failure and retry; owner-less file exclusion;
+unverified context gates; bounded latest-profile queueing and logout cleanup.
+
+`backend/tests/native_home_order.rs` runs the real C frame bridge and renderer
+accessors from a Rust driver. It verifies complete long keys, hidden flags,
+preferences, no extra revision for identical responses, empty target state
+while new-profile requests wait, explicit refresh, held snapshot lifetime and
+logout. The native UI suite now has eight passing tests; the backend suite has
+159. Retained C `syncordem`, `contaoffline` and `synccolecoes` also pass for this
+runtime checkpoint. C sync asserts that Home-order fetching no longer uses it.
+
+The collection fixture reused `syncordem.c` but redeclared its `addons_n` stub
+and referenced a missing `ciclo` helper. Both issues are present in the prior
+checkpoint's source. The fixture now uses the included stub and an explicit
+`sync_iniciar`/frame-loop helper; all five original assertion scenarios pass.
+This changes only test wiring. These retained collection cases must move to
+Rust when account collections are rewritten.
 
 `contaoffline_limites` cannot link because its retained fixture lacks saved-list
 and account-journal doubles. The same missing symbols occur at the unchanged

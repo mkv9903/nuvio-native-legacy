@@ -67,8 +67,8 @@ owner and otherwise wait/retry rather than using the signed-in member's ID.
 
 The Rust account domain, HTTP client, worker, native boundary, platform helper,
 Home ordering, addon networking/storage, edit merging and the native addon
-boundary, provider loading and complete catalog title models pass 145 tests.
-Seven additional Rust driver tests cover the retained C account/addon screens,
+boundary, provider loading and complete catalog title models pass 159 tests.
+Eight additional Rust driver tests cover the retained C account/addon screens,
 view layouts and actual source/subtitle workers under Xvfb. The five relevant C reference groups passed
 before their test cases moved to Rust. See [test coverage](test-coverage.md).
 The Linux app builds and starts under Xvfb using disposable isolated preview

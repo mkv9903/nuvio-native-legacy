@@ -1,28 +1,8 @@
-// A ORDEM DA HOME VOLTA DO CACHE NO FLUXO DE VERDADE, e nao so na unidade.
-//
-// Issue #125 ("metadata is delayed, messing up my home screen order"). O
-// cache local de catordemcache.c ja passava no seu proprio teste
-// (tests/catordemcache.sh) e mesmo assim a linha "ordem restaurada do cache
-// local" quase nunca aparecia nos logs de campo: o defeito estava em QUANDO
-// sync.c chama o cache, nao no cache. Este teste roda o sync.c REAL — fio de
-// verdade, sync_iniciar/sync_passo de verdade — com rede, perfis e disco
-// dublados, e reproduz as aberturas que o app faz:
-//
-//   1. boot com perfil salvo, pergunta de perfil aberta, a pessoa responde
-//      depois do ciclo interrompido, DURANTE ele (perfis_puxar no ar) ou no
-//      quadro entre o fim do fio e o sync_passo que o recolhe;
-//   2. o mesmo trocando de perfil (salvo 1, escolhe 2 — o caso que falhava);
-//   3. a resposta da conta chega com a MESMA ordem: nada e refeito;
-//   4. o ciclo completo do perfil escolhido sempre roda, e nao so no
-//      sync_periodico cinco minutos depois.
-//
-// Cada "sessao" e um processo novo (as estaticas de sync.c nao voltam a zero
-// dentro de um processo); o disco dublado e uma pasta de verdade, entao o
-// que uma sessao grava a seguinte le. Ver tests/syncordem.sh.
+/* Retained C profile-cycle and credential regressions. Home-order cache,
+ * publication and late-reply cases now run in Rust home_order tests. */
 #include "sync.h"
 #include "addons.h"
 #include "catordem.h"
-#include "catordemcache.h"
 #include "traktauth.h"
 #include "perfis.h"
 #include <pthread.h>
@@ -143,18 +123,7 @@ static void soltar(void) {
 
 // ------------------------------------------------------------ rede dublada
 
-static const char *ORDEM_A =
-  "[{\"settings_json\":{\"items\":["
-  "{\"addon_id\":\"xperience\",\"type\":\"movie\",\"catalog_id\":\"foryou\",\"order\":0},"
-  "{\"addon_id\":\"cinemeta\",\"type\":\"movie\",\"catalog_id\":\"top\",\"order\":1},"
-  "{\"addon_id\":\"cinemeta\",\"type\":\"series\",\"catalog_id\":\"top\",\"order\":2,\"enabled\":false}]}}]";
-static const char *ORDEM_B =
-  "[{\"settings_json\":{\"items\":["
-  "{\"addon_id\":\"cinemeta\",\"type\":\"series\",\"catalog_id\":\"top\",\"order\":0},"
-  "{\"addon_id\":\"xperience\",\"type\":\"movie\",\"catalog_id\":\"foryou\",\"order\":1}]}}]";
-
-static volatile int rpcCatHome;
-static int hold_home_order;
+static volatile int rpcCatHome, rpcCollections;
 static int rpcCredencial;
 // Modo "troca": a RPC das colecoes do perfil 1 fica presa ate a pessoa trocar
 // para o 2 — o ciclo do 1 termina com o 2 ja ativo.
@@ -162,6 +131,7 @@ static int segurarCol, puxandoCol;
 char *sessao_rpc(const char *funcao, const char *corpo, int *st) {
   *st = 200;
   if (!strcmp(funcao, "sync_pull_collections")) {
+    rpcCollections++;
     int p1 = strstr(corpo, "\"p_profile_id\":1") != NULL;
     pthread_mutex_lock(&trava);
     puxandoCol = 1;
@@ -171,12 +141,8 @@ char *sessao_rpc(const char *funcao, const char *corpo, int *st) {
     return strdup(p1 ? "[{\"marca\":\"perfil1\"}]" : "[{\"marca\":\"perfil2\"}]");
   }
   if (!strcmp(funcao, "sync_pull_home_catalog_settings")) {
-    pthread_mutex_lock(&trava);
-    while (hold_home_order) pthread_cond_wait(&sinal, &trava);
     rpcCatHome++;
-    pthread_mutex_unlock(&trava);
-    // A conta guarda uma ordem por perfil: o 2 tem ORDEM_A, o 1 ORDEM_B.
-    return strdup(strstr(corpo, "\"p_profile_id\":2") ? ORDEM_A : ORDEM_B);
+    return strdup("[]");  /* This RPC must never come from retained C sync. */
   }
   if (!strcmp(funcao, "sync_push_provider_credentials")) {
     // Resposta do servidor de campo (tapmal5, 1.4.3) para trakt e simkl.
@@ -319,9 +285,7 @@ int main(int argc, char **argv) {
   // "tarde": o fio interrompido JA acabou, mas sync_passo ainda nao o viu —
   // a resposta cai no mesmo quadro, entre o fim do fio e o passo seguinte.
   int tarde = argc > 2 && !strcmp(argv[2], "tarde");
-  int frio = argc > 3 && !strcmp(argv[3], "frio");
-  const char *esperada = alvo == 2 ? "xperience_movie_foryou" : "cinemeta_series_top";
-  int remAntes, rpcAntes;
+  int rpcBefore;
 
   setvbuf(stdout, NULL, _IOLBF, 0);
   if (argc > 1 && !strcmp(argv[1], "credencial")) {
@@ -381,7 +345,7 @@ int main(int argc, char **argv) {
     ateTerminar();
     confere("colecoes do perfil 1 nao aplicadas no 2", colDoOutro == 0);
     confere("ciclo do perfil 2 rodou e aplicou as dele", colDoCerto > 0);
-    confere("ordem final e a do perfil 2", !strcmp(catordem_chave(0), "xperience_movie_foryou"));
+    confere("Home-order networking has left C sync", rpcCatHome == 0);
     confere("ciclo do 2 aplicado: home do 2 pronta", sync_perfil_pronto());
     // Volta ao 1: a pendencia dele volta a valer (e sai do arquivo do perfil).
     escolher(1);
@@ -393,51 +357,24 @@ int main(int argc, char **argv) {
     printf("%s\n", falhas ? "FALHOU" : "PASSOU");
     return falhas ? 1 : 0;
   }
-  carregarAtivo();                     // main.c: perfis_carregar_ativo()
-  printf("-- sessao: salvo=%d, escolhe=%d%s%s\n", ativo, alvo,
-         segura ? ", responde com o 1o ciclo no ar" :
-         tarde ? ", responde antes de sync_passo ver o fio acabar" : "",
-         frio ? ", sem cache" : "");
+  carregarAtivo();
+  printf("-- C profile cycle: saved=%d, selected=%d%s%s\n", ativo, alvo,
+         segura ? ", choice during profile fetch" : "",
+         tarde ? ", choice before completed worker publication" : "");
   segurar = segura;
-  sync_iniciar();                      // app_iniciar, com sessao gravada
+  sync_iniciar();
   if (segura) esperarPuxando();
   else if (tarde) { int i; for (i = 0; i < 2000 && sync_estado() == SYNC_RODANDO; i++) usleep(1000); }
-  else { ateTerminar(); quadros(2); }  // "[sync] ciclo interrompido"
-
-  escolher(alvo);                      // profile_picker_complete()
-  /* Keep the fake server behind an explicit gate until the cache assertions
-   * finish. A fast worker must not race the cache-before-network check. */
-  pthread_mutex_lock(&trava);
-  hold_home_order = 1;
-  pthread_mutex_unlock(&trava);
-  sync_iniciar();                      // app.c, ramo da escolha
-
-  if (!frio) {
-    // ANTES de qualquer resposta de rede do perfil escolhido.
-    confere("ordem do perfil escolhido ja na memoria antes da rede",
-            rpcCatHome == 0 && !strcmp(catordem_chave(0), esperada));
-    confere("home remontada nessa ordem antes da rede",
-            remontagens > 0 && !strcmp(primeiraNaRemontagem, esperada));
-  }
-  remAntes = remontagens;
-  rpcAntes = rpcCatHome;
-  pthread_mutex_lock(&trava);
-  hold_home_order = 0;
-  pthread_cond_broadcast(&sinal);
-  pthread_mutex_unlock(&trava);
+  else { ateTerminar(); quadros(2); }
+  escolher(alvo);
+  rpcBefore = rpcCollections;
+  sync_iniciar();
   if (segura) soltar();
   ateTerminar();
-  // O ciclo interrompido nao pode engolir o ciclo do perfil escolhido: se o
-  // fio ainda estava vivo quando a pessoa respondeu, o ciclo completo tem de
-  // partir quando ele acabar, e nao cinco minutos depois (sync_periodico).
   ateTerminar();
-  confere("ciclo completo do perfil escolhido rodou", rpcCatHome > rpcAntes);
-  confere("ordem final e a da conta", !strcmp(catordem_chave(0), esperada));
-  if (frio)
-    confere("sem cache: a resposta da conta remonta a home", remontagens > remAntes);
-  else
-    confere("mesma ordem na resposta da conta: nenhuma remontagem a mais",
-            remontagens == remAntes);
+  confere("Selected profile's complete C collection cycle ran", rpcCollections > rpcBefore);
+  confere("Home-order networking has left C sync", rpcCatHome == 0);
+  confere("Selected profile is ready", sync_perfil_pronto());
   printf("%s\n", falhas ? "FALHOU" : "PASSOU");
   return falhas ? 1 : 0;
 }

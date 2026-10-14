@@ -2,6 +2,13 @@
 #define NV_RUST_CATALOG_ORDER_H
 #include <stddef.h>
 #include <stdint.h>
+#include "rust_account.h"
+typedef struct RustHomeOrderController RustHomeOrderController;
+RustHomeOrderController *nuvio_home_order_create(const RustAccount *account, const char *directory);
+void nuvio_home_order_destroy(RustHomeOrderController *controller);
+void nuvio_home_order_step(const RustHomeOrderController *controller, int allow_periodic);
+void nuvio_home_order_refresh(const RustHomeOrderController *controller);
+void nuvio_home_order_logout(const RustHomeOrderController *controller);
 typedef struct RustHomeOrderSnapshot RustHomeOrderSnapshot;
 RustHomeOrderSnapshot *nuvio_home_order_snapshot(void);
 uint64_t nuvio_home_order_snapshot_revision(const RustHomeOrderSnapshot *snapshot);
@@ -18,7 +25,4 @@ size_t nuvio_home_order_union(const char *const *local, size_t count, int *outpu
 /* -1: absent; 0: false; 1: true. */
 int nuvio_home_order_preference(int underline);
 void nuvio_home_order_reset(void);
-int nuvio_home_order_cache_load(const char *directory, const char *account, uint32_t profile);
-int nuvio_home_order_cache_save(const char *directory, const char *account, uint32_t profile, const char *body);
-void nuvio_home_order_cache_clear(const char *directory);
 #endif

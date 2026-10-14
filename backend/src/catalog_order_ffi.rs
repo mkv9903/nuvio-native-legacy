@@ -1,19 +1,115 @@
 //! Transitional native access to the Rust Home order capability.
 //! C renderer callers keep their historical function names in a thin adapter.
 use crate::{
-    catalog_order::{HomeOrder, HomeOrderState, HomeOrderStore},
+    catalog_order::{HomeOrderState, HomeOrderStore},
+    content_context::ContentContext,
+    controller::AccountController,
     error::{Error, Result},
-    model::ProfileId,
+    home_order_backend::HomeOrderBackend,
+    home_order_controller::HomeOrderController,
 };
 use std::{
     ffi::{c_char, CStr, CString},
-    slice,
+    ptr, slice,
     sync::{Arc, Mutex, OnceLock},
 };
 
 fn state() -> &'static HomeOrderState {
     static STATE: OnceLock<HomeOrderState> = OnceLock::new();
     STATE.get_or_init(HomeOrderState::default)
+}
+
+pub struct NativeHomeOrderController {
+    pub controller: HomeOrderController,
+    published: Mutex<Option<(Option<ContentContext>, u64)>>,
+}
+impl NativeHomeOrderController {
+    pub fn new(controller: HomeOrderController) -> Self {
+        Self {
+            controller,
+            published: Mutex::new(None),
+        }
+    }
+    fn publish(&self) {
+        let snapshot = self.controller.backend.snapshot();
+        if !self.controller.backend.snapshot_current(&snapshot) {
+            return;
+        }
+        let mut published = self.published.lock().unwrap();
+        if published
+            .as_ref()
+            .is_some_and(|(_, revision)| *revision == snapshot.revision)
+        {
+            return;
+        }
+        let context_changed = published
+            .as_ref()
+            .is_none_or(|(context, _)| context != &snapshot.context);
+        if state().replace(snapshot.order.clone(), context_changed) {
+            println!(
+                "[catalogs] Rust Home order: profile={} rows={} hidden={}",
+                snapshot
+                    .context
+                    .as_ref()
+                    .map(|context| context.profile.get())
+                    .unwrap_or(0),
+                snapshot.order.keys.len(),
+                snapshot.order.hidden.len()
+            );
+        }
+        if let Some(error) = snapshot.error.as_ref().or(snapshot.storage_error.as_ref()) {
+            println!("[catalogs] Home order retry: {error}");
+        }
+        *published = Some((snapshot.context, snapshot.revision));
+    }
+}
+#[no_mangle]
+pub unsafe extern "C" fn nuvio_home_order_create(
+    account: *const AccountController,
+    directory: *const c_char,
+) -> *mut NativeHomeOrderController {
+    let result = (|| {
+        let account = unsafe { account.as_ref() }.ok_or(Error::Configuration)?;
+        let store = HomeOrderStore::open(unsafe { text(directory)? })?;
+        let backend = HomeOrderBackend::new(Arc::new(account.backend.clone()), Arc::new(store));
+        Ok::<_, Error>(NativeHomeOrderController::new(HomeOrderController::new(
+            backend,
+        )?))
+    })();
+    result
+        .map(|controller| Box::into_raw(Box::new(controller)))
+        .unwrap_or(ptr::null_mut())
+}
+#[no_mangle]
+pub unsafe extern "C" fn nuvio_home_order_destroy(handle: *mut NativeHomeOrderController) {
+    if !handle.is_null() {
+        drop(unsafe { Box::from_raw(handle) });
+    }
+}
+#[no_mangle]
+pub unsafe extern "C" fn nuvio_home_order_step(
+    handle: *const NativeHomeOrderController,
+    allow_periodic: i32,
+) {
+    if let Some(handle) = unsafe { handle.as_ref() } {
+        handle.controller.step(allow_periodic != 0);
+        handle.publish();
+    }
+}
+#[no_mangle]
+pub unsafe extern "C" fn nuvio_home_order_refresh(handle: *const NativeHomeOrderController) {
+    if let Some(handle) = unsafe { handle.as_ref() } {
+        handle.controller.refresh();
+    }
+}
+#[no_mangle]
+pub unsafe extern "C" fn nuvio_home_order_logout(handle: *const NativeHomeOrderController) {
+    if let Some(handle) = unsafe { handle.as_ref() } {
+        handle.controller.logout();
+        handle.publish();
+    } else {
+        state().reset();
+    }
 }
 
 pub struct NativeOrderSnapshot {
@@ -161,50 +257,4 @@ pub extern "C" fn nuvio_home_order_preference(underline: i32) -> i32 {
 #[no_mangle]
 pub extern "C" fn nuvio_home_order_reset() {
     state().reset();
-}
-#[no_mangle]
-pub unsafe extern "C" fn nuvio_home_order_cache_load(
-    directory: *const c_char,
-    account: *const c_char,
-    profile: u32,
-) -> i32 {
-    state().reset();
-    let result: Result<bool> = (|| {
-        let store = HomeOrderStore::open(unsafe { text(directory)? })?;
-        let account = unsafe { text(account)? };
-        if account.is_empty() {
-            return Err(Error::InvalidData);
-        }
-        let order = store.load(account, ProfileId::new(profile).ok_or(Error::InvalidData)?)?;
-        Ok(order.is_some_and(|order| state().apply(order)))
-    })();
-    result.map(i32::from).unwrap_or(0)
-}
-#[no_mangle]
-pub unsafe extern "C" fn nuvio_home_order_cache_save(
-    directory: *const c_char,
-    account: *const c_char,
-    profile: u32,
-    body: *const c_char,
-) -> i32 {
-    let result: Result<bool> = (|| {
-        // Missing or invalid configuration never overwrites a valid cache.
-        let Some(order) = HomeOrder::decode(unsafe { text(body)? }.as_bytes())? else {
-            return Ok(false);
-        };
-        let store = HomeOrderStore::open(unsafe { text(directory)? })?;
-        store.save(
-            unsafe { text(account)? },
-            ProfileId::new(profile).ok_or(Error::InvalidData)?,
-            &order,
-        )?;
-        Ok(true)
-    })();
-    result.map(i32::from).unwrap_or(0)
-}
-#[no_mangle]
-pub unsafe extern "C" fn nuvio_home_order_cache_clear(directory: *const c_char) {
-    if let Ok(store) = unsafe { text(directory) }.and_then(HomeOrderStore::open) {
-        let _ = store.clear();
-    }
 }

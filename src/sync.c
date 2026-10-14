@@ -32,7 +32,7 @@
 #include "ajustes.h"
 #include "idioma.h"
 #include "catordem.h"
-#include "catordemcache.h"
+#include "home_order_runtime.h"
 #include "contacache.h"
 #include "descoberta.h"
 #include "simkl.h"
@@ -53,7 +53,7 @@
 static pthread_t fio;
 static int fioVivo, fioPronto;
 // A ENTREGA DO FIO DE SYNC PARA O PRINCIPAL (#203). `fioPronto` e
-// `fioPronto` protects the retained capability buffers (catHomeBlob, colBlob)
+// `fioPronto` protects the retained capability buffers (colBlob and other C-owned responses)
 // after the worker finishes writing them; o principal ve a porteira e
 // consome/libera os buffers. Escrita e leitura simples nao garantem essa ordem
 // no ARM da TV (nem para o compilador): o principal podia ver a porteira antes
@@ -103,7 +103,7 @@ static int  temTmdb, temMdb;
 // Contagens do ultimo ciclo, para o resumo da tela de ajustes poder dizer a
 // verdade em vez de "sincronizado" sem qualificar. Vistos e biblioteca deixaram
 // de ser SO contagem — ver a nota grande na secao "so leitura".
-static int cVistos, cBiblio, cColecoes, temAjustesPerfil, temCatHome;
+static int cVistos, cBiblio, cColecoes, temAjustesPerfil;
 
 // Blob de ajustes do perfil, cru, esperando ser aplicado no fio principal — e,
 // desde o push de ajustes (#85), GUARDADO depois disso: ele e a BASE da costura
@@ -140,15 +140,6 @@ static void carregarProtecaoAjustes(void) {
   free(t);
 }
 
-// A ordem das fileiras da home, crua, tambem esperando o fio principal. Nao e
-// contada como as outras so-leitura: ela e a home da pessoa, e ate agora a
-// resposta chegava, virava um numero no resumo e era jogada fora.
-static char *catHomeBlob;
-static int   temCatHomeBlob;
-// O cache da ordem e por perfil. Quando a pessoa troca de perfil, a ordem
-// anterior precisa sair antes de a nova entrar; quando o app atualiza, ela
-// entra antes da primeira resposta de rede.
-static int catordemCachePerfil = -1;
 // De qual perfil e o ciclo no ar, e o que ele deixou pendente. Ver
 // sync_iniciar (pedido com o fio vivo) e sync_passo (repeticao ao terminar).
 static int perfilDoCiclo, cicloInterrompido, pedidoComFioVivo;
@@ -692,42 +683,6 @@ static void empurrarAjustes(void) {
   free(r);
 }
 
-// A resposta inteira e guardada, nao interpretada aqui: quem le e catordem.c,
-// no fio principal. Interpretar neste fio e mexer na ordem das fileiras no meio
-// de um quadro que ja esta desenhando a home — a mesma razao que faz os addons
-// esperarem sync_passo.
-static int puxarCatHome(const char *corpo) {
-  char *r;
-  int st = 0;
-  if (jaAusente("sync_pull_home_catalog_settings")) return 0;
-  r = sessao_rpc("sync_pull_home_catalog_settings", corpo, &st);
-  if (!ok2xx(r, st)) {
-    // IMPRIME, como o contarRpc que estava aqui antes ja fazia. Sem esta linha
-    // a RPC ausente e a resposta vazia ficam com o MESMO sintoma no log —
-    // silencio — e foi exatamente o que aconteceu no primeiro deploy: nao dava
-    // para saber se o servidor nao tem a funcao ou se a conta nao configurou
-    // ordem nenhuma. Um caso e limitacao do servidor, o outro e o app
-    // funcionando; confundi-los custa uma sessao de investigacao.
-    printf("[sync] ordem de catalogos: HTTP %d%s\n", st,
-           (r && nuvem_erro_ausente(r)) ? " (funcao nao existe neste servidor)" : "");
-    if (r && nuvem_erro_ausente(r) && nAusentes < SY_AUSENTES)
-      ausentes[nAusentes++] = "sync_pull_home_catalog_settings";
-    // A ordem ja tem copia propria (catordemcache.c), restaurada em
-    // sync_iniciar antes de qualquer rede: aqui basta nao mexer nela.
-    if (!(r && nuvem_erro_ausente(r)) && contacache_falha_transitoria(st)) {
-      falhaServidor(st);
-      if (catordem_tem_ordem())
-        printf("[sync] servidor da conta indisponivel (HTTP %d): fica a ordem de catalogos guardada\n", st);
-    }
-    free(r);
-    return 0;
-  }
-  free(catHomeBlob);
-  catHomeBlob = r;          // o fio principal libera depois de ler
-  temCatHomeBlob = 1;
-  return 1;
-}
-
 static void puxarSoLeitura(void) {
   char corpo[160];
   int perfil = perfis_ativo();
@@ -775,10 +730,6 @@ static void puxarSoLeitura(void) {
   snprintf(corpo, sizeof corpo,
            "{\"p_profile_id\":%d,\"p_platform\":\"tv\"}", perfil);
   temAjustesPerfil = puxarAjustesPerfil(corpo);
-
-  snprintf(corpo, sizeof corpo,
-           "{\"p_profile_id\":%d,\"p_platform\":\"home_catalog_shared\"}", perfil);
-  temCatHome = puxarCatHome(corpo);
 }
 
 // O SERVIDOR DA CONTA CAIU NO MEIO DO CICLO (os addons falharam com 5xx/429/
@@ -898,44 +849,14 @@ static void *rodar(void *u) {
   return NULL;
 }
 
-// A ORDEM LOCAL NAO DEPENDE DE REDE, E TAMBEM NAO DEPENDE DO FIO (#125).
-//
-// Isto morava DEPOIS de `if (fioVivo) return` em sync_iniciar. O arranque com
-// conta de varios perfis chama sync_iniciar com o perfil salvo, o fio para em
-// "ciclo interrompido" esperando a pergunta, e a pessoa responde. Se ela
-// responde antes de sync_passo ver o fio acabar — a pergunta abre do cache de
-// perfis no primeiro quadro, e perfis_puxar ainda esta na rede —, o
-// sync_iniciar da escolha voltava na primeira linha: o cache do perfil
-// escolhido nunca era lido, e a home ficava na ordem do perfil salvo (ou na
-// padrao) ate o blob da conta chegar e reordenar tudo. MEDIDO em
-// tests/syncordem.sh, sessao 5: salvo 1, escolhe 2 com o fio vivo -> nenhuma
-// "ordem restaurada ... (perfil 2)", e depois "3 na ordem da conta" + "ordem
-// guardada" — o mesmo par de linhas dos logs de campo.
-//
-// Restaurar tambem antes do freio, como antes: num boot apos update, sem
-// internet ou com o servidor em pausa, a Home ainda precisa abrir com a
-// escolha que ja estava no aparelho.
-//
-// REMONTA TAMBEM QUANDO O PERFIL NOVO NAO TEM CACHE, se havia ordem na
-// memoria: catordem_cache_carregar esquece a ordem anterior antes de ler, e a
-// home ficaria desenhada na ordem do OUTRO perfil ate a rede responder.
-static void restaurarOrdemLocal(void) {
-  int tinha, mudou;
-  if (!sessao_logada() || catordemCachePerfil == perfis_ativo()) return;
-  tinha = catordem_tem_ordem();
-  mudou = catordem_cache_carregar(perfis_ativo(), sessao_usuario());
-  catordemCachePerfil = perfis_ativo();
-  if (mudou || tinha) desc_remontar_fileiras();
-}
-
 void sync_iniciar(void) {
   plugins_perfil_mudou();   // conta/perfil novos: estado e geracao dos plugins
   colfileiras_contexto();
   cat_historico_contexto(sessao_logada() ? sessao_usuario() : "",
                          sessao_logada() ? perfis_ativo() : 0);
-  restaurarOrdemLocal();
   if (!sessao_logada()) return;
   addon_registry_request_refresh();
+  home_order_runtime_refresh();
   // PEDIDO COM O FIO VIVO NAO SE PERDE. Voltar calado deixava um buraco: o
   // fio que estava no ar pode ser justamente o interrompido pela pergunta de
   // perfil, e ai o ciclo completo do perfil escolhido so partia com
@@ -1003,6 +924,13 @@ static void spRelatar(void) {
 }
 
 void sync_passo(unsigned agoraMs) {
+  static unsigned order_revision;
+  unsigned current_order = catordem_revisao();
+  int order_changed = current_order != order_revision;
+  order_revision = current_order;
+  if (order_changed && catordem_tem_ocultar_nao_lancados())
+    ajustes_definir_ocultar_nao_lancados(catordem_ocultar_nao_lancados());
+  /* The underline preference is retained; this UI does not draw that underline. */
   static unsigned addon_version;
   unsigned current_version = addon_registry_version();
   if (current_version != addon_version) {
@@ -1020,7 +948,10 @@ void sync_passo(unsigned agoraMs) {
   // Custo no caso comum: uma comparacao de inteiro (cat_n) e um strcmp de 16
   // bytes. Nada e refeito enquanto o catalogo for o mesmo.
   contalib_reconciliar();
-  if (!fioVivo || !PRONTO_LER(fioPronto)) return;
+  if (!fioVivo || !PRONTO_LER(fioPronto)) {
+    if (order_changed) { colfileiras_sincronizar(); desc_remontar_fileiras(); }
+    return;
+  }
   fioVivo = 0;
   __atomic_store_n(&fioPronto, 0, __ATOMIC_RELAXED);
   memset(spMs, 0, sizeof spMs);
@@ -1035,12 +966,12 @@ void sync_passo(unsigned agoraMs) {
   // Descartar tudo e pedir a volta do perfil certo; o que ja estava na tela e
   // do perfil novo (invalidarPerfil em app.c).
   if (!contaDoCicloAtual() || (!cicloInterrompido && !perfilDoCicloAtual())) {
+    if (order_changed) { colfileiras_sincronizar(); desc_remontar_fileiras(); }
     printf("[sync] ciclo do perfil %d descartado: o perfil ativo agora e %d\n",
            perfilDoCiclo, perfis_ativo());
     fflush(stdout);
     temTraktRem = 0; traktTok[0] = 0;
     temTmdb = temMdb = 0;
-    free(catHomeBlob); catHomeBlob = NULL; temCatHomeBlob = 0;
     free(colBlob);     colBlob = NULL;     temColBlob = 0;
     free(bibBlob);     bibBlob = NULL;     temBibBlob = 0;
     free(vistosBlob);  vistosBlob = NULL;  temVistosBlob = 0;
@@ -1061,8 +992,8 @@ void sync_passo(unsigned agoraMs) {
   // ultimas refazia Trakt e todos os manifestos por nada, e como o ciclo novo
   // publica um conjunto diferente do anterior, a home carregava um catalogo,
   // trocava por outro e so entao assentava na ordem final.
-  { int remontar = 0, soFileiras = 0;
-    int atualizarColecoes = temColBlob || temCatHomeBlob;
+  { int remontar = 0, soFileiras = order_changed;
+    int atualizarColecoes = temColBlob || order_changed;
   spMarcar(SP_ADDONS);
   // Vinculo feito NESTA TV ganha do que a conta manda: o servidor nao aceita o
   // push de "trakt" (400 22023), entao a linha da conta pode ser um token
@@ -1086,24 +1017,6 @@ void sync_passo(unsigned agoraMs) {
   if (temTmdb)      { desc_tmdb_definir(tmdbKey);   temTmdb = 0; }
   if (temMdb)       { extras_definir_chave(mdbKey); temMdb = 0; }
   spMarcar(SP_CRED);
-  // A ordem da home entra no MESMO remontar, e so quando MUDOU de verdade.
-  // Uma remontagem por ciclo de sync custaria a home inteira a cada 5 minutos,
-  // e o baseline de jank desta TV nao tem essa folga; duas remontagens no mesmo
-  // quadro (addons e ordem) custariam o dobro por nada.
-  if (temCatHomeBlob && catHomeBlob) {
-    if (catordem_ler(catHomeBlob)) {
-      catordem_cache_gravar(perfis_ativo(), sessao_usuario(), catHomeBlob);
-      if (catordem_tem_ocultar_nao_lancados())
-        ajustes_definir_ocultar_nao_lancados(catordem_ocultar_nao_lancados());
-      // `hide_catalog_underline` e lido e NAO aplicado: nao ha sublinhado de
-      // catalogo desenhado neste app. Ler ja evita confundir "a conta nao
-      // mandou" com "a conta mandou false" quando a fileira ganhar rotulo.
-      soFileiras = 1;
-    }
-    free(catHomeBlob);
-    catHomeBlob = NULL;
-    temCatHomeBlob = 0;
-  }
   spMarcar(SP_ORDEM);
   if (temColBlob && colBlob) {
     unsigned antes = col_revisao();
@@ -1456,9 +1369,7 @@ void sync_esquecer_usuario(void) {
   cat_historico_contexto("", 0);
   // A ordem importa pouco, mas o CONJUNTO nao: cada linha aqui corresponde a
   // uma coisa que sobrevivia ao logout.
-  catordem_esquecer();
-  catordem_cache_esquecer();
-  catordemCachePerfil = -1;
+  home_order_runtime_logout();
   // As copias da conta (#215): addons com chave de debrid na URL, biblioteca,
   // vistos e colecoes de quem saiu.
   contacache_esquecer();
@@ -1483,9 +1394,6 @@ void sync_esquecer_usuario(void) {
   // O jornal da conta sai da MEMORIA; o arquivo (por usuario, so ids) fica
   // para quando ESTA pessoa voltar — e o que ainda nao subiu nao se perde.
   contapend_esquecer();
-  free(catHomeBlob);
-  catHomeBlob = NULL;
-  temCatHomeBlob = 0;
   // A biblioteca e os vistos da conta anterior. Numa TV de sala isto nao e
   // detalhe: sem esta linha, a proxima pessoa a entrar veria a lista de filmes
   // salvos de quem saiu na tela de Biblioteca dela.
@@ -1516,10 +1424,8 @@ void sync_esquecer_usuario(void) {
   buscasrec_esquecer();
   free(bibBlob);    bibBlob = NULL;    temBibBlob = 0;
   free(vistosBlob); vistosBlob = NULL; temVistosBlob = 0;
-  // colBlob estava de fora desta lista desde que foi criado, ao lado de um
-  // catHomeBlob que ja era liberado. Um ciclo que terminou logo antes do logout
-  // deixava as colecoes da conta anterior esperando o proximo sync_passo, que
-  // as aplicaria na sessao seguinte.
+  // A cycle completed just before logout must not publish old collections
+  // into the next session.
   free(colBlob);    colBlob = NULL;    temColBlob = 0;
   plugins_esquecer();
   desc_esquecer();   // solta a cache de manifestos da conta que saiu
@@ -1548,7 +1454,7 @@ void sync_esquecer_usuario(void) {
   memset(tmdbKey, 0, sizeof tmdbKey); temTmdb = 0;
   memset(mdbKey, 0, sizeof mdbKey);   temMdb = 0;
   cVistos = cBiblio = cColecoes = 0;
-  temAjustesPerfil = temCatHome = 0;
+  temAjustesPerfil = 0;
   estado = SYNC_PARADO;
   ultimoOk = 0;
   sujoProgresso = 0; sujoAjustes = 0;

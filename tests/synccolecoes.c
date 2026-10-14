@@ -29,7 +29,6 @@ static int collectionsStatus = 200, outageBeforeCollections;
 static const char *payload;
 static const char *object = "{\"collections_json\":{\"collections\":[{\"id\":\"account-group\",\"title\":\"Account\",\"folders\":[{\"id\":\"remote-folder\",\"title\":\"Remote\",\"sources\":[{\"addonBaseUrl\":\"https://fixture.example\",\"type\":\"movie\",\"catalogId\":\"movies\"}]}]}]}}";
 const char *addons_base_por_id(const char *id) { (void)id; return ""; }
-int addons_n(void) { return 0; }
 const char *addons_base(int i) { (void)i; return ""; }
 const char *addons_id_manifesto(int i) { (void)i; return ""; }
 char *dados_caminho(char *dst, unsigned n, const char *nome) {
@@ -52,53 +51,55 @@ static void folder(const char *id) {
   assert(col_n() == 1 && col_folder(0));
   assert(!strcmp(col_folder(0)->id, id));
 }
+/* The included fixture supplies the frame loop, not a collection-cycle helper. */
+static void run_cycle(void) { sync_iniciar(); ateTerminar(); }
 int main(int argc, char **argv) {
   assert(argc == 2);
   escolher(2);
   fil_definir_perfil(2);
   payload = object;
   if (!strcmp(argv[1], "network")) {
-    ciclo();
+    run_cycle();
     folder("remote-folder");
     char *copy = contacache_ler(CC_COLECOES, 2, sessao_usuario(), NULL);
     assert(copy && !strcmp(copy, object)); free(copy);
     assert(!contacache_ler(CC_COLECOES, 1, sessao_usuario(), NULL));
     int before = remontagens;
     unsigned rev = col_revisao();
-    ciclo(); folder("remote-folder");
+    run_cycle(); folder("remote-folder");
     assert(remontagens == before && col_revisao() == rev);
     assert(fil_estado_chave("collection_account-group") == FIL_NA_HOME);
-    payload = "[]"; ciclo(); folder("remote-folder");
+    payload = "[]"; run_cycle(); folder("remote-folder");
     assert(remontagens == before);
     copy = contacache_ler(CC_COLECOES, 2, sessao_usuario(), NULL);
     assert(copy && !strcmp(copy, object)); free(copy);
     payload = "{\"collections_json\":{\"collections\":[]";
-    ciclo(); folder("remote-folder"); assert(remontagens == before);
+    run_cycle(); folder("remote-folder"); assert(remontagens == before);
     copy = contacache_ler(CC_COLECOES, 2, sessao_usuario(), NULL);
     assert(copy && !strcmp(copy, object)); free(copy);
     payload = "{\"collections_json\":{\"collections\":[]}}";
-    ciclo(); assert(col_n() == 0);
+    run_cycle(); assert(col_n() == 0);
     assert(fil_estado_chave("collection_account-group") == -1);
     assert(remontagens == before + 1);
     before = remontagens;
     payload = "{\"collections_json\":null}";
-    ciclo(); assert(col_n() == 0 && remontagens == before);
+    run_cycle(); assert(col_n() == 0 && remontagens == before);
   } else if (!strcmp(argv[1], "copy") || !strcmp(argv[1], "fallback")) {
     assert(contacache_gravar(CC_COLECOES, 2, sessao_usuario(), object));
     collectionsStatus = 503; payload = NULL;
     outageBeforeCollections = !strcmp(argv[1], "copy");
-    ciclo(); folder("remote-folder");
+    run_cycle(); folder("remote-folder");
     assert(sync_servidor_fora() == 503);
   } else if (!strcmp(argv[1], "isolated")) {
     assert(contacache_gravar(CC_COLECOES, 1, sessao_usuario(), object));
     assert(col_definir_json(object) == 1);
     col_esquecer_perfil(); assert(col_n() == 0);
     collectionsStatus = 503; payload = NULL; outageBeforeCollections = 1;
-    ciclo(); assert(col_n() == 0);
+    run_cycle(); assert(col_n() == 0);
   } else if (!strcmp(argv[1], "no-copy")) {
     assert(col_definir_json(object) == 1);
     collectionsStatus = 503; payload = NULL;
-    ciclo(); folder("remote-folder");
+    run_cycle(); folder("remote-folder");
   } else assert(0);
   puts("synccolecoes: ok");
   return 0;

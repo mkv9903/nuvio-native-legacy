@@ -4,6 +4,7 @@
 #include "profiles.h"
 #include "rust_account.h"
 #include "addon_registry.h"
+#include "home_order_runtime.h"
 #include "nuvem.h"
 #include "fileiras.h"
 #include <pthread.h>
@@ -102,6 +103,7 @@ void account_ui_test_attach(RustAccount *test_account) {
 void session_init(void) {
   account = nuvio_account_create(data_dir(), NV_APP_ID);
   addon_registry_init(account, data_dir());
+  home_order_runtime_init(account, data_dir());
   refresh_view();
   printf("[account] Rust backend %s\n", account ? "initialized" : "unavailable");
   printf("[account] Compiled C/Rust account configuration matches: %s\n",
@@ -129,7 +131,7 @@ void session_login_start(void) { nuvio_account_login_tv(account); refresh_view()
 void session_login_email(const char *email, const char *password) { nuvio_account_login_email(account, email, password); refresh_view(); }
 void session_step(unsigned now_ms) { (void)now_ms; nuvio_account_step(account); refresh_view(); }
 void session_cancel(void) { nuvio_account_cancel(account); refresh_view(); }
-void session_logout(void) { nuvio_account_logout(account); addon_registry_logout(); refresh_view(); }
+void session_logout(void) { nuvio_account_logout(account); addon_registry_logout(); home_order_runtime_logout(); refresh_view(); }
 
 static char *request_account(int table, const char *name, const char *argument, int *status) {
   RustAccountReply *reply = nuvio_account_request(account, table, name, argument ? argument : (table ? "" : "{}"));
@@ -164,6 +166,7 @@ void account_apply_profile(void) {
   fil_definir_perfil(active); fontepref_definir_perfil(active); arteesc_definir_perfil(active);
   plugins_perfil_mudou();
   addon_registry_step(ajustes_addons_do_principal(), 0);
+  home_order_runtime_step(0);
 }
 void profiles_load_active(void) { refresh_view(); account_apply_profile(); }
 int profiles_needs_selection(void) { return nuvio_account_needs_selection(account); }

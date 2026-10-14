@@ -1,15 +1,15 @@
 //! Account Home ordering, independent of rendering, C buffers and local styles.
 use crate::{
+    content_context::ContentScope,
     error::{Error, Result},
     json_store::JsonStore,
-    model::ProfileId,
     TEST_APP_ID,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::{
     collections::{HashMap, HashSet},
-    fmt,
+    fmt::{self, Write},
     path::Path,
     sync::{Arc, RwLock},
 };
@@ -238,6 +238,16 @@ impl HomeOrderState {
         state.revision = state.revision.wrapping_add(1);
         true
     }
+    /// Runtime publication receives preferences already resolved in its scope.
+    pub fn replace(&self, next: Arc<HomeOrder>, context_changed: bool) -> bool {
+        let mut state = self.published.write().unwrap();
+        if !context_changed && state.order == next {
+            return false;
+        }
+        state.order = next;
+        state.revision = state.revision.wrapping_add(1);
+        true
+    }
     pub fn decode_and_apply(&self, bytes: &[u8]) -> Result<bool> {
         Ok(HomeOrder::decode(bytes)?.is_some_and(|order| self.apply(order)))
     }
@@ -252,8 +262,7 @@ impl HomeOrderState {
 struct Envelope {
     version: u32,
     app_id: String,
-    account: String,
-    profile: ProfileId,
+    scope: ContentScope,
     order: HomeOrder,
 }
 #[derive(Clone)]
@@ -266,52 +275,78 @@ impl HomeOrderStore {
             files: JsonStore::open(directory, TEST_APP_ID)?,
         })
     }
-    fn name(profile: ProfileId) -> String {
-        format!("home-order-p{}.json", profile.get())
+    pub fn file_name(scope: &ContentScope) -> Result<String> {
+        if scope.member.is_empty() || scope.owner.is_empty() {
+            return Err(Error::InvalidData);
+        }
+        let bytes = Zeroizing::new(serde_json::to_vec(scope).map_err(|_| Error::InvalidData)?);
+        let hash = ring::digest::digest(&ring::digest::SHA256, &bytes);
+        let mut name = String::from("home-order-v2-");
+        for byte in hash.as_ref() {
+            write!(name, "{byte:02x}").expect("writing to String");
+        }
+        name.push_str(".json");
+        Ok(name)
     }
-    pub fn load(&self, account: &str, profile: ProfileId) -> Result<Option<HomeOrder>> {
+}
+pub trait HomeOrderStorage: Send + Sync {
+    fn load(&self, scope: &ContentScope) -> Result<Option<HomeOrder>>;
+    fn save(
+        &self,
+        scope: &ContentScope,
+        order: &HomeOrder,
+        current: &dyn Fn() -> bool,
+    ) -> Result<()>;
+    fn clear(&self) -> Result<()>;
+}
+impl HomeOrderStorage for HomeOrderStore {
+    fn load(&self, scope: &ContentScope) -> Result<Option<HomeOrder>> {
         let Some(bytes) = self
             .files
-            .read(&Self::name(profile), RESPONSE_LIMIT as u64)?
+            .read(&Self::file_name(scope)?, RESPONSE_LIMIT as u64)?
         else {
             return Ok(None);
         };
         let envelope: Envelope = serde_json::from_slice(&bytes).map_err(|_| Error::InvalidData)?;
-        if envelope.version != 1 || envelope.app_id != TEST_APP_ID {
+        if envelope.version != 2 || envelope.app_id != TEST_APP_ID || &envelope.scope != scope {
             return Err(Error::InvalidData);
-        }
-        if envelope.account != account || envelope.profile != profile {
-            return Ok(None);
         }
         envelope.order.validate()?;
         Ok(Some(envelope.order))
     }
-    pub fn save(&self, account: &str, profile: ProfileId, order: &HomeOrder) -> Result<()> {
-        if account.is_empty() {
-            return Err(Error::InvalidData);
-        }
+    fn save(
+        &self,
+        scope: &ContentScope,
+        order: &HomeOrder,
+        current: &dyn Fn() -> bool,
+    ) -> Result<()> {
+        let name = Self::file_name(scope)?;
         order.validate()?;
         let envelope = Envelope {
-            version: 1,
+            version: 2,
             app_id: TEST_APP_ID.into(),
-            account: account.into(),
-            profile,
+            scope: scope.clone(),
             order: order.clone(),
         };
         let bytes = Zeroizing::new(serde_json::to_vec(&envelope).map_err(|_| Error::InvalidData)?);
-        self.files
-            .write(&Self::name(profile), &bytes, RESPONSE_LIMIT as u64)
+        self.files.with_lock(&format!("{name}.lock"), || {
+            if !current() {
+                return Err(Error::Cancelled);
+            }
+            self.files.write(&name, &bytes, RESPONSE_LIMIT as u64)
+        })
     }
-    pub fn clear(&self) -> Result<()> {
+    fn clear(&self) -> Result<()> {
         for name in self.files.names()? {
             if name
-                .strip_prefix("home-order-p")
+                .strip_prefix("home-order-v2-")
                 .and_then(|value| value.strip_suffix(".json"))
-                .and_then(|value| value.parse::<u32>().ok())
-                .and_then(ProfileId::new)
-                .is_some()
+                .is_some_and(|key| {
+                    key.len() == 64 && key.bytes().all(|byte| byte.is_ascii_hexdigit())
+                })
             {
-                self.files.remove(&name)?;
+                self.files
+                    .with_lock(&format!("{name}.lock"), || self.files.remove(&name))?;
             }
         }
         Ok(())

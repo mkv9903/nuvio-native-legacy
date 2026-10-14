@@ -1,6 +1,7 @@
 mod support;
 use nuvio_backend::{
-    catalog_order::{HomeOrder, HomeOrderState, HomeOrderStore},
+    catalog_order::{HomeOrder, HomeOrderState, HomeOrderStorage, HomeOrderStore},
+    content_context::ContentScope,
     error::Error,
     model::ProfileId,
 };
@@ -12,6 +13,13 @@ fn decode(value: serde_json::Value) -> HomeOrder {
     HomeOrder::decode(&serde_json::to_vec(&value).unwrap())
         .unwrap()
         .unwrap()
+}
+fn scope(member: &str, profile_id: u32) -> ContentScope {
+    ContentScope {
+        member: member.into(),
+        owner: "owner".into(),
+        profile: profile(profile_id),
+    }
 }
 fn profile(id: u32) -> ProfileId {
     ProfileId::new(id).unwrap()
@@ -221,27 +229,34 @@ fn versioned_cache_survives_restart_and_isolates_accounts_and_profiles() {
     let directory = Directory::new();
     let store = HomeOrderStore::open(&directory.path).unwrap();
     let order = decode(json!({"order":["first","second"],"hidden_catalog_keys":["second"]}));
-    store.save("account-a", profile(3), &order).unwrap();
+    store
+        .save(&scope("account-a", 3), &order, &|| true)
+        .unwrap();
     drop(store);
     let reopened = HomeOrderStore::open(&directory.path).unwrap();
-    assert_eq!(reopened.load("account-a", profile(3)).unwrap(), Some(order));
-    assert!(reopened.load("account-b", profile(3)).unwrap().is_none());
-    assert!(reopened.load("account-a", profile(4)).unwrap().is_none());
+    assert_eq!(reopened.load(&scope("account-a", 3)).unwrap(), Some(order));
+    assert!(reopened.load(&scope("account-b", 3)).unwrap().is_none());
+    assert!(reopened.load(&scope("account-a", 4)).unwrap().is_none());
     reopened
-        .save("account-a", profile(9), &HomeOrder::default())
+        .save(&scope("account-a", 9), &HomeOrder::default(), &|| true)
         .unwrap();
     assert_eq!(
-        reopened.load("account-a", profile(9)).unwrap(),
+        reopened.load(&scope("account-a", 9)).unwrap(),
         Some(HomeOrder::default())
     );
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
         assert_eq!(
-            fs::metadata(directory.path.join("rust-backend-v1/home-order-p3.json"))
-                .unwrap()
-                .permissions()
-                .mode()
+            fs::metadata(
+                directory
+                    .path
+                    .join("rust-backend-v1")
+                    .join(HomeOrderStore::file_name(&scope("account-a", 3)).unwrap())
+            )
+            .unwrap()
+            .permissions()
+            .mode()
                 & 0o777,
             0o600
         );
@@ -252,8 +267,8 @@ fn versioned_cache_survives_restart_and_isolates_accounts_and_profiles() {
     )
     .unwrap();
     reopened.clear().unwrap();
-    assert!(reopened.load("account-a", profile(3)).unwrap().is_none());
-    assert!(reopened.load("account-a", profile(9)).unwrap().is_none());
+    assert!(reopened.load(&scope("account-a", 3)).unwrap().is_none());
+    assert!(reopened.load(&scope("account-a", 9)).unwrap().is_none());
     assert!(directory
         .path
         .join("home-catalog-settings-p3.json")
@@ -264,10 +279,17 @@ fn versioned_cache_survives_restart_and_isolates_accounts_and_profiles() {
 fn invalid_versions_ownership_and_storage_targets_are_not_imported() {
     let directory = Directory::new();
     let store = HomeOrderStore::open(&directory.path).unwrap();
-    let file = directory.path.join("rust-backend-v1/home-order-p1.json");
-    for body in ["", "{}", "{\"version\":2,\"app_id\":\"space.mkv.nuvio.rusttest\",\"account\":\"a\",\"profile\":1,\"order\":{\"keys\":[],\"hidden\":[],\"hide_unreleased\":null,\"hide_underline\":null}}"] {
+    let file = directory
+        .path
+        .join("rust-backend-v1")
+        .join(HomeOrderStore::file_name(&scope("a", 1)).unwrap());
+    for body in [
+        "",
+        "{}",
+        r#"{"version":1,"app_id":"space.mkv.nuvio.rusttest","account":"a","profile":1,"order":{"keys":[],"hidden":[],"hide_unreleased":null,"hide_underline":null}}"#,
+    ] {
         fs::write(&file, body).unwrap();
-        assert!(store.load("a", profile(1)).is_err());
+        assert!(store.load(&scope("a", 1)).is_err());
         assert_eq!(fs::read_to_string(&file).unwrap(), body);
     }
     assert!(HomeOrderStore::open(directory.parent.join("space.mkv.nuvio.native")).is_err());
@@ -278,8 +300,10 @@ fn invalid_versions_ownership_and_storage_targets_are_not_imported() {
         let outside = directory.parent.join("private.json");
         fs::write(&outside, "outside").unwrap();
         symlink(&outside, &file).unwrap();
-        assert!(store.load("a", profile(1)).is_err());
-        store.save("a", profile(1), &HomeOrder::default()).unwrap();
+        assert!(store.load(&scope("a", 1)).is_err());
+        store
+            .save(&scope("a", 1), &HomeOrder::default(), &|| true)
+            .unwrap();
         assert_eq!(fs::read_to_string(outside).unwrap(), "outside");
     }
 }

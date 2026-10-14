@@ -97,6 +97,7 @@
 #include "video.h"
 #include "addons.h"
 #include "addon_registry.h"
+#include "home_order_runtime.h"
 #include "idioma.h"
 #include "descoberta.h"
 #include "ilha_voo.h"
@@ -2372,7 +2373,10 @@ void app_atualizar(float dt, Uint32 agora) {
 #ifdef NV_LINUX_DESKTOP
   if (!uiPreview)
 #endif
+  {
     addon_registry_step(ajustes_addons_do_principal(), !player_aberto());
+    home_order_runtime_step(!player_aberto());
+  }
   if (player_aberto() || player_mini_ativo()) diagnostico_cancelar_vazao();
   // Login e escolha de perfil retornam cedo; a atividade da conta anterior
   // precisa sair antes deles, junto de qualquer modal/pedido ja enfileirado.

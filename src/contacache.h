@@ -10,8 +10,8 @@
 //
 // O que fica aqui: a ULTIMA resposta 2xx de cada superficie, crua, por CONTA
 // (o `sub` do JWT) e por PERFIL, num envelope versionado. Quem le confere o
-// dono e o perfil, como catordemcache.c (que continua sendo o cache da ordem
-// de catalogos). Gravacao atomica (dados_gravar). Apagado no logout.
+// Home ordering has its own owner/profile-scoped Rust cache.
+// This retained C cache uses atomic writes and is cleared on logout.
 //
 // CONTEUDO SENSIVEL: a resposta da tabela `addons` traz as URLs com as chaves
 // de debrid embutidas. Por isso contacache_esquecer e chamado JUNTO com o resto

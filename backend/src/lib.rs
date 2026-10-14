@@ -20,6 +20,8 @@ pub mod content_context;
 pub mod controller;
 pub mod error;
 pub mod ffi;
+pub mod home_order_backend;
+pub mod home_order_controller;
 pub mod http;
 mod json_store;
 pub mod model;

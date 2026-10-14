@@ -36,7 +36,7 @@
 //
 // ONDE ESTE MODULO PARA: ele le e guarda, e sabe aplicar no catalogo. Ele NAO
 // fala com a rede — quem busca e sync.c, no fio dele, e entrega o corpo cru
-// aqui no fio principal (mesma disciplina do colBlob/catHomeBlob). Assim este
+// aqui no fio principal (mesma disciplina do colBlob). Assim este
 // arquivo compila e e testado sem SDL, sem rede e sem descoberta.
 #ifndef NV_CONTALIB_H
 #define NV_CONTALIB_H
