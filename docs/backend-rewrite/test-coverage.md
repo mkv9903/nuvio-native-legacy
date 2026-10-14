@@ -275,13 +275,18 @@ in nested test runs.
 ## Native title ownership foundation
 
 The current backend suite passes 164 tests; the separate native Rust/C suite
-passes 11. Five title tests verify complete values and separate provider/IMDb
+passes 15. Five title tests verify complete values and separate provider/IMDb
 identity, UTF-8 projection boundaries, null/malformed input, concurrent readers,
 and perfect-score/near-perfect rating scaling. Three native title tests use the
 actual C catalog and verify independent copies, release of final owners,
 held selections through replacement, C artwork enrichment overlays and borrowed
 text surviving in-place updates until frame retirement. No field-size or buffer
-constant is used as a Rust domain limit.
+constant is used as a Rust domain limit. Four additional native cases cover the
+real saved-menu/channel entry points, held Details/playback selections and
+re-insertion by complete ID, deferred undo after releasing its source,
+one-time execution, replacement/cancellation and clone failure. The retained
+C playback-retention fixture passes its original same-session resume,
+confirmation, timeout, identity-change and saved-source assertions.
 
 The Linux application builds and remains running during a ten-second Xvfb
 startup check with disposable preview data. Retained C `catcache`, `canaisidx`,

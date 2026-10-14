@@ -68,7 +68,7 @@ owner and otherwise wait/retry rather than using the signed-in member's ID.
 The Rust account domain, HTTP client, worker, native boundary, platform helper,
 Home ordering, addon networking/storage, edit merging and the native addon
 boundary, provider loading and complete catalog title models pass 164 tests.
-Eleven additional Rust driver tests cover the retained C account/addon screens,
+Fifteen additional Rust driver tests cover the retained C account/addon screens,
 view layouts, Home-order frame publication and actual source/subtitle workers
 under Xvfb. The five relevant C reference groups passed
 before their test cases moved to Rust. See [test coverage](test-coverage.md).
@@ -126,3 +126,9 @@ The native title foundation retains complete immutable Rust data across C
 catalog copies and replacement. The user approved keeping the existing title
 features and fixing perfect-score ratings. Runtime producer/cache/consumer
 integration remains pending; see [title ownership](title-ownership.md).
+
+Details, playback, live-channel and saved-menu selections now retain their own
+title references. Deferred save/watched notifications clone and release an owned
+title context. The touched notification components use English code/files/text
+while retaining the existing island rendering. Retained playback holds its title
+until the session is discarded; normal closure releases it after progress work.

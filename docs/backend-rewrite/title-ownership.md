@@ -41,21 +41,43 @@ to Rust before native titles are published in the application.
 
 This checkpoint does **not** enable the Rust title producer in the application.
 Catalog loading still uses the C producer. Before switching it over, adapt
-long-lived UI selections, deferred actions, worker arrays and temporary copies;
+worker arrays and remaining temporary copies;
 replace the assembled binary cache; and connect complete IDs and image strings
 through Details, source selection and rendering consumers. Existing enrichment,
 episode, progress and commercial-availability data must survive those changes.
 Profile-scoped catalog scheduling and publication remain part of this milestone.
 The previous-profile Home-row bug is not yet resolved.
 
+Details, playback, live-channel and saved/social menu selections now own their
+references. Details re-resolves the complete held provider ID and retains its
+record through the closing animation. Playback keeps its record during native
+retention and releases it only after actual session teardown. The router's
+next-episode wait releases its title on cancellation, timeout or consumption.
+Deferred save/watched actions use explicit clone/release callbacks; execution,
+replacement and shutdown release their references. Legacy plain-data notice
+contexts can still be copied by value.
+
+The touched action/save notification components are translated into English
+files, names, comments, logs and visible text. Their island renderer and layout
+are retained. Small English-commented compatibility headers keep unmigrated
+callers working. Existing C settings marker filenames remain part of the
+unmigrated settings backend; they are not Rust save-file imports.
+
 ## Verification
 
 Five Rust title tests cover complete strings, provider/IMDb identity, independent
 references, Unicode projection, malformed inputs, display NULs, concurrent
-readers and rating scaling. Three Rust-driven native tests use the actual C
+readers and rating scaling. Seven Rust-driven native tests use the actual C
 catalog to cover held selections across replacement, final-owner release,
 legacy artwork enrichment and frame-safe in-place updates. Remaining C catalog
 tests continue to exercise their unmigrated algorithms; they are not replacements
 for the Rust catalog-loader tests.
+
+The additional native cases exercise held Details/playback selections and
+re-insertion by complete ID, the actual saved-menu/channel entry points,
+one-time undo execution after its source is released, replacement/cancellation,
+final-owner release and context-clone failure. The retained C playback-retention
+fixture also passes, including pause confirmation, same-session resume,
+timeouts, account/profile changes, backend replacement and saved-source behavior.
 
 No TV handoff is requested for this foundation checkpoint.

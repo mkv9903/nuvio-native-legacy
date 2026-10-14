@@ -17,7 +17,8 @@
 #include "progresso.h"
 #include "salvos.h"
 #include "ilhasalvar.h"
-#include "ilhaacao.h"
+#include "action_notice.h"
+#include "title_action_context.h"
 #include "ilha.h"
 #include "botoes.h"
 #include "badges.h"
@@ -104,7 +105,7 @@ static int   opSimkl;
 // Frase no lugar de "Biblioteca atualizada" quando o destino e o Simkl e nao
 // ha vinculo: a lista desta TV foi escrita, o Simkl nao — e a tela diz.
 static const char *avisoOp;
-static char  operacaoImdb[16];
+static CatItem operation_title;
 static volatile int holdAtivo, holdCancelado, holdPronto;
 // O OK QUE ABRIU O MODAL AINDA ESTA AFUNDADO.
 //
@@ -120,23 +121,11 @@ static volatile int holdAtivo, holdCancelado, holdPronto;
 static volatile int esperandoSoltura;
 static Uint32 holdDesde;
 
-// MODO PAINEL: o mesmo menu, aberto SEGURANDO OK numa linha do painel de
-// Salvos (salvospainel.c, dono 25/09/2026: "segurar e remover, ou more
-// infos").
-//
-// POR QUE UMA COPIA E NAO O INDICE. O painel mostra titulos que NAO estao no
-// catalogo — a lista local se desenha do proprio arquivo, antes de a descoberta
-// responder (ver salvospainel.c) — e para esses nao existe indice nenhum. A
-// copia e o titulo; o catalogo, quando tem o mesmo IMDb, continua sendo quem
-// responde (itemAtual), porque e ele que tem progresso, temporadas e a marca.
-//
-// O RESTO E O MESMO MENU: mesmo cartao, mesmas pilulas, mesma espera pelo 2xx
-// do Trakt e o mesmo caminho de escrita de OP_LISTA (salvos_definir + Trakt ou
-// Simkl + espelho). Um "Remover" proprio do painel seria a quinta porta
-// escrevendo a mesma marca, e o defeito dos quatro "+" do app irmao (salvos.h)
-// comecou exatamente assim.
-static int     doPainel;
-static CatItem copiaPainel;
+// Saved/social rows can provide a title before it exists in the catalog.
+// Hold their own metadata; prefer a matching catalog record when available
+// because it contains episode, resume and membership updates.
+static int panel_mode;
+static CatItem panel_title;
 // MODO SOCIAL (abas Atividade e Amigos do painel, dono 03/10: "falta o menu
 // contextual na aba activity e friends"): o mesmo modo painel, sem "Mover para
 // categoria" (isso e dos Salvos), mais as acoes da LINHA que o painel passa
@@ -299,25 +288,22 @@ static void *fioTirarRemoto(void *u) {
 static int indiceAtual(void) {
   int n = cat_n();
   int achado;
-  // No modo painel o indice e so "o catalogo tem este titulo?" — pode nao ter,
-  // e ai quem responde e a copia (itemAtual).
-  if (doPainel) return copiaPainel.imdb[0] ? cat_indice_por_imdb(copiaPainel.imdb) : -1;
+  // A panel row can use its held title when no matching catalog record exists.
+  if (panel_mode) return catalog_title_id(&panel_title)[0] ? cat_indice_por_imdb(catalog_title_id(&panel_title)) : -1;
   if (n < 1 || idx < 0 || idx >= n) return -1;
-  if (operacaoImdb[0]) {
-    achado = cat_indice_por_imdb(operacaoImdb);
-    // A resposta pode chegar depois de a descoberta trocar o bloco. Nunca
-    // reutilizar `idx` nesse caso, pois ele pode ser outro titulo.
+  if (catalog_title_id(&operation_title)[0]) {
+    achado = cat_indice_por_imdb(catalog_title_id(&operation_title));
+    // A late result must resolve its held identity, never a replaced neighbor.
     return achado;
   }
   return idx;
 }
 
-// O titulo do menu: a copia do catalogo quando ela existe, senao (so no modo
-// painel) a copia que o painel entregou. NULL quando nao ha mais titulo.
+// Prefer current catalog metadata, falling back to the owned panel selection.
 static const CatItem *itemAtual(void) {
   int i = indiceAtual();
   const CatItem *ci = i >= 0 ? cat_item(i) : NULL;
-  if (!ci && doPainel && (copiaPainel.imdb[0] || doSocial)) ci = &copiaPainel;
+  if (!ci && panel_mode && (catalog_title_id(&panel_title)[0] || doSocial)) ci = &panel_title;
   return ci;
 }
 
@@ -343,7 +329,7 @@ static void juntar(const char *rot, int acao) {
 // so quando o catalogo a tem (a copia nao traz as temporadas).
 static int assistidoPossivel(const CatItem *ci, int i) {
   return ci && ci->imdb[0] && (!strcmp(ci->tipo, "movie") || !strcmp(ci->tipo, "series")) &&
-         (!doPainel || i >= 0 || !strcmp(ci->tipo, "movie"));
+         (!panel_mode || i >= 0 || !strcmp(ci->tipo, "movie"));
 }
 // A extra que se junta a "Marcar como assistido" (CtxExtra.juntaAssistido), ou -1.
 static int extraJunta(void) {
@@ -409,7 +395,7 @@ static void montar(void) {
   }
   // AS CATEGORIAS DA PESSOA (salvosorg.h) so existem no painel de Salvos: e
   // la que o titulo esta salvo e e la que a escolha abre.
-  if (doPainel && !doSocial && ci->imdb[0]) juntar("Mover para categoria", OP_CATEGORIA);
+  if (panel_mode && !doSocial && ci->imdb[0]) juntar("Mover para categoria", OP_CATEGORIA);
   // O web so oferece "assistido" em filme e serie — nao em canal nem evento,
   // que sao tipos que os addons do dono tambem declaram.
   //
@@ -443,16 +429,16 @@ static void montar(void) {
   // desistiu no meio quer so esta.
   // O menu do painel e o curto que o dono pediu (remover, mais informacoes,
   // assistido): esta e a de baixo sao acoes do cartaz da home.
-  if (!doPainel && ci->progresso > 0 && ci->imdb[0]) {
+  if (!panel_mode && ci->progresso > 0 && ci->imdb[0]) {
     juntar("Tirar de Continuar assistindo", OP_TIRAR_CONTINUAR);
   }
   // Por ULTIMO: e da fileira, nao do titulo. So quando a home disse qual e a
   // fileira e ela tem forma para escolher (Continuar assistindo, Top 10 e o
   // destaque ficam com o visual deles — a home nem passa a chave).
-  if (!doPainel && filChave[0] && fil_estilos(filChave, NULL, NULL, FIL_TIPO_N) > 0)
+  if (!panel_mode && filChave[0] && fil_estilos(filChave, NULL, NULL, FIL_TIPO_N) > 0)
     juntar("Estilo da fileira", OP_ESTILO);
   // Cartao "Retomar agora": soltar o titulo da faixa, sem apagar progresso.
-  if (!doPainel && dispensarOp) juntar("Dispensar", OP_DISPENSAR);
+  if (!panel_mode && dispensarOp) juntar("Dispensar", OP_DISPENSAR);
   // As acoes da linha social por ULTIMO: sao dela, nao do titulo.
   if (doSocial) {
     int k;
@@ -514,7 +500,7 @@ void ctx_abrir(int indice) {
     return;
   }
   if (indice < 0 || indice >= cat_n() || !cat_item(indice)) { filChave[0] = 0; dispensarPend = 0; return; }
-  doPainel = 0;
+  panel_mode = 0;
   doSocial = 0;
   soFileira = 0;
   doLista = 0;
@@ -547,7 +533,7 @@ void ctx_abrir_lista(const LstLista *l) {
   if (holdCancelado) { holdCancelado = 0; holdPronto = 0; return; }
   if (!l) return;
   filChave[0] = 0;
-  doPainel = 0; soFileira = 0; doSocial = 0;
+  panel_mode = 0; soFileira = 0; doSocial = 0;
   lista = *l;
   doLista = 1;
   abrirComum(-1);
@@ -573,7 +559,7 @@ void ctx_abrir_fileira(const char *chave, const char *titulo) {
   }
   ctx_fileira(chave, titulo);
   if (fil_estilos(filChave, NULL, NULL, FIL_TIPO_N) < 1) { filChave[0] = 0; return; }
-  doPainel = 0;
+  panel_mode = 0;
   doSocial = 0;
   soFileira = 1;
   doLista = 0;
@@ -597,7 +583,7 @@ static void abrirComum(int indice) {
   fecharAoConfirmar = 0;
   operacao = CTX_OP_NENHUMA; intencao = 0; estadoOperacao = 0;
   espelhoAplicado = 0;
-  operacaoImdb[0] = 0;
+  catalog_item_clear(&operation_title);
   memset(focoAnim, 0, sizeof focoAnim);
   montar();
   infoT = 0.0f; infoH = 0.0f; infoDesenhada = 0;
@@ -607,52 +593,39 @@ static void abrirComum(int indice) {
   if (!doLista && !soFileira) ctxinfo_abrir(itemAtual());
 }
 
-void ctx_abrir_salvo(const CatItem *titulo) {
-  if (holdCancelado) {
-    holdCancelado = 0;
-    holdPronto = 0;
-    return;
-  }
-  if (!titulo || !titulo->imdb[0]) return;
-  filChave[0] = 0;   // o painel de Salvos nao e fileira da home
-  soFileira = 0;
-  copiaPainel = *titulo;
-  // O ID DO TITULO, nunca o do episodio: e o que a lista local, a watchlist e
-  // a conta guardam (salvos.h), e o que o Trakt recebe no DELETE.
-  salvos_id_titulo(titulo->imdb, copiaPainel.imdb, sizeof copiaPainel.imdb);
-  if (!copiaPainel.tipo[0]) snprintf(copiaPainel.tipo, sizeof copiaPainel.tipo, "movie");
-  doPainel = 1;
-  doSocial = 0;
-  doLista = 0;
+void context_menu_open_saved(const CatItem *title) {
+  if (holdCancelado) { holdCancelado = 0; holdPronto = 0; return; }
+  if (!title || !catalog_title_id(title)[0]) return;
+  filChave[0] = 0; soFileira = 0;
+  catalog_item_replace(&panel_title, title);
+  // Existing saved-list consumers use the base title, without an episode suffix.
+  salvos_id_titulo(catalog_title_id(title), panel_title.imdb, sizeof panel_title.imdb);
+  if (!panel_title.tipo[0]) snprintf(panel_title.tipo, sizeof panel_title.tipo, "movie");
+  panel_mode = 1; doSocial = 0; doLista = 0;
   inlineOn = inlinePend; inlinePend = 0;
   abrirComum(-1);
 }
 
-void ctx_abrir_extras(const CatItem *titulo, const CtxExtra *ex, int n) {
-  int k;
+void context_menu_open_extras(const CatItem *title, const CtxExtra *actions, int count) {
+  int index;
   if (holdCancelado) { holdCancelado = 0; holdPronto = 0; return; }
-  if (!titulo || (!titulo->imdb[0] && n < 1)) return;
-  filChave[0] = 0;
-  soFileira = 0;
-  copiaPainel = *titulo;
-  if (copiaPainel.imdb[0]) {
-    salvos_id_titulo(titulo->imdb, copiaPainel.imdb, sizeof copiaPainel.imdb);
-    if (!copiaPainel.tipo[0]) snprintf(copiaPainel.tipo, sizeof copiaPainel.tipo, "movie");
+  if (!title || (!catalog_title_id(title)[0] && count < 1)) return;
+  filChave[0] = 0; soFileira = 0;
+  catalog_item_replace(&panel_title, title);
+  if (catalog_title_id(&panel_title)[0]) {
+    salvos_id_titulo(catalog_title_id(title), panel_title.imdb, sizeof panel_title.imdb);
+    if (!panel_title.tipo[0]) snprintf(panel_title.tipo, sizeof panel_title.tipo, "movie");
   }
   nExtras = 0;
-  for (k = 0; ex && k < n && k < CTX_EXTRAS_MAX; k++) extras[nExtras++] = ex[k];
-  extraPedido = -1;
-  confExtra = -1;
-  pendExtra = -1;
-  doPainel = 1;
-  doSocial = 1;
-  doLista = 0;
+  for (index = 0; actions && index < count && index < CTX_EXTRAS_MAX; index++) extras[nExtras++] = actions[index];
+  extraPedido = -1; confExtra = -1; pendExtra = -1;
+  panel_mode = 1; doSocial = 1; doLista = 0;
   abrirComum(-1);
 }
 
 int ctx_pediu_extra(void) { int v = extraPedido; extraPedido = -1; return v; }
 
-int ctx_do_painel(void) { return aberto && doPainel; }
+int ctx_do_painel(void) { return aberto && panel_mode; }
 void ctx_centro_dica(float cx) { dicaCx = cx; }
 
 int ctx_aberto(void) { return aberto; }
@@ -672,74 +645,59 @@ const char *ctx_pediu_categoria(void) {
   return s;
 }
 
-// O ESPELHO LOCAL DE "ASSISTIDO", separado de quem confirma: com Trakt ele
-// roda depois do 2xx (ctx_atualizar); sem Trakt roda na hora (aplicar), porque
-// nao ha resposta nenhuma a esperar.
-
-// --- ILHA: a confirmacao de assistido / nao assistido (ilhaacao.h) -----------------
-// Desfazer so quando ha inverso de verdade: DESMARCAR e puro (nada some), e
-// MARCAR so quando o titulo nao tinha posicao de retomada — marcar apaga o
-// ponto de retomada local e nas contas, e esse nao volta.
-typedef struct { CatItem ci; int intencao; } AssistidoCtx;
-static CatItem opItem;      // copia do titulo da operacao em curso (o bloco do catalogo troca)
-static int opTinhaRetomada;
-static void desfazerAssistido(const void *p) {
-  const AssistidoCtx *c = p;
-  int volta = !c->intencao;
-  visto_titulo(c->ci.imdb, c->ci.tipo, c->ci.temporadas, c->ci.nTemporadas, volta, visto_destinos());
-  if (trakt_ativo()) trakt_assistido_tipo(c->ci.imdb, c->ci.tipo, volta);
-  cat_historico_definir_id(c->ci.imdb, c->ci.tipo, volta);
+// Confirmed watched actions update the local mirror. With Trakt, wait for its
+// result; without it, apply immediately because no Trakt response is pending.
+// Undo is available for unmarking, and for marking without a lost resume point.
+static int operation_had_resume;
+static void undo_watched(const void *value) {
+  const TitleActionContext *context = value;
+  const CatItem *title = &context->title;
+  const char *id = catalog_title_id(title);
+  const char *tracking_id = catalog_title_imdb_id(title);
+  int restored = !context->intent;
+  visto_titulo(id, title->tipo, title->temporadas, title->nTemporadas, restored, visto_destinos());
+  if (*tracking_id && trakt_ativo()) trakt_assistido_tipo(tracking_id, title->tipo, restored);
+  cat_historico_definir_id(id, title->tipo, restored);
   desc_remontar_fileiras();
 }
-static void anunciarAssistido(int intencao) {
-  static AssistidoCtx c;
-  IlhaAcao a;
-  if (!opItem.imdb[0]) return;
-  c.ci = opItem; c.intencao = intencao;
-  memset(&a, 0, sizeof a);
-  a.icone = intencao ? "check" : "aj_x";
-  a.frase = intencao ? i18n("Marcado como assistido") : i18n("Marcado como não assistido");
-  a.titulo = opItem.titulo; a.thumb = opItem.poster; a.arte = opItem.backdrop;
-  a.tipo = intencao ? ILHA_OK : ILHA_INFO;
-  if (!(intencao && opTinhaRetomada)) { a.desfazer = desfazerAssistido; a.ctx = &c; a.ctxN = sizeof c; }
-  ilhaacao_feita(&a);
+static void announce_watched(int intent) {
+  TitleActionContext context;
+  ActionNotice notice = {0};
+  if (!catalog_title_id(&operation_title)[0]) return;
+  title_action_context_init(&context, &operation_title, intent);
+  notice.icon = intent ? "check" : "aj_x";
+  notice.message = intent ? "Marked as watched" : "Marked as not watched";
+  notice.title = catalog_title_text(&operation_title, TITLE_NAME);
+  notice.thumbnail = catalog_title_text(&operation_title, TITLE_POSTER);
+  notice.artwork = catalog_title_text(&operation_title, TITLE_BACKGROUND);
+  notice.kind = intent ? ILHA_OK : ILHA_INFO;
+  if (!(intent && operation_had_resume)) {
+    notice.undo = undo_watched; notice.context = &context;
+    notice.clone_context = title_action_context_clone;
+    notice.release_context = title_action_context_release;
+  }
+  action_notice_show(&notice);
+  title_action_context_clear(&context);
 }
-static void espelharAssistido(int atual, const CatItem *ci, int intencao) {
-  cat_historico_definir_id(ci->imdb, ci->tipo, intencao);
-  // MARCAR COMO ASSISTIDO APAGA A POSICAO DE RETOMADA.
-  //
-  // cat_historico_definir_id so escreve numa tabela lateral de
-  // historico, e a fileira "Continuar assistindo" nao le dela: ela
-  // le progresso/restanteMin/temporada/episodio do proprio item. Sem
-  // isto o card continuava ali com a barra cheia depois de o titulo
-  // ter sido marcado como visto — o "removo do watch e o card nao
-  // sai" do relato.
-  //
-  // E o MESMO par que "Tirar de Continuar assistindo" faz logo
-  // abaixo, e pelo mesmo motivo: quem terminou nao tem o que
-  // retomar. So na direcao "assistido"; desmarcar nao inventa uma
-  // posicao que ninguem gravou.
-  if (intencao) {
-    char chave[192];
-    prog_chave(chave, sizeof chave, ci->imdb, ci->temporada, ci->episodio);
-    prog_remover(chave);
-    // As mesmas tres fontes de "Tirar de Continuar assistindo": quem
-    // marcou como visto tambem nao quer o card de retomada de volta
-    // no proximo ciclo.
-    trakt_playback_remover(ci->imdb);
-    simkl_playback_remover(ci->imdb);
-    syncprog_remover(chave);
-    // O CARIMBO DE "TIRAR DE CONTINUAR" (#244). Sem ele a proxima passada
-    // readmitia o item pelo /sync/playback que o servidor ainda devolvia (ou
-    // por uma pausa que o DELETE nao alcancou), so sem a barra.
-    prog_marcar_removido(ci->imdb);
-    // E O CARD SAI DA FILEIRA NA HORA (#244): zerar a barra deixava os cards da
-    // obra ali, "marca todos mas nao remove nenhum". Mesma remocao do "Tirar".
-    // Depois de zerar: tirar desloca a janela e `atual` deixaria de valer.
-    cat_zerar_progresso(atual);
-    { char obra[sizeof ci->imdb];   // `ci` aponta para o bloco que a poda desloca
-      snprintf(obra, sizeof obra, "%s", ci->imdb);
-      cat_tirar_continuar(obra); }
+static void mirror_watched(int index, const CatItem *title, int intent) {
+  const char *id = catalog_title_id(title);
+  const char *tracking_id = catalog_title_imdb_id(title);
+  cat_historico_definir_id(id, title->tipo, intent);
+  // Marking watched removes the resume point. Unmarking cannot restore it.
+  // Clear progress before pruning the row, since pruning moves catalog slots.
+  if (intent) {
+    size_t capacity = strlen(id) + 48;
+    char *key = malloc(capacity);
+    if (key) {
+      prog_chave(key, capacity, id, title->temporada, title->episodio);
+      prog_remover(key);
+      syncprog_remover(key);
+      free(key);
+    }
+    if (*tracking_id) { trakt_playback_remover(tracking_id); simkl_playback_remover(tracking_id); }
+    prog_marcar_removido(id);
+    cat_zerar_progresso(index);
+    cat_tirar_continuar(id);
   }
 }
 
@@ -763,40 +721,29 @@ static void aplicarEstilo(void) {
   aberto = 0;
 }
 
-// MARCAR/DESMARCAR NO HISTORICO DA CONTA (o corpo de OP_ASSISTIDO, e tambem o
-// passo de historico do "Ja assisti" da recomendacao: `soMarcar` nunca desmarca).
-static void iniciarAssistido(int atual, const CatItem *ci, int soMarcar) {
-      intencao = soMarcar ? 1 : (historicoDe(ci) == 1 ? 0 : 1);
-      opItem = *ci; opTinhaRetomada = ci->progresso > 0 || ci->restanteMin > 0;
-      snprintf(operacaoImdb, sizeof operacaoImdb, "%s", ci->imdb);
-      operacao = CTX_OP_HISTORICO;
-      opSimkl = 0;
-      avisoOp = NULL;
-      espelhoAplicado = 0;
-      estadoOperacao = CTX_PENDENTE;
-      // SIMKL E CONTA NUVIO, em fio (visto.c), com ou sem Trakt. Antes daqui
-      // so havia o Trakt, e sem ele esta acao era "[trakt] historico recusado:
-      // Trakt desligado" e CTX_FALHA — o "sem o traktv nao ta dando o watched"
-      // do dono. As temporadas vao junto porque desmarcar serie no Simkl sem
-      // elas apagaria a serie da biblioteca de la (ver simkl.c).
-      visto_titulo(ci->imdb, ci->tipo, ci->temporadas, ci->nTemporadas, intencao,
-                   visto_destinos());
-      if (trakt_ativo()) {
-        // O caminho do Trakt NAO MUDOU: mesmo pedido, mesma espera, espelho so
-        // depois do 2xx em ctx_atualizar.
-        if (!trakt_assistido_tipo(ci->imdb, ci->tipo, intencao))
-          estadoOperacao = CTX_FALHA;
-      } else {
-        // SEM TRAKT NAO HA RESPOSTA A ESPERAR (o mesmo raciocinio do "+" na
-        // Lista do Nuvio, acima): o local e a verdade desta TV, aplicado agora,
-        // e a conta o devolve no proximo pull (sync.c aplica os vistos da
-        // conta justamente quando o Trakt esta desligado).
-        espelharAssistido(atual, ci, intencao);
-        estadoOperacao = CTX_CONFIRMADA;
-        espelhoAplicado = 1;
-        desc_remontar_fileiras();
-        anunciarAssistido(intencao);
-      }
+// Mark/unmark history. Recommendation actions can request marking only.
+static void start_watched_action(int index, const CatItem *title, int mark_only) {
+  const char *id, *tracking_id;
+  intencao = mark_only ? 1 : (historicoDe(title) == 1 ? 0 : 1);
+  catalog_item_replace(&operation_title, title);
+  title = &operation_title;
+  operation_had_resume = title->progresso > 0 || title->restanteMin > 0;
+  id = catalog_title_id(title); tracking_id = catalog_title_imdb_id(title);
+  operacao = CTX_OP_HISTORICO;
+  opSimkl = 0; avisoOp = NULL; espelhoAplicado = 0;
+  estadoOperacao = CTX_PENDENTE;
+  // Preserve season information when unmarking a series on linked services.
+  visto_titulo(id, title->tipo, title->temporadas, title->nTemporadas, intencao, visto_destinos());
+  if (*tracking_id && trakt_ativo()) {
+    if (!trakt_assistido_tipo(tracking_id, title->tipo, intencao)) estadoOperacao = CTX_FALHA;
+  } else {
+    // Without a Trakt request, the local update is already confirmed.
+    mirror_watched(index, title, intencao);
+    estadoOperacao = CTX_CONFIRMADA;
+    espelhoAplicado = 1;
+    desc_remontar_fileiras();
+    announce_watched(intencao);
+  }
 }
 
 static void aplicar(void) {
@@ -824,7 +771,7 @@ static void aplicar(void) {
       // "JA ASSISTI": primeiro o historico da conta (so marca). A extra sai
       // quando ele confirma — agora, sem Trakt, ou em ctx_atualizar com o 2xx.
       if (estadoOperacao == CTX_PENDENTE) return;
-      iniciarAssistido(indiceAtual(), ci, 1);
+      start_watched_action(indiceAtual(), ci, 1);
       if (estadoOperacao == CTX_PENDENTE) { pendExtra = k; montar(); return; }
       if (estadoOperacao == CTX_FALHA) { montar(); return; }
     }
@@ -867,9 +814,9 @@ static void aplicar(void) {
       // Primeira vez: a ilha pergunta onde o + salva; o menu sai e o titulo e
       // gravado depois da resposta (ilhasalvar.c).
       if (ilhasalvar_perguntar(ci, intencao)) { aberto = 0; return; }
-      snprintf(operacaoImdb, sizeof operacaoImdb, "%s", ci->imdb);
+      catalog_item_replace(&operation_title, ci);
       operacao = CTX_OP_LISTA;
-      fecharAoConfirmar = doPainel && !intencao;
+      fecharAoConfirmar = panel_mode && !intencao;
       opSimkl = 0;
       avisoOp = NULL;
       espelhoAplicado = 0;
@@ -910,14 +857,14 @@ static void aplicar(void) {
         estadoOperacao = CTX_CONFIRMADA;
         espelhoAplicado = 1;
         cat_definir_na_lista(atual, intencao);
-        cat_definir_na_lista_imdb(operacaoImdb, intencao);
+        cat_definir_na_lista_imdb(catalog_title_id(&operation_title), intencao);
         desc_remontar_fileiras();
         if (fecharAoConfirmar) { aberto = 0; fecharAoConfirmar = 0; }
       }
       montar();
       break;
     case OP_ASSISTIDO:
-      iniciarAssistido(atual, ci, 0);
+      start_watched_action(atual, ci, 0);
       montar();
       break;
     case OP_CATEGORIA:
@@ -974,12 +921,12 @@ static void aplicar(void) {
       simkl_playback_remover(imdb);
       // SEM DESFAZER: o ponto de retomada foi apagado aqui e nas contas, e nao
       // ha como restaura-lo; por isso a confirmacao do menu continua.
-      { IlhaAcao a;
+      { ActionNotice a;
         memset(&a, 0, sizeof a);
-        a.icone = "aj_x"; a.frase = i18n("Removido de Continuar assistindo");
-        a.titulo = tit;
-        a.tipo = ILHA_INFO;
-        ilhaacao_feita(&a); }
+        a.icon = "aj_x"; a.message = "Removed from Continue watching";
+        a.title = tit;
+        a.kind = ILHA_INFO;
+        action_notice_show(&a); }
       aberto = 0;
       pagina = 0;
       break;
@@ -1064,7 +1011,7 @@ void ctx_atualizar(float dt, Uint32 agora) {
   if (holdAtivo && agora - holdDesde >= NV_HOLD_MS) holdPronto = 1;
   if (ajustes_animacoes_reduzidas())
     anim = aberto ? 1.0f : 0.0f;
-  else if (inlineOn && doPainel) {
+  else if (inlineOn && panel_mode) {
     // O ACORDEAO do painel Social/Salvos anda na mola da pilula da ilha
     // (movimento.h), como o resto do painel; o repique fica na folga de 1.0.
     anim = mov_mola_assenta(&animV, anim, aberto ? 1.0f : 0.0f, dt, MOV_PILULA_W, MOV_PILULA_Z);
@@ -1117,10 +1064,10 @@ void ctx_atualizar(float dt, Uint32 agora) {
         if (ci && novo == CTX_CONFIRMADA) {
           if (operacao == CTX_OP_LISTA) {
             cat_definir_na_lista(atual, intencao);
-            cat_definir_na_lista_imdb(operacaoImdb, intencao);
+            cat_definir_na_lista_imdb(catalog_title_id(&operation_title), intencao);
           } else {
-            espelharAssistido(atual, ci, intencao);
-            anunciarAssistido(intencao);
+            mirror_watched(atual, &operation_title, intencao);
+            announce_watched(intencao);
           }
         }
         espelhoAplicado = 1;
@@ -1146,6 +1093,8 @@ void ctx_atualizar(float dt, Uint32 agora) {
       }
     }
   }
+  if (!aberto && anim < 0.001f && infoT < 0.001f && estadoOperacao != CTX_PENDENTE)
+    context_menu_release();
 }
 
 // PONTEIRO (#99): passar por cima de uma opcao a foca (a mesma variavel de
@@ -1592,7 +1541,7 @@ static void desenhaLista(float a) {
 #define IL_PAD    18.0f
 #define IL_PILULA 50.0f
 void ctx_inline_pedir(int on) { inlinePend = on; }
-static int modoInline(void) { return inlineOn && doPainel && !doSocial && !doLista && !soFileira; }
+static int modoInline(void) { return inlineOn && panel_mode && !doSocial && !doLista && !soFileira; }
 float ctx_inline_t(void) { return modoInline() ? (anim < 0.0f ? 0.0f : anim > 1.0f ? 1.0f : anim) : 0.0f; }
 static CtxInfoEstado estInline(const CatItem *ci) {
   CtxInfoEstado e; e.salvo = tituloSalvo(ci); e.visto = historicoDe(ci); return e;
@@ -1732,7 +1681,7 @@ static void ctx_desenharCorpo_(Uint32 agora) {
 
   // O poster acompanha o cartao na home (a mola de foco ainda pode estar
   // andando quando o menu abre): o retangulo e o deste quadro.
-  if (temCartaz && !doPainel && !cartazFixo) {
+  if (temCartaz && !panel_mode && !cartazFixo) {
     HomeItem hi;
     if (home_item_focado(&hi) && hi.indice == idx && hi.rect.w > 8.0f && hi.rect.h > 8.0f)
       cartazRect = ctxDaHome(hi.rect);
@@ -1753,12 +1702,12 @@ static void ctx_desenharCorpo_(Uint32 agora) {
   // Sem cartaz: no meio da tela, ou do painel de Salvos (dicaCx).
   x = -1.0f;
   y = (NV_TELA_H - alt) * 0.5f;
-  if (temCartaz && !doPainel) {
+  if (temCartaz && !panel_mode) {
     x = ctxXCartaz(cartazRect);
     y = cartazRect.y;
   }
   if (x < 0.0f) {
-    float cx = doPainel && dicaCx >= 0.0f ? dicaCx : NV_TELA_W * 0.5f;
+    float cx = panel_mode && dicaCx >= 0.0f ? dicaCx : NV_TELA_W * 0.5f;
     x = cx - CTX_W * 0.5f;
   }
   // A EXTENSAO muda o lugar do menu: os dois juntos ao lado do cartaz (ou no
@@ -1768,7 +1717,7 @@ static void ctx_desenharCorpo_(Uint32 agora) {
   grupoH = alt;
   // O CARTAZ VIRA O CARTAO: com cartaz focado o cartao de informacoes e o
   // proprio cartaz crescido (ctxinfo_cartao_geo) e o menu fica colado a ele.
-  morph = infoOn && temCartaz && !doPainel;
+  morph = infoOn && temCartaz && !panel_mode;
   if (morph) {
     float hAlvo, wCart;
     grande = cartazRect.w > cartazRect.h * 1.2f && cartazRect.w < cartazRect.h * 1.5f;   // so o 4:3 (Destaque)
@@ -1784,8 +1733,8 @@ static void ctx_desenharCorpo_(Uint32 agora) {
     x = cg.menuX; y = cg.cartao.y; grupoH = cg.cartao.h;
   } else
   if (infoOn) {
-    float pedido = doPainel && dicaCx >= 0.0f ? dicaCx : -1.0f;
-    ctxinfo_geometria(temCartaz && !doPainel ? &cartazRect : NULL, x, pedido, CTX_W, &geo);
+    float pedido = panel_mode && dicaCx >= 0.0f ? dicaCx : -1.0f;
+    ctxinfo_geometria(temCartaz && !panel_mode ? &cartazRect : NULL, x, pedido, CTX_W, &geo);
     x = geo.menuX;
     if (geo.infoW > 0.0f) {
       float hAlvo = ctxinfo_altura(ci, &est, geo.infoW);
@@ -1794,7 +1743,7 @@ static void ctx_desenharCorpo_(Uint32 agora) {
       if (infoH < 1.0f || ajustes_animacoes_reduzidas()) infoH = hAlvo;
       else infoH += (hAlvo - infoH) * 0.22f;
       if (infoH > grupoH) grupoH = infoH;
-      if (!(temCartaz && !doPainel)) y = (NV_TELA_H - grupoH) * 0.5f;
+      if (!(temCartaz && !panel_mode)) y = (NV_TELA_H - grupoH) * 0.5f;
     }
   }
   if (y + grupoH > NV_TELA_H - CTX_BORDA) y = NV_TELA_H - CTX_BORDA - grupoH;
@@ -1849,10 +1798,10 @@ static void ctx_desenharCorpo_(Uint32 agora) {
     x -= (float)cg.lado * (1.0f - e) * 40.0f;
     a = anim_clamp((e - 0.35f) / 0.65f, 0.0f, 1.0f);
   } else
-  if (temCartaz && !doPainel && !cartazFixo && cartaoDaHome()) {
+  if (temCartaz && !panel_mode && !cartazFixo && cartaoDaHome()) {
     /* feito */
   } else
-  if (temCartaz && !doPainel && cartazArte[0]) {
+  if (temCartaz && !panel_mode && cartazArte[0]) {
     GLuint t = tex_obter_larg(cartazArte, cartazRect.w * gfx_escala_ui());
     if (t) {
       float raio = ajustes_raio_poster_px() / gfx_escala_ui() / cartazRect.h, teto = 0.5f * cartazRect.w / cartazRect.h;
@@ -1879,7 +1828,7 @@ static void ctx_desenharCorpo_(Uint32 agora) {
   }
 
   // Entra deslizando 16 px a partir do lado do poster, como as folhas do app.
-  if (!morph) x += (1.0f - a) * (temCartaz && !doPainel && x < cartazRect.x ? 16.0f : -16.0f);
+  if (!morph) x += (1.0f - a) * (temCartaz && !panel_mode && x < cartazRect.x ? 16.0f : -16.0f);
   ilhaCtx((GfxRect){ x, y, CTX_W, alt }, CTX_ILHA_RAIO, a);
 
   // CABECALHO: o nome e, embaixo, o que o titulo e ("Serie · 2024 · ...") —
@@ -1937,4 +1886,11 @@ static void ctx_desenharCorpo_(Uint32 agora) {
     }
     linhaCtx(r, ops[i].rot, icone, f, a);
   }
+}
+
+/* Release after the closing animation, or explicitly during app teardown. */
+void context_menu_release(void) {
+  catalog_item_clear(&panel_title);
+  catalog_item_clear(&operation_title);
+  operacao = CTX_OP_NENHUMA;
 }

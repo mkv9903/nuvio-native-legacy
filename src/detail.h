@@ -21,6 +21,8 @@ int  detail_aberto(void);
 void detail_fechar(void);
 // Fecha sem a mola de saida (o player saiu para a home: ilha_minimizar).
 void detail_fechar_seco(void);
+/* Release the held title at teardown; normal close waits for its animation. */
+void details_release(void);
 int  detail_relogio_oculto(void);  // 1 no carrossel de titulos (cartao com vizinhos), ainda sem esticar: a ilha do relogio some
 int  detail_pediu_social(void);   // 1 uma vez: CIMA no alto da pagina pediu o painel de Salvos/Avisos
 int  detail_pediu_menu(void);   // 1 uma vez: ESQUERDA na borda pediu o menu lateral (a pagina NAO fecha; Voltar e quem sai)

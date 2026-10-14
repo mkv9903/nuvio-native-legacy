@@ -21,6 +21,7 @@
 //   4. Ao rolar, a arte de fundo NAO desfoca: ela vai a 15% de opacidade em
 //      0.8s. O desfoque gaussiano era do app da Apple TV.
 #include "detail.h"
+#include "catalog_item.h"
 #include "focoprof.h"
 #include "posterprov.h"
 #include "episodios.h"
@@ -160,13 +161,15 @@ static void heroReiniciar(void);
 static HomeItem item;
 static int  aberto = 0, saindo = 0;
 static int  idx = 0;                 // titulo atual dentro do acervo
-// A IDENTIDADE do titulo aberto, e uma copia dele. Ver revalidarIdx.
-// Do tamanho do CatItem.imdb: com [24] o id de canal ao vivo ("pp-live:...",
-// mais de 23 caracteres) era cortado, revalidarIdx nunca o achava e reinseria a
-// copia da abertura a cada quadro (D1 da 1.7.0: "saiu de 740 para 741"...).
-static char idxImdb[sizeof(((CatItem *)0)->imdb)];
-static CatItem idxCopia;
-static int  idxTemCopia;
+// Keep an owned selection across catalog replacement and the closing animation.
+// Its full provider ID comes from the retained Rust snapshot, without a buffer.
+static CatItem opened_title;
+static int has_opened_title;
+static void hold_opened_title(const CatItem *title) {
+  if (title) { catalog_item_replace(&opened_title, title); has_opened_title = 1; }
+  else { catalog_item_clear(&opened_title); has_opened_title = 0; }
+}
+void details_release(void) { hold_opened_title(NULL); }
 // Ultima revisao do catalogo que esta pagina ja tratou. Ver detail_atualizar.
 static unsigned revistaVista;
 // O tipo (serie ou nao) com que os extras foram pedidos nesta abertura. Item
@@ -1225,15 +1228,10 @@ static void abrirInterno(const HomeItem *it) {
   { int adotou = 0;
     if (!adotou) trailer_fechar(); }
   revistaVista = cat_revisao();
-  // Guarda identidade e copia ANTES de qualquer republicacao. Ver revalidarIdx.
+  // Capture the selected title before a publisher can replace the catalog.
   arteFixa[0] = logoFixo[0] = logoCatalogoFixo[0] = 0;
-  arteFixaPoster = 0;   // arte nova por abertura
-  { const CatItem *ci0 = cat_item(idx);
-    idxImdb[0] = 0; idxTemCopia = 0;
-    if (ci0) {
-      snprintf(idxImdb, sizeof idxImdb, "%s", ci0->imdb);
-      idxCopia = *ci0; idxTemCopia = 1;
-    } }
+  arteFixaPoster = 0;
+  hold_opened_title(cat_item(idx));
   { const CatItem *ci0 = cat_item(idx);
     artehero_logo_sessao_iniciar(ci0); }
   // Nota do Trakt, comentarios e relacionados. Pedido na ABERTURA e nao no
@@ -2667,52 +2665,30 @@ static void sincronizarColunas(void) {
                 ? foco.nColunas[foco.fileira] - 1 : 0;
 }
 
-// O INDICE NAO E ESTAVEL, E ESTA TELA VIVE MINUTOS.
-//
-// `idx` e uma posicao no vetor do catalogo, e cat_definir_tudo TROCA O BLOCO
-// INTEIRO (tres pontos em descoberta.c). Toda republicacao com esta tela aberta
-// fazia o indice apontar para quem passou a ocupar aquela posicao — e o
-// resultado era a pagina de titulo trocando sozinha para outro filme.
-//
-// MEDIDO NO RELATO, e as tres partes dele batem com esta causa: "pisca" e a
-// troca do bloco; "abre um titulo diferente" e o novo ocupante; "primeiro abre
-// algo de Continuar assistindo" porque aqueles itens ocupam as PRIMEIRAS
-// posicoes do catalogo, entao um titulo aberto de la tem indice 0..7, que e
-// justamente a faixa que a republicacao reescreve primeiro. E "depois de alguns
-// minutos parado" e o sync periodico, que roda a cada cinco.
-//
-// O player nao sofria disso porque o sync nao roda com ele aberto — pensaram
-// nele e nao nesta tela. Issue #16.
-//
-// A identidade estavel e o imdb. Quando o titulo some do catalogo (o catalogo
-// novo pode nao trazer a fileira de onde ele veio), a copia guardada na abertura
-// volta por cat_acrescentar: melhor reinseri-lo do que deixar a tela mostrando
-// outra obra.
-static void revalidarIdx(void) {
-  const CatItem *ci;
-  int novo;
-  if (!idxImdb[0]) return;
-  ci = cat_item(idx);
-  if (ci && !strcmp(ci->imdb, idxImdb)) return;      // caso comum: nada mudou
-  novo = cat_indice_por_imdb(idxImdb);
-  if (novo < 0 && idxTemCopia) novo = cat_acrescentar(&idxCopia);
-  if (novo < 0) return;                              // sem para onde ir: fica
-  // O MESMO TITULO NA MESMA POSICAO, so com o id escrito de outro jeito: o
-  // card de serie carrega o episodio ("tt0052520:1:32") e a copia que ficou
-  // nesta posicao nao, ou o contrario. cat_indice_por_imdb casa os dois
-  // (mesmoTitulo) e devolve o proprio idx — nao houve remontagem nenhuma.
-  // Antes, o strcmp acima falhava em TODO quadro e a linha abaixo saia 20 a
-  // 40 vezes por segundo: no D1, 3400 linhas a cada 5 min (ids 15821..15897,
-  // "tt20285780 saiu de 0 para 0"; 15747, "475 para 475"), o que enchia os
-  // 200 KB do registro e apagava todo o resto do log. O id guardado NAO e
-  // trocado pelo da tela: entre o cat_item acima e a busca pode ter caido uma
-  // republicacao, e adotar o id lido ali seria adotar outro titulo.
-  if (novo == idx) return;
-  printf("[detail] catalogo remontou: %s saiu de %d para %d\n",
-         idxImdb, idx, novo);
+// A catalog index can change while Details stays open. Re-resolve using the
+// complete held identity, and reinsert the held selection if its row vanished.
+// A series resume ID and its base title may resolve to the same position;
+// avoid logging or replacing the selection in that common case.
+static void revalidate_title_index(void) {
+  const CatItem *current;
+  const char *id = catalog_title_id(&opened_title);
+  int next;
+  if (!id[0]) return;
+  current = cat_item(idx);
+  if (current && !strcmp(catalog_title_id(current), id)) return;
+  next = cat_indice_por_imdb(id);
+  if (next < 0 && has_opened_title) next = cat_acrescentar(&opened_title);
+  if (next < 0 || next == idx) return;
+  printf("[details] catalog replaced: selected title moved from %d to %d\n", idx, next);
   fflush(stdout);
-  idx = novo;
+  idx = next;
 }
+
+#ifdef NV_NATIVE_UI_TEST
+void details_test_hold(const CatItem *title, int index) { hold_opened_title(title); idx = index; }
+int details_test_revalidate(void) { revalidate_title_index(); return idx; }
+const CatItem *details_test_selection(void) { return has_opened_title ? &opened_title : NULL; }
+#endif
 
 // O foco esta numa fileira da PRIMEIRA tela? Na serie, temporadas e episodios
 // ficam no heroi (mockup "detalhe-retomar"): a pagina fica no topo, com a arte.
@@ -2741,7 +2717,7 @@ void detail_atualizar(float dt, Uint32 agora) {
     if (alvo < 0.0f) alvo = 0.0f;
     colListaScroll = anim_mola2(&colListaVel, colListaScroll, alvo, dt, NV_MOLA2_SCROLL);
   }
-  revalidarIdx();
+  revalidate_title_index();
   trocaarte_atualizar(dt);
   // OK NA TELA DE ESCOLHA: a arte congelada na abertura (arteFixa/logoFixo)
   // e justamente a que a pessoa acabou de trocar. Solta e pede de novo — com a
@@ -2995,8 +2971,8 @@ void detail_atualizar(float dt, Uint32 agora) {
     // O fio do TMDB pode trocar ou limpar o logo no catalogo enquanto o detalhe
     // mostra logoFixo; ao voltar, o hero lia o catalogo novo (vazio ou FALHOU)
     // e caia no nome escrito. Restaura o caminho que funcionou na abertura.
-    if (logoCatalogoFixo[0] && idxImdb[0]) {
-      int i = cat_indice_por_imdb(idxImdb);
+    if (logoCatalogoFixo[0] && catalog_title_id(&opened_title)[0]) {
+      int i = cat_indice_por_imdb(catalog_title_id(&opened_title));
       if (i >= 0) {
         const CatItem *c = cat_item(i);
         int ruim = !c || !c->logo[0];
@@ -3005,13 +2981,17 @@ void detail_atualizar(float dt, Uint32 agora) {
           ruim = !u || tex_falhou(u);
         }
         if (ruim && c) {
-          CatItem e = *c;
+          CatItem e;
+          catalog_item_copy(&e, c);
           snprintf(e.logo, sizeof e.logo, "%s", logoCatalogoFixo);
           cat_atualizar_item(i, &e);
+          catalog_item_clear(&e);
         }
       }
     }
-    aberto = 0; saindo = 0; t = 0.0f; carro = 0; trailer_fechar(); return;
+    aberto = 0; saindo = 0; t = 0.0f; carro = 0; trailer_fechar();
+    details_release();
+    return;
   }
 
   // SEGURAR OK SEM RESPOSTA NA TELA (dono, 06/10): na home o cartao ganha a

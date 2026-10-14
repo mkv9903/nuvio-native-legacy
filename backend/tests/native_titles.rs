@@ -20,6 +20,25 @@ extern "C" {
     fn native_title_current() -> *const c_void;
     fn native_title_frame();
     fn native_title_find(id: *const c_char) -> i32;
+    fn native_title_details_hold(item: *const c_void);
+    fn native_title_details_revalidate() -> i32;
+    fn native_title_details_selection() -> *const c_void;
+    fn native_title_details_release();
+    fn native_title_player_hold(item: *const c_void);
+    fn native_title_player_selection() -> *const c_void;
+    fn native_title_player_release();
+    fn native_title_open_saved_menu(item: *const c_void);
+    fn native_title_menu_selection() -> *const c_void;
+    fn native_title_menu_release();
+    fn native_title_set_channel(item: *const c_void);
+    fn native_title_channel_id() -> *const c_char;
+    fn native_title_queue_undo(item: *const c_void, intent: i32, clone_failure: i32);
+    fn native_title_undo_id() -> *const c_char;
+    fn native_title_undo_intent() -> i32;
+    fn native_title_undo_executions() -> i32;
+    fn native_title_reset_undo();
+    fn action_notice_has_undo() -> i32;
+    fn action_notice_button(button: i32);
 }
 fn snapshot(id: &str, poster: &str) -> Arc<TitleSnapshot> {
     let title = CatalogTitle::from_meta(
@@ -132,4 +151,133 @@ fn in_place_metadata_updates_retire_borrowed_native_text_until_the_next_frame() 
         native_title_frame();
         native_title_frame();
     }
+}
+
+#[test]
+fn details_and_playback_selections_retain_full_identity_when_catalogs_change() {
+    let id = format!("provider:{}", "same-prefix".repeat(500));
+    let title = snapshot(&id, "poster");
+    let weak = Arc::downgrade(&title);
+    unsafe {
+        let source = native_title_create(Arc::into_raw(title).cast());
+        native_title_details_hold(source);
+        native_title_player_hold(source);
+        native_title_destroy(source);
+        let other = native_title_create(Arc::into_raw(snapshot("other", "poster")).cast());
+        native_title_publish(other);
+        native_title_destroy(other);
+        native_title_frame();
+        assert_eq!(native_title_details_revalidate(), 1);
+        assert_eq!(get(native_title_details_selection(), TitleField::Id), id);
+        assert_eq!(get(native_title_player_selection(), TitleField::Id), id);
+        // The reinserted selection is a separate catalog owner.
+        native_title_details_release();
+        native_title_player_release();
+        assert!(weak.upgrade().is_some());
+        native_title_publish(std::ptr::null());
+        native_title_publish(std::ptr::null());
+        native_title_frame();
+        native_title_frame();
+    }
+    assert!(
+        weak.upgrade().is_none(),
+        "held UI selections leaked a title"
+    );
+}
+
+#[test]
+fn undo_owns_the_original_title_until_execution_and_runs_only_once() {
+    let id = format!("kitsu:{}", "complete-id".repeat(500));
+    let title = snapshot(&id, "poster");
+    let weak = Arc::downgrade(&title);
+    unsafe {
+        native_title_reset_undo();
+        let source = native_title_create(Arc::into_raw(title).cast());
+        native_title_queue_undo(source, 1, 0);
+        native_title_destroy(source);
+        native_title_frame();
+        native_title_frame();
+        assert_eq!(action_notice_has_undo(), 1);
+        assert!(weak.upgrade().is_some());
+        // Closing with OK preserves the action for reopening its island notice.
+        action_notice_button(2);
+        assert_eq!(action_notice_has_undo(), 1);
+        action_notice_button(1);
+        assert_eq!(CStr::from_ptr(native_title_undo_id()).to_str().unwrap(), id);
+        assert_eq!(native_title_undo_intent(), 1);
+        assert_eq!(native_title_undo_executions(), 1);
+        action_notice_button(1);
+        assert_eq!(native_title_undo_executions(), 1);
+        assert_eq!(action_notice_has_undo(), 0);
+        native_title_reset_undo();
+    }
+    assert!(weak.upgrade().is_none(), "executed undo leaked its title");
+}
+
+#[test]
+fn replacing_or_cancelling_undo_releases_its_title_and_clone_failure_offers_no_undo() {
+    let first = snapshot("first", "poster");
+    let first_weak = Arc::downgrade(&first);
+    let second = snapshot("second", "poster");
+    let second_weak = Arc::downgrade(&second);
+    unsafe {
+        native_title_reset_undo();
+        let source = native_title_create(Arc::into_raw(first).cast());
+        native_title_queue_undo(source, 1, 0);
+        native_title_destroy(source);
+        let next = native_title_create(Arc::into_raw(second).cast());
+        native_title_queue_undo(next, 0, 0);
+        native_title_destroy(next);
+        assert!(first_weak.upgrade().is_none());
+        assert!(second_weak.upgrade().is_some());
+        native_title_reset_undo();
+        assert!(second_weak.upgrade().is_none());
+        let failed = snapshot("failed", "poster");
+        let failed_weak = Arc::downgrade(&failed);
+        let source = native_title_create(Arc::into_raw(failed).cast());
+        native_title_queue_undo(source, 1, 1);
+        native_title_destroy(source);
+        assert_eq!(action_notice_has_undo(), 0);
+        action_notice_button(1);
+        assert_eq!(native_title_undo_executions(), 0);
+        assert!(failed_weak.upgrade().is_none());
+        native_title_reset_undo();
+    }
+}
+
+#[test]
+fn actual_saved_menu_and_live_channel_keep_independent_complete_selections() {
+    let id = format!("kitsu:{}", "full-saved-id".repeat(400));
+    let title = snapshot(&id, "poster");
+    let weak = Arc::downgrade(&title);
+    unsafe {
+        native_title_publish(std::ptr::null());
+        native_title_publish(std::ptr::null());
+        native_title_frame();
+        let source = native_title_create(Arc::into_raw(title).cast());
+        native_title_open_saved_menu(source);
+        native_title_set_channel(source);
+        native_title_destroy(source);
+        assert_eq!(get(native_title_menu_selection(), TitleField::Id), id);
+        assert_eq!(
+            CStr::from_ptr(native_title_channel_id()).to_str().unwrap(),
+            id
+        );
+        // Reopening for another title releases only the menu's previous owner.
+        let next = native_title_create(Arc::into_raw(snapshot("kitsu:next", "poster")).cast());
+        native_title_open_saved_menu(next);
+        native_title_destroy(next);
+        assert_eq!(
+            get(native_title_menu_selection(), TitleField::Id),
+            "kitsu:next"
+        );
+        assert!(weak.upgrade().is_some());
+        native_title_menu_release();
+        native_title_player_release();
+        assert_eq!(CStr::from_ptr(native_title_channel_id()).to_bytes(), b"");
+    }
+    assert!(
+        weak.upgrade().is_none(),
+        "menu/channel selection leaked its owner"
+    );
 }

@@ -304,10 +304,10 @@ int main(int argc, char **argv) {
   item.backdrop[0] = 0;
   limpar();
   // 8. Acao sem Desfazer (Tirar de Continuar): so "Ok".
-  { IlhaAcao a;
+  { ActionNotice a;
     memset(&a, 0, sizeof a);
-    a.icone = "aj_x"; a.frase = "Removido de Continuar assistindo"; a.titulo = item.titulo;
-    a.thumb = item.poster; a.tipo = ILHA_INFO;
+    a.icon = "aj_x"; a.message = "Removido de Continuar assistindo"; a.title = item.titulo;
+    a.thumbnail = item.poster; a.kind = ILHA_INFO;
     ilhaacao_feita(&a); }
   quadros(90);
   tecla(SDLK_s);

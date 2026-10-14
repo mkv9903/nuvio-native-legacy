@@ -42,6 +42,7 @@
 #include "anim.h"
 #include "layout.h"
 #include "catalogo.h"
+#include "catalog_item.h"
 #include "artehero.h"
 #include "logotitulo.h"
 #include "corviva.h"
@@ -320,17 +321,10 @@ static double puloDestino(double fim) { return fim > 0.0 ? fim + .25 : duracaoSe
 
 static char linhaEp[220];          // "T1, E1 · <sinopse curta>", montada na abertura
 
-// CANAL DE TV (tipo "channel"/"tv"): sem progresso a gravar, sem episodio a
-// seguir, sem fim — e com o GUIA como menu de contexto (BAIXO/azul abrem o
-// overlay, CH+/- trocam de canal).
-//
-// O item fica CONGELADO na abertura, nao relido do catalogo a cada chamada: a
-// descoberta republica o vetor de itens inteiro por fileira (cat_definir_tudo)
-// DURANTE a reproducao, e a troca faz `idx` apontar para outro titulo — o
-// canal no ar virava "nao-canal", o Baixo voltava a so acordar a interface e
-// o overlay nunca abria. CatItem e so arrays, a copia e segura.
-static int     canalSessao;
-static CatItem itemCanal;
+// Hold live-channel metadata while catalog publishers replace their rows.
+// Channel playback has no resume record or next episode; Down/blue opens EPG.
+static int is_channel_session;
+static CatItem channel_title;
 // MINI-PLAYER (PiP): o canal saiu da tela cheia mas segue no ar num canto.
 // `querMini` e o pedido do CH+/- feito dentro do PiP: so ele mantem a
 // miniatura na troca de canal — OK num canal (guia, home) volta a tela cheia.
@@ -342,69 +336,53 @@ static int     mini, querMini;
 // pipeline e o mesmo, so o retangulo muda. O PiP de canto continua existindo
 // fora do guia (canal aberto pela home).
 static int     miniGuia;
-// O TITULO ABERTO E UMA COPIA, NAO UM INDICE.
-//
-// `idx` e uma posicao no catalogo, e o catalogo e REPUBLICADO durante a sessao
-// — sync da conta, remontagem da descoberta, colecoes chegando. Depois de uma
-// republicacao a mesma posicao aponta para OUTRO titulo, e tudo que lia
-// cat_item(idx) passava a falar dele: a arte e o nome na tela de carregamento,
-// o alvo da busca de fontes, e ate a GRAVACAO DE PROGRESSO (que ia para o
-// titulo errado). O relato do @rawldon foi o sintoma visivel: ao trocar de
-// fonte, a tela de carregamento piscava a arte de um titulo visto antes —
-// porque player_abrir reabria pelo indice velho.
-//
-// O canal ja tinha exatamente esta protecao (itemCanal / player_marcar_canal),
-// pelo mesmo motivo. Agora TODO titulo e copiado na abertura e e a copia que
-// vale; o indice e re-resolvido pelo IMDb quando alguem precisa dele (ver
-// idxAtual).
-static CatItem itemFixo; static int temFixo;
+// Playback owns its title independently of catalog indices. Retained playback
+// keeps this reference until its native media session is finally discarded.
+static CatItem playback_title;
+static int has_playback_title;
+static void hold_playback_title(const CatItem *title) {
+  if (title) { catalog_item_replace(&playback_title, title); has_playback_title = 1; }
+  else { catalog_item_clear(&playback_title); has_playback_title = 0; }
+}
+static void release_playback_titles(void) {
+  hold_playback_title(NULL);
+  catalog_item_clear(&channel_title);
+  is_channel_session = 0;
+}
+#ifdef NV_NATIVE_UI_TEST
+void player_test_hold_title(const CatItem *title) { hold_playback_title(title); }
+const CatItem *player_test_selection(void) { return has_playback_title ? &playback_title : NULL; }
+#endif
 static const CatItem *item(void) {
-  if (canalSessao) return &itemCanal;
-  if (temFixo) return &itemFixo;
+  if (is_channel_session) return &channel_title;
+  if (has_playback_title) return &playback_title;
   return cat_item(idx);
 }
-// O indice CORRENTE do titulo aberto: re-resolvido pelo IMDb, porque o que foi
-// guardado em `idx` pode ter sido deslocado por uma republicacao. Cai em `idx`
-// so sem IMDb (ou com o player fechado). #151: fica na copia de sempre
-// enquanto ela for o mesmo titulo — a primeira copia pelo IMDb costuma ser o
-// card do CW, que nao tem a lista de episodios.
-//
-// #190 (Owlphibia29, "Attack on Titan trocado por Knights of Guinevere na tela
-// de pausa e no menu de episodios"): o fio de "Continuar assistindo"
-// (cat_trocar_continuar) refaz a fileira COM O PLAYER ABERTO — o log dela
-// mostra "continuar assistindo refeita" logo depois do loadCompleted — e isso
-// reordena os primeiros itens e desliza o resto. A tela de pausa, a folha de
-// episodios e o cartao A seguir recebiam o `idx` cru e liam o vizinho.
-//
-// `idxVivo` guarda a ultima resolucao, para a busca partir dela e nao do
-// indice da abertura. E quando o titulo SAIU do catalogo (a fileira de onde
-// ele veio nao voltou), a copia da abertura entra de novo por cat_acrescentar,
-// a mesma saida de detail.c (revalidarIdx). Devolver `idx` nesse caso era
-// devolver outro titulo.
-static int idxVivo = -1;
-static int idxAtual(void) {
-  if (temFixo && itemFixo.imdb[0]) {
-    int i = cat_indice_titulo(itemFixo.imdb, idxVivo >= 0 ? idxVivo : idx);
-    if (i < 0 && (aberto || mini) && !canalSessao && cat_n() > 0) {
-      i = cat_acrescentar(&itemFixo);
+// Resolve the held title against the latest catalog, preferring its episode
+// record. If its row vanished during playback, restore the held selection.
+static int live_title_index = -1;
+static int playback_title_index(void) {
+  if (has_playback_title && catalog_title_id(&playback_title)[0]) {
+    int i = cat_indice_titulo(catalog_title_id(&playback_title), live_title_index >= 0 ? live_title_index : idx);
+    if (i < 0 && (aberto || mini) && !is_channel_session && cat_n() > 0) {
+      i = cat_acrescentar(&playback_title);
       if (i >= 0) {
-        printf("[player] %s saiu do catalogo com o player aberto: copia da abertura de volta em %d\n",
-               itemFixo.imdb, i);
+        printf("[player] held title restored to catalog at %d\n", i);
         fflush(stdout);
       }
     }
     if (i >= 0) {
-      if (idxVivo >= 0 && i != idxVivo) {
-        printf("[player] catalogo remontou: %s saiu de %d para %d\n", itemFixo.imdb, idxVivo, i);
+      if (live_title_index >= 0 && i != live_title_index) {
+        printf("[player] catalog replaced: selected title moved from %d to %d\n", live_title_index, i);
         fflush(stdout);
       }
-      idxVivo = i;
+      live_title_index = i;
       return i;
     }
   }
   return idx;
 }
-static int ehCanal(void) { return canalSessao; }
+static int ehCanal(void) { return is_channel_session; }
 // Source codec badge for the current DTS track, including unsupported audio.
 // Native playback status is reported separately in the island and information.
 static int marcaDtsAtual(void) {
@@ -434,7 +412,7 @@ static const char *textoAudioAtual(void) {
   }
   return txt;
 }
-const char *player_id_canal(void) { return canalSessao ? itemCanal.imdb : ""; }
+const char *player_channel_id(void) { return is_channel_session ? catalog_title_id(&channel_title) : ""; }
 
 // Programa do canal no ar: a XMLTV (epgIdx) ou, num canal Xtream que nao
 // casou nela, a grade curta do painel (#158). xtepg_passo aqui porque o guia,
@@ -447,13 +425,12 @@ static int pAgora(int epgIdx, time_t t, EpgProg *p) {
   xtepg_passo();
   return xtepg_agora(id, t, p);
 }
-// Marcacao deterministica para quem JA SABE que e canal (o guia): cobre a
-// janela em que uma republicacao cai entre o cat_acrescentar e o player_abrir
-// — o item no indice ja pode ser outro quando player_abrir le.
-void player_marcar_canal(const CatItem *it) {
-  if (!it) return;
-  canalSessao = 1;
-  itemCanal = *it;
+// The guide supplies an owned channel selection when publication could replace
+// its catalog index before playback opens.
+void player_set_channel_title(const CatItem *title) {
+  if (!title) return;
+  is_channel_session = 1;
+  catalog_item_replace(&channel_title, title);
 }
 // "38 min" / "1 h 5 min" do catalogo -> segundos (0 = nao deu para ler). So
 // serve de ESCALA para o marcador de um episodio vizinho (credfonte.h).
@@ -514,7 +491,7 @@ static int retomadaAplicada, retomarPct;
 // REPETIDAS de player_definir_episodio — uma delas dispara quando o nome do
 // episodio chega tarde (player_atualizar) e reatribuiria retomarPct.
 static int semRetomada;
-int player_indice(void) { return idxAtual(); }
+int player_indice(void) { return playback_title_index(); }
 const char *player_linha_episodio(void) { return linhaEp; }
 int  player_pediu_guia(void) { int v = pedGuia; pedGuia = 0; return v; }
 int  player_pediu_guia_cheio(void) { int v = pedGuiaCheio; pedGuiaCheio = 0; return v; }
@@ -546,7 +523,7 @@ int player_pediu_proximo(int *t,int *e) {
 }
 const CatEp *player_proximo_episodio(void) {
   const CatEp *melhor=NULL;
-  int ix=idxAtual(),n=cat_n_episodios(ix);
+  int ix=playback_title_index(),n=cat_n_episodios(ix);
   for(int i=0;i<n;i++) {
     const CatEp *p=cat_episodio(ix,i);if(!p)continue;
     if(p->temporada<epT||(p->temporada==epT&&p->episodio<=epE))continue;
@@ -633,9 +610,9 @@ void player_definir_episodio(int t, int e) {
   const CatItem *c = item();
   epT = t; epE = e; linhaEp[0] = 0;
   retomarPct = 0;
-  // !canalSessao: canal nao tem retomada, e se o indice ja foi remapeado o
+  // !is_channel_session: canal nao tem retomada, e se o indice ja foi remapeado o
   // "progresso" lido ali seria de outro titulo qualquer.
-  if (c && !canalSessao && !semRetomada && c->progresso > 0 && c->progresso < ajustes_cw_concluido() &&
+  if (c && !is_channel_session && !semRetomada && c->progresso > 0 && c->progresso < ajustes_cw_concluido() &&
       (strcmp(c->tipo,"series") || (t==c->temporada && e==c->episodio))) retomarPct=c->progresso;
   // FILME TAMBEM PEDE MARCADOR, e ate agora nao pedia: esta linha desligava o
   // modulo e voltava. Fazia sentido enquanto a fonte era o api.introdb.app, que
@@ -673,7 +650,7 @@ void player_definir_episodio(int t, int e) {
   // chega (player_atualizar), entao "sempre" seria a cada quadro.
   if (c->imdb[0]) {
     char alvo[64];
-    cat_id_stream(idxAtual(), epT, epE, alvo, sizeof alvo);
+    cat_id_stream(playback_title_index(), epT, epE, alvo, sizeof alvo);
     if (!abrindoSessao && stream_n() > 0 && !stream_lista_do_alvo(alvo))
       stream_invalidar("episode changed");
   }
@@ -682,7 +659,7 @@ void player_definir_episodio(int t, int e) {
   snprintf(linhaEp, sizeof linhaEp, i18n("T%dE%d"), epT, epE);
   if (epT == c->temporada && epE == c->episodio && c->nomeEpisodio[0])
     snprintf(linhaEp, sizeof linhaEp, i18n("T%dE%d · %s"), epT, epE, c->nomeEpisodio);
-  for (int ix = idxAtual(), i = 0; i < cat_n_episodios(ix); i++) {
+  for (int ix = playback_title_index(), i = 0; i < cat_n_episodios(ix); i++) {
     const CatEp *ep = cat_episodio(ix, i);
     if (ep && ep->temporada == epT && ep->episodio == epE) {
       snprintf(linhaEp, sizeof linhaEp, i18n("T%dE%d · %s"), epT, epE, ep->nome);
@@ -692,7 +669,7 @@ void player_definir_episodio(int t, int e) {
   if(idx!=introIdx||epT!=introT||epE!=introE){
     introIdx=idx;introT=epT;introE=epE;
     { double dA=0,dP=0;
-      for(int ix=idxAtual(),i=0;i<cat_n_episodios(ix);i++){
+      for(int ix=playback_title_index(),i=0;i<cat_n_episodios(ix);i++){
         const CatEp *ep=cat_episodio(ix,i);
         if(!ep||ep->temporada!=epT)continue;
         if(ep->episodio==epE-1)dA=duracaoTexto(ep->duracao);
@@ -1170,7 +1147,7 @@ void player_abrir(int indiceCatalogo, const char *url) {
   int ficaMini = querMini; querMini = 0;
   int n = cat_n(); if (n < 1) n = 1;
   idx = ((indiceCatalogo % n) + n) % n;
-  idxVivo = idx;
+  live_title_index = idx;
   aberto = 1; saindo = 0; pediuSair = 0; barraFoco = 0;
   // Titulo novo: um avanco em curso do anterior mandaria a posicao velha ao
   // pipeline novo assim que o silencio vencesse.
@@ -1183,24 +1160,24 @@ void player_abrir(int indiceCatalogo, const char *url) {
   // Canal ao vivo nao tem classificacao por titulo: o id "cs:channel:..." nao
   // existe na base parental e o pedido so gastaria uma requisicao.
   { const CatItem *ci = cat_item(idx);
-    // A COPIA e feita AQUI, no unico instante em que o indice e sabidamente o
-    // do titulo pedido. Ver item().
-    if (ci) { itemFixo = *ci; temFixo = 1; } else temFixo = 0;
-    artehero_logo_sessao_iniciar(temFixo ? &itemFixo : NULL);
-    canalSessao = ci && (!strcmp(ci->tipo, "channel") || !strcmp(ci->tipo, "tv"));
-    if (canalSessao) itemCanal = *ci;
+    // Retain while the catalog index still identifies the requested title.
+    hold_playback_title(ci);
+    artehero_logo_sessao_iniciar(has_playback_title ? &playback_title : NULL);
+    is_channel_session = ci && (!strcmp(ci->tipo, "channel") || !strcmp(ci->tipo, "tv"));
+    if (is_channel_session) catalog_item_replace(&channel_title, ci);
+    else catalog_item_clear(&channel_title);
     // So o CH+/- feito dentro do PiP (player_manter_mini) mantem a miniatura
     // na troca — o stream velho segue no ar ate a fonte nova chegar pelo
     // fluxo de sempre. Qualquer outra abertura (OK no guia, filme, serie)
     // volta a tela cheia e para o video do canto.
-    if (ficaMini && canalSessao) { mini = 1; aberto = 0; }
+    if (ficaMini && is_channel_session) { mini = 1; aberto = 0; }
     else if (mini || ficaMini) { mini = 0; miniGuia = 0; video_parar(); }
     else miniGuia = 0;
     janAtiva = 0;
-    if (ci && ci->imdb[0] && !canalSessao && ajustes_classif_player()) parental_pedir(ci->imdb);
+    if (ci && ci->imdb[0] && !is_channel_session && ajustes_classif_player()) parental_pedir(ci->imdb);
     // A grade EPG comeca a baixar ja: o banner "agora/a seguir" do OSD e o
     // overlay do guia dependem dela. Idempotente.
-    if (canalSessao) { guia_carregar(); epg_iniciar(); } }
+    if (is_channel_session) { guia_carregar(); epg_iniciar(); } }
   tocando = 1; retomandoSalto = 0; visivel = 1; anim = 0.0f; entrada = 0.0f; soBarra = 0; cheio = 1.0f; fileira = 1.0f;
   pedFontes = erroFonte = pedFaixas = pedProxT = pedProxE = 0; inicioImagem = 0;
   abrindoExp = 0; abrindoT = 0.0f; abrindoDesde = 0;
@@ -1395,7 +1372,7 @@ static void alvoStream(char *dst, unsigned tam) {
   const CatItem *c = item();
   dst[0] = 0;
   if (!c || !c->imdb[0]) return;
-  if (epT > 0 && epE > 0) cat_id_stream(idxAtual(), epT, epE, dst, tam);
+  if (epT > 0 && epE > 0) cat_id_stream(playback_title_index(), epT, epE, dst, tam);
   else snprintf(dst, tam, "%s", c->imdb);
 }
 
@@ -1502,7 +1479,7 @@ static void fecharSessao(int manter) {
     float pos = concluiu ? duracaoSeg : posSeg;
     // Pelo indice CORRENTE do titulo, nao pelo guardado: depois de uma
     // republicacao o guardado grava o progresso no titulo errado.
-    int ia = idxAtual();
+    int ia = playback_title_index();
     const CatItem *ci = item();
     home_registrar_retorno(ia, pos, duracaoSeg);
     ilhacart_player_saiu(ia, pos, duracaoSeg, epT, epE);
@@ -1593,6 +1570,7 @@ static void fecharSessao(int manter) {
   // corrido — o aviso simplesmente nao entraria, sem nada no log dizendo por
   // que. Ver a nota no desenho da guia parental.
   inicioImagem = 0; pgDesde = 0;
+  if (!manter) release_playback_titles();
 }
 
 void player_encerrar(void) {
@@ -1615,7 +1593,7 @@ static int podeReter(void) {
          comVideo && !ehCanal() && c && c->imdb[0] && !erroFonte &&
          video_pronto() && video_ativo() && !video_falhou() && !video_terminou() &&
          !video_conflito_recurso() && !video_reconectando() && video_url_atual()[0] &&
-         duracaoSeg >= 120.0f && home_retorno_vale(idxAtual(), posSeg, duracaoSeg) &&
+         duracaoSeg >= 120.0f && home_retorno_vale(playback_title_index(), posSeg, duracaoSeg) &&
          !concluiuAgora(credEfetivo());
 }
 
@@ -1674,7 +1652,7 @@ int player_retomar_retido(const char *imdb, int t, int e) {
   Uint32 agora = SDL_GetTicks();
   player_validar_retido(agora);
   if (!retido) return 0;
-  if (!imdb || strcmp(imdb, itemFixo.imdb) || t != epT || e != epE) {
+  if (!imdb || strcmp(imdb, catalog_title_id(&playback_title)) || t != epT || e != epE) {
     player_descartar_retido(); return 0;
   }
   retido = 0; retidoVoo = 0; aberto = 1; saindo = pediuSair = 0;
@@ -1725,7 +1703,7 @@ static PlrRect miniDestino(void) {
   return o;
 }
 
-int  player_minimizavel(void) { return canalSessao && comVideo; }
+int  player_minimizavel(void) { return is_channel_session && comVideo; }
 int  player_mini_ativo(void)  { return mini; }
 void player_manter_mini(void) { querMini = 1; }
 
@@ -1871,7 +1849,7 @@ void player_mini_desenhar(Uint32 agora) {
       gfx_cor((GfxRect){ x + 12.0f, yc - 4.0f, 8.0f, 8.0f }, 0.5f, 1, 1, 1, 1.0f);
       txt_tracking(TXT_MINI, av, 255, 255, 255, x + 28.0f, yc - (float)l.h * 0.5f, 1.0f, 1.3f);
       x += w + 12.0f; }
-    snprintf(rot, sizeof rot, "%s", itemCanal.titulo[0] ? itemCanal.titulo : i18n("Canal"));
+    snprintf(rot, sizeof rot, "%s", channel_title.titulo[0] ? channel_title.titulo : i18n("Canal"));
     if (pAgora(epgIdx, time(NULL), &ag)) {
       size_t u = strlen(rot);
       snprintf(rot + u, sizeof rot - u, " \xc2\xb7 %s", ag.titulo);
@@ -1972,7 +1950,7 @@ int player_regra_concluiu(double posSeg, double durSeg, double cred) {
 // hora: a lista de episodios pode chegar depois da abertura (#151).
 static double duracaoCatalogo(void) {
   if (epT <= 0) return 0.0;
-  for (int ix = idxAtual(), i = 0; i < cat_n_episodios(ix); i++) {
+  for (int ix = playback_title_index(), i = 0; i < cat_n_episodios(ix); i++) {
     const CatEp *ep = cat_episodio(ix, i);
     if (ep && ep->temporada == epT && ep->episodio == epE) return duracaoTexto(ep->duracao);
   }
@@ -2009,7 +1987,7 @@ static int ofertaProximo(void) {
   if(!p&&epT>0&&duracaoSeg>1&&duracaoSeg-posSeg<=PLR_CRED_PISO_S&&!semProxAvisado){
     semProxAvisado=1;
     printf("[posplay] sem proximo episodio depois de T%dE%d: lista com %d episodios%s\n",
-           epT,epE,cat_n_episodios(idxAtual()),desc_episodios_carregando(idxAtual())?" (ainda carregando)":"");
+           epT,epE,cat_n_episodios(playback_title_index()),desc_episodios_carregando(playback_title_index())?" (ainda carregando)":"");
     fflush(stdout);
   }
   if(!p||duracaoSeg<=1)return 0;
@@ -2198,19 +2176,19 @@ static void avMontarOsd(AoVivoOsd *o) {
   int ids[AV_B_N], i, n = avBotoes(ids), w = video_largura(), h = video_altura();
   const char *id = player_id_canal();
   memset(o, 0, sizeof *o);
-  o->nome = itemCanal.titulo;
-  o->logo = itemCanal.poster;
-  o->desc = itemCanal.sinopse;
+  o->nome = channel_title.titulo;
+  o->logo = channel_title.poster;
+  o->desc = channel_title.sinopse;
   cat[0] = 0;
   guia_info_canal(id, &o->numero, &o->total, cat, sizeof cat);
   if (!cat[0]) {
     // Sem lista de guia: a categoria vem no genero do item ("Canal · Esportes").
-    const char *sep = strstr(itemCanal.genero, " \xc2\xb7 ");
+    const char *sep = strstr(channel_title.genero, " \xc2\xb7 ");
     if (sep) snprintf(cat, sizeof cat, "%s", sep + 3);
   }
   o->categoria = cat;
   if (epgIdx == -1 && epg_estado() == EPG_PRONTO) {
-    epgIdx = epg_match(itemCanal.titulo);
+    epgIdx = epg_match(channel_title.titulo);
     if (epgIdx < 0) epgIdx = -2;
   }
   if (id[0] && xtream_e_id(id)) { xtepg_querer(id); xtepg_passo(); }
@@ -2534,8 +2512,8 @@ void player_evento(const SDL_Event *e) {
         // Canal nao tem episodio nem "relacionados": o mesmo lugar vira a
         // porta do guia, que e a lista de escolha dele.
         if (ehCanal()) pedGuia = 1;
-        else if (epT > 0) episodios_abrir(idxAtual(), epT, epE);
-        else posplay_abrir_relacionados(idxAtual());
+        else if (epT > 0) episodios_abrir(playback_title_index(), epT, epE);
+        else posplay_abrir_relacionados(playback_title_index());
         break;
       default:          pedFaixas = 1;     break;   // 1 = coluna do audio
     }
@@ -2840,7 +2818,7 @@ void player_atualizar(float dt, Uint32 agora) {
     const CatItem *ci = item();
     if (epsPedidoRev != cat_revisao()) { epsPedidoRev = cat_revisao(); epsPedidoDe[0] = 0; }
     if (!ehCanal() && epT > 0 && ci && ci->imdb[0] && strcmp(epsPedidoDe, ci->imdb)) {
-      int ix = idxAtual();
+      int ix = playback_title_index();
       if (cat_n_episodios(ix) > 0) {
         snprintf(epsPedidoDe, sizeof epsPedidoDe, "%s", ci->imdb);
       } else if (!desc_episodios_carregando(ix)) {
@@ -2861,7 +2839,7 @@ void player_atualizar(float dt, Uint32 agora) {
     // 90% em ~1h42 de exibicao e abriria o painel de relacionados no meio da
     // programacao.
     if (!ehCanal())
-      posplay_atualizar(dt, agora, posSeg, duracaoSeg, eSerie, idxAtual(),
+      posplay_atualizar(dt, agora, posSeg, duracaoSeg, eSerie, playback_title_index(),
                         eSerie && ofertaProximo()); }
   // Com o painel no ar os controles nao somem: eles sao a saida do dono.
   if (posplay_visivel()) ultimoInput = agora;
@@ -2893,7 +2871,7 @@ void player_atualizar(float dt, Uint32 agora) {
                    !player_carregando() &&
                    !episodios_aberto() && !stream_folha_aberta() &&
                    !faixas_aberta() && !ofertaProximo() && !posplay_visivel(),
-                   idxAtual(), item() ? item()->imdb : "", linhaEp);
+                   playback_title_index(), item() ? item()->imdb : "", linhaEp);
   // Com o painel de pe os controles SAEM de cena. Este ponto ja foi das duas
   // formas: com os controles visiveis o dono achou pior e pediu de volta o
   // comportamento original, com o painel ocupando o rodape sozinho, so que
@@ -3907,7 +3885,7 @@ void player_desenhar(Uint32 agora) {
     static char lin[200];
     PlrIlhaPedido pd;
     memset(&pd, 0, sizeof pd);
-    if (itemCanal.titulo[0]) snprintf(lin, sizeof lin, "%s \xc2\xb7 %s", itemCanal.titulo, i18n("Sintonizando…"));
+    if (channel_title.titulo[0]) snprintf(lin, sizeof lin, "%s \xc2\xb7 %s", channel_title.titulo, i18n("Sintonizando…"));
     else snprintf(lin, sizeof lin, "%s", i18n("Sintonizando…"));
     pd.texto = lin; pd.respira = 1; pd.semFim = 1; pd.aberta = 1;
     plrilha_pedir(&pd);
@@ -3939,7 +3917,7 @@ void player_desenhar(Uint32 agora) {
   if (erroFonte && ehCanal()) {
     // Cartao no estilo do ao vivo: a marca do canal e a causa (provedor, conta)
     // que o app ja calculou em erroTitulo/erroDica.
-    aovivo_erro_desenhar(itemCanal.titulo, itemCanal.poster, erroTitulo, erroDica, entrada);
+    aovivo_erro_desenhar(channel_title.titulo, channel_title.poster, erroTitulo, erroDica, entrada);
   } else if (erroFonte) {
     // A FONTE NAO ABRIU: a ilha do canto vira o MODAL (o mesmo das
     // confirmacoes), com o motivo real e as duas saidas que o proprio texto
@@ -4260,9 +4238,9 @@ static void desenharOsdCorpo(Uint32 agora, float a, float ac, const CatItem *c) 
   // ("T1E3 · The Head", o codigo em negrito e o nome apagado) ou, num filme,
   // a meta do catalogo com pontos entre os campos.
   { float yBase = yBarra - 36.0f;
-    const char *marca = (!canalSessao && c) ? artehero_logo_sessao(c) : NULL;
+    const char *marca = (!is_channel_session && c) ? artehero_logo_sessao(c) : NULL;
     GLuint logo = marca ? tex_obter_larg_qualquer(marca, 480) : 0;
-    if (!canalSessao && linhaEp[0]) {
+    if (!is_channel_session && linhaEp[0]) {
       const char *sep = strstr(linhaEp, " \xc2\xb7 ");
       char cod[64];
       size_t nc = sep ? (size_t)(sep - linhaEp) : strlen(linhaEp);
@@ -4275,7 +4253,7 @@ static void desenharOsdCorpo(Uint32 agora, float a, float ac, const CatItem *c) 
         txt_desenhar_alpha(l1, cx, yBase, ac);
         if (sep) txt_desenhar_alpha(l2, cx + l1.w + 8.0f, yBase, ac);
         yBase -= 16.0f; }
-    } else if (!canalSessao && c && c->meta[0]) {
+    } else if (!is_channel_session && c && c->meta[0]) {
       // "2026 · 2h 37min · Aventura": os campos do catalogo separados por um
       // ponto de 4 px a 40%, 21/400 a 66%.
       char m[sizeof c->meta];
@@ -4306,7 +4284,7 @@ static void desenharOsdCorpo(Uint32 agora, float a, float ac, const CatItem *c) 
       gfx_rect((GfxRect){ cx, yBase - h, w, h }, logo,
                tex_marca_escura(marca) ? GFX_MARCA : GFX_TEXTO, 0, 0, 0, 0, .95f, .95f, .97f, ac);
     } else {
-      const char *nome = canalSessao ? itemCanal.titulo : (c ? c->titulo : "");
+      const char *nome = is_channel_session ? channel_title.titulo : (c ? c->titulo : "");
       if (nome && nome[0]) {
         TxtLinha lt = txt_linha_corta(TXT_PLR_TITULO, nome, 255, 255, 255, 255, cw * 0.62f);
         txt_desenhar_alpha(lt, cx, yBase - (float)lt.h, ac);

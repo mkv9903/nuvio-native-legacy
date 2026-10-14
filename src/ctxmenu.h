@@ -25,6 +25,8 @@ void ctx_abrir(int indice);
 int  ctx_aberto(void);
 void ctx_evento(const SDL_Event *e);
 void ctx_atualizar(float dt, Uint32 agora);
+/* Drop retained title owners after the exit animation or at app shutdown. */
+void context_menu_release(void);
 void ctx_desenhar(Uint32 agora);
 // O CARTAO DE INFORMACOES no ultimo quadro desenhado (o cartaz crescido, ou a
 // ilha de informacoes quando nao ha cartaz): 1 e as caixas (tela virtual) do
@@ -42,7 +44,8 @@ const CatItem *ctx_titulo(void);
 // Salvos" (o mesmo OP_LISTA do cartaz: lista local + Trakt ou Simkl +
 // espelho), "Mover para categoria" e, quando da, "Marcar como assistido". O
 // toque na linha abre o titulo, como antes.
-void ctx_abrir_salvo(const CatItem *titulo);
+void context_menu_open_saved(const CatItem *title);
+#define ctx_abrir_salvo context_menu_open_saved
 // O MESMO MENU NAS ABAS ATIVIDADE E AMIGOS do painel (modo social). Com IMDb
 // sao as acoes do titulo do modo painel (sem "Mover para categoria") e, por
 // ultimo, as `extras` da linha; sem IMDb (a linha de um amigo: `titulo` e o
@@ -63,7 +66,8 @@ typedef struct {
   // (serie fora do catalogo, sem IMDb) ela e so a propria extra.
   int juntaAssistido;
 } CtxExtra;
-void ctx_abrir_extras(const CatItem *titulo, const CtxExtra *extras, int n);
+void context_menu_open_extras(const CatItem *title, const CtxExtra *extras, int count);
+#define ctx_abrir_extras context_menu_open_extras
 int  ctx_pediu_extra(void);
 // A LINHA EXPANDIDA DO PAINEL DE SALVOS (dono, 06/10): o menu da lista de Salvos
 // nao flutua — a linha em foco se abre DENTRO do painel (acordeao). ctx_inline_t

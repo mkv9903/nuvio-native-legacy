@@ -70,6 +70,8 @@
 #include "avisos.h"
 #include "ilha.h"
 #include "ilhasalvar.h"
+#include "action_notice.h"
+#include "catalog_item.h"
 #include "plrilha.h"
 #include "ilhacart.h"
 #include "cwretido.h"
@@ -202,14 +204,16 @@ static int autoParcialPronto(void) {
 // instante ainda nao tem a lista de episodios nem o "proximo" que
 // continuar_desenhar calculou para desenhar o card.
 static int cwTocarT, cwTocarE;
-// O MESMO OK num card cujo episodio TERMINOU e cuja lista de episodios ainda
-// nao chegou: a pagina abre e o toque fica esperando a lista para achar o
-// proximo, em vez de recomecar o terminado. `cwEsperaItem` e uma copia: a
-// fileira pode ser refeita enquanto a lista chega.
-static int cwEspera;
-static CatItem cwEsperaItem;
-static Uint32 cwEsperaDesde;
-#define CW_ESPERA_MS 15000u
+// A completed Continue Watching episode can wait for its episode list.
+// Hold the selected title while publishers rebuild rows underneath Details.
+static int awaiting_next_episode;
+static CatItem next_episode_title;
+static Uint32 next_episode_started;
+#define NEXT_EPISODE_WAIT_MS 15000u
+static void cancel_next_episode_wait(void) {
+  awaiting_next_episode = 0;
+  catalog_item_clear(&next_episode_title);
+}
 static pthread_t fioFonte;
 static int fioFonteVivo;                  // 0 = canal escolheu sem o fio
 static _Atomic int fonteEscolhida = -2;   // release/acquire entre verificacao e UI
@@ -2756,7 +2760,7 @@ void app_atualizar(float dt, Uint32 agora) {
         // O mesmo caminho do OK no card de "Continuar assistindo" com "OK no
         // card" = Retomar: a pagina abre e a reproducao e pedida junto, no
         // episodio que o cartao mostrava (cwTocarT/E, issue #93).
-        cwTocarT = cwTocarE = 0; cwEspera = 0;
+        cwTocarT = cwTocarE = 0; cancel_next_episode_wait();
         if (o == ILHA_PEDIU_TOCAR && ic.serie && ic.t > 0 && ic.e > 0) { cwTocarT = ic.t; cwTocarE = ic.e; }
         abrirPorIndice(idx);
         if (o == ILHA_PEDIU_TOCAR) detail_pedir_reproduzir();
@@ -2954,17 +2958,15 @@ void app_atualizar(float dt, Uint32 agora) {
         const CatItem *cw = cat_item(it.indice);
         int tocar = 1;
         cwTocarT = cwTocarE = 0;
-        cwEspera = 0;
+        cancel_next_episode_wait();
         if (cw && !strcmp(cw->tipo, "series")) {
           cwTocarT = cw->temporada; cwTocarE = cw->episodio;
-          // EPISODIO TERMINADO NUNCA TOCA DE NOVO DO COMECO. O card ja anuncia
-          // o proximo quando a lista existe; sem lista (a copia do card nao
-          // tem), a pagina abre e o toque espera a lista (cwEsperarProximo).
-          // Sem proximo — fim da serie, ou o seguinte ainda nao foi ao ar —,
-          // so a pagina abre.
+          // A completed episode must not restart. Use the next episode when
+          // its list is available; otherwise retain the selection and wait.
+          // If the series ended or its next episode is unreleased, open Details.
           if (cw->progresso >= ajustes_cw_concluido() && cw->temporada > 0 &&
               cw->episodio > 0) {
-            int k = cat_indice_titulo(cw->imdb, it.indice);
+            int k = cat_indice_titulo(catalog_title_id(cw), it.indice);
             ProxSugestao prox;
             tocar = 0;
             cwTocarT = cwTocarE = 0;
@@ -2975,12 +2977,12 @@ void app_atualizar(float dt, Uint32 agora) {
                 cwTocarT = prox.temporada; cwTocarE = prox.episodio;
                 tocar = 1;
               } else
-                printf("[cw] %s terminado e sem proximo: abrindo so a pagina\n", cw->imdb);
+                printf("[continue-watching] no next episode; opening Details\n");
             } else {
-              cwEsperaItem = *cw;
-              cwEsperaDesde = SDL_GetTicks();
-              cwEspera = 1;
-              printf("[cw] %s terminado, lista a caminho: o toque espera o proximo\n", cw->imdb);
+              catalog_item_replace(&next_episode_title, cw);
+              next_episode_started = SDL_GetTicks();
+              awaiting_next_episode = 1;
+              printf("[continue-watching] waiting for the next episode list\n");
             }
           }
         }
@@ -3002,25 +3004,24 @@ void app_atualizar(float dt, Uint32 agora) {
     }
   }
 
-  // A ESPERA DO PROXIMO (cwEspera, acima). Pagina fechada, player aberto ou
-  // prazo vencido desistem: a pagina fica aberta e nada toca.
-  if (cwEspera) {
+  // Stop waiting if Details closes, playback starts or the existing timeout
+  // expires. Read the owned selection before releasing it on success.
+  if (awaiting_next_episode) {
     if (!detail_aberto() || player_aberto() ||
-        SDL_GetTicks() - cwEsperaDesde > CW_ESPERA_MS) {
-      printf("[cw] %s: lista nao chegou a tempo; fica so a pagina\n", cwEsperaItem.imdb);
-      cwEspera = 0; cwTocarT = cwTocarE = 0;
+        SDL_GetTicks() - next_episode_started > NEXT_EPISODE_WAIT_MS) {
+      printf("[continue-watching] episode wait ended; leaving Details open\n");
+      cancel_next_episode_wait(); cwTocarT = cwTocarE = 0;
     } else {
-      int k = cat_indice_titulo(cwEsperaItem.imdb, detail_indice());
+      int k = cat_indice_titulo(catalog_title_id(&next_episode_title), detail_indice());
       if (k >= 0 && cat_n_episodios(k) > 0) {
-        ProxSugestao prox;
-        cwEspera = 0; cwTocarT = cwTocarE = 0;
-        if (prox_seguinte(&cwEsperaItem, cat_episodio(k, 0), cat_n_episodios(k),
-                          ajustes_cw_concluido(),
-                          (long long)time(NULL) * 1000LL, &prox)) {
-          cwTocarT = prox.temporada; cwTocarE = prox.episodio;
+        ProxSugestao next;
+        cwTocarT = cwTocarE = 0;
+        if (prox_seguinte(&next_episode_title, cat_episodio(k, 0), cat_n_episodios(k),
+                          ajustes_cw_concluido(), (long long)time(NULL) * 1000LL, &next)) {
+          cwTocarT = next.temporada; cwTocarE = next.episodio;
           detail_pedir_reproduzir();
-        } else
-          printf("[cw] %s terminado e sem proximo: abrindo so a pagina\n", cwEsperaItem.imdb);
+        } else printf("[continue-watching] no next episode; leaving Details open\n");
+        cancel_next_episode_wait();
       }
     }
   }
@@ -4341,6 +4342,11 @@ void app_encerrar(void) {
   aguardandoFonte = 0;
   player_encerrar();
   legsync_destruir();   // F05: join dos fios do AutoSync, depois do player
+  details_release();
+  context_menu_release();
+  save_notice_release();
+  cancel_next_episode_wait();
+  action_notice_clear();
   video_encerrar();    // solta o nome LS2 antes do processo sumir (deploy mata sem aviso)
   ajustes_encerrar();
   diagnostico_encerrar();
