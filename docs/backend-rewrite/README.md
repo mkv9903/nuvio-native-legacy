@@ -153,3 +153,10 @@ disposable preview startup, plus webOS ARM compilation, soft-float/glibc 2.12
 checks and matching runtime/full/debug build IDs. Build-only artifacts are
 archived under `build/backend/webos/checkpoints/ddc25bb9`. No new IPK was made;
 the canonical earlier package/runtime/symbol set was restored and hash-verified.
+
+The complete native scene restoration checkpoint at `c7198054` passes 184
+backend tests, 21 native Rust/C tests, Linux compilation and disposable preview
+startup. Its webOS ARM build passes soft-float ABI and glibc 2.12 checks, with
+matching runtime/full/debug build IDs. Build-only files and hashes are archived
+under `build/backend/webos/checkpoints/c7198054`. No IPK or TV handoff was made;
+the earlier canonical package/runtime/symbol set was restored and hash-verified.

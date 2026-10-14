@@ -72,3 +72,9 @@ still cover its current runtime behavior. Connecting this Rust store and removin
 those binary-cache routines is part of the active catalog milestone, followed
 by context-scoped catalog scheduling/publication. No manual TV/Linux handoff is
 requested for this checkpoint.
+
+The build-only checkpoint at `c7198054` also passes webOS ARM compilation,
+soft-float ABI, imported glibc maximum 2.12 and matching executable/debug build
+IDs. Its artifacts and hashes are archived separately. The existing canonical
+IPK and matching runtime/symbol files were restored and verified byte-for-byte;
+this compatibility build was not installed or tested on the TV.
