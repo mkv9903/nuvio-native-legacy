@@ -26,6 +26,28 @@ const char *native_title_text(const CatItem *item, unsigned field) { return cata
 void native_title_overlay_poster(CatItem *item, const char *poster) {
   snprintf(item->poster, sizeof item->poster, "%s", poster);
 }
+int64_t native_title_projection_value(const CatItem *item, unsigned field) {
+  switch (field) {
+    case 0: return item->progresso; case 1: return item->temporada;
+    case 2: return item->episodio; case 3: return item->restanteMin;
+    case 4: return item->retomadoMs; case 5: return item->naLista;
+    case 6: return item->naColecao; case 7: return item->nElenco;
+    case 8: return item->nTemporadas;
+    default: return -1;
+  }
+}
+const char *native_title_cast_projection(const CatItem *item, size_t index, unsigned field) {
+  if (!item || index >= (size_t)item->nElenco) return "";
+  switch (field) {
+    case 0: return item->elenco[index].nome;
+    case 1: return item->elenco[index].papel;
+    case 2: return item->elenco[index].foto;
+    default: return "";
+  }
+}
+int native_title_season_projection(const CatItem *item, size_t index) {
+  return item && index < (size_t)item->nTemporadas ? item->temporadas[index] : -1;
+}
 void native_title_publish(const CatItem *item) { cat_definir_tudo(item, item ? 1 : 0, NULL, 0); }
 void native_title_update(const CatItem *item) { cat_atualizar_item(0, item); }
 const CatItem *native_title_current(void) { return cat_n() ? cat_item(0) : NULL; }

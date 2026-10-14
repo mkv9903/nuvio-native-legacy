@@ -42,9 +42,32 @@ writes; concurrent independent handles; private permissions, hashed names and
 redacted diagnostics; symlink-safe recovery; legacy exclusion and selective
 cleanup.
 
-This is the tested model/storage layer. It is **not yet connected** to the C
-application's assembled-scene cache. The legacy binary reader/writer remains
-until worker/title/row ownership and native rehydration are ready. Its C tests
+`SceneSnapshot` now restores this JSON into immutable Rust title and row owners.
+Rows retain their complete keys, configured provider URLs, catalog IDs, encoded
+extra requests and explicit loading/empty states. Retained title or row readers
+outlive the scene without leaking its other records. Native title records keep
+all artwork variants, cast/person IDs, commercial providers, display metadata,
+resume fields, seasons and membership flags. Native text projections sanitize
+display NULs and stop at UTF-8 boundaries. Full request identities and complete
+arrays remain in Rust; the transitional C display arrays retain their existing
+quotas until their consumers adapt.
+
+Six additional Rust tests verify complete native restoration and final-owner
+release, configured/encoded row requests, distinct empty/loading state, invalid
+windows, safe out-of-range queries, UTF-8 projection, cancellation after native
+construction and rejection of original/discarded storage and foreign app roots.
+An additional Rust-driven C test verifies the actual restored title projections,
+including cast/season display quotas, retained complete data and final release.
+The checkpoint passes 184 backend tests and 21 native integration tests.
+
+Storage is private to this new Rust Test app. There are no legacy readers,
+converters, original-app directory searches or compatibility fallbacks in the
+Rust scene restore path. Only versioned Rust JSON belonging to this rewrite is
+eligible for restoration.
+
+This layer is **not yet connected** to the C application's assembled-scene
+cache. Native capture of remaining C enrichment and runtime cache wiring are
+still pending. The legacy binary reader/writer remains until that switch. Its C tests
 still cover its current runtime behavior. Connecting this Rust store and removing
 those binary-cache routines is part of the active catalog milestone, followed
 by context-scoped catalog scheduling/publication. No manual TV/Linux handoff is

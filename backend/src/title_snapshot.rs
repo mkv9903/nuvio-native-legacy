@@ -1,6 +1,7 @@
 //! Immutable, complete title data retained by native readers independently.
 use crate::{
     addons::ADDON_RESPONSE_LIMIT,
+    catalog_scene::SceneTitle,
     catalog_titles::{normalized_rating, CatalogTitle},
     error::{Error, Result},
 };
@@ -25,16 +26,72 @@ pub enum TitleField {
     Description,
     Country,
     Origin,
+    CatalogBackground,
+    TmdbBackground,
+    TraktBackground,
+    LogoLanguage,
+    LogoLanguageUrl,
+    Classification,
+    Director,
+    SubscriptionName,
+    SubscriptionLogo,
+    RentalName,
+    RentalLogo,
+    PurchaseName,
+    PurchaseLogo,
+    EpisodeName,
+}
+/// Read-only scalar projection; the complete scene record remains Rust-owned.
+#[repr(C)]
+pub struct TitleInfo {
+    pub percentage: u32,
+    pub season: u32,
+    pub episode: u32,
+    pub remaining_minutes: u32,
+    pub last_watched_ms: i64,
+    pub on_watchlist: i32,
+    pub in_collection: i32,
+    pub cast_count: usize,
+    pub season_count: usize,
 }
 pub struct TitleSnapshot {
-    pub title: CatalogTitle,
-    pub origin: String,
-    native: [CString; 12],
+    pub record: SceneTitle,
+    native: [CString; 26],
+    cast: Vec<[CString; 3]>,
+    info: TitleInfo,
 }
 impl TitleSnapshot {
     pub fn new(title: CatalogTitle, origin: String) -> Self {
-        let genre = title.genre_text();
-        let metadata = title.metadata_text();
+        let mut record = SceneTitle::from(title);
+        record.origin = origin;
+        Self::from_scene(record)
+    }
+    pub fn from_scene(record: SceneTitle) -> Self {
+        let title = &record.metadata;
+        let genre = record
+            .display
+            .genre_text
+            .clone()
+            .unwrap_or_else(|| title.genre_text());
+        let metadata = record
+            .display
+            .metadata_text
+            .clone()
+            .unwrap_or_else(|| title.metadata_text());
+        let provider = |value: &Option<crate::catalog_scene::CommercialProvider>| {
+            value
+                .as_ref()
+                .map(|provider| [provider.name.clone(), provider.logo.clone()])
+                .unwrap_or_default()
+        };
+        let subscription = provider(&record.availability.subscription);
+        let rental = provider(&record.availability.rental);
+        let purchase = provider(&record.availability.purchase);
+        let catalog_background = if record.artwork.catalog_background.is_empty() {
+            title.background.as_str()
+        } else {
+            record.artwork.catalog_background.as_str()
+        };
         let values = [
             title.id.as_str(),
             title.imdb_id.as_deref().unwrap_or(""),
@@ -47,14 +104,51 @@ impl TitleSnapshot {
             metadata.as_str(),
             title.description.as_str(),
             title.country.as_str(),
-            origin.as_str(),
+            record.origin.as_str(),
+            catalog_background,
+            record.artwork.tmdb_background.as_str(),
+            record.artwork.trakt_background.as_str(),
+            record.artwork.logo_language.as_str(),
+            record.artwork.logo_language_url.as_str(),
+            record.display.classification.as_str(),
+            record.display.director.as_str(),
+            subscription[0].as_str(),
+            subscription[1].as_str(),
+            rental[0].as_str(),
+            rental[1].as_str(),
+            purchase[0].as_str(),
+            purchase[1].as_str(),
+            record.resume.episode_name.as_str(),
         ];
-        let native =
-            values.map(|value| CString::new(value.replace('\0', " ")).expect("display title text"));
+        let native = values.map(native_text);
+        let cast = record
+            .cast
+            .iter()
+            .map(|member| {
+                [
+                    member.name.as_str(),
+                    member.role.as_str(),
+                    member.photo.as_str(),
+                ]
+                .map(native_text)
+            })
+            .collect();
+        let info = TitleInfo {
+            percentage: record.resume.percentage.into(),
+            season: record.resume.season,
+            episode: record.resume.episode,
+            remaining_minutes: record.resume.remaining_minutes,
+            last_watched_ms: record.resume.last_watched_ms,
+            on_watchlist: record.on_watchlist.into(),
+            in_collection: record.in_collection.into(),
+            cast_count: record.cast.len(),
+            season_count: record.seasons.len(),
+        };
         Self {
-            title,
-            origin,
+            record,
             native,
+            cast,
+            info,
         }
     }
     fn text(&self, field: u32) -> &CStr {
@@ -63,6 +157,9 @@ impl TitleSnapshot {
             .map(CString::as_c_str)
             .unwrap_or(c"")
     }
+}
+pub(crate) fn native_text(value: &str) -> CString {
+    CString::new(value.replace('\0', " ")).expect("native display text")
 }
 pub fn native_title(title: CatalogTitle, origin: String) -> *const TitleSnapshot {
     Arc::into_raw(Arc::new(TitleSnapshot::new(title, origin)))
@@ -153,12 +250,15 @@ pub unsafe extern "C" fn nuvio_title_copy_text(
     output: *mut c_char,
     capacity: usize,
 ) {
-    if output.is_null() || capacity == 0 {
-        return;
-    }
     let value = unsafe { title.as_ref() }
         .map(|title| title.text(field).to_bytes())
         .unwrap_or_default();
+    unsafe { copy_projection(value, output, capacity) };
+}
+unsafe fn copy_projection(value: &[u8], output: *mut c_char, capacity: usize) {
+    if output.is_null() || capacity == 0 {
+        return;
+    }
     let mut length = value.len().min(capacity - 1);
     while length > 0 && value.get(length).is_some_and(|byte| byte & 0xc0 == 0x80) {
         length -= 1;
@@ -171,7 +271,7 @@ pub unsafe extern "C" fn nuvio_title_copy_text(
 #[no_mangle]
 pub unsafe extern "C" fn nuvio_title_rating(title: *const TitleSnapshot) -> i32 {
     unsafe { title.as_ref() }
-        .and_then(|title| title.title.rating)
+        .and_then(|title| title.record.metadata.rating)
         .map(|rating| nuvio_title_rating_value(rating))
         .unwrap_or(0)
 }
@@ -186,6 +286,57 @@ pub extern "C" fn nuvio_title_rating_value(value: f64) -> i32 {
 #[no_mangle]
 pub unsafe extern "C" fn nuvio_title_tmdb_id(title: *const TitleSnapshot) -> u64 {
     unsafe { title.as_ref() }
-        .and_then(|title| title.title.tmdb_id)
+        .and_then(|title| title.record.metadata.tmdb_id)
+        .unwrap_or(0)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn nuvio_title_info(title: *const TitleSnapshot) -> *const TitleInfo {
+    unsafe { title.as_ref() }
+        .map(|title| &title.info as *const _)
+        .unwrap_or(ptr::null())
+}
+#[no_mangle]
+pub unsafe extern "C" fn nuvio_title_cast_text(
+    title: *const TitleSnapshot,
+    index: usize,
+    field: u32,
+) -> *const c_char {
+    unsafe { title.as_ref() }
+        .and_then(|title| title.cast.get(index))
+        .and_then(|member| member.get(field as usize))
+        .map(|value| value.as_ptr())
+        .unwrap_or(c"".as_ptr())
+}
+#[no_mangle]
+pub unsafe extern "C" fn nuvio_title_cast_tmdb_id(
+    title: *const TitleSnapshot,
+    index: usize,
+) -> u64 {
+    unsafe { title.as_ref() }
+        .and_then(|title| title.record.cast.get(index))
+        .and_then(|member| member.tmdb_id)
+        .unwrap_or(0)
+}
+#[no_mangle]
+pub unsafe extern "C" fn nuvio_title_copy_cast_text(
+    title: *const TitleSnapshot,
+    index: usize,
+    field: u32,
+    output: *mut c_char,
+    capacity: usize,
+) {
+    let value = unsafe { title.as_ref() }
+        .and_then(|title| title.cast.get(index))
+        .and_then(|member| member.get(field as usize))
+        .map(|value| value.as_bytes())
+        .unwrap_or_default();
+    unsafe { copy_projection(value, output, capacity) };
+}
+#[no_mangle]
+pub unsafe extern "C" fn nuvio_title_season(title: *const TitleSnapshot, index: usize) -> u32 {
+    unsafe { title.as_ref() }
+        .and_then(|title| title.record.seasons.get(index))
+        .copied()
         .unwrap_or(0)
 }

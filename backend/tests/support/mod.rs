@@ -1,4 +1,5 @@
 #![allow(dead_code)]
+pub mod scene;
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use nuvio_backend::{
     account::{AccountBackend, Clock},

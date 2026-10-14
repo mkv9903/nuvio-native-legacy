@@ -19,6 +19,9 @@ No implementation from either discarded rewrite is carried into this branch.
 - Use fresh versioned Rust JSON for each rewritten area. Restore only this
   rewrite's own data. Do not import C files or discarded standalone files;
   this replaces the earlier migration decision.
+  The user reaffirmed this rule: installation is treated as a new app, with
+  storage private to `space.mkv.nuvio.rusttest`. Do not add compatibility readers,
+  converters, production-directory searches or old-format fallback paths.
 - Write all new Rust code, tests, logs, comments, documentation and filenames in
   English. Translate complete C UI components when touched; translate only the
   affected UI component in a large mixed file. C backend areas awaiting
@@ -67,8 +70,8 @@ owner and otherwise wait/retry rather than using the signed-in member's ID.
 
 The Rust account domain, HTTP client, worker, native boundary, platform helper,
 Home ordering, addon networking/storage, edit merging and the native addon
-boundary, provider loading, complete catalog title models and scene storage pass 178 tests.
-Twenty additional Rust driver tests cover the retained C account/addon screens,
+boundary, provider loading, complete catalog title models and scene storage pass 184 tests.
+Twenty-one additional Rust driver tests cover the retained C account/addon screens,
 view layouts, Home-order frame publication and actual source/subtitle workers
 under Xvfb. The five relevant C reference groups passed
 before their test cases moved to Rust. See [test coverage](test-coverage.md).
@@ -135,8 +138,9 @@ until the session is discarded; normal closure releases it after progress work.
 
 Complete Home scenes now have a tested Rust model and private Serde JSON store,
 covering artwork/cast/resume/seasons/availability and full provider values.
-Native rehydration, remaining worker ownership and application cache wiring are
-still pending. See [scene cache](scene-cache.md).
+Native restoration now retains complete titles/rows and projects existing C
+display fields. Capture of remaining C enrichment, remaining consumer ownership
+and application cache wiring are still pending. See [scene cache](scene-cache.md).
 
 Home assembly and Continue Watching's transitional title handoffs now retain
 and release their Rust owners, including cancelled rounds, late results,

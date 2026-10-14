@@ -1,6 +1,8 @@
 #![cfg(feature = "native-ui-tests")]
+mod support;
 use nuvio_backend::{
     catalog_titles::CatalogTitle,
+    scene_snapshot::SceneSnapshot,
     title_snapshot::{TitleField, TitleSnapshot},
 };
 use serde_json::json;
@@ -15,6 +17,10 @@ extern "C" {
     fn native_title_destroy(item: *mut c_void);
     fn native_title_text(item: *const c_void, field: u32) -> *const c_char;
     fn native_title_overlay_poster(item: *mut c_void, poster: *const c_char);
+    fn native_title_projection_value(item: *const c_void, field: u32) -> i64;
+    fn native_title_cast_projection(item: *const c_void, index: usize, field: u32)
+        -> *const c_char;
+    fn native_title_season_projection(item: *const c_void, index: usize) -> i32;
     fn native_title_publish(item: *const c_void);
     fn native_title_update(item: *const c_void);
     fn native_title_current() -> *const c_void;
@@ -52,6 +58,64 @@ extern "C" {
     fn native_title_compact_enrichment(rejected: *const c_void, kept: *const c_void)
         -> *mut c_void;
     fn native_title_filter_progress(finished: *const c_void, kept: *const c_void) -> *mut c_void;
+}
+
+#[test]
+fn restored_scene_projects_all_existing_c_fields_while_retaining_complete_rust_records() {
+    let expected = support::scene::complete_scene();
+    let scene = SceneSnapshot::new(expected.clone()).unwrap();
+    let weak = Arc::downgrade(&scene.titles[0]);
+    unsafe {
+        let item = native_title_create(Arc::into_raw(scene.titles[0].clone()).cast());
+        drop(scene);
+        assert!(!item.is_null());
+        for (field, expected) in [
+            (TitleField::CatalogBackground, "https://art.invalid/catalog"),
+            (TitleField::TmdbBackground, "https://art.invalid/tmdb"),
+            (TitleField::TraktBackground, "https://art.invalid/trakt"),
+            (TitleField::LogoLanguage, "en"),
+            (TitleField::LogoLanguageUrl, "https://art.invalid/logo"),
+            (TitleField::Classification, "TV-14"),
+            (TitleField::SubscriptionName, "Subscription"),
+            (TitleField::SubscriptionLogo, "subscription-logo"),
+            (TitleField::RentalName, "Rental"),
+            (TitleField::RentalLogo, "rental-logo"),
+            (TitleField::PurchaseName, "Purchase"),
+            (TitleField::PurchaseLogo, "purchase-logo"),
+            (TitleField::MetadataText, "2026 · 80 seasons"),
+        ] {
+            assert_eq!(get(item, field), expected);
+        }
+        for (field, expected) in [47, 5, 13, 24, 1_234_567_890_123, 1, 1, 12, 64]
+            .into_iter()
+            .enumerate()
+        {
+            assert_eq!(native_title_projection_value(item, field as u32), expected);
+        }
+        for (index, source) in expected.titles[0].cast.iter().take(12).enumerate() {
+            for (field, source) in [
+                source.name.as_str(),
+                source.role.as_str(),
+                source.photo.as_str(),
+            ]
+            .into_iter()
+            .enumerate()
+            {
+                let projected =
+                    CStr::from_ptr(native_title_cast_projection(item, index, field as u32))
+                        .to_str()
+                        .unwrap();
+                assert!(!projected.is_empty());
+                assert!(source.starts_with(projected));
+            }
+        }
+        for season in 0..64 {
+            assert_eq!(native_title_season_projection(item, season), season as i32);
+        }
+        assert_eq!(weak.upgrade().unwrap().record, expected.titles[0]);
+        native_title_destroy(item);
+    }
+    assert!(weak.upgrade().is_none());
 }
 
 #[test]
@@ -206,7 +270,7 @@ fn actual_c_copies_keep_complete_rust_values_alive_and_allow_legacy_art_enrichme
             get(copy, TitleField::Poster),
             "https://art.invalid/enriched"
         );
-        assert_eq!(weak.upgrade().unwrap().title.poster, poster);
+        assert_eq!(weak.upgrade().unwrap().record.metadata.poster, poster);
         native_title_destroy(copy);
     }
     assert!(

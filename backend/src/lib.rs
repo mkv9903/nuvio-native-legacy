@@ -32,6 +32,7 @@ mod platform;
 pub mod provider_http;
 pub mod provider_loader;
 pub mod scene_cache;
+pub mod scene_snapshot;
 pub mod service;
 pub mod storage;
 pub mod title_snapshot;

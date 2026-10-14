@@ -75,7 +75,7 @@ unmigrated settings backend; they are not Rust save-file imports.
 
 Five Rust title tests cover complete strings, provider/IMDb identity, independent
 references, Unicode projection, malformed inputs, display NULs, concurrent
-readers and rating scaling. Twelve Rust-driven native tests use the actual C
+readers and rating scaling. Thirteen Rust-driven native tests use the actual C
 catalog to cover held selections across replacement, final-owner release,
 legacy artwork enrichment and frame-safe in-place updates. Remaining C catalog
 tests continue to exercise their unmigrated algorithms; they are not replacements
@@ -128,6 +128,15 @@ pre-checkpoint discovery/Trakt sources reproduce the original fixture failures.
 Replace these C fixtures with Rust cases when their capabilities are rewritten.
 
 Remaining search/grid, metadata and renderer temporary ownership, native scene
-capture/restore, complete request/artwork consumers and runtime Rust catalog
+capture, complete request/artwork consumers and runtime Rust catalog
 publication are still pending. This checkpoint does not enable native title
 production or claim that the profile-switch Home-row issue is fixed.
+
+The subsequent native scene restoration checkpoint makes `TitleSnapshot` own
+the complete `SceneTitle` directly rather than duplicate its metadata model.
+The existing C projection includes artwork alternatives, logo language evidence,
+classification/director, all commercial providers, resume/membership fields and
+cast/seasons. The full Rust cast/season vectors and complete strings remain
+available independently of the transitional C display quotas. Six Rust scene
+snapshot tests and one additional actual-C projection case cover this restore
+path; total checks are 184 backend tests and 21 native tests.
