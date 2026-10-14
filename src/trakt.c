@@ -1,4 +1,5 @@
 #include "trakt.h"
+#include "catalog_item.h"
 #include "vistoep.h"
 #include "ajustes.h"
 #include "artemetahub.h"
@@ -778,16 +779,24 @@ int trakt_enfeitar_lote(CatItem *saida, int n) {
         snprintf(fila.t[q].tipo, sizeof fila.t[q].tipo, "%s", saida[q].tipo);
       }
       enfeitarFila(&fila);
-      for (r = 0, w = 0; r < n; r++)
-        if (fila.t[r].ok) { if (w != r) saida[w] = saida[r]; w++; }
+      for (r = 0, w = 0; r < n; r++) {
+        if (fila.t[r].ok) {
+          if (w != r) catalog_item_move(&saida[w], &saida[r]);
+          w++;
+        } else catalog_item_clear(&saida[r]);
+      }
       n = w;
       free(fila.t);
     } else {
       // Sem memoria para a fila: em serie, no proprio fio.
       int r, w;
-      for (r = 0, w = 0; r < n; r++)
+      for (r = 0, w = 0; r < n; r++) {
         if (itemPronto(&saida[r]) ||
-            enfeitar(&saida[r], saida[r].tipo)) { if (w != r) saida[w] = saida[r]; w++; }
+            enfeitar(&saida[r], saida[r].tipo)) {
+          if (w != r) catalog_item_move(&saida[w], &saida[r]);
+          w++;
+        } else catalog_item_clear(&saida[r]);
+      }
       n = w;
     } }
   return n;

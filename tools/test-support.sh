@@ -12,11 +12,11 @@ cc() {
   local has_backend=0 profile_fixture=0 needs_registry=0 has_registry=0 has_order=0 needs_items=0 has_items=0 argument
   local fixture_flags=()
   for argument in "$@"; do
-    case "$argument" in *src/account_ui_adapter.c|*src/addon_registry.c|*src/addon_registry_adapter.c|*src/descoberta.c|*src/sync.c|*src/catalog_order_adapter.c|*src/home_order_runtime.c|*src/catalogo.c|*src/catalog_item.c) has_backend=1 ;; esac
+    case "$argument" in *src/account_ui_adapter.c|*src/addon_registry.c|*src/addon_registry_adapter.c|*src/descoberta.c|*src/sync.c|*src/catalog_order_adapter.c|*src/home_order_runtime.c|*src/catalogo.c|*src/catalog_item.c|*src/trakt.c) has_backend=1 ;; esac
     case "$argument" in *src/account_ui_adapter.c|*src/sync.c) needs_registry=1 ;; esac
     case "$argument" in *src/addon_registry.c) has_registry=1 ;; esac
     case "$argument" in *src/home_order_runtime.c) has_order=1 ;; esac
-    case "$argument" in *src/catalogo.c|*src/descoberta.c) needs_items=1 ;; esac
+    case "$argument" in *src/catalogo.c|*src/descoberta.c|*src/trakt.c) needs_items=1 ;; esac
     case "$argument" in *src/catalog_item.c) has_items=1 ;; esac
     case "$argument" in tests/listas.c|tests/salvospainel_tabs.c|tests/player_retido.c|tests/releaseinfo.c) profile_fixture=1 ;; esac
   done

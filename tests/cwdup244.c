@@ -110,12 +110,17 @@ int   ajustes_cw_do_episodio_mais_alto(void) { return 1; }
 int   contalib_sementes_a_seguir(ContaSemente *s, int m, int a) { (void)s; (void)m; (void)a; return 0; }
 const char *nuvem_trakt_cliente(void)      { return ""; }
 int   addons_n(void)                       { return 0; }
+/* Keep unused discovery branches linkable with the current no-addon fixture. */
+int addons_fornece(int index, int resource) { (void)index; (void)resource; return 0; }
+int addons_sondado(int index) { (void)index; return 0; }
+int ajustes_itens_fileira(void) { return 18; }
 const char *addons_base(int i)             { (void)i; return ""; }
 const char *addons_id_manifesto(int i)     { (void)i; return ""; }
 const char *addons_nome(int i)             { (void)i; return "addon"; }
 unsigned addons_versao(void)               { return 1; }
 const char *addons_base_por_id(const char *id) { (void)id; return ""; }
-void  addons_manifesto_lido(int i, const char *corpo) { (void)i; (void)corpo; }
+int addons_manifesto_lido(int i, const char *corpo) { (void)i; (void)corpo; return 1; }
+void addon_registry_refresh(void) {}
 char *rede_baixar(const char *u, int t)    { (void)u; (void)t; return NULL; }
 char *rede_baixar_com(const char *u, int t, const char *const *c) {
   (void)c; return rede_baixar(u, t); }

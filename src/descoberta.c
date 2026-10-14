@@ -2307,10 +2307,11 @@ static void preservarFileirasAusentes(CatItem **lote, int *n, int *cap,
       int alvo = *cap ? *cap * 2 : 128;
       while (alvo < need) alvo *= 2;
       CatItem *novo = realloc(*lote, sizeof(CatItem) * (size_t)alvo);
-      if (!novo) return;
+      if (!novo) { catalog_items_clear(tmp, (size_t)got); return; }
       *lote = novo; *cap = alvo;
     }
-    if (got) memcpy(*lote + *n, tmp, sizeof(CatItem) * (size_t)got);
+    if (got) catalog_items_copy(*lote + *n, tmp, (size_t)got);
+    catalog_items_clear(tmp, (size_t)got);
     fil[*nFil] = *old;
     fil[*nFil].ini = *n; fil[*nFil].n = got;
     (*n) += got; (*nFil)++;
@@ -2323,7 +2324,12 @@ static unsigned long long descAgoraMs(void);
 
 // Sob catTrava.
 static void rodadaSoltarLocked(RodadaCat *r) {
-  if (--r->refs == 0) { free(r->t); free(r); }
+  if (--r->refs == 0) {
+    int index;
+    for (index = 0; index < r->nT; index++)
+      catalog_items_clear(r->t[index].itens, (size_t)r->t[index].n);
+    free(r->t); free(r);
+  }
 }
 // Quem monta acabou com a rodada (inteira, ou desistiu): nenhum fio pega
 // pedido novo dela, e o ultimo a sair libera.
@@ -2430,7 +2436,7 @@ static int continuarLocal(CatItem *saida, int max) {
     CatItem *enfeitadas = malloc(sizeof *enfeitadas * (size_t)n);
     if (enfeitadas) {
       int ni, j;
-      memcpy(enfeitadas, saida, sizeof *enfeitadas * (size_t)n);
+      catalog_items_copy(enfeitadas, saida, (size_t)n);
       // A reserva exibida na rodada offline nao e um titulo resolvido.
       // Enfeitar completa somente campos vazios; deixe-o substituir essa
       // reserva quando a rede voltar, sem apagar a copia que a UI ja tem.
@@ -2443,8 +2449,9 @@ static int continuarLocal(CatItem *saida, int max) {
         for (j = 0; j < ni; j++)
           if (!strcmp(saida[i].imdb, enfeitadas[j].imdb) &&
               !strcmp(saida[i].tipo, enfeitadas[j].tipo)) {
-            saida[i] = enfeitadas[j]; break;
+            catalog_item_replace(&saida[i], &enfeitadas[j]); break;
           }
+      catalog_items_clear(enfeitadas, (size_t)ni);
       free(enfeitadas);
     }
     for (i = 0; i < n; i++)
@@ -2569,7 +2576,9 @@ static int filtrarRemoto(CatItem *v, int n, int (*aSeguir)(const char *),
   for (i = 0, w = 0; i < n; i++) {
     // "A SEGUIR" (issue #66) entra com 0%: e o proximo episodio de uma serie
     // cujo ultimo terminou. Nao e "pausado", mas e "continuar".
-    if (!aSeguir(v[i].imdb) && !emAndamento(v[i].progresso)) { (*fora)++; continue; }
+    if (!aSeguir(v[i].imdb) && !emAndamento(v[i].progresso)) {
+      (*fora)++; catalog_item_clear(&v[i]); continue;
+    }
     // O REGISTRO LOCAL MAIS NOVO VENCE A RESPOSTA REMOTA. Sem este cruzamento
     // a refazagem da fileira (issue #38) lia um /sync/playback que ainda nao
     // recebeu o scrobble que acabamos de mandar: o titulo terminado voltava a
@@ -2591,7 +2600,7 @@ static int filtrarRemoto(CatItem *v, int n, int (*aSeguir)(const char *),
         // sendo "a seguir" (progresso 0); do fim para cima (>90%) sai, como
         // antes, porque ai terminou. Vale para Trakt e Simkl (aSeguir).
         if (pct < 1 && aSeguir(v[i].imdb)) pct = 0;
-        else if (!emAndamento(pct)) { (*fora)++; continue; }
+        else if (!emAndamento(pct)) { (*fora)++; catalog_item_clear(&v[i]); continue; }
         v[i].progresso = pct;
       } }
     // O EPISODIO VELHO DO REMOTO NAO VOLTA POR CIMA DO QUE ESTA TV VIU DEPOIS.
@@ -2634,7 +2643,7 @@ static int filtrarRemoto(CatItem *v, int n, int (*aSeguir)(const char *),
         }
       }
     }
-    if (w != i) v[w] = v[i];
+    if (w != i) catalog_item_move(&v[w], &v[i]);
     w++;
   }
   return w;
@@ -2706,14 +2715,14 @@ static int contaASeguir(CatItem *lista, int n, int max) {
     x.estreiaMs = cwo_estreia(lote[i].imdb);
     if (!ajustes_cw_mostrar_nao_exibidos() &&
         cwo_futuro(&x, (long long)time(NULL) * 1000LL)) continue;
-    if (n < max) alvo = n++;
+    if (n < max) { alvo = n++; catalog_item_copy(&lista[alvo], &lote[i]); }
     else {
       int vel = 0;
       for (j = 1; j < n; j++) if (lista[j].retomadoMs < lista[vel].retomadoMs) vel = j;
       if (lista[vel].retomadoMs >= lote[i].retomadoMs) continue;
       alvo = vel;
+      catalog_item_replace(&lista[alvo], &lote[i]);
     }
-    lista[alvo] = lote[i];
     entraram++;
   }
   { int a, b;
@@ -2724,6 +2733,7 @@ static int contaASeguir(CatItem *lista, int n, int max) {
     } }
   printf("[desc] continuar assistindo: a seguir da conta: %d semente(s), %d consultada(s), "
          "%d confirmada(s), %d na lista\n", nSem, nLote, confirmados, entraram);
+  catalog_items_clear(lote, (size_t)confirmados);
   free(lote);
   return n;
 }
@@ -2963,12 +2973,15 @@ static int montarContinuar(CatItem *saida, int max) {
       printf("[desc] continuar assistindo: Trakt sem resposta e lista vazia; "
              "mantidos os %d card(s) da tela\n", k);
       fflush(stdout);
+      catalog_items_clear(doTrakt, (size_t)nT);
+      catalog_items_clear(daConta, (size_t)nL);
+      catalog_items_clear(doSimkl, (size_t)nS);
       free(doSimkl);
       return k;
     }
   }
   for (i = 0; i < nJ; i++) {
-    saida[i] = *juntos[i].item;
+    catalog_item_copy(&saida[i], juntos[i].item);
     if (getenv("NUVIO_CW_LOG"))
       printf("[desc] cw[%d] %s T%dE%d %d%% ms=%lld %s\n", i, saida[i].imdb, saida[i].temporada,
              saida[i].episodio, saida[i].progresso, juntos[i].ms,
@@ -2985,6 +2998,9 @@ static int montarContinuar(CatItem *saida, int max) {
          nT, nS, fora, nL, repetidos, nJ);
   fflush(stdout);
   // O lote do Simkl ja foi COPIADO para `saida` acima; nada mais aponta nele.
+  catalog_items_clear(doTrakt, (size_t)nT);
+  catalog_items_clear(daConta, (size_t)nL);
+  catalog_items_clear(doSimkl, (size_t)nS);
   free(doSimkl);
   return nJ;
 }
@@ -3013,6 +3029,7 @@ static void *fioContinuar(void *u) {
   n = montarContinuar(lote, CONT_MAX);
   // Publica AINDA sob a trava: ver cwGer.
   cat_trocar_continuar(lote, n);
+  catalog_items_clear(lote, (size_t)n);
   cwGerNaTela = cwGer;
   pthread_mutex_unlock(&contTrava);
   localizarContinuarPublicado();
@@ -3047,9 +3064,9 @@ int desc_continuar_otimista(int indice) {
   const CatItem *ci = cat_item(indice);
   int n, k, mudou, travou;
   if (!ci || !ci->imdb[0]) return 0;
-  novo = *ci;
-  if (novo.progresso < 1 || novo.progresso >= ajustes_cw_concluido()) return 0;
+  if (ci->progresso < 1 || ci->progresso >= ajustes_cw_concluido()) return 0;
   if (ajustes_cw_fonte() == AJ_CWF_SIMKL && !simkl_ativo()) return 0;
+  catalog_item_copy(&novo, ci);
   if (!strcmp(novo.tipo, "series") && novo.temporada > 0 && novo.episodio > 0) {
     char base[64];
     idbase_copiar(ci->imdb, base, sizeof base);
@@ -3066,6 +3083,11 @@ int desc_continuar_otimista(int indice) {
   printf("[desc] continuar assistindo: %s %s ao sair do player (local; a refacao confirma)\n",
          novo.imdb, mudou ? "na frente" : "ja estava na frente");
   fflush(stdout);
+  /* Composition borrows the current row and the held title until publication.
+   * Only these inputs own references; the output is a temporary borrowed view. */
+  memset(saida, 0, sizeof *saida * (size_t)k);
+  catalog_items_clear(atual, (size_t)n);
+  catalog_item_clear(&novo);
   return mudou;
 }
 
@@ -3089,6 +3111,7 @@ static void cwDepoisDePublicar(CatItem *c, int k) {
     // cwGerMontar NAO anda: o lote de montar() segue com a janela velha, e
     // cada publicacao seguinte dele precisa da mesma reaplicacao.
     cat_trocar_continuar(c, k);
+    catalog_items_clear(c, (size_t)k);
     free(c);
   }
   pthread_mutex_unlock(&contTrava);
@@ -3494,6 +3517,8 @@ static pthread_mutex_t listasTrava = PTHREAD_MUTEX_INITIALIZER;
 
 static void listasLiberar(ListasTrakt *j) {
   if (!j) return;
+  catalog_items_clear(j->wl, (size_t)j->nWl);
+  catalog_items_clear(j->col, (size_t)j->nCol);
   free(j->wl); free(j->col); free(j);
 }
 
@@ -3515,6 +3540,8 @@ static void *fioListas(void *u) {
   pthread_mutex_lock(&listasTrava);
   if (j->largado) {
     pthread_mutex_unlock(&listasTrava);
+    catalog_items_clear(wl, (size_t)nw);
+    catalog_items_clear(col, (size_t)nc);
     free(wl); free(col); free(j);
     return NULL;
   }
@@ -3570,8 +3597,8 @@ static void publicarParcial(CatItem **lote, int *cap, int n,
     if (maior) { *lote = maior; *cap = n + extra; } else extra = 0;
   }
   if (extra) {
-    if (j->nWl) memcpy(*lote + n, j->wl, sizeof(CatItem) * (size_t)j->nWl);
-    if (j->nCol) memcpy(*lote + n + j->nWl, j->col, sizeof(CatItem) * (size_t)j->nCol);
+    if (j->nWl) catalog_items_copy(*lote + n, j->wl, (size_t)j->nWl);
+    if (j->nCol) catalog_items_copy(*lote + n + j->nWl, j->col, (size_t)j->nCol);
     if (listasNaTela && !*listasNaTela) {
       *listasNaTela = 1;
       printf("[desc] listas do Trakt na tela junto das fileiras: %d + %d\n", j->nWl, j->nCol);
@@ -3579,8 +3606,80 @@ static void publicarParcial(CatItem **lote, int *cap, int n,
     }
   }
   publicarMontagem(*lote, n + extra, fils, nf);
+  /* The published block retained its own references. The temporary list tail
+   * must be empty before another catalog appends into this batch. */
+  catalog_items_clear(*lote + n, (size_t)extra);
   parcialNaTela = 1;
 }
+
+#ifdef NV_NATIVE_UI_TEST
+/* Rust driver fixtures exercise the real shared-round and publication paths.
+ * A delayed worker keeps its own pending result after the assembler leaves. */
+typedef struct {
+  RodadaCat *round;
+  CatItem pending;
+  int participants;
+} DiscoveryTestRound;
+void *discovery_test_round_create(const CatItem *title) {
+  DiscoveryTestRound *test = calloc(1, sizeof *test);
+  RodadaCat *round = test ? calloc(1, sizeof *round) : NULL;
+  TarefaCat *tasks = round ? calloc(2, sizeof *tasks) : NULL;
+  if (!tasks) { free(round); free(test); return NULL; }
+  round->t = tasks; round->nT = 2; round->refs = 2;
+  catalog_item_copy(&tasks[0].itens[0], title);
+  tasks[0].n = 1; tasks[0].pronto = 1;
+  catalog_item_copy(&test->pending, title);
+  test->round = round;
+  test->participants = 2;
+  return test;
+}
+void discovery_test_round_publish(void *handle) {
+  DiscoveryTestRound *test = handle;
+  publicarMontagem(test->round->t[0].itens, 1, NULL, 0);
+}
+void discovery_test_round_abandon(void *handle) {
+  DiscoveryTestRound *test = handle;
+  rodadaSoltar(test->round);
+  if (__atomic_sub_fetch(&test->participants, 1, __ATOMIC_ACQ_REL) == 0) free(test);
+}
+void discovery_test_round_complete(void *handle) {
+  DiscoveryTestRound *test = handle;
+  RodadaCat *round = test->round;
+  pthread_mutex_lock(&catTrava);
+  catalog_item_move(&round->t[1].itens[0], &test->pending);
+  round->t[1].n = 1; round->t[1].pronto = 1;
+  rodadaSoltarLocked(round);
+  pthread_mutex_unlock(&catTrava);
+  if (__atomic_sub_fetch(&test->participants, 1, __ATOMIC_ACQ_REL) == 0) free(test);
+}
+int discovery_test_partial_lists(const CatItem *title, const CatItem *saved,
+                                 int repeats) {
+  ListasTrakt *lists = calloc(1, sizeof *lists);
+  CatItem *batch = calloc(1, sizeof *batch);
+  int capacity = 1, index, visible = 0, valid = 1;
+  if (lists) lists->wl = calloc(1, sizeof *lists->wl);
+  if (!batch || !lists || !lists->wl) {
+    free(batch); listasLiberar(lists); return 0;
+  }
+  catalog_item_copy(batch, title);
+  catalog_item_copy(lists->wl, saved);
+  lists->nWl = 1; lists->pronto = 1;
+  for (index = 0; index < repeats; index++) {
+    publicarParcial(&batch, &capacity, 1, NULL, 0, lists, &visible);
+    if (cat_n() != 2 || batch[1].rust_title) { valid = 0; break; }
+    cat_quadro();
+  }
+  listasAbandonar(lists);
+  catalog_item_clear(batch);
+  free(batch);
+  return valid;
+}
+static int discovery_test_not_next(const char *id) { (void)id; return 0; }
+int discovery_test_filter_owned(CatItem *items, int count) {
+  int removed = 0;
+  return filtrarRemoto(items, count, discovery_test_not_next, &removed);
+}
+#endif
 
 static void *montar(void *u) {
   addon_registry_refresh();
@@ -4113,6 +4212,7 @@ static void *montar(void *u) {
             const Decl *d = tarefas[k].d;
             int got, respondeu, largado = 0;
             int estadoLinha = 0;
+            int previous_count = 0;
             const CatItem *origem = tarefas[k].itens;
             // Rascunho de quem monta para a linha anterior de um catalogo
             // LARGADO: o balde dele ainda e do fio, que pode escrever nele.
@@ -4181,6 +4281,7 @@ static void *montar(void *u) {
               // Timeout preserva o ultimo lote bom desta chave. No primeiro
               // arranque, sem snapshot, segue omitida de forma segura.
               got = linhaAnterior(d->chave, daLinhaAnterior, MAX_POR_FILEIRA, NULL);
+              previous_count = got;
               origem = daLinhaAnterior;
               // Sem lote anterior a vaga vai para o seguinte, mas a chave fica
               // no snapshot: a proxima volta pede este de novo (#195).
@@ -4189,7 +4290,8 @@ static void *montar(void *u) {
             GARANTE(MAX_POR_FILEIRA + 2);
             if (got > cap - n) got = cap - n;
             if (got > 0)
-              memcpy(lote + n, origem, sizeof(CatItem) * (size_t)got);
+              catalog_items_copy(lote + n, origem, (size_t)got);
+            catalog_items_clear(daLinhaAnterior, (size_t)previous_count);
           {
             CatFileira *f = &fil[nFil++];
             memset(f, 0, sizeof *f);
@@ -4293,14 +4395,14 @@ static void *montar(void *u) {
     if (listas->nWl) {
       GARANTE(listas->nWl);
       if (listas->nWl <= cap - n) {
-        memcpy(lote + n, listas->wl, sizeof(CatItem) * (size_t)listas->nWl);
+        catalog_items_copy(lote + n, listas->wl, (size_t)listas->nWl);
         n += listas->nWl;
       }
     }
     if (listas->nCol) {
       GARANTE(listas->nCol);
       if (listas->nCol <= cap - n) {
-        memcpy(lote + n, listas->col, sizeof(CatItem) * (size_t)listas->nCol);
+        catalog_items_copy(lote + n, listas->col, (size_t)listas->nCol);
         n += listas->nCol;
       }
     }
@@ -4332,8 +4434,8 @@ static void *montar(void *u) {
       int jj, ja = 0;
       for (jj = 0; jj < n; jj++)
         if (!strcmp(lote[jj].imdb, lote[k].imdb)) { lote[jj].naLista = 1; ja = 1; break; }
-      if (ja) continue;
-      if (w != k) lote[w] = lote[k];
+      if (ja) { catalog_item_clear(&lote[k]); continue; }
+      if (w != k) catalog_item_move(&lote[w], &lote[k]);
       w++;
     }
     novos = w - n;
@@ -4384,6 +4486,7 @@ static void *montar(void *u) {
                  homeestado_mudancas_texto(mudou & HOMEESTADO_MUDOU_FONTE,
                                            txt, sizeof txt)); }
       fflush(stdout);
+      catalog_items_clear(lote, (size_t)n);
       free(lote); repetirAoFim = 0; buscandoSoltar();
       desc_iniciar();
       return NULL;
@@ -4498,6 +4601,7 @@ static void *montar(void *u) {
     printf("[desc] nada veio da rede; segue o catalogo do pacote\n");
   }
   fflush(stdout);
+  catalog_items_clear(lote, (size_t)n);
   free(lote);
   listasAbandonar(listas);   // so sobra se o lote veio vazio antes de usa-las
   buscandoSoltar();
@@ -4524,6 +4628,7 @@ condenada:
          "(credencial/addons/idioma); recomecando ja\n", ondeParou);
   fflush(stdout);
   listasAbandonar(listas);
+  catalog_items_clear(lote, (size_t)n);
   free(lote);
   repetirAoFim = 0;
   buscandoSoltar();

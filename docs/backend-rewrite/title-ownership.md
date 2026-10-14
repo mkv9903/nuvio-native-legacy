@@ -75,7 +75,7 @@ unmigrated settings backend; they are not Rust save-file imports.
 
 Five Rust title tests cover complete strings, provider/IMDb identity, independent
 references, Unicode projection, malformed inputs, display NULs, concurrent
-readers and rating scaling. Eight Rust-driven native tests use the actual C
+readers and rating scaling. Twelve Rust-driven native tests use the actual C
 catalog to cover held selections across replacement, final-owner release,
 legacy artwork enrichment and frame-safe in-place updates. Remaining C catalog
 tests continue to exercise their unmigrated algorithms; they are not replacements
@@ -93,3 +93,41 @@ paths with decimal and percent variants, numeric/string perfect scores, near-10
 rounding, tiny positive values, missing values, NaN/overflow and invalid scores.
 
 No TV handoff is requested for this foundation checkpoint.
+
+## Home assembly ownership checkpoint
+
+The retained Home assembler now owns its catalog task results, cached-row
+copies, accumulated title batch and saved-list batches explicitly. The last
+round participant releases ready and late results even when the assembler has
+cancelled. Publication retains its own references before temporary saved-list
+tails are released; later catalog appends cannot overwrite an unreleased tail.
+Final, cancelled and superseded assembly exits release the accumulated batch.
+
+Continue Watching's temporary inputs, enriched copies and publication copies
+also release their references. Enrichment/progress filtering releases rejected
+titles and transfers surviving records when compacting. Optimistic composition
+still uses a short-lived borrowed output: its retained inputs live through
+publication and are released afterwards. Its ordering/filtering behavior remains
+C until that capability's own rewrite.
+
+Four additional Rust native-driver cases exercise actual shared-round cleanup
+in both participant completion orders, publication followed by cancellation and
+a late worker, forty partial saved-list publications, and enrichment/progress
+compaction with final-owner checks. The full suite passes 178 backend tests and
+20 native tests. Linux builds and starts using disposable Xvfb preview data.
+Retained local Continue Watching checks also pass with ASan/UBSan; retained
+ordering, duplicate, Trakt contract/startup and watched-action checks pass.
+
+These checks exposed existing fixture drift: the no-addon doubles had the old
+void manifest-result signature and omitted newer discovery functions; the date
+fixture expected Portuguese despite the existing English-only month formatter;
+the Trakt duplicate fixture lacked function/data sections for its selective
+linking. Test-only updates restore these fixtures without changing their
+behavioral assertions (except the required English date text). The unchanged
+pre-checkpoint discovery/Trakt sources reproduce the original fixture failures.
+Replace these C fixtures with Rust cases when their capabilities are rewritten.
+
+Remaining search/grid, metadata and renderer temporary ownership, native scene
+capture/restore, complete request/artwork consumers and runtime Rust catalog
+publication are still pending. This checkpoint does not enable native title
+production or claim that the profile-switch Home-row issue is fixed.

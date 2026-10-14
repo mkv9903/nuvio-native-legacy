@@ -12,7 +12,7 @@ cc() {
   for argument in "$@"; do
     case "$argument" in *src/addon_registry.c) registry=1 ;; *src/addon_registry_adapter.c) adapter=1 ;; esac
     case "$argument" in *src/addonstats.c) statistics=1 ;; esac
-    case "$argument" in *src/catalogo.c|*src/descoberta.c) needs_items=1 ;; *src/catalog_item.c) has_items=1 ;; esac
+    case "$argument" in *src/catalogo.c|*src/descoberta.c|*src/trakt.c) needs_items=1 ;; *src/catalog_item.c) has_items=1 ;; esac
   done
   if [ "$registry" = 0 ]; then fixture_flags+=("$test_root/src/addon_registry.c"); fi
   if [ "$adapter" = 0 ]; then fixture_flags+=("$test_root/src/addon_registry_adapter.c"); fi

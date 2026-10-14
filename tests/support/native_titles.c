@@ -5,6 +5,7 @@
 #include "detail.h"
 #include "player.h"
 #include "ctxmenu.h"
+#include "trakt.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -30,6 +31,37 @@ void native_title_update(const CatItem *item) { cat_atualizar_item(0, item); }
 const CatItem *native_title_current(void) { return cat_n() ? cat_item(0) : NULL; }
 void native_title_frame(void) { cat_quadro(); }
 int native_title_find(const char *id) { return cat_indice_por_imdb(id); }
+
+extern int discovery_test_filter_owned(CatItem *items, int count);
+/* The providers here have non-IMDb IDs, so the real enrichment path never
+ * performs network I/O. The first unusable title must release its owner and
+ * the second must move into its place without duplicating ownership. */
+CatItem *native_title_compact_enrichment(const CatItem *rejected, const CatItem *kept) {
+  CatItem *items = calloc(2, sizeof *items);
+  int count;
+  if (!items) return NULL;
+  catalog_item_copy(&items[0], rejected);
+  catalog_item_copy(&items[1], kept);
+  items[0].poster[0] = 0;
+  count = trakt_enfeitar_lote(items, 2);
+  if (count != 1 || items[1].rust_title) {
+    catalog_items_clear(items, 2); free(items); return NULL;
+  }
+  return items;
+}
+CatItem *native_title_filter_progress(const CatItem *finished, const CatItem *kept) {
+  CatItem *items = calloc(2, sizeof *items);
+  int count;
+  if (!items) return NULL;
+  catalog_item_copy(&items[0], finished);
+  catalog_item_copy(&items[1], kept);
+  items[0].progresso = 100; items[1].progresso = 40;
+  count = discovery_test_filter_owned(items, 2);
+  if (count != 1 || items[1].rust_title) {
+    catalog_items_clear(items, 2); free(items); return NULL;
+  }
+  return items;
+}
 
 extern void details_test_hold(const CatItem *title, int index);
 extern int details_test_revalidate(void);

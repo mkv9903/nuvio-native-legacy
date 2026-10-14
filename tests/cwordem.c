@@ -86,15 +86,15 @@ int main(void) {
   // C9 (1792569600000), com "agora" em 24/09/2026.
   { char b[32];
     const long long brothers = 1792569600000LL, agora = 1790290800000LL;
-    assert(cwo_data_curta(brothers, agora, 0, 0, b, sizeof b) && !strcmp(b, "21 out"));
+    assert(cwo_data_curta(brothers, agora, 0, 0, b, sizeof b) && !strcmp(b, "Oct 21"));
     assert(cwo_data_curta(brothers, agora, 1, 0, b, sizeof b) && !strcmp(b, "Oct 21"));
-    assert(cwo_data_curta(brothers, agora, 0, 1, b, sizeof b) && !strcmp(b, "21 OUT"));
+    assert(cwo_data_curta(brothers, agora, 0, 1, b, sizeof b) && !strcmp(b, "OCT 21"));
     assert(cwo_data_curta(brothers, agora, 1, 1, b, sizeof b) && !strcmp(b, "OCT 21"));
     // Outro ano leva o ano; 2027-01-05T00:00Z.
-    assert(cwo_data_curta(1799107200000LL, agora, 0, 0, b, sizeof b) && !strcmp(b, "5 jan 2027"));
+    assert(cwo_data_curta(1799107200000LL, agora, 0, 0, b, sizeof b) && !strcmp(b, "Jan 5, 2027"));
     assert(cwo_data_curta(1799107200000LL, agora, 1, 0, b, sizeof b) && !strcmp(b, "Jan 5, 2027"));
     // Dia pelo UTC: 23:30Z de 20/10 e dia 20, qualquer que seja o fuso da TV.
-    assert(cwo_data_curta(1792539000000LL, agora, 0, 0, b, sizeof b) && !strcmp(b, "20 out"));
+    assert(cwo_data_curta(1792539000000LL, agora, 0, 0, b, sizeof b) && !strcmp(b, "Oct 20"));
     assert(!cwo_data_curta(CWO_SEM_DATA, agora, 0, 0, b, sizeof b) && !b[0]); }
   puts("ok  rotulo do futuro: 21 out / Oct 21, ano so quando outro, UTC");
 

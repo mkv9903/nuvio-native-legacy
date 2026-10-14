@@ -40,6 +40,133 @@ extern "C" {
     fn action_notice_has_undo() -> i32;
     fn action_notice_button(button: i32);
     fn discovery_test_rating_paths(body: *const c_char, ratings: *mut i32) -> i32;
+    fn discovery_test_round_create(item: *const c_void) -> *mut c_void;
+    fn discovery_test_round_publish(handle: *mut c_void);
+    fn discovery_test_round_abandon(handle: *mut c_void);
+    fn discovery_test_round_complete(handle: *mut c_void);
+    fn discovery_test_partial_lists(
+        title: *const c_void,
+        saved: *const c_void,
+        repeats: i32,
+    ) -> i32;
+    fn native_title_compact_enrichment(rejected: *const c_void, kept: *const c_void)
+        -> *mut c_void;
+    fn native_title_filter_progress(finished: *const c_void, kept: *const c_void) -> *mut c_void;
+}
+
+#[test]
+fn cancelled_catalog_round_releases_ready_and_late_results_after_its_last_participant() {
+    for worker_first in [false, true] {
+        let title = snapshot("provider:cancelled", "poster");
+        let weak = Arc::downgrade(&title);
+        unsafe {
+            let source = native_title_create(Arc::into_raw(title).cast());
+            let round = discovery_test_round_create(source);
+            assert!(!round.is_null());
+            native_title_destroy(source);
+            if worker_first {
+                discovery_test_round_complete(round);
+                assert!(weak.upgrade().is_some());
+                discovery_test_round_abandon(round);
+            } else {
+                discovery_test_round_abandon(round);
+                assert!(weak.upgrade().is_some());
+                // This result finishes after the caller cancelled the round.
+                let address = round as usize;
+                std::thread::spawn(move || discovery_test_round_complete(address as *mut c_void))
+                    .join()
+                    .unwrap();
+            }
+        }
+        assert!(weak.upgrade().is_none(), "a closed round leaked a result");
+    }
+}
+
+#[test]
+fn published_catalog_survives_round_cancellation_and_a_late_worker() {
+    let id = format!("provider:{}", "long-identity".repeat(300));
+    let title = snapshot(&id, "poster");
+    let weak = Arc::downgrade(&title);
+    unsafe {
+        let source = native_title_create(Arc::into_raw(title).cast());
+        let round = discovery_test_round_create(source);
+        assert!(!round.is_null());
+        native_title_destroy(source);
+        discovery_test_round_publish(round);
+        discovery_test_round_abandon(round);
+        discovery_test_round_complete(round);
+        assert_eq!(get(native_title_current(), TitleField::Id), id);
+        assert!(weak.upgrade().is_some());
+        native_title_publish(std::ptr::null());
+        // The C catalog intentionally retains its most recently retired block.
+        // Retire an empty block to replace that final reader grace period.
+        native_title_publish(std::ptr::null());
+        native_title_frame();
+        native_title_frame();
+    }
+    assert!(weak.upgrade().is_none());
+}
+
+#[test]
+fn repeated_partial_home_publications_release_temporary_saved_list_tails() {
+    let catalog = snapshot("provider:catalog", "poster");
+    let saved = snapshot("provider:saved", "poster");
+    let catalog_weak = Arc::downgrade(&catalog);
+    let saved_weak = Arc::downgrade(&saved);
+    unsafe {
+        let catalog_item = native_title_create(Arc::into_raw(catalog).cast());
+        let saved_item = native_title_create(Arc::into_raw(saved).cast());
+        assert_eq!(
+            discovery_test_partial_lists(catalog_item, saved_item, 40),
+            1
+        );
+        native_title_destroy(catalog_item);
+        native_title_destroy(saved_item);
+        assert_eq!(
+            get(native_title_current(), TitleField::Id),
+            "provider:catalog"
+        );
+        native_title_publish(std::ptr::null());
+        native_title_publish(std::ptr::null());
+        native_title_frame();
+        native_title_frame();
+    }
+    assert!(
+        catalog_weak.upgrade().is_none(),
+        "a Home batch leaked its owner"
+    );
+    assert!(
+        saved_weak.upgrade().is_none(),
+        "a saved-list tail leaked its owner"
+    );
+}
+
+#[test]
+fn enrichment_and_progress_compaction_drop_rejected_owners_and_transfer_survivors() {
+    for compact in [
+        native_title_compact_enrichment,
+        native_title_filter_progress,
+    ] {
+        let rejected = snapshot("provider:rejected", "poster");
+        let kept = snapshot("provider:kept", "poster");
+        let rejected_weak = Arc::downgrade(&rejected);
+        let kept_weak = Arc::downgrade(&kept);
+        unsafe {
+            let rejected_item = native_title_create(Arc::into_raw(rejected).cast());
+            let kept_item = native_title_create(Arc::into_raw(kept).cast());
+            let result = compact(rejected_item, kept_item);
+            assert!(!result.is_null());
+            native_title_destroy(rejected_item);
+            native_title_destroy(kept_item);
+            assert!(rejected_weak.upgrade().is_none());
+            assert_eq!(get(result, TitleField::Id), "provider:kept");
+            native_title_destroy(result);
+        }
+        assert!(
+            kept_weak.upgrade().is_none(),
+            "compaction duplicated ownership"
+        );
+    }
 }
 fn snapshot(id: &str, poster: &str) -> Arc<TitleSnapshot> {
     let title = CatalogTitle::from_meta(

@@ -1,6 +1,7 @@
 #!/bin/bash
 set -eu
 cd "$(dirname "$0")/.."
+source tools/test-support.sh
 dir=$(mktemp -d "${TMPDIR:-/tmp}/nuvio-traktcontracts.XXXXXX")
 trap 'rm -rf "$dir"' EXIT
 flags=()

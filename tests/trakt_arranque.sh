@@ -3,6 +3,7 @@
 #   bash tests/trakt_arranque.sh
 set -eu
 cd "$(dirname "$0")/.."
+source tools/test-support.sh
 dir=$(mktemp -d "${TMPDIR:-/tmp}/nuvio-traktarr.XXXXXX")
 trap 'rm -rf "$dir"' EXIT
 stripflag=(-Wl,--gc-sections)

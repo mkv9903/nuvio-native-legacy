@@ -97,12 +97,14 @@ int   trakt_enfeitar_lote(CatItem *s, int n);
 int   trakt_lista(const char *q, CatItem *s, int m) { (void)q; (void)s; (void)m; return 0; }
 const char *nuvem_trakt_cliente(void)      { return ""; }
 int   addons_n(void)                       { return 0; }
+void addon_registry_refresh(void)          {}
 const char *addons_base(int i)             { (void)i; return ""; }
 const char *addons_id_manifesto(int i)     { (void)i; return ""; }
 const char *addons_nome(int i)             { (void)i; return "addon"; }
 unsigned addons_versao(void)               { return 1; }
 const char *addons_base_por_id(const char *id) { (void)id; return ""; }
-void  addons_manifesto_lido(int i, const char *corpo) { (void)i; (void)corpo; }
+/* Match the current registry result contract; this fixture has no addons. */
+int addons_manifesto_lido(int i, const char *corpo) { (void)i; (void)corpo; return 1; }
 char *rede_baixar(const char *u, int t)    { (void)u; (void)t; return NULL; }
 char *rede_baixar_com(const char *u, int t, const char *const *c) {
   (void)c; return rede_baixar(u, t); }

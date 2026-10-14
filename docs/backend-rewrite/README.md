@@ -68,7 +68,7 @@ owner and otherwise wait/retry rather than using the signed-in member's ID.
 The Rust account domain, HTTP client, worker, native boundary, platform helper,
 Home ordering, addon networking/storage, edit merging and the native addon
 boundary, provider loading, complete catalog title models and scene storage pass 178 tests.
-Sixteen additional Rust driver tests cover the retained C account/addon screens,
+Twenty additional Rust driver tests cover the retained C account/addon screens,
 view layouts, Home-order frame publication and actual source/subtitle workers
 under Xvfb. The five relevant C reference groups passed
 before their test cases moved to Rust. See [test coverage](test-coverage.md).
@@ -137,6 +137,12 @@ Complete Home scenes now have a tested Rust model and private Serde JSON store,
 covering artwork/cast/resume/seasons/availability and full provider values.
 Native rehydration, remaining worker ownership and application cache wiring are
 still pending. See [scene cache](scene-cache.md).
+
+Home assembly and Continue Watching's transitional title handoffs now retain
+and release their Rust owners, including cancelled rounds, late results,
+temporary saved-list tails and compacted-away titles. Four additional native
+Rust cases verify these lifetimes. The Rust catalog producer remains disabled
+until the remaining consumers and assembled-scene cache are integrated.
 
 The title/scene checkpoint at `ddc25bb9` also passes the Linux build and a
 disposable preview startup, plus webOS ARM compilation, soft-float/glibc 2.12
