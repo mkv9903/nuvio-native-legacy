@@ -67,6 +67,17 @@ impl JsonStore {
         Ok(Some(bytes))
     }
     pub fn write(&self, name: &str, bytes: &[u8], limit: u64) -> Result<()> {
+        self.write_guarded(name, bytes, limit, &|| true)
+    }
+    /// Check captured-context validity after the temporary file is complete,
+    /// immediately before publishing it. Cancellation preserves the prior file.
+    pub fn write_guarded(
+        &self,
+        name: &str,
+        bytes: &[u8],
+        limit: u64,
+        current: &dyn Fn() -> bool,
+    ) -> Result<()> {
         if bytes.len() as u64 > limit {
             return Err(Error::ResponseLimit);
         }
@@ -86,6 +97,9 @@ impl JsonStore {
             file.write_all(bytes)
                 .and_then(|_| file.sync_all())
                 .map_err(|_| Error::Storage)?;
+            if !current() {
+                return Err(Error::Cancelled);
+            }
             fs::rename(&temporary, destination).map_err(|_| Error::Storage)?;
             File::open(&self.directory)
                 .and_then(|directory| directory.sync_all())

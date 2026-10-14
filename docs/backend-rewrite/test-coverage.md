@@ -274,7 +274,7 @@ in nested test runs.
 
 ## Native title ownership foundation
 
-The current backend suite passes 164 tests; the separate native Rust/C suite
+The title-ownership checkpoint passed 164 backend tests; the native Rust/C suite
 passes 15. Five title tests verify complete values and separate provider/IMDb
 identity, UTF-8 projection boundaries, null/malformed input, concurrent readers,
 and perfect-score/near-perfect rating scaling. Three native title tests use the
@@ -300,3 +300,28 @@ These C assertions remain because the application catalog producer and scene
 cache have not yet moved to Rust. Raw binary writing refuses Rust-owned titles
 so opaque addresses cannot reach disk. This foundation is not a complete
 catalog rewrite or a Linux/TV handoff; see [title ownership](title-ownership.md).
+
+## Rust Home scene model and storage
+
+The backend suite now passes 178 tests; the native suite still passes all 15
+with the new Rust library and the unchanged C UI library. Fourteen scene-cache
+tests cover complete metadata, artwork variants/logo evidence, cast/person IDs,
+seasons, resume, subscription/rental/purchase and membership fields. Full IDs,
+names, image/provider URLs and row keys round-trip, with arrays beyond the old
+C limits. Tests preserve loading versus confirmed-empty states and authoritative
+empty scenes, and reject invalid windows/identities/request values without
+replacing a valid file.
+
+Storage coverage includes member/confirmed-owner/selected-profile scope,
+primary-addon inheritance, private permissions and hashed filenames, schema/
+app/language checks, damaged files and symlinks, cancellation after temporary
+write, late cache reads/errors, aggregate byte limits, concurrent store handles,
+selective cleanup and exclusion of old C files. JSON serialization has a bounded
+output buffer; strings are not silently truncated. The shared atomic-file helper
+retains its previous behavior for account/addon/Home-order callers; their full
+regression suite passes after adding the optional pre-rename context guard.
+
+The scene layer is not yet the application cache. Native scene capture/restore,
+remaining C copy ownership and actual catalog orchestration still need to be
+connected before removing the C binary routines and their retained test programs.
+See [the storage record](scene-cache.md).

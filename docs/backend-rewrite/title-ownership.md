@@ -33,9 +33,10 @@ that frame is rendered. Held selections require their own references.
 
 Raw C binary cache writing rejects native-owned records; native pointers must
 never be persisted. Binary reads clear the pointer field before publication.
-This is an interim guard, not the new Rust catalog cache. The new loader already
-has versioned provider-document JSON; the assembled scene cache must also move
-to Rust before native titles are published in the application.
+This is an interim guard, not the new Rust catalog cache. The loader already
+has versioned provider-document JSON, and a complete scene model/private JSON
+store is now tested in Rust. [Scene cache](scene-cache.md) still needs native
+capture/restore and application wiring before native titles are published.
 
 ## Remaining integration
 

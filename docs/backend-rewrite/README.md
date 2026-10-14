@@ -67,7 +67,7 @@ owner and otherwise wait/retry rather than using the signed-in member's ID.
 
 The Rust account domain, HTTP client, worker, native boundary, platform helper,
 Home ordering, addon networking/storage, edit merging and the native addon
-boundary, provider loading and complete catalog title models pass 164 tests.
+boundary, provider loading, complete catalog title models and scene storage pass 178 tests.
 Fifteen additional Rust driver tests cover the retained C account/addon screens,
 view layouts, Home-order frame publication and actual source/subtitle workers
 under Xvfb. The five relevant C reference groups passed
@@ -132,3 +132,8 @@ title references. Deferred save/watched notifications clone and release an owned
 title context. The touched notification components use English code/files/text
 while retaining the existing island rendering. Retained playback holds its title
 until the session is discarded; normal closure releases it after progress work.
+
+Complete Home scenes now have a tested Rust model and private Serde JSON store,
+covering artwork/cast/resume/seasons/availability and full provider values.
+Native rehydration, remaining worker ownership and application cache wiring are
+still pending. See [scene cache](scene-cache.md).

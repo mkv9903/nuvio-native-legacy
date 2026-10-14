@@ -270,6 +270,11 @@ The application producer, scene cache and remaining C consumers are still being
 adapted; see [title ownership](title-ownership.md). This foundation does not yet
 switch application catalog loading to Rust.
 
+The complete scene model and private versioned JSON store are also implemented
+and tested in Rust. This prepares persistence for native-owned titles and rows;
+the runtime binary cache has not yet been replaced. See [scene cache](scene-cache.md)
+for fields, scope guards and remaining integration.
+
 Implementation is in progress. This document is not a Linux or TV test handoff.
 The first account flow has user-confirmed Fedora QR and email/password login;
 the new Rust runtime has not yet been verified on the TV.
