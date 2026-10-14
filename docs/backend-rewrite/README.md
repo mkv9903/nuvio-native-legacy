@@ -137,3 +137,9 @@ Complete Home scenes now have a tested Rust model and private Serde JSON store,
 covering artwork/cast/resume/seasons/availability and full provider values.
 Native rehydration, remaining worker ownership and application cache wiring are
 still pending. See [scene cache](scene-cache.md).
+
+The title/scene checkpoint at `ddc25bb9` also passes the Linux build and a
+disposable preview startup, plus webOS ARM compilation, soft-float/glibc 2.12
+checks and matching runtime/full/debug build IDs. Build-only artifacts are
+archived under `build/backend/webos/checkpoints/ddc25bb9`. No new IPK was made;
+the canonical earlier package/runtime/symbol set was restored and hash-verified.

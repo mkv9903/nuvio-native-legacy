@@ -325,3 +325,11 @@ The scene layer is not yet the application cache. Native scene capture/restore,
 remaining C copy ownership and actual catalog orchestration still need to be
 connected before removing the C binary routines and their retained test programs.
 See [the storage record](scene-cache.md).
+
+The complete `ddc25bb9` source checkpoint builds for Linux and remains running
+during a ten-second Xvfb preview check with disposable data. Its webOS ARM build
+passes soft-float ABI and imported glibc <= 2.12 checks, with identical executable/
+full/debug build IDs. Build-only artifacts and the source/hash record are archived
+under `build/backend/webos/checkpoints/ddc25bb9`. The canonical earlier IPK and its
+matching runtime/symbol files were restored and hash-verified. TV runtime and
+complete catalog/profile integration remain unverified.
