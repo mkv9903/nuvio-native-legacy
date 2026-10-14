@@ -62,6 +62,15 @@ fn number(value: &Value) -> Option<f64> {
         .or_else(|| value.as_str()?.parse().ok())
         .filter(|number| number.is_finite())
 }
+/// Normalize addon ratings before rounding. Percent-form values remain
+/// supported, while a perfect ten stays on the ten-point scale.
+pub fn normalized_rating(value: f64) -> Option<f64> {
+    (value.is_finite() && (0.0..=100.0).contains(&value)).then_some(if value > 10.0 {
+        value / 10.0
+    } else {
+        value
+    })
+}
 fn safe_background(input: &str) -> String {
     if url::Url::parse(input)
         .ok()
@@ -115,8 +124,7 @@ impl CatalogTitle {
         let rating = value
             .get("imdbRating")
             .and_then(number)
-            .filter(|value| (0.0..=100.0).contains(value))
-            .map(|value| if value > 10.0 { value / 10.0 } else { value });
+            .and_then(normalized_rating);
         let tmdb_id = if matches!(media_type.as_str(), "movie" | "series") {
             value
                 .get("moviedb_id")

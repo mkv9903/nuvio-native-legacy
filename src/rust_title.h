@@ -21,5 +21,6 @@ void nuvio_titles_next_frame(void);
 const char *nuvio_title_text(const RustTitleSnapshot *title, unsigned field);
 void nuvio_title_copy_text(const RustTitleSnapshot *title, unsigned field, char *output, size_t capacity);
 int nuvio_title_rating(const RustTitleSnapshot *title);
+int nuvio_title_rating_value(double value);
 uint64_t nuvio_title_tmdb_id(const RustTitleSnapshot *title);
 #endif

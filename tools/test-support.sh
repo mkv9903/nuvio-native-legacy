@@ -16,7 +16,7 @@ cc() {
     case "$argument" in *src/account_ui_adapter.c|*src/sync.c) needs_registry=1 ;; esac
     case "$argument" in *src/addon_registry.c) has_registry=1 ;; esac
     case "$argument" in *src/home_order_runtime.c) has_order=1 ;; esac
-    case "$argument" in *src/catalogo.c) needs_items=1 ;; esac
+    case "$argument" in *src/catalogo.c|*src/descoberta.c) needs_items=1 ;; esac
     case "$argument" in *src/catalog_item.c) has_items=1 ;; esac
     case "$argument" in tests/listas.c|tests/salvospainel_tabs.c|tests/player_retido.c|tests/releaseinfo.c) profile_fixture=1 ;; esac
   done

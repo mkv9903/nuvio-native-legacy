@@ -39,6 +39,7 @@ extern "C" {
     fn native_title_reset_undo();
     fn action_notice_has_undo() -> i32;
     fn action_notice_button(button: i32);
+    fn discovery_test_rating_paths(body: *const c_char, ratings: *mut i32) -> i32;
 }
 fn snapshot(id: &str, poster: &str) -> Arc<TitleSnapshot> {
     let title = CatalogTitle::from_meta(
@@ -280,4 +281,33 @@ fn actual_saved_menu_and_live_channel_keep_independent_complete_selections() {
         weak.upgrade().is_none(),
         "menu/channel selection leaked its owner"
     );
+}
+
+#[test]
+fn retained_catalog_detail_and_partial_metadata_paths_use_rust_rating_conversion() {
+    for (rating, expected, partial) in [
+        (json!("8.5"), 85, 85),
+        (json!(10), 100, 100),
+        (json!("10.0"), 100, 100),
+        (json!(9.95), 100, 100),
+        (json!(9.94), 99, 99),
+        (json!(100), 100, 100),
+        (json!(85), 85, 85),
+        (json!(0.01), 0, 0),
+        (json!(null), 0, 85),
+        (json!("NaN"), 0, 85),
+        (json!("1e400"), 0, 85),
+        (json!(101), 0, 85),
+    ] {
+        let body = CString::new(
+            json!({"id":"tt1","name":"Title","poster":"poster","imdbRating":rating}).to_string(),
+        )
+        .unwrap();
+        let mut scores = [-1; 3];
+        assert_eq!(
+            unsafe { discovery_test_rating_paths(body.as_ptr(), scores.as_mut_ptr()) },
+            1
+        );
+        assert_eq!(scores, [expected, expected, partial], "rating {rating}");
+    }
 }

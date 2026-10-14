@@ -1,7 +1,7 @@
 //! Immutable, complete title data retained by native readers independently.
 use crate::{
     addons::ADDON_RESPONSE_LIMIT,
-    catalog_titles::CatalogTitle,
+    catalog_titles::{normalized_rating, CatalogTitle},
     error::{Error, Result},
 };
 use std::{
@@ -172,7 +172,15 @@ pub unsafe extern "C" fn nuvio_title_copy_text(
 pub unsafe extern "C" fn nuvio_title_rating(title: *const TitleSnapshot) -> i32 {
     unsafe { title.as_ref() }
         .and_then(|title| title.title.rating)
-        .map(|rating| (rating * 10.0).round() as i32)
+        .map(|rating| nuvio_title_rating_value(rating))
+        .unwrap_or(0)
+}
+/// Retained metadata readers use the same conversion until their full loaders
+/// move to Rust. Invalid or missing ratings have no visible score.
+#[no_mangle]
+pub extern "C" fn nuvio_title_rating_value(value: f64) -> i32 {
+    normalized_rating(value)
+        .map(|value| (value * 10.0).round() as i32)
         .unwrap_or(0)
 }
 #[no_mangle]

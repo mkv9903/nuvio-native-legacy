@@ -152,7 +152,15 @@ fn ratings_keep_their_scale_when_perfect_or_rounded_to_one_hundred_percent() {
         assert!(!title.is_null());
         unsafe {
             assert_eq!(nuvio_title_rating(title), expected, "rating {rating}");
+            let value = rating
+                .as_f64()
+                .or_else(|| rating.as_str()?.parse().ok())
+                .unwrap_or(0.0);
+            assert_eq!(nuvio_title_rating_value(value), expected);
             nuvio_title_release(title);
         }
+    }
+    for invalid in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY, -1.0, 101.0] {
+        assert_eq!(nuvio_title_rating_value(invalid), 0);
     }
 }

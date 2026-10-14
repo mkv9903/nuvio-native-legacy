@@ -333,3 +333,13 @@ full/debug build IDs. Build-only artifacts and the source/hash record are archiv
 under `build/backend/webos/checkpoints/ddc25bb9`. The canonical earlier IPK and its
 matching runtime/symbol files were restored and hash-verified. TV runtime and
 complete catalog/profile integration remain unverified.
+
+## Live rating conversion
+
+All three retained metadata paths now delegate rating conversion to Rust. The
+backend suite still passes 178 tests, with extended native-math edge cases in
+the existing title test. The native suite now passes 16 tests: the new case
+executes the real C catalog reader, detail enrichment and partial update through
+the Rust helper. Perfect numeric/string 10 and percent 100 remain 100%, 9.95
+rounds to 100%, 8.5 remains 85%, and missing/invalid partial values retain the
+prior score. This prevents later detail enrichment from reintroducing the bug.

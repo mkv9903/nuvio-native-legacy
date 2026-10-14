@@ -11,6 +11,13 @@ The user also approved correcting the old rating conversion: 8.5/10 remains
 85%, while 10/10 and scores rounding to 100% remain 100%. The C conversion's
 second scale adjustment incorrectly turned those scores into 10%.
 
+The retained C catalog reader, detail enrichment and partial metadata updates
+now call the same Rust conversion helper. The correction therefore runs in the
+current application as well as the new Rust title model. Invalid/nonfinite
+scores have no displayed rating; missing scores in a partial detail response
+continue to preserve the existing score. The full C metadata reader remains
+until its loader is replaced.
+
 ## Native title foundation
 
 Rust owns complete provider IDs, separate IMDb hints, title strings and artwork
@@ -68,7 +75,7 @@ unmigrated settings backend; they are not Rust save-file imports.
 
 Five Rust title tests cover complete strings, provider/IMDb identity, independent
 references, Unicode projection, malformed inputs, display NULs, concurrent
-readers and rating scaling. Seven Rust-driven native tests use the actual C
+readers and rating scaling. Eight Rust-driven native tests use the actual C
 catalog to cover held selections across replacement, final-owner release,
 legacy artwork enrichment and frame-safe in-place updates. Remaining C catalog
 tests continue to exercise their unmigrated algorithms; they are not replacements
@@ -80,5 +87,9 @@ one-time undo execution after its source is released, replacement/cancellation,
 final-owner release and context-clone failure. The retained C playback-retention
 fixture also passes, including pause confirmation, same-session resume,
 timeouts, account/profile changes, backend replacement and saved-source behavior.
+
+The native rating case exercises the actual C catalog/detail/partial-update
+paths with decimal and percent variants, numeric/string perfect scores, near-10
+rounding, tiny positive values, missing values, NaN/overflow and invalid scores.
 
 No TV handoff is requested for this foundation checkpoint.

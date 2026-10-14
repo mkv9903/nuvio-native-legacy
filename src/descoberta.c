@@ -11,6 +11,7 @@
 #include "metaprov.h"
 #include <SDL2/SDL.h>
 #include "catalogo.h"
+#include "catalog_item.h"
 #include "addons.h"
 #include "addon_registry.h"
 #include "rede.h"
@@ -1160,9 +1161,7 @@ static int deMeta(const char *ini, const char *fim, const char *tipo, CatItem *d
   // aparece enquanto nao houver valor. Quem preenche de verdade e a ficha do
   // TMDB em extras.c (release_dates -> certification), que chega depois.
   d->classificacao[0] = 0;
-  { double nota = js_num(ini, fim, "imdbRating", 0.0);
-    d->nota = (int)(nota * 10.0 + 0.5) / 1; }
-  if (d->nota > 99) d->nota /= 10;
+  d->nota = nuvio_title_rating_value(js_num(ini, fim, "imdbRating", 0.0));
   return 1;
 }
 
@@ -6177,6 +6176,11 @@ static int metaCatalogoResolver(const CatItem *orig, MetaFontes *mf) {
 
 // Elenco/direcao/generos/nota/pais a partir de uma ficha, so nos campos que
 // `d` ainda tem vazios (`soVazios`=1) ou todos os que a ficha traz (0).
+static void apply_positive_rating(CatItem *title, const char *body) {
+  double value = js_num(body, NULL, "imdbRating", 0.0);
+  if (value > 0.0 && value <= 100.0) title->nota = nuvio_title_rating_value(value);
+}
+
 static void fichaDe(CatItem *d, const char *corpo, int soVazios) {
   const char *c = js_array(corpo, NULL, "cast");
   if (!soVazios || !d->nElenco) {
@@ -6214,15 +6218,29 @@ static void fichaDe(CatItem *d, const char *corpo, int soVazios) {
     // um genero: so vale como "ja tem" se veio de uma ficha.
     if (lista[0] && (!soVazios || !d->genero[0])) snprintf(d->genero, sizeof d->genero, "%s", lista); }
   if (!soVazios || d->nota <= 0) {
-    double nota = js_num(corpo, NULL, "imdbRating", 0.0);
-    if (nota > 0.0) {
-      int n10 = (int)(nota * 10.0 + 0.5);
-      if (n10 > 99) n10 /= 10;
-      d->nota = n10;
-    }
+    apply_positive_rating(d, corpo);
   }
   if (!soVazios || !d->pais[0]) js_texto(corpo, NULL, "country", d->pais, sizeof d->pais);
 }
+
+#ifdef NV_NATIVE_UI_TEST
+/* Exercise the retained catalog, detail and partial-update rating paths. */
+int discovery_test_rating_paths(const char *body, int *ratings) {
+  CatItem *title;
+  if (!body || !ratings || !(title = calloc(1, sizeof *title))) return 0;
+  if (!deMeta(body, body + strlen(body), "movie", title)) {
+    catalog_item_clear(title); free(title); return 0;
+  }
+  ratings[0] = title->nota;
+  fichaDe(title, body, 0);
+  ratings[1] = title->nota;
+  title->nota = 85;
+  apply_positive_rating(title, body);
+  ratings[2] = title->nota;
+  catalog_item_clear(title); free(title);
+  return 1;
+}
+#endif
 
 // As fontes de COMPLEMENTO (a partir da segunda) preenchem o que a base deixou
 // vazio: ficha e sinopse/fundo/logo (completarRaso, que so age em item sem sinopse).
@@ -6418,14 +6436,7 @@ static void *buscarEps(void *u) {
     { char lista[160];
       generosDe(corpo, lista, sizeof lista, ehFilme ? "movie" : "series");
       if (lista[0]) snprintf(edit.genero, sizeof edit.genero, "%s", lista); }
-    { double nota = js_num(corpo, NULL, "imdbRating", 0.0);
-      // O campo vem como "8.1" (string ou numero); guardamos por 10 para caber
-      // em int sem perder a casa decimal, como o resto do catalogo ja faz.
-      if (nota > 0.0) {
-        int n10 = (int)(nota * 10.0 + 0.5);
-        if (n10 > 99) n10 /= 10;      // ja veio multiplicado
-        edit.nota = n10;
-      } }
+    apply_positive_rating(&edit, corpo);
     js_texto(corpo, NULL, "country", edit.pais, sizeof edit.pais);
     // Temporadas presentes, sem repetir e em ordem.
     { const char *v = js_array(corpo, NULL, "videos");
