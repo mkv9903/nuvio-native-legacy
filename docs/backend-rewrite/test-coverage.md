@@ -343,3 +343,9 @@ executes the real C catalog reader, detail enrichment and partial update through
 the Rust helper. Perfect numeric/string 10 and percent 100 remain 100%, 9.95
 rounds to 100%, 8.5 remains 85%, and missing/invalid partial values retain the
 prior score. This prevents later detail enrichment from reintroducing the bug.
+
+The live fix at `c1f58ce5` also builds for Linux and webOS ARM. Its ARM artifact
+passes soft-float/glibc <= 2.12 checks and matching runtime/full/debug build IDs;
+build-only files and hashes are archived under its `checkpoints` directory.
+The earlier canonical IPK/runtime/symbol set was restored and hash-verified.
+No new IPK was produced and no TV runtime test was performed.

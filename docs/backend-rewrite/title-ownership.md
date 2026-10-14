@@ -49,8 +49,8 @@ capture/restore and application wiring before native titles are published.
 
 This checkpoint does **not** enable the Rust title producer in the application.
 Catalog loading still uses the C producer. Before switching it over, adapt
-worker arrays and remaining temporary copies;
-replace the assembled binary cache; and connect complete IDs and image strings
+worker arrays and remaining temporary copies; replace the assembled binary
+cache; and connect complete IDs and image strings
 through Details, source selection and rendering consumers. Existing enrichment,
 episode, progress and commercial-availability data must survive those changes.
 Profile-scoped catalog scheduling and publication remain part of this milestone.
