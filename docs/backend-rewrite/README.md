@@ -69,7 +69,8 @@ The Rust account domain, HTTP client, worker, native boundary, platform helper,
 Home ordering, addon networking/storage, edit merging and the native addon
 boundary, provider loading and complete catalog title models pass 159 tests.
 Eight additional Rust driver tests cover the retained C account/addon screens,
-view layouts and actual source/subtitle workers under Xvfb. The five relevant C reference groups passed
+view layouts, Home-order frame publication and actual source/subtitle workers
+under Xvfb. The five relevant C reference groups passed
 before their test cases moved to Rust. See [test coverage](test-coverage.md).
 The Linux app builds and starts under Xvfb using disposable isolated preview
 data. The addon runtime checkpoint also checks retained sync ordering, account
@@ -87,6 +88,13 @@ compatibility builds are archived separately under its `checkpoints` directory;
 they are not new IPKs or manual-test handoffs. The addon-runtime compatibility
 build at `0869329b` also passes ARM/ABI/glibc checks; it is archived without an
 IPK, with the earlier matching package/runtime/symbol set restored.
+
+The Home-order runtime at `e7385a83` passes 159 backend tests, eight native
+Rust/C driver tests, retained C profile-cycle/outage/collection checks, and a
+Linux build with disposable preview startup. Its ARM compatibility build passes
+the soft-float/glibc checks and has matching executable/debug build IDs. It is
+archived separately without an IPK; the canonical earlier package and its
+matching runtime/symbol files have been restored and hash-verified.
 
 The user's Fedora check found a QR response-shape regression, which was corrected
 against the live anonymous service. The user has now confirmed that both QR and
