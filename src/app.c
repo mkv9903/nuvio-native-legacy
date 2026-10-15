@@ -2379,7 +2379,7 @@ void app_atualizar(float dt, Uint32 agora) {
   if (!uiPreview)
 #endif
   {
-    addon_registry_step(ajustes_addons_do_principal(), !player_aberto());
+    addon_registry_step(0, !player_aberto());
     home_order_runtime_step(!player_aberto());
     catalog_runtime_step();
   }

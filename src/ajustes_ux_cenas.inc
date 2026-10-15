@@ -627,19 +627,19 @@ static void ajcCenaFontes(int op) {
   }
 }
 // Addons e plugins: pecas de quebra-cabeca com interruptores.
-static void ajcCenaAddons(int op) {
-  int i, sel = ajc_passo(1.8f, 4);
-  for (i = 0; i < 4; i++) {
-    float y = 50 + i * 66;
+static void draw_addon_illustration(int op) {
+  int index, selection = ajc_passo(1.8f, 4);
+  for (index = 0; index < 4; index++) {
+    float y = 50 + index * 66;
     ajc_neutro(60, y, 360, 54, 14, 1);
     ajc_ladrilho(op == AJ_PLUGINS ? "aj_plug" : "aj_puzzle", 92, y + 27, 34, 0, 1);
     ajc_barra(120, y + 18, 150, 0.75f); ajc_barra(120, y + 32, 90, 0.35f);
-    ajc_chave(364, y + 16, i == 2 ? (sel == 2 ? 1 - ajc_passo_t(1.8f) : 0) : 1, 1);
-    if (i == sel) ajc_foco(60, y, 360, 54, 14, 1);
+    ajc_chave(364, y + 16, index == 2 ? (selection == 2 ? 1 - ajc_passo_t(1.8f) : 0) : 1, 1);
+    if (index == selection) ajc_foco(60, y, 360, 54, 14, 1);
   }
-  // o catalogo que eles alimentam
-  for (i = 0; i < 3; i++) ajc_cartaz(450 + (i % 2) * 70, 60 + (i / 2) * 110, 60, 90, i + 3, i == 2 && sel == 2 ? 1 - ajc_passo_t(1.8f) : 1);
-  if (op == AJ_ADDONS_PRINCIPAL || op == AJ_BUSCA_CINEMETA) ajcChaveCanto(ajcLig(op));
+  // Illustrate the catalogs supplied by these addons.
+  for (index = 0; index < 3; index++) ajc_cartaz(450 + (index % 2) * 70, 60 + (index / 2) * 110, 60, 90, index + 3, index == 2 && selection == 2 ? 1 - ajc_passo_t(1.8f) : 1);
+  if (op == AJ_BUSCA_CINEMETA) ajcChaveCanto(ajcLig(op));
 }
 // Debrid, P2P, servidores, TV ao vivo: a TV ligada a um servico, com o pulso.
 static void ajcCenaServico(int op, const char *icone) {
@@ -800,7 +800,7 @@ static void ajcCenaOpcao(int sec, int op) {
     case AJ_ANIM: case AJ_RELOGIO: case AJ_RELOGIO_12H: case AJ_ESMAECER: case AJ_DESCANSO_ESTILO: case AJ_DESCANSO_FONTE:
       ajcCenaMovimento(op); return;
     case AJ_QUALIDADE: case AJ_DV: case AJ_ATMOS: case AJ_FONTE_HDR: ajcCenaQualidade(op); return;
-    case AJ_ADDONS: case AJ_PLUGINS: case AJ_ADDONS_PRINCIPAL: case AJ_BUSCA_CINEMETA: ajcCenaAddons(op); return;
+    case AJ_ADDONS: case AJ_PLUGINS: case AJ_BUSCA_CINEMETA: draw_addon_illustration(op); return;
     case AJ_IDIOMA: case AJ_TMDB_IDIOMA: ajcCenaIdioma(op); return;
     case AJ_DEBRID_RD: case AJ_DEBRID_TB: case AJ_DEBRID_PM: case AJ_DEBRID_AD: case AJ_DEBRID_AD_TESTAR:
       ajcCenaServico(op, "aj_zap"); return;
@@ -832,7 +832,7 @@ static void ajcCenaCategoria(int sec) {
     case AJS_TRAILERS: ajcCenaTrailer(-1); return;
     case AJS_APARENCIA: ajcCenaCor(AJ_TEMA); return;
     case AJS_REPRODUCAO: ajcCenaQualidade(AJ_QUALIDADE); return;
-    case AJS_FONTES: ajcCenaAddons(AJ_ADDONS); return;
+    case AJS_FONTES: draw_addon_illustration(AJ_ADDONS); return;
     case AJS_IDIOMAS: ajcCenaLegenda(AJ_LEG_LINGUA); return;
     case AJS_TVAOVIVO: ajcCenaAoVivo(-1); return;
     case AJS_CONTAS: ajcCenaPerfis(-1); return;

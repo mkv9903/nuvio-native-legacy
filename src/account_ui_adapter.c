@@ -26,7 +26,6 @@
 void fontepref_definir_perfil(int profile);
 void arteesc_definir_perfil(int profile);
 void plugins_perfil_mudou(void);
-int ajustes_addons_do_principal(void);
 
 static RustAccount *account;
 static pthread_key_t view_key;
@@ -162,12 +161,12 @@ const AccountProfile *profiles_get_active(void) {
 }
 const char *profiles_owner(void) { const RustAccountView *view = current_view(); return view ? view->owner : ""; }
 int profiles_active(void) { return (int)nuvio_account_active_id(account); }
-int profiles_active_addons(void) { return (int)nuvio_account_addon_profile(account, ajustes_addons_do_principal()); }
+int profiles_active_addons(void) { return (int)nuvio_account_addon_profile(account, 0); }
 void account_apply_profile(void) {
   int active = profiles_active();
   fil_definir_perfil(active); fontepref_definir_perfil(active); arteesc_definir_perfil(active);
   plugins_perfil_mudou();
-  addon_registry_step(ajustes_addons_do_principal(), 0);
+  addon_registry_step(0, 0);
   home_order_runtime_step(0);
 }
 void profiles_load_active(void) { refresh_view(); account_apply_profile(); }

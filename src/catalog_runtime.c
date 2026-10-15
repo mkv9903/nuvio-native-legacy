@@ -131,9 +131,18 @@ void catalog_runtime_use(const RustCatalogWork *work) {
   nuvio_catalog_work_release(old);
 }
 void catalog_runtime_cycle_begin(void) {
+  RustAddonSnapshot *addons;
   pthread_mutex_lock(&frame_lock);
+  /* The account wait may have crossed login or profile selection. Pin the
+   * exact list used by this job instead of the thread's pre-wait reader. */
+  nuvio_catalog_step(runtime);
   const RustCatalogWork *work = nuvio_catalog_begin(runtime);
   catalog_runtime_use(work); nuvio_catalog_work_release(work);
+  if (initialized) {
+    addons=nuvio_catalog_work_addons(catalog_runtime_work());
+    addon_registry_use(addons);
+    nuvio_addons_snapshot_destroy(addons);
+  }
   pthread_mutex_unlock(&frame_lock);
 }
 void catalog_runtime_cycle_end(void) { catalog_runtime_use(NULL); }

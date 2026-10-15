@@ -90,7 +90,7 @@ static const Item TELA[] = {
   // (escolha da fonte) e Contas e servicos (addons, debrid, P2P, servidores).
   SEC("Fontes e addons", "Addons, escolha da fonte e debrid", "aj_puzzle"),
     ROT("Addons"),
-      OPC(AJ_ADDONS), OPC(AJ_PLUGINS), OPC(AJ_ADDONS_PRINCIPAL), OPC(AJ_BUSCA_CINEMETA),
+      OPC(AJ_ADDONS), OPC(AJ_PLUGINS), OPC(AJ_BUSCA_CINEMETA),
     ROT("Escolha da fonte"),
       OPC(AJ_FONTE_MANUAL), OPC(AJ_FONTE_AUTO), OPC(AJ_FONTE_REPOR),
       OPC(AJ_FONTE_PRIORIDADE), OPC(AJ_FONTE_HDR), OPC(AJ_FONTE_PRAZO), OPC(AJ_FONTE_TOCAR_CONFERINDO), OPC(AJ_FONTE_AQUECER), OPC(AJ_FONTE_CONFERIR_VARIAS), OPC(AJ_FONTE_PREPARAR),

@@ -154,7 +154,6 @@
   1,                /* som do trailer no destaque: DESLIGADO (V_LIGA: 1 = Desligado) */
   22,               /* espera do trailer no destaque: 2,2 s (em decimos de segundo) */
   90,               /* percentual assistido: 90%, o numero fixo de antes */
-  0,                /* addons do perfil principal: LIGADO (V_LIGA: 0 = Ligado) */
   0,                /* transicao do destaque: Deslizar */
   // Arte do addon: todas DESLIGADAS (V_LIGA: 1 = Desligado) — o visual de antes.
   1, 1, 1, 1,       /* posteres, fundo, logo do addon; arte das pastas da conta */

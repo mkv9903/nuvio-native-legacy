@@ -164,9 +164,6 @@ int  ajustes_cor_logo(void);
 int  ajustes_vidro(void);
 // "Contorno do vidro": 1 = o fio fino dos cartoes/linhas em repouso aparece.
 int  ajustes_vidro_contorno(void);
-// Ajustes > Conta, "Usar os addons do perfil principal" (padrao ligado): o
-// perfil que nao e o principal le os addons do principal. Ver perfis_ativo_addons.
-int  ajustes_addons_do_principal(void);
 // So para as capturas de teste e o atalho de quem ja sabe: grava como a tela.
 void ajustes_definir_vidro(int ligado);
 // A MESMA cor mais a TINTA que contrasta com ela (acentos-mockup.html, 03/10):

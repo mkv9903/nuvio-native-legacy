@@ -212,7 +212,7 @@ static const char *uxSinonimos(int op) {
  * procura pelo nome que ja conhecia: "contas", "chaves", "escolha da fonte". */
 static const char *uxCaminhoAntigo(int op) {
   switch (op) {
-    case AJ_ADDONS: case AJ_PLUGINS: case AJ_ADDONS_PRINCIPAL:
+    case AJ_ADDONS: case AJ_PLUGINS:
       return "Contas e serviços";
     case AJ_DEBRID_RD: case AJ_DEBRID_TB: case AJ_DEBRID_PM: case AJ_DEBRID_AD: case AJ_DEBRID_AD_TESTAR:
     case AJ_MDB_CHAVE: case AJ_FANART_CHAVE:

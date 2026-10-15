@@ -14,6 +14,7 @@ void nuvio_catalog_destroy(const RustCatalogRuntime *runtime);
 void nuvio_catalog_step(const RustCatalogRuntime *runtime);
 void nuvio_catalog_logout(const RustCatalogRuntime *runtime);
 const RustCatalogWork *nuvio_catalog_begin(const RustCatalogRuntime *runtime);
+RustAddonSnapshot *nuvio_catalog_work_addons(const RustCatalogWork *work);
 const RustCatalogWork *nuvio_catalog_work_retain(const RustCatalogWork *work);
 void nuvio_catalog_work_release(const RustCatalogWork *work);
 int nuvio_catalog_work_current(const RustCatalogWork *work);

@@ -251,9 +251,6 @@ typedef enum {
   // Continuar assistindo passa ao proximo. No fim pelo mesmo motivo: valor[] e
   // CHAVE[] sao posicionais.
   AJ_CW_CONCLUIDO,
-  // Perfil que nao e o principal le os addons do principal (perfis_ativo_addons).
-  // No fim pelo mesmo motivo: valor[] e CHAVE[] sao posicionais.
-  AJ_ADDONS_PRINCIPAL,
   // Como o destaque troca de titulo: deslizando de lado ou esmaecendo
   // (home.c, heroDesliza). No fim pelo mesmo motivo: valor[] e CHAVE[] sao
   // posicionais.
@@ -1069,7 +1066,6 @@ static const Opcao OPCOES[AJ_N] = {
   // Era o 90 fixo de montarContinuar/home_registrar_retorno/proximo.h. Local:
   // o web nao tem a escolha.
   NUM("Percentual assistido",            70, 98, 1, "%"),  // local: cwConcluidoLocal
-  ESC("Usar os addons do perfil principal", V_LIGA, 2), // local: addonsPrincipalLocal
   ESC("Transição do destaque",   V_HERO_TRANSICAO, 2), // local: heroTransicaoLocal
   ESC("Pôsteres do addon",               V_LIGA, 2),   // local: posterAddonLocal
   ESC("Fundo do destaque do addon",      V_LIGA, 2),   // local: fundoAddonLocal
@@ -1281,9 +1277,6 @@ static const char *CHAVE[] = {
   "trailerDestaqueSomLocal", "trailerDestaqueEsperaLocal",
   // LOCAL e SEM o "-": o web nao tem esta escolha e ela precisa sobreviver.
   "cwConcluidoLocal",
-  // LOCAL e SEM o "-": escolha desta TV, somada a marca uses_primary_addons da
-  // conta (ver perfis_ativo_addons).
-  "addonsPrincipalLocal",
   // LOCAL e SEM o "-": o web nao tem esta escolha.
   "heroTransicaoLocal",
   // LOCAIS e SEM o "-": o web nao tem estas escolhas e elas precisam sobreviver.
@@ -1715,7 +1708,6 @@ int ajustes_vidro(void) { return 1; }
 int ajustes_vidro(void) { return lig(AJ_VIDRO) && !SEGURO; }
 int ajustes_fundo(void) { int v = valor[AJ_FUNDO]; return v >= 0 && v < 3 ? v : 0; }
 int ajustes_vidro_contorno(void) { return lig(AJ_VIDRO_CONTORNO); }
-int ajustes_addons_do_principal(void) { return lig(AJ_ADDONS_PRINCIPAL); }
 #endif
 float ajustes_vidro_opacidade(void) {
   static const float F[] = { 0.60f, 0.70f, 0.78f, 0.86f, 0.92f };
@@ -3403,7 +3395,6 @@ static int somenteDesteAparelho(int op) {
     case AJ_VIDRO:          /* visual desta TV: a GPU de cada uma aguenta diferente */
     case AJ_VIDRO_CONTORNO:
     case AJ_CW_CONCLUIDO:   /* o web nao tem esta escolha */
-    case AJ_ADDONS_PRINCIPAL: /* escolha desta TV; a conta tem uses_primary_addons */
     case AJ_HERO_TRANSICAO: /* o web nao tem esta escolha */
     case AJ_ADDON_POSTER: case AJ_ADDON_FUNDO: case AJ_ADDON_LOGO:
     case AJ_DET_TRAILER_SOM: /* o web nao tem */
@@ -4411,7 +4402,6 @@ static const char *ajudaOpcao(int op) {
     case AJ_POSTER_TESTAR: return "Baixa o cartaz de um filme conhecido com a configuração atual e mostra se deu certo. O primeiro cartaz de cada título é montado no servidor e pode levar alguns segundos.";
     case AJ_HOME_LAYOUT: return "Moderna: destaque atrás das fileiras. Padrão: destaque num banner no topo. Dinâmica: estilo Apple TV, com destaques grandes e Top 10.";
     case AJ_VIDRO: return "Painéis, botões e menus viram ilhas translúcidas que deixam a arte aparecer. Desligado, as mesmas ilhas ficam opacas. Só muda o visual; nada muda de lugar.";
-    case AJ_ADDONS_PRINCIPAL: return "Os outros perfis desta conta usam os addons do perfil principal. Desligado, cada perfil usa os seus — a não ser que a conta já diga para usar os do principal.";
     case AJ_VIDRO_CONTORNO: return "O contorno das linhas e dos cartões, inclusive o do foco. Desligado, o item em foco é marcado só por um fundo mais claro na cor de destaque.";
     case AJ_COR_LOGO: return "Com um tema dinâmico, a cor sai do logo do título em vez da arte de fundo. Logo branco ou preto usa a arte.";
     case AJ_MANTER_VIDEO: return "Ao sair de um filme para a home, o vídeo fica pausado e carregado por até 2 minutos, e o Retomar volta na hora. Custa caro: a memória do vídeo e o player ficam presos, o trailer da home não toca nesse tempo e TVs mais fracas podem ficar lentas. Desligado (padrão), o player é liberado ao sair e o Retomar reabre direto pela fonte que estava tocando, sem procurar nos add-ons.";
@@ -5317,7 +5307,6 @@ static int definirValorDireto(int op, int novo) {
   }
   // Back to Automatic = measure again at the next launch.
   if (op == AJ_RESOLUCAO && novo == RES_AUTO) dados_apagar(RES_ARQ_AUTO);
-  if (op == AJ_ADDONS_PRINCIPAL) sync_iniciar();
   if (op == AJ_SELOS_PACOTE) { selospacote_escolher(novo - 1); spEspelhar(); }
   // Modelo de regex (#202): escolher um troca o padrao; "Personalizado" so
   // deixa o padrao como esta.
@@ -5974,7 +5963,6 @@ static AjPreview familiaPreviaOpcao(int op) {
     case AJ_DESCANSO_ESTILO: case AJ_DESCANSO_FONTE:
       return AJPV_INTERFACE;
     case AJ_PERFIL_ATIVO: case AJ_SYNC: case AJ_SAIR:
-      case AJ_ADDONS_PRINCIPAL:
       return AJPV_CONTA;
     case AJ_SALVOS_DEST: case AJ_TRAKT: case AJ_SIMKL:  case AJ_HIST_CONTA:
       return AJPV_RASTREIO;

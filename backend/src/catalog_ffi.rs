@@ -133,6 +133,19 @@ pub unsafe extern "C" fn nuvio_catalog_begin(
         .unwrap_or(ptr::null())
 }
 #[no_mangle]
+pub unsafe extern "C" fn nuvio_catalog_work_addons(
+    work: *const NativeCatalogWork,
+) -> *mut NativeAddonSnapshot {
+    unsafe { work.as_ref() }
+        .filter(|work| work.runtime.scenes.current(&work.work))
+        .map(|work| {
+            Box::into_raw(Box::new(NativeAddonSnapshot::new(
+                work.work.source.addons.clone(),
+            )))
+        })
+        .unwrap_or(ptr::null_mut())
+}
+#[no_mangle]
 pub unsafe extern "C" fn nuvio_catalog_work_retain(
     work: *const NativeCatalogWork,
 ) -> *const NativeCatalogWork {

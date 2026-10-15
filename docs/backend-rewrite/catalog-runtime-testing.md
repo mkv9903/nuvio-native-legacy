@@ -1,5 +1,9 @@
 # Integrated catalog test build
 
+For the subsequent profile-switch correction, see
+[profile catalog regression](profile-catalog-regression.md). The packaged
+checkpoint below records the earlier integrated catalog build.
+
 The native app now uses Rust for Home catalog HTTP requests, response parsing,
 provider-document caching, complete title/row ownership and private scene JSON.
 The C UI retains its layout, illustrations and remote navigation. C Home

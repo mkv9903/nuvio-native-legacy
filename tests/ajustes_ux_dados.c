@@ -327,7 +327,7 @@ static void reorganizacao202(void) {
     { AJ_ATUALIZAR, "Sobre e ajuda" },
   };
   static const struct { int op; const char *sec, *grp; } MUDARAM[] = {
-    { AJ_PLUGINS, "Fontes e addons", "Addons" }, { AJ_ADDONS_PRINCIPAL, "Fontes e addons", "Addons" },
+    { AJ_PLUGINS, "Fontes e addons", "Addons" },
     { AJ_BUSCA_CINEMETA, "Fontes e addons", "Addons" }, { AJ_TAM_MAX, "Fontes e addons", "Escolha da fonte" },
     { AJ_DEBRID_RD, "Fontes e addons", "Debrid" }, { AJ_MDB_CHAVE, "Página do título", "Notas" }, { AJ_FANART_CHAVE, "Cartazes e arte", "De onde vem a arte" },
     { AJ_LEG_LINGUA2, "Idiomas e legendas", "Segunda legenda" },

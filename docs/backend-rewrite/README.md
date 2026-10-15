@@ -71,7 +71,7 @@ owner and otherwise wait/retry rather than using the signed-in member's ID.
 The Rust account domain, HTTP client, worker, native boundary, platform helper,
 Home ordering, addon networking/storage, edit merging and the native addon
 boundary, provider loading, complete catalog title models and scene
-storage/publication pass 196 tests. Forty-two additional Rust driver tests cover
+storage/publication pass 196 tests. Forty-five additional Rust driver tests cover
 the retained C account/addon screens, view layouts, Home-order publication,
 source/subtitle workers, title lifetimes and integrated catalog/profile paths.
 All 34 native catalog/title/capture cases also pass ASan/UBSan. The five relevant
@@ -183,3 +183,7 @@ ASan/UBSan cases pass. The webOS release/IPK passes payload, identity,
 soft-float/glibc 2.12 and matching-symbol checks. Canonical artifacts and hashes
 are under `build/backend/webos`; TV runtime testing is pending. The linked
 catalog test guide records the exact source, package hash and manual cases.
+
+The subsequent [profile catalog regression](profile-catalog-regression.md)
+removes the user-rejected local sharing override and pins the Home worker
+reader to its Rust job after the account wait.

@@ -3,6 +3,7 @@
 #   bash tests/ajustes_ux_dados.sh
 set -eu
 cd "$(dirname "$0")/.."
+source tools/test-support.sh
 sources=()
 for source in src/*.c; do
   case "$source" in src/main.c|src/ajustes.c) continue;; esac
