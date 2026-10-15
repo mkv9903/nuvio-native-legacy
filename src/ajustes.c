@@ -3,6 +3,8 @@
 // cancela. A lista mostra valor e chevron, a ficha explica alcance e padrao.
 // IDs, chaves persistidas e indices de valores continuam os legados.
 #include "ajustes.h"
+#include "catalog_item.h"
+#include "catalog_row.h"
 #include "horafmt.h"
 #include "ajustes_ux.h"
 #include "dados.h"

@@ -10,6 +10,8 @@
 // veio no pacote em vez de abrir vazio.
 #ifndef NV_DESCOBERTA_H
 #define NV_DESCOBERTA_H
+/* Discard transient metadata from the previously displayed Rust context. */
+void discovery_metadata_context_changed(void);
 #include <stddef.h>
 #include "catalogo.h"
 #include "colecoes.h"

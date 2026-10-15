@@ -5,6 +5,7 @@
 /* UI readers refresh once at a frame boundary. A worker pins its parent's
  * snapshot for the entire job; pointers stay valid until that reader refreshes. */
 void addon_registry_init(RustAccount *account, const char *directory);
+const RustAddons *addon_registry_controller(void);
 void addon_registry_step(int force_primary, int allow_periodic);
 void addon_registry_refresh(void);
 void addon_registry_use(const RustAddonSnapshot *snapshot);

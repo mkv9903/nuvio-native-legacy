@@ -1,5 +1,8 @@
 #include "catalogo.h"
 #include "catalog_item.h"
+#include "catalog_row.h"
+#include "catalog_runtime.h"
+#include "catalog_scene_adapter.h"
 #include "idbase.h"
 #include "tendencia.h"
 #include "artereserva.h"
@@ -21,6 +24,7 @@ __attribute__((weak)) int arte_reserva_registrar(const char *url, const char *im
 #include <stdio.h>
 
 static int mesmoTitulo(const char *a, const char *b);
+static int catalog_define_guarded(const CatItem *titles, int count, const CatFileira *rows, int row_count, const RustCatalogSceneView *view, unsigned expected_revision, const RustCatalogWork *work);
 static ProgRegistro *lerProgresso(int *k);
 static int aplicarProgressoEm(CatItem *v, int m, const ProgRegistro *regs, int k);
 static int removidoVence(const CatItem *c, const void *u);
@@ -733,375 +737,74 @@ int cat_carregar(const char *dirArte) {
 }
 
 #endif
-// --- CACHE EM DISCO ----------------------------------------------------------
-//
-// Ver a nota em catalogo.h. O cabecalho carrega a versao E o sizeof(CatItem):
-// e o sizeof que protege de verdade, porque acrescentar um campo na struct
-// muda o layout sem que ninguem se lembre de subir a versao a mao.
-// SO O PROTOTIPO, e nao #include "ajustes.h": aquele cabecalho puxa
-// <SDL2/SDL.h>, e catalogo.c e compilado sem SDL por tests/catcache.sh — que e
-// justamente o teste deste cache. Incluir o cabecalho troca um teste leve por
-// um que precisa da biblioteca grafica inteira para conferir um fwrite.
-int ajustes_idioma(void);
-
-#define CACHE_MAGIA  0x4E56434Bu   /* "NVCK" */
-// VERSAO 2: o cabecalho passou a carregar a identidade do dono. Subir a versao
-// nao e formalidade — um arquivo da versao 1 lido com esta struct daria um
-// usuario de lixo e um perfil de lixo, e a comparacao abaixo o recusaria por
-// acaso em vez de por regra.
-// VERSAO 3: o cabecalho passou a carregar o IDIOMA. `CatItem.genero` guarda o
-// rotulo do tipo JA TRADUZIDO ("Programa de TV · Drama"), montado na hora de
-// analisar — e o cache grava o CatItem inteiro. Sem este campo, uma home
-// gravada em portugues continuava dizendo "Programa de TV" e "Filme" depois de
-// a pessoa mudar para ingles, para sempre, enquanto o resto da tela (que passa
-// por i18n a cada desenho) ja estava traduzido. Relatado numa OLED48A2PUA.
-// VERSAO 4: CatItem.elenco cresceu de 6 para CAT_ELENCO_MAX (12) no issue #94.
-// O cabecalho ja grava sizeof(CatItem) e recusaria o arquivo por tamanho — a
-// versao sobe mesmo assim para o motivo da recusa ser o campo novo, e nao um
-// "tamanho diferente" que ninguem lembra de onde veio.
-// VERSAO 6: o vinculo do Trakt passou a ser POR PERFIL (traktauth.c). Ate a 5
-// o perfil 2 sem Trakt proprio usava o do perfil 1, e o cache gravado com o
-// perfil 2 guarda a watchlist, o "continuar" e as listas do Trakt do 1 com o
-// cabecalho dizendo "perfil 2" — a identidade confere e a home do 2 abriria
-// com o Trakt do 1 ate a rede substituir. O formato NAO mudou: um arquivo da 5
-// com perfil 1 continua certo (era o dono daquele Trakt) e e aceito, para o
-// perfil 1 nao pagar um arranque sem cache por nada; o de qualquer outro
-// perfil e recusado e apagado.
-#define CACHE_VERSAO 6
-// Mesmo cabecalho, itens CODIFICADOS (zeros em corrida). Um CatItem tem ~16 KB
-// e quase tudo e zero (buffers de URL dimensionados para o pior caso): 1600
-// titulos eram 25,6 MB gravados na MEMFS dentro da trava do sistema de arquivos
-// e levados ao IndexedDB pela syncfs, SINCRONA, no fio principal — e relidos
-// por inteiro a cada abertura. A magia diferente (e nao a versao) mantem o
-// teste de versao 5 e o formato do cabecalho como estavam; uma build antiga
-// que encontre este arquivo o descarta como "outra build".
-#define CACHE_MAGIA_RLE 0x4E56434Cu
-#define RLE_ZMIN 16u   /* corrida de zeros que vale separar */
-
-/* Formato: pares {u32 zeros, u32 literal, bytes[literal]} ate cobrir `n`.
-   dst == NULL so mede. */
-static size_t rleCodificar(const unsigned char *src, size_t n, unsigned char *dst) {
-  size_t i = 0, saida = 0;
-  while (i < n) {
-    size_t z = 0, l = 0, j;
-    unsigned zz, ll;
-    while (i + z < n && src[i + z] == 0) z++;
-    j = i + z;
-    while (j + l < n) {
-      size_t k = 0;
-      if (src[j + l] == 0) {
-        while (j + l + k < n && src[j + l + k] == 0 && k < RLE_ZMIN) k++;
-        if (k >= RLE_ZMIN || j + l + k >= n) break;
-        l += k;       /* zeros curtos ficam no literal */
-        continue;
-      }
-      l++;
-    }
-    zz = (unsigned)z; ll = (unsigned)l;
-    if (dst) { memcpy(dst + saida, &zz, 4); memcpy(dst + saida + 4, &ll, 4); memcpy(dst + saida + 8, src + j, l); }
-    saida += 8 + l;
-    i = j + l;
-  }
-  return saida;
+/* Rust owns private JSON scenes and restores them asynchronously after the
+ * account and selected profile are verified. These entry points retain the
+ * existing native callers; no original C cache file is opened or converted. */
+int cat_do_cache(void) { return __atomic_load_n(&veioDoCache,__ATOMIC_ACQUIRE); }
+void catalog_mark_cached(int cached) { __atomic_store_n(&veioDoCache,cached!=0,__ATOMIC_RELEASE); }
+void cat_cache_substituido(void) { catalog_mark_cached(0); }
+int cat_ler_cache(const char *directory) { (void)directory; return 0; }
+int cat_apagar_cache(void) { catalog_runtime_logout(); return 1; }
+int cat_gravar_cache(const char *directory) {
+  (void)directory; return catalog_runtime_capture(1);
 }
-static int rleDecodificar(const unsigned char *enc, size_t encN, unsigned char *dst, size_t n) {
-  size_t i = 0, o = 0;
-  memset(dst, 0, n);
-  while (i < encN) {
-    unsigned zz, ll;
-    if (i + 8 > encN) return 0;
-    memcpy(&zz, enc + i, 4); memcpy(&ll, enc + i + 4, 4);
-    i += 8;
-    if (zz > n - o || ll > n - o - zz || ll > encN - i) return 0;
-    o += zz;
-    memcpy(dst + o, enc + i, ll);
-    o += ll; i += ll;
-  }
-  return o <= n;
+int cat_gravar_cache_se_identidade(const char *directory, const char *member, int profile) {
+  const char *current=sessao_usuario();
+  if (!member || !current || strcmp(member,current) || profile!=perfis_ativo()) return 0;
+  return cat_gravar_cache(directory);
 }
-#define CACHE_VERSAO_SO_P1 5
-
-typedef struct {
-  unsigned magia, versao, tamItem, tamFileira;
-  int nItens, nFileiras;
-  // DE QUEM E ESTE CACHE. Ver a nota de cat_apagar_cache em catalogo.h: sem
-  // estes dois campos, a primeira abertura depois de trocar de conta ou de
-  // perfil mostrava a home da ANTERIOR — watchlist, continuar assistindo e o
-  // feed de amigos com nome e avatar — ate a rede substituir. E nao e so
-  // estetico: cada CatFileira leva `base` (addonurl.h), campo desse tamanho porque o
-  // Xperience embute um JWT no CAMINHO (ver catalogo.h). O arquivo carrega
-  // credencial de addon do usuario anterior.
-  char usuario[64];   // `sub` do JWT; "" quando deslogado
-  int  perfil;        // perfis_ativo()
-  int  ingles;        // ajustes_idioma() (IDIOMA_*; 0 pt, 1 en como antes) quando o arquivo foi escrito
-} CacheCab;
-
-// Quem esta logado AGORA. Chamada nas duas pontas — gravar e ler — e por isso o
-// arquivo so e aceito por quem o escreveu.
-//
-// `sub` e nao o token: o access_token ROTACIONA na renovacao, e chavear por ele
-// faria a mesma pessoa perder o cache toda vez que a sessao se renovasse.
-static void identidadeAtual(char *usr, size_t tam, int *perfil) {
-  const char *u = sessao_usuario();
-  snprintf(usr, tam, "%s", u ? u : "");
-  *perfil = perfis_ativo();
-}
-
-// Ultima pasta em que o cache foi procurado ou gravado. Existe so para
-// cat_apagar_cache, que e chamada do logout e nao tem `dirArte` nenhum na mao.
-//
-// Sem trava, e de proposito: dados_dir() nao muda depois de dados_iniciar,
-// entao o fio da descoberta reescreve aqui sempre os MESMOS bytes que o fio
-// principal ja escreveu no arranque. Uma trava protegeria uma escrita que nao
-// muda nada — e o unico caso em que o valor difere, dados_dir() vazia, e o
-// aparelho onde nada e gravavel e portanto nao ha cache nenhum em disputa.
-static char dirCache[512];
-
-// A PASTA GRAVAVEL GANHA DE `dirArte`, E A ESCOLHA MORA AQUI E NAO NOS
-// CHAMADORES.
-//
-// `dirArte` e o PACOTE. No alvo Tizen ele e /app/art, que vem de
-// --preload-file (tools/tizen.sh) e portanto e MEMFS: RAM, apagada a cada
-// recarga. Gravar la NAO FALHA — o fopen devolve um FILE*, o fwrite escreve, o
-// rename funciona, e nada disso sobrevive a fechar o app. O efeito medido e que
-// no Tizen este cache nunca existiu na pratica: toda abertura refazia os ~30
-// pedidos e esperava os 14,5 s que a nota de catalogo.h registra.
-//
-// O app ja resolveu isto uma vez para o cache de ARTE — src/main.c aponta
-// tex_cache_dir para dados_dir()/cache pelo mesmo motivo e com a mesma nota.
-//
-// Aqui a regra fica DENTRO do modulo, e nao nos chamadores, porque o leitor
-// (home.c) e o escritor (descoberta.c) sao arquivos diferentes: corrigindo num
-// so, os dois passariam a discordar sobre onde o arquivo esta, que e pior que o
-// defeito. Assim as duas pontas mudam juntas por construcao.
-//
-// ORDEM DE ARRANQUE, que e o que faz isto funcionar: dados_iniciar roda em
-// main.c ANTES de app_iniciar, e e app_iniciar quem chama home_iniciar e
-// portanto cat_ler_cache. dados_dir() ja e valido na leitura.
-//
-// `dados_dir()` pode ser "" quando nenhum candidato aceitou escrita (ver
-// src/dados.h) — nesse caso volta-se ao comportamento de sempre.
-static void caminhoCache(const char *dirArte, char *dst, size_t tam) {
-  const char *d = dados_dir();
-  if (!d || !*d) d = (dirArte && *dirArte) ? dirArte
-                                           : (dirCache[0] ? dirCache : ".");
-  if (d != dirCache) snprintf(dirCache, sizeof dirCache, "%s", d);
-  snprintf(dst, tam, "%s/catalogo-rede.bin", d);
-}
-
-int cat_apagar_cache(void) {
-  char caminho[600];
-  int foi;
-  caminhoCache(NULL, caminho, sizeof caminho);
-  foi = (remove(caminho) == 0);
-  if (foi) {
-    printf("[cat] cache do catalogo apagado\n");
-    fflush(stdout);
-  }
-  return foi;
-}
-
-// Chamado pela descoberta quando o catalogo COMPLETO da rede substitui o do
-// cache. A partir daqui a tela ja e a desta sessao.
-void cat_cache_substituido(void) { veioDoCache = 0; }
-
-int cat_gravar_cache_se_identidade(const char *dirArte, const char *donoEsperado,
-                                   int perfilEsperado) {
-  char caminho[600], tmp[620];
-  CacheCab c;
-  FILE *f;
-  CatItem *copia;
-  CatFileira *copiaFils;
-  int qtd, qf;
-  if (n < 1 && nFils < 1) return 0;
-  caminhoCache(dirArte, caminho, sizeof caminho);
-  // Grava num temporario e renomeia: quem le na proxima abertura nunca pega
-  // arquivo pela metade se o app for fechado no meio da escrita.
-  snprintf(tmp, sizeof tmp, "%s.tmp", caminho);
-  // Zerar o cabecalho INTEIRO antes de preencher: `usuario` tem 64 bytes e o
-  // `sub` usa 36. Sem isto o resto seria lixo de pilha, e o arquivo deixaria de
-  // ser identico para o mesmo estado — o que torna qualquer conferencia byte a
-  // byte impossivel e vaza pedaco de pilha para o disco.
-  memset(&c, 0, sizeof c);
-  c.magia = CACHE_MAGIA; c.versao = CACHE_VERSAO;
-  c.ingles = ajustes_idioma();
-  c.tamItem = (unsigned)sizeof(CatItem);
-  c.tamFileira = (unsigned)sizeof(CatFileira);
-  identidadeAtual(c.usuario, sizeof c.usuario, &c.perfil);
-  if (!donoEsperado || strcmp(c.usuario, donoEsperado) || c.perfil != perfilEsperado)
-    return 0;
-  // RETRATO DO BLOCO SOB pubTrava, e so dele se codifica (queda "double free
-  // or corruption (!prev)" / "malloc(): invalid next size" da 2.0.0, LG webOS).
-  // As duas passadas do RLE liam `itens` e `n` da tela sem trava, no fio da
-  // descoberta, logo depois de "fileiras remontadas sem rede" — o instante em
-  // que o fio principal aplica a biblioteca da conta (cat_definir_na_lista no
-  // bloco, cat_acrescentar_lote trocando o bloco). Um naLista que vira 1 entre
-  // a passada que MEDE e a que ESCREVE quebra uma corrida de zeros, a segunda
-  // sai maior que o malloc da primeira e escreve alem do fim. Ler o bloco fora
-  // da trava tambem nao garante que ele viva: cat_quadro libera os trocados.
-  // A copia custa um memcpy do catalogo (o mesmo de cada troca de bloco) e
-  // tira a codificacao de dentro da trava. tests/catcachecorrida.sh.
+const RustSceneSnapshot *catalog_capture_scene(void) {
+  CatItem *titles;
+  CatFileira *rows;
+  const RustSceneSnapshot *scene;
+  int count, row_count;
   catTravar();
-  qtd = n; qf = nFils;
-  copia = malloc(sizeof(CatItem) * (size_t)(qtd > 0 ? qtd : 1));
-  copiaFils = malloc(sizeof(CatFileira) * (size_t)(qf > 0 ? qf : 1));
-  if (!copia || !copiaFils) {
-    pthread_mutex_unlock(&pubTrava); free(copia); free(copiaFils); return 0;
-  }
-  for (int index = 0; index < qtd; index++) if (itens[index].rust_title) {
-    pthread_mutex_unlock(&pubTrava); free(copia); free(copiaFils); return 0;
-  }
-  if (qtd > 0) memcpy(copia, itens, sizeof(CatItem) * (size_t)qtd);
-  if (qf > 0) memcpy(copiaFils, fils, sizeof(CatFileira) * (size_t)qf);
+  count=n; row_count=nFils;
+  titles=calloc(count?count:1,sizeof *titles);
+  rows=calloc(row_count?row_count:1,sizeof *rows);
+  if (!titles || !rows) { free(titles); free(rows); pthread_mutex_unlock(&pubTrava); return NULL; }
+  catalog_items_copy(titles,itens,(size_t)count);
+  catalog_rows_copy(rows,fils,(size_t)row_count);
   pthread_mutex_unlock(&pubTrava);
-  c.nItens = qtd; c.nFileiras = qf;
-  { /* CODIFICA FORA DA TRAVA DO SISTEMA DE ARQUIVOS: so o fwrite fica dentro. */
-    double t0 = cat_relogio_ms(), t1, t2;
-    size_t rawN = sizeof(CatItem) * (size_t)qtd, encN;
-    unsigned char *enc;
-    unsigned long long encN64;
-    encN = rleCodificar((const unsigned char *)copia, rawN, NULL);
-    enc = malloc(encN ? encN : 1);
-    if (!enc) { free(copia); free(copiaFils); return 0; }
-    CAT_TESTE_CACHE_MEIO();
-    rleCodificar((const unsigned char *)copia, rawN, enc);
-    free(copia);
-    c.magia = CACHE_MAGIA_RLE;
-    encN64 = encN;
-    t1 = cat_relogio_ms();
-    f = fopen(tmp, "wb");
-    if (!f) { free(enc); free(copiaFils); return 0; }
-    if (fwrite(&c, sizeof c, 1, f) != 1 ||
-        fwrite(&encN64, sizeof encN64, 1, f) != 1 ||
-        fwrite(enc, 1, encN, f) != encN ||
-        (qf > 0 &&
-         fwrite(copiaFils, sizeof(CatFileira), (size_t)qf, f) != (size_t)qf)) {
-      fclose(f); remove(tmp); free(enc); free(copiaFils); return 0;
-    }
-    free(enc);
-    free(copiaFils);
-    t2 = cat_relogio_ms();
-    printf("[perf] cat cache: %zu KB -> %zu KB, codifica %.1f ms (fora da trava), escreve %.1f ms (dentro da trava do FS)\n",
-           rawN / 1024, encN / 1024, t1 - t0, t2 - t1);
-    fflush(stdout);
-  }
-  fclose(f);
-  // A profile/account switch during serialization must not publish the old
-  // catalogue under the new private identity.
-  { char donoAgora[sizeof c.usuario]; int perfilAgora;
-    identidadeAtual(donoAgora, sizeof donoAgora, &perfilAgora);
-    if (strcmp(donoAgora, donoEsperado) || perfilAgora != perfilEsperado) {
-      remove(tmp); return 0;
+  scene=catalog_scene_capture(titles,count,rows,row_count);
+  catalog_items_clear(titles,(size_t)count); catalog_rows_clear(rows,(size_t)row_count);
+  free(titles); free(rows); return scene;
+}
+int catalog_cached_row_allowed(const char *key) {
+  int index, allowed=0;
+  if (!key) return 0;
+  catTravar();
+  for (index=0;index<nFils;index++) {
+    if (!strcmp(fils[index].chave,key) || !strcmp(catalog_row_text(fils+index,ROW_KEY),key)) {
+      allowed=catalog_runtime_row_reusable(fils+index); break;
     }
   }
-  if (rename(tmp, caminho) != 0) { remove(tmp); return 0; }
-  printf("[cat] cache gravado em %s: %d titulos, %d fileiras\n",
-         caminho, qtd, qf);
-  fflush(stdout);
-  return 1;
+  pthread_mutex_unlock(&pubTrava); return allowed;
+}
+int catalog_apply_scene_view(const RustSceneSnapshot *scene, int cached, const RustCatalogSceneView *view, unsigned expected_revision) {
+  size_t count=nuvio_scene_title_count(scene), row_count=nuvio_scene_row_count(scene), index;
+  CatItem *titles; CatFileira *rows;
+  if (!scene) return catalog_define_guarded(NULL,0,NULL,0,view,expected_revision,NULL);
+  if (count>CAT_MAX || row_count>CAT_FIL_MAX) return 0;
+  titles=calloc(count?count:1,sizeof *titles); rows=calloc(row_count?row_count:1,sizeof *rows);
+  if (!titles || !rows) { free(titles); free(rows); return 0; }
+  for (index=0;index<count;index++) catalog_item_from_rust(titles+index,nuvio_scene_title(scene,index));
+  for (index=0;index<row_count;index++) {
+    const RustRowSnapshot *row=nuvio_scene_row(scene,index);
+    if (!catalog_row_from_rust(rows+index,row)) {
+      nuvio_row_release(row); catalog_items_clear(titles,count); catalog_rows_clear(rows,row_count);
+      free(titles); free(rows); return 0;
+    }
+  }
+  int published=catalog_define_guarded(titles,(int)count,rows,(int)row_count,view,expected_revision,NULL);
+  if (published) catalog_mark_cached(cached);
+  catalog_items_clear(titles,count); catalog_rows_clear(rows,row_count);
+  free(titles); free(rows); return published;
+}
+int catalog_apply_scene(const RustSceneSnapshot *scene, int cached) {
+  return catalog_apply_scene_view(scene,cached,NULL,0);
 }
 
-int cat_gravar_cache(const char *dirArte) {
-  char dono[64]; int perfil;
-  identidadeAtual(dono, sizeof dono, &perfil);
-  return cat_gravar_cache_se_identidade(dirArte, dono, perfil);
-}
-
-int cat_ler_cache(const char *dirArte) {
-  char caminho[600];
-  char usuario[64];
-  int perfil = 0;
-  CacheCab c;
-  FILE *f;
-  CatItem *novo;
-  // static: 40 x 1 KB nao pertence a pilha. Roda uma vez, no arranque.
-  static CatFileira lidas[CAT_FIL_MAX];
-  int nLidas = 0;
-  caminhoCache(dirArte, caminho, sizeof caminho);
-  f = fopen(caminho, "rb");
-  if (!f) return 0;
-  if (fread(&c, sizeof c, 1, f) != 1) { fclose(f); return 0; }
-  // RECUSA em vez de ler torto. Struct diferente = arquivo de outra build.
-  if ((c.magia != CACHE_MAGIA && c.magia != CACHE_MAGIA_RLE) ||
-      !(c.versao == CACHE_VERSAO ||
-        (c.versao == CACHE_VERSAO_SO_P1 && c.perfil == 1)) ||
-      c.tamItem != sizeof(CatItem) || c.tamFileira != sizeof(CatFileira) ||
-      c.nItens < 0 || c.nItens > CAT_MAX ||
-      c.nFileiras < 0 || c.nFileiras > CAT_FIL_MAX) {
-    fclose(f);
-    printf("[cat] cache descartado (formato de outra build)\n");
-    remove(caminho);
-    return 0;
-  }
-  // CACHE DE OUTRA PESSOA E RECUSADO E APAGADO, nao apenas ignorado.
-  //
-  // Ignorar deixaria o arquivo em disco, e ele leva os catalogos da conta
-  // anterior com a `base` de cada fileira — que no Xperience carrega um JWT
-  // dentro do proprio caminho. Um cache que sobra e credencial que sobra.
-  //
-  // Apagar aqui e a rede de seguranca, nao a porta da frente: o logout deve
-  // chamar cat_apagar_cache (ver catalogo.h). Esta verificacao tambem cobre o
-  // caso que o logout nao ve — trocar de PERFIL dentro da mesma conta, que nao
-  // passa por sync_esquecer_usuario.
-  c.usuario[sizeof c.usuario - 1] = 0;
-  identidadeAtual(usuario, sizeof usuario, &perfil);
-  // O IDIOMA ENTRA NA MESMA COMPARACAO, e pelo mesmo motivo dos outros dois:
-  // o arquivo carrega texto ja montado para um idioma. Subir a versao invalida
-  // os arquivos antigos UMA VEZ; sem esta linha, trocar de idioma depois disso
-  // nao invalidaria nada e a home voltaria a dizer "Programa de TV" em ingles.
-  if (strcmp(c.usuario, usuario) != 0 || c.perfil != perfil ||
-      c.ingles != ajustes_idioma()) {
-    fclose(f);
-    printf("[cat] cache descartado (era de outro usuario/perfil/idioma)\n");
-    fflush(stdout);
-    remove(caminho);
-    return 0;
-  }
-  novo = malloc(sizeof(CatItem) * (size_t)(c.nItens > 0 ? c.nItens : 1));
-  if (!novo) { fclose(f); return 0; }
-  if (c.magia == CACHE_MAGIA_RLE) {
-    unsigned long long encN64 = 0;
-    size_t rawN = sizeof(CatItem) * (size_t)c.nItens;
-    unsigned char *enc;
-    if (fread(&encN64, sizeof encN64, 1, f) != 1 || encN64 > (unsigned long long)rawN * 2 + 64) {
-      free(novo); fclose(f); remove(caminho); return 0;
-    }
-    enc = malloc(encN64 ? (size_t)encN64 : 1);
-    if (!enc || fread(enc, 1, (size_t)encN64, f) != (size_t)encN64 ||
-        !rleDecodificar(enc, (size_t)encN64, (unsigned char *)novo, rawN)) {
-      free(enc); free(novo); fclose(f); remove(caminho); return 0;
-    }
-    free(enc);
-  } else if (fread(novo, sizeof(CatItem), (size_t)c.nItens, f) != (size_t)c.nItens) {
-    free(novo); fclose(f); remove(caminho); return 0;
-  }
-  if (c.nFileiras > 0) {
-    if (fread(lidas, sizeof(CatFileira), (size_t)c.nFileiras, f)
-        != (size_t)c.nFileiras) {
-      free(novo); fclose(f); remove(caminho); return 0;
-    }
-    nLidas = c.nFileiras;
-  }
-  fclose(f);
-  // Reaproveita o caminho de troca de bloco, que ja e o seguro para o fio de
-  // desenho — e o que corta as janelas de fileira pelo tamanho real.
-  for (int index = 0; index < (int)c.nItens; index++) novo[index].rust_title = NULL;
-  cat_definir_tudo(novo, c.nItens, lidas, nLidas);
-  veioDoCache = 1;
-  free(novo);
-  printf("[cat] cache lido: %d titulos, %d fileiras\n", c.nItens, nLidas);
-  fflush(stdout);
-  return 1;
-}
-
-int cat_do_cache(void) { return veioDoCache; }
-
-// ASSINATURA DE UM CATALOGO: o que a home DESENHA dele — fileiras (chave,
-// titulo, janela) e a identidade de cada item (imdb, tipo). FNV-1a sobre isso.
-// Arte, sinopse e contagens nao entram: mudam sem que a home mude de forma.
-// Serve para a descoberta saber se o que ela acabou de montar e o MESMO que ja
-// esta na tela, e nesse caso nao publicar — publicar igual e remontar a home
-// por nada, que e o "ela fica recarregando" do dono.
 unsigned long cat_assinatura_de(const CatItem *lista, int qtd,
                                 const CatFileira *fl, int nf) {
   unsigned long h = 2166136261UL;
@@ -1481,7 +1184,9 @@ static void tirarDaJanela(int r, int indice) {
   if (f->n < 1) {
     int k, total = nFils;
     nFils = 0;
+    nuvio_row_retire(fils[r].rust_row);
     for (k = r; k + 1 < total; k++) fils[k] = fils[k + 1];
+    memset(fils + total - 1, 0, sizeof *fils);
     nFils = total - 1;
   }
   revisaoSobe(); mudou();
@@ -1686,6 +1391,20 @@ int cat_n_fileiras(void) { return nFils; }
 const CatFileira *cat_fileira(int r) {
   return (r >= 0 && r < nFils) ? &fils[r] : NULL;
 }
+int catalog_copy_row_index(int index, CatFileira *destination) {
+  int found;
+  if (!destination) return 0;
+  catTravar(); found=index>=0 && index<nFils;
+  if (found) catalog_row_copy(destination,fils+index);
+  pthread_mutex_unlock(&pubTrava); return found;
+}
+int catalog_copy_rows(CatFileira *destination, int capacity) {
+  int count;
+  if (!destination || capacity<1) return 0;
+  catTravar(); count=nFils<capacity?nFils:capacity;
+  catalog_rows_copy(destination,fils,(size_t)count);
+  pthread_mutex_unlock(&pubTrava); return count;
+}
 
 int cat_home_apenas_fixas(void) {
   int r, i, inicial = 1;
@@ -1718,7 +1437,7 @@ int cat_copiar_fileira(const char *chave, CatItem *saida, int max,
     qtd = f->n < max ? f->n : max;
     if (f->ini < 0 || f->ini + qtd > n || !itens) break;
     catalog_items_copy(saida, itens + f->ini, (size_t)qtd);
-    if (meta) *meta = *f;
+    if (meta) catalog_row_copy(meta,f);
     pthread_mutex_unlock(&pubTrava);
     return qtd;
   }
@@ -1792,7 +1511,7 @@ void cat_atualizar_item(int i, const CatItem *item) {
   catalog_item_copy(&copia, item);
   CAT_TESTE_ANTES_TRAVA();
   catTravar();
-  if (itens && i >= 0 && i < n &&
+  if (catalog_metadata_current() && itens && i >= 0 && i < n &&
       !strcmp(catalog_title_id(&itens[i]), catalog_title_id(&copia)) &&
       (!tipo_certo(itens[i].tipo) || !strcmp(tipo_base(itens[i].tipo), tipo_base(copia.tipo)))) {
     /* Keep the previous native reference alive until frame retirement. */
@@ -1988,13 +1707,29 @@ void cat_republicar_fileiras(const CatFileira *novasFils, int nNovas) {
           novasFils[k].estado != fils[k].estado) igual = 0;
     if (igual) { pthread_mutex_unlock(&pubTrava); return; }
   }
+  int old_row_count = nFils;
+  CatFileira *owned_rows = calloc(q ? q : 1, sizeof *owned_rows);
+  if (!owned_rows) { pthread_mutex_unlock(&pubTrava); return; }
+  catalog_rows_copy(owned_rows, novasFils, (size_t)q);
+  for (k=0;k<q;k++) if (!owned_rows[k].rust_row) {
+    int previous;
+    for (previous=0;previous<nFils;previous++)
+      if (!strcmp(owned_rows[k].chave,fils[previous].chave) && !strcmp(owned_rows[k].base,fils[previous].base) &&
+          !strcmp(owned_rows[k].tipo,fils[previous].tipo) && !strcmp(owned_rows[k].catId,fils[previous].catId)) {
+        owned_rows[k].rust_row=nuvio_row_retain(fils[previous].rust_row); break;
+      }
+  }
+  novasFils = owned_rows;
   nFils = 0;                 // ver a nota em catalogo.h: zera antes de mexer
+  for (k=0;k<old_row_count;k++) nuvio_row_retire(fils[k].rust_row);
+  memset(fils, 0, sizeof *fils * CAT_FIL_MAX);
   for (k = 0; k < q; k++) {
     CatFileira f = novasFils[k];
-    if (f.ini < 0 || f.ini > n || (f.n < 1 && !f.estado)) continue;
+    if (f.ini < 0 || f.ini > n || (f.n < 1 && !f.estado)) { catalog_row_clear(owned_rows+k); continue; }
     if (f.ini + f.n > n) f.n = n - f.ini;
     fils[v++] = f;
   }
+  free(owned_rows);
   nFils = v;
   // BUMPA A REVISAO sempre que as fileiras mudaram. cat_definir_tudo e
   // cat_trocar_continuar ja fazem isto; sem isto aqui, cat_republicar_fileiras
@@ -2006,10 +1741,10 @@ void cat_republicar_fileiras(const CatFileira *novasFils, int nNovas) {
   pthread_mutex_unlock(&pubTrava);
 }
 
-void cat_definir_tudo(const CatItem *lista, int qtd,
-                      const CatFileira *novasFils, int nNovas) {
+static int catalog_define_guarded(const CatItem *lista, int qtd,
+                      const CatFileira *novasFils, int nNovas, const RustCatalogSceneView *view, unsigned expected_revision, const RustCatalogWork *work) {
   double tIni = cat_relogio_ms(), tFora = 0, tTrava = 0, tProg = 0;
-  if (qtd < 0 || qtd > CAT_MAX || (qtd > 0 && !lista)) return;
+  if (qtd < 0 || qtd > CAT_MAX || (qtd > 0 && !lista)) return 0;
   // TROCA DE BLOCO, sem realloc no lugar.
   //
   // cat_definir roda no fio da descoberta enquanto o desenho le itens[] no fio
@@ -2027,7 +1762,7 @@ void cat_definir_tudo(const CatItem *lista, int qtd,
   {
     int novoN = qtd > CAT_MAX ? CAT_MAX : qtd;
     CatItem *novo = malloc(sizeof(CatItem) * (size_t)(novoN > 0 ? novoN : 1));
-    if (!novo) return;
+    if (!novo) return 0;
     if (novoN > 0) catalog_items_copy(novo, lista, (size_t)novoN);
     // Historico de ORDEM por fileira (tendencia.h), ANTES da troca e sobre os
     // parametros — le e grava arquivo, e depois da troca `novo` pode ser
@@ -2061,8 +1796,15 @@ void cat_definir_tudo(const CatItem *lista, int qtd,
     tFora = cat_relogio_ms() - tIni;
     catTravar();
     tTrava = cat_relogio_ms();
+    if ((view && (cat_revisao()!=expected_revision || !nuvio_catalog_view_current(view))) ||
+        (work && !nuvio_catalog_work_current(work))) {
+      pthread_mutex_unlock(&pubTrava); catalog_items_clear(novo,(size_t)novoN); free(novo); return 0;
+    }
     int previous_count = n;
     __atomic_store_n(&n, 0, __ATOMIC_RELEASE);
+    int old_row_count = nFils, row_index;
+    const RustRowSnapshot *old_rows[CAT_FIL_MAX];
+    for (row_index=0;row_index<old_row_count;row_index++) old_rows[row_index]=fils[row_index].rust_row;
     nFils = 0;
     aposentar(itens, previous_count);
     __atomic_store_n(&itens, novo, __ATOMIC_RELEASE);
@@ -2084,10 +1826,12 @@ void cat_definir_tudo(const CatItem *lista, int qtd,
         // vizinho.
         if (f.ini < 0 || f.ini > n || (f.n < 1 && !f.estado)) continue;
         if (f.ini + f.n > n) f.n = n - f.ini;
-        fils[v++] = f;
+        catalog_row_copy(&fils[v++], &f);
       }
       nFils = v;
     }
+    for (row_index=0;row_index<old_row_count;row_index++) nuvio_row_retire(old_rows[row_index]);
+    memset(fils+nFils,0,(CAT_FIL_MAX-nFils)*sizeof *fils);
     // O CICLO COMPLETO TAMBEM NAO TRAZ DE VOLTA. montar() chama
     // montarContinuar no comeco e publica aqui dezenas de segundos depois (os
     // manifestos): uma remocao feita nesse meio passaria. Ver a mesma poda em
@@ -2101,6 +1845,14 @@ void cat_definir_tudo(const CatItem *lista, int qtd,
   printf("[perf] cat_definir_tudo: %d itens, fora da trava %.1f ms, DENTRO da trava %.1f ms, progresso do disco %.1f ms (fora da trava), total %.1f ms\n",
          qtd, tFora, tTrava, tProg, cat_relogio_ms() - tIni);
   fflush(stdout);
+  return 1;
+}
+void cat_definir_tudo(const CatItem *titles, int count, const CatFileira *rows, int row_count) {
+  (void)catalog_define_guarded(titles,count,rows,row_count,NULL,0,NULL);
+}
+int catalog_publish_job(const CatItem *titles, int count, const CatFileira *rows, int row_count) {
+  if (!catalog_runtime_current()) return 0;
+  return catalog_define_guarded(titles,count,rows,row_count,NULL,0,catalog_runtime_work());
 }
 
 // TROCA SO A JANELA DE "CONTINUAR ASSISTINDO" (issue #38).
@@ -2133,6 +1885,7 @@ void cat_trocar_continuar(const CatItem *lista, int qtd) {
   if (qtd < 0) qtd = 0;
   regs = lerProgresso(&nRegs);
   catTravar();
+  if (!catalog_metadata_current()) { pthread_mutex_unlock(&pubTrava); free(regs); return; }
   tTrava = cat_relogio_ms();
   for (r = 0; r < nFils; r++)
     if (!strcmp(fils[r].chave, "continue_watching")) {
@@ -2171,6 +1924,8 @@ void cat_trocar_continuar(const CatItem *lista, int qtd) {
   tProg = cat_relogio_ms() - tProg;
   int previous_count = n;
   __atomic_store_n(&n, 0, __ATOMIC_RELEASE);
+  for (r=0;r<nv;r++) novas[r].rust_row=nuvio_row_retain(novas[r].rust_row);
+  for (r=0;r<nFils;r++) nuvio_row_retire(fils[r].rust_row);
   nFils = 0;
   aposentar(itens, previous_count);
   __atomic_store_n(&itens, novo, __ATOMIC_RELEASE);
@@ -2183,6 +1938,7 @@ void cat_trocar_continuar(const CatItem *lista, int qtd) {
   pthread_mutex_unlock(&epTrava);
   __atomic_store_n(&n, novoN, __ATOMIC_RELEASE);
   memcpy(fils, novas, sizeof *novas * (size_t)nv);
+  memset(fils+nv,0,(CAT_FIL_MAX-nv)*sizeof *fils);
   nFils = nv;
   // A REFACAO NAO TRAZ DE VOLTA O QUE FOI TIRADO. montarContinuar ja filtra,
   // mas um fio que montou ANTES da remocao e publica DEPOIS dela passaria o
@@ -2210,7 +1966,7 @@ void cat_definir_episodios(int indiceItem, const CatEp *lista, int qtd) {
   pthread_mutex_lock(&epTrava);
   // Faixa ainda nao criada para este indice (o `n` subiu antes): nao ha onde
   // escrever. Quem pediu repede quando a revisao andar.
-  if (!epIni || !epQtd || indiceItem >= nFaixas) {
+  if (!catalog_metadata_current() || !epIni || !epQtd || indiceItem >= nFaixas) {
     pthread_mutex_unlock(&epTrava);
     return;
   }

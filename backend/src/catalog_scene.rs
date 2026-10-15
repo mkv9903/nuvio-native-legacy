@@ -73,10 +73,28 @@ pub struct SceneTitle {
 }
 impl From<CatalogTitle> for SceneTitle {
     fn from(metadata: CatalogTitle) -> Self {
+        let host = url::Url::parse(&metadata.background)
+            .ok()
+            .and_then(|url| url.host_str().map(str::to_owned));
+        let backdrop = metadata.background != metadata.poster;
+        let artwork = ArtworkVariants {
+            catalog_background: metadata.background.clone(),
+            tmdb_background: if backdrop && host.as_deref() == Some("image.tmdb.org") {
+                metadata.background.clone()
+            } else {
+                String::new()
+            },
+            trakt_background: if backdrop && host.as_deref() == Some("media.trakt.tv") {
+                metadata.background.clone()
+            } else {
+                String::new()
+            },
+            ..ArtworkVariants::default()
+        };
         Self {
             metadata,
             origin: String::new(),
-            artwork: ArtworkVariants::default(),
+            artwork,
             display: TitleDisplay::default(),
             cast: Vec::new(),
             availability: Availability::default(),

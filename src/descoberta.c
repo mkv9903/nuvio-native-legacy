@@ -12,6 +12,8 @@
 #include <SDL2/SDL.h>
 #include "catalogo.h"
 #include "catalog_item.h"
+#include "catalog_row.h"
+#include "catalog_runtime.h"
 #include "addons.h"
 #include "addon_registry.h"
 #include "rede.h"
@@ -970,6 +972,7 @@ static pthread_mutex_t listaTrava = PTHREAD_MUTEX_INITIALIZER;
 static int listaLidaNaVolta;
 // Fim de volta: `buscando` cai sob a mesma trava em que desc_iniciar o testa e marca.
 static void buscandoSoltar(void) {
+  catalog_runtime_cycle_end();
   pthread_mutex_lock(&listaTrava); buscando = 0; pthread_mutex_unlock(&listaTrava);
 }
 // O QUE ESTA NA TELA E PARCIAL: publicado em partes por uma volta que nao
@@ -1178,6 +1181,19 @@ static int lerCatalogo(const char *base, const char *tipo, const char *id,
   const char *p;
   int n = 0;
   if (respondeu) *respondeu = 0;
+  if (catalog_runtime_enabled()) {
+    char origin[96];
+    const RustSceneSnapshot *scene;
+    size_t index, count;
+    origemDaBase(base, origin, sizeof origin);
+    scene = nuvio_catalog_load(catalog_runtime_work(), base, tipo, id, origin,
+                               (size_t)(max < quantos ? max : quantos), respondeu);
+    count = nuvio_scene_title_count(scene);
+    for (index=0;index<count;index++)
+      catalog_item_from_rust(saida+index, nuvio_scene_title(scene,index));
+    nuvio_scene_release(scene);
+    return (int)count;
+  }
   if (!descPedidoCoube(base, nv_addon_url(url, sizeof url, base, "/catalog/%s/%s.json", tipo, id),
                        sizeof url)) return 0;
   // 8 s e nao 25: um addon fora do ar segurava um dos tres fios por 25 s, e a
@@ -1247,6 +1263,7 @@ static int nFilsLote;
 
 typedef struct {
   char chave[192];      // homeCatalogKey:        <addonId>_<tipo>_<catalogoId>
+  size_t addon_index, catalog_index;
   char desativar[352];  // homeCatalogDisableKey: <base>_<tipo>_<catalogoId>_<nome>
   char titulo[96];
   char tipo[8];
@@ -2036,6 +2053,7 @@ static int lerManifesto(int iAddon, const char *base, Decl *saida, int max,
   char *corpo, *escolhido;
   const char *p, *fim;
   int n = 0, total = 0, e = 0, nEleg = 0;
+  size_t catalog_index = 0;
   if (totalReal) *totalReal = 0;
   if (promovidos) *promovidos = 0;
   // Ja largado em paralelo no comeco de montar(); so cai na rede aqui quando
@@ -2074,6 +2092,7 @@ static int lerManifesto(int iAddon, const char *base, Decl *saida, int max,
   // no fim dele (o Xperience poe os dele em 603/604 de 605). Quem para de
   // gravar e o `if (n < max)` la dentro.
   while (p) {
+    size_t current_catalog = catalog_index++;
     const char *f = js_fim(p);
     tipo[0] = id[0] = nome[0] = 0;
     js_texto(p, f, "type", tipo, sizeof tipo);
@@ -2109,6 +2128,7 @@ static int lerManifesto(int iAddon, const char *base, Decl *saida, int max,
       d = guardar ? &saida[n] : &local;
       memset(d, 0, sizeof *d);
       d->base = base;
+      d->addon_index = (size_t)iAddon; d->catalog_index = current_catalog;
       // BUSCA: procura "search" dentro do bloco `extra`/`extraSupported` DESTE
       // catalogo (a faixa [p,f) e o objeto dele, entao nao vaza para o vizinho).
       //
@@ -2191,6 +2211,8 @@ static int lerManifesto(int iAddon, const char *base, Decl *saida, int max,
 
 typedef struct {
   const Decl *d;        // so para quem monta; o fio le as copias abaixo
+  size_t addon_index, catalog_index;
+  const RustRowSnapshot *row;
   char base[NV_ADDON_URL_MAX], tipo[8], id[96];
   CatItem itens[MAX_POR_FILEIRA];
   int  n;
@@ -2206,6 +2228,7 @@ typedef struct {
 // pedido dele sem escrever em memoria de ninguem.
 typedef struct {
   TarefaCat *t;
+  const RustCatalogWork *work;
   int nT, prox, refs, fechada;
   unsigned long long inicioMs, ultimoProntoMs;
 } RodadaCat;
@@ -2235,6 +2258,7 @@ static int linhaAnterior(const char *chave, CatItem *saida, int max,
   // for the current owner/profile/config, none of its item bodies are safe to
   // reuse.
   if (!homeestado_contexto_valido() || !homeestado_tem_fileira(chave)) return 0;
+  if (!catalog_cached_row_allowed(chave)) return 0;
   return cat_copiar_fileira(chave, saida, max, meta);
 }
 
@@ -2245,7 +2269,7 @@ static int fileiraMontada(const CatFileira *v, int n, const char *chave) {
 }
 
 static int fileiraPodeSerPreservada(const CatFileira *f) {
-  return f && f->chave[0] && homeestado_contexto_valido() &&
+  return f && f->chave[0] && catalog_runtime_row_reusable(f) && homeestado_contexto_valido() &&
          homeestado_tem_fileira(f->chave);
 }
 
@@ -2281,6 +2305,7 @@ static void ordenarPorSnapshot(CatFileira *fil, int n) {
 static void preservarFileirasAusentes(CatItem **lote, int *n, int *cap,
                                        CatFileira *fil, int *nFil) {
   int r;
+  CatFileira previous={0};
   // static pelo mesmo motivo do daLinhaAnterior de montar(): 24 CatItem sao
   // ~375 KB, e o fio que monta tem 2 MB de pilha no Tizen. Um fio so chama.
   static CatItem tmp[MAX_POR_FILEIRA];
@@ -2293,8 +2318,10 @@ static void preservarFileirasAusentes(CatItem **lote, int *n, int *cap,
   int teto = fil_limite() + fixas;
   if (teto > CAT_FIL_MAX) teto = CAT_FIL_MAX;
   for (r = 0; r < cat_n_fileiras() && *nFil < teto; r++) {
-    const CatFileira *old = cat_fileira(r);
+    const CatFileira *old=&previous;
     int got, need;
+    catalog_row_clear(&previous);
+    if (!catalog_copy_row_index(r,&previous)) continue;
     if (!old || !old->chave[0] || fileiraMontada(fil, *nFil, old->chave)) continue;
     // Reuse bytes only from the accepted snapshot for this exact owner,
     // profile, and configuration. A still-configured URL does not make items
@@ -2307,15 +2334,16 @@ static void preservarFileirasAusentes(CatItem **lote, int *n, int *cap,
       int alvo = *cap ? *cap * 2 : 128;
       while (alvo < need) alvo *= 2;
       CatItem *novo = realloc(*lote, sizeof(CatItem) * (size_t)alvo);
-      if (!novo) { catalog_items_clear(tmp, (size_t)got); return; }
+      if (!novo) { catalog_items_clear(tmp, (size_t)got); catalog_row_clear(&previous); return; }
       *lote = novo; *cap = alvo;
     }
     if (got) catalog_items_copy(*lote + *n, tmp, (size_t)got);
     catalog_items_clear(tmp, (size_t)got);
-    fil[*nFil] = *old;
+    catalog_row_copy(&fil[*nFil], old);
     fil[*nFil].ini = *n; fil[*nFil].n = got;
     (*n) += got; (*nFil)++;
   }
+  catalog_row_clear(&previous);
 }
 
 static pthread_mutex_t catTrava = PTHREAD_MUTEX_INITIALIZER;
@@ -2326,8 +2354,11 @@ static unsigned long long descAgoraMs(void);
 static void rodadaSoltarLocked(RodadaCat *r) {
   if (--r->refs == 0) {
     int index;
-    for (index = 0; index < r->nT; index++)
+    for (index = 0; index < r->nT; index++) {
       catalog_items_clear(r->t[index].itens, (size_t)r->t[index].n);
+      nuvio_row_release(r->t[index].row);
+    }
+    nuvio_catalog_work_release(r->work);
     free(r->t); free(r);
   }
 }
@@ -2342,6 +2373,7 @@ static void rodadaSoltar(RodadaCat *r) {
 
 static void *fioCatalogo(void *u) {
   RodadaCat *r = u;
+  catalog_runtime_use(r->work);
   for (;;) {
     int meu, got, respondeu = 0;
     TarefaCat *t;
@@ -2359,7 +2391,13 @@ static void *fioCatalogo(void *u) {
     // QUANTOS e o ajuste (12/18/24, #163); o balde tem sempre o teto.
     { int q = ajustes_itens_fileira();
       if (q > MAX_POR_FILEIRA) q = MAX_POR_FILEIRA;
-      got = lerCatalogo(t->base, t->tipo, t->id, t->itens,
+      if (catalog_runtime_enabled()) {
+        const RustSceneSnapshot *scene=nuvio_catalog_load_index(r->work,t->addon_index,t->catalog_index,(size_t)q,&respondeu);
+        size_t index, count=nuvio_scene_title_count(scene);
+        got=(int)count;
+        for (index=0;index<count;index++) catalog_item_from_rust(t->itens+index,nuvio_scene_title(scene,index));
+        t->row=nuvio_scene_row(scene,0); nuvio_scene_release(scene);
+      } else got = lerCatalogo(t->base, t->tipo, t->id, t->itens,
                         MAX_POR_FILEIRA, q, &respondeu); }
 
     pthread_mutex_lock(&catTrava);
@@ -2404,7 +2442,8 @@ static int continuarLocal(CatItem *saida, int max) {
     if (repetido) continue;
     d = &saida[n];
     memset(d, 0, sizeof *d);
-    cat_copiar_por_id(r->contentId, r->episodio > 0 ? "series" : "movie", d);
+    if (catalog_runtime_display_current())
+      cat_copiar_por_id(r->contentId, r->episodio > 0 ? "series" : "movie", d);
     // O catalogo pode guardar outro episodio desta obra. Metadados do titulo
     // permanecem; o episodio e o tempo pertencem ao progresso de agora.
     if (d->temporada != r->temporada || d->episodio != r->episodio)
@@ -3025,6 +3064,7 @@ static void *fioContinuar(void *u) {
   CatItem lote[CONT_MAX];
   int n;
   (void)u;
+  if (!catalog_content_begin()) { cwVivo=0; return NULL; }
   pthread_mutex_lock(&contTrava);
   n = montarContinuar(lote, CONT_MAX);
   // Publica AINDA sob a trava: ver cwGer.
@@ -3033,6 +3073,7 @@ static void *fioContinuar(void *u) {
   cwGerNaTela = cwGer;
   pthread_mutex_unlock(&contTrava);
   localizarContinuarPublicado();
+  catalog_content_end();
   cwVivo = 0;
   if (cwDeNovo) { cwDeNovo = 0; desc_refazer_continuar(); }
   return NULL;
@@ -3120,9 +3161,14 @@ static void cwDepoisDePublicar(CatItem *c, int k) {
 static void publicarMontagem(const CatItem *lote, int n, const CatFileira *fils, int nf) {
   int k;
   double t0 = cat_relogio_ms();
+  if (!catalog_runtime_current()) return;
   CatItem *cw = cwAntesDePublicar(&k);
-  cat_definir_tudo(lote, n, fils, nf);
+  if (!catalog_publish_job(lote, n, fils, nf)) {
+    catalog_items_clear(cw,(size_t)k); free(cw); return;
+  }
+  catalog_runtime_mark_published();
   cwDepoisDePublicar(cw, k);
+  catalog_runtime_capture(0);
   printf("[perf] publicarMontagem: %d itens, %d fileiras, %.1f ms\n", n, nf, cat_relogio_ms() - t0);
   fflush(stdout);
 }
@@ -3615,6 +3661,27 @@ static void publicarParcial(CatItem **lote, int *cap, int n,
 #ifdef NV_NATIVE_UI_TEST
 /* Rust driver fixtures exercise the real shared-round and publication paths.
  * A delayed worker keeps its own pending result after the assembler leaves. */
+int discovery_test_runtime_catalog(size_t addon_index, size_t catalog_index) {
+  RodadaCat *round=calloc(1,sizeof *round);
+  CatFileira row={0};
+  pthread_t worker;
+  int count;
+  if (!round) return -1;
+  round->t=calloc(1,sizeof *round->t);
+  if (!round->t) { free(round); return -1; }
+  round->nT=1; round->refs=2;
+  round->work=nuvio_catalog_work_retain(catalog_runtime_work());
+  round->t[0].addon_index=addon_index; round->t[0].catalog_index=catalog_index;
+  if (pthread_create(&worker,NULL,fioCatalogo,round)) {
+    round->refs=1; rodadaSoltar(round); return -1;
+  }
+  pthread_join(worker,NULL);
+  count=round->t[0].n;
+  if (round->t[0].row && catalog_row_from_rust(&row,nuvio_row_retain(round->t[0].row)))
+    publicarMontagem(round->t[0].itens,count,&row,1);
+  catalog_row_clear(&row); rodadaSoltar(round);
+  return count;
+}
 typedef struct {
   RodadaCat *round;
   CatItem pending;
@@ -3682,6 +3749,8 @@ int discovery_test_filter_owned(CatItem *items, int count) {
 #endif
 
 static void *montar(void *u) {
+  catalog_runtime_cycle_end();
+  catalog_rows_clear(filsLote,CAT_FIL_MAX); nFilsLote=0;
   addon_registry_refresh();
   // O lote tambem cresce: era dimensionado por CAT_MAX e por isso herdava o
   // mesmo teto arbitrario.
@@ -3776,8 +3845,9 @@ static void *montar(void *u) {
   // home inteira na tela (volta silenciosa) so marca e acrescenta; em partes,
   // entram de rabo na publicacao seguinte (ou nesta, se ja houve uma).
 #define LISTAS_SE_PRONTAS() do { \
+    if (cat_do_cache() && !cat_home_apenas_fixas()) progressivo = 0; \
     if (!listasNaTela && listasProntas(listas) && listas->nWl + listas->nCol > 0 && \
-        minhaGeracao == montagemGeracao && fonteIntacta(&ctxIni)) { \
+        minhaGeracao == montagemGeracao && fonteIntacta(&ctxIni) && catalog_runtime_current()) { \
       if (!progressivo) { \
         listasNaTela = 1; \
         if (listas->nWl) cat_mesclar_listas(listas->wl, listas->nWl); \
@@ -3786,9 +3856,9 @@ static void *montar(void *u) {
       } else if (n == nPublicado || n == 0) { \
         /* So com o lote igual ao que esta na tela: o rabo de rascunho nao \
            pode cobrir item que ainda nao foi publicado. */ \
-        if (nPublicado < 0) nFileirasMontadas = 0; \
+        if (nPublicado < 0) { catalog_rows_clear(filsLote,CAT_FIL_MAX); nFilsLote=0; } \
         nPublicado = n; \
-        publicarParcial(&lote, &cap, n, filsMontadas, nFileirasMontadas, \
+        publicarParcial(&lote, &cap, n, filsLote, nFilsLote, \
                         listas, &listasNaTela); \
       } \
     } } while (0)
@@ -3814,17 +3884,19 @@ static void *montar(void *u) {
   // criar um aqui so para copiar seria trabalho a toa.
   if (n > 0 && progressivo) {
     int nf = 0;
+    catalog_rows_clear(filsLote, CAT_FIL_MAX);
     if (nContinuar > 0) {
-      CatFileira *f0 = &filsMontadas[nf++];
+      CatFileira *f0 = &filsLote[nf++];
       memset(f0, 0, sizeof *f0);
       snprintf(f0->chave,  sizeof f0->chave,  "continue_watching");
       snprintf(f0->titulo, sizeof f0->titulo, "Continuar assistindo");
       snprintf(f0->tipo,   sizeof f0->tipo,   "movie");
       f0->ini = 0; f0->n = nContinuar;
     }
-    nFileirasMontadas = nf;
+    nFilsLote=nf; nFileirasMontadas=nf;
+    catalog_rows_project(filsMontadas,filsLote,(size_t)nf,CAT_FIL_MAX);
     nPublicado = n;
-    publicarParcial(&lote, &cap, n, filsMontadas, nf, listas, &listasNaTela);
+    publicarParcial(&lote, &cap, n, filsLote, nf, listas, &listasNaTela);
     marco("continuar assistindo na tela");
   }
   LISTAS_SE_PRONTAS();
@@ -3849,6 +3921,7 @@ static void *montar(void *u) {
     int nDecl = 0, k;
     // static: 40 KB. montar() roda num fio so por vez (ver declsMontagem).
     static CatFileira fil[CAT_FIL_MAX];
+    catalog_rows_clear(fil, CAT_FIL_MAX);
     int nFil = 0;
     // A fileira 0 e "Continuar assistindo", que ja foi montada acima. Ela e
     // SINTETICA: nao esta na ordem do web e nao pode ser desligada por chave —
@@ -3906,6 +3979,7 @@ static void *montar(void *u) {
         }
         printf("[desc] conta pronta: %d addon(s) (espera encerrada)\n", addons_n()); fflush(stdout);
       } }
+    catalog_runtime_cycle_begin();
     // A LISTA DE ADDONS E LIDA AQUI. Marcar o instante e o que permite dizer,
     // no fim, se um pedido de remontagem que chegou no meio do caminho ja foi
     // atendido por esta volta. Ver geracaoPedida.
@@ -4175,6 +4249,7 @@ static void *montar(void *u) {
             if (!strcmp(tarefas[t].d->chave, d->chave)) { repetida = 1; break; }
           if (repetida) { duplicados++; continue; }
           tarefas[nTarefas].d = d;
+          tarefas[nTarefas].addon_index=d->addon_index; tarefas[nTarefas].catalog_index=d->catalog_index;
           // COPIAS para o fio: um fio largado por lento sobrevive a esta volta,
           // e `decls` (estatico) e a lista de addons ja podem ser de outra.
           snprintf(tarefas[nTarefas].base, sizeof tarefas[nTarefas].base, "%s", d->base ? d->base : "");
@@ -4186,6 +4261,7 @@ static void *montar(void *u) {
         if (!nTarefas) { free(tarefas); free(rod); break; }
         pedidos += nTarefas;
         rod->nT = nTarefas;
+        rod->work = nuvio_catalog_work_retain(catalog_runtime_work());
         rod->refs = 1;                       // quem monta
         rod->inicioMs = rod->ultimoProntoMs = descAgoraMs();
 
@@ -4300,6 +4376,8 @@ static void *montar(void *u) {
             snprintf(f->tipo,   sizeof f->tipo,   "%s", d->tipo);
             snprintf(f->base,   sizeof f->base,   "%s", d->base ? d->base : "");
             snprintf(f->catId,  sizeof f->catId,  "%s", d->id);
+            if (!largado && tarefas[k].row)
+              catalog_row_from_rust(f,nuvio_row_retain(tarefas[k].row));
             f->ini = n; f->n = got; f->estado = estadoLinha;
           }
           n += got;
@@ -4322,11 +4400,13 @@ static void *montar(void *u) {
           // filsMontadas so muda JUNTO com a publicacao: sem ela o bloco da tela
           // e outro. Estrutura que mudou no meio NAO interrompe: estas fileiras
           // sao da conta/perfil/addons certos, e o fim da volta as rearruma.
+          if (cat_do_cache() && !cat_home_apenas_fixas()) progressivo = 0;
           if (progressivo && minhaGeracao == montagemGeracao && fonteIntacta(&ctxIni)) {
             nFileirasMontadas = nFil;
-            memcpy(filsMontadas, fil, sizeof(CatFileira) * (size_t)nFil);
+            catalog_rows_replace(filsLote,fil,(size_t)nFil,CAT_FIL_MAX); nFilsLote=nFil;
+            catalog_rows_project(filsMontadas, fil, (size_t)nFil, CAT_FIL_MAX);
             nPublicado = n;
-            publicarParcial(&lote, &cap, n, filsMontadas, nFileirasMontadas,
+            publicarParcial(&lote, &cap, n, filsLote, nFilsLote,
                             listas, &listasNaTela);
           }
           // Bandeira propria: `nFil == 1` nunca acontece aqui porque a fileira
@@ -4361,7 +4441,8 @@ static void *montar(void *u) {
         // o teto impediu de PEDIR. Quem precisa disso e desc_remontar_fileiras.
         catalogosNaoPedidos = sobraram; }
       nFilsLote = nFil;
-      memcpy(filsLote, fil, sizeof(CatFileira) * (size_t)nFil);
+      catalog_rows_replace(filsLote, fil, (size_t)nFil, CAT_FIL_MAX);
+      catalog_rows_clear(fil, CAT_FIL_MAX);
       // UMA LINHA QUE RESPONDE "o que falhou no arranque". As quatro contagens
       // sao as quatro respostas possiveis de um catalogo, e sem separa-las o
       // unico numero disponivel era o total de fileiras — que fica igual quer o
@@ -4449,7 +4530,7 @@ static void *montar(void *u) {
   ordenarPorSnapshot(filsLote, nFilsLote);
 #undef GARANTE
 
-  if (n || nFilsLote > 0) {
+  if (n || nFilsLote > 0 || (catalog_runtime_enabled() && catalog_runtime_current())) {
     // SO PUBLICA SE MUDOU. A mesma home montada de novo (ciclo de 5 min, sync
     // sem novidade) tem a mesma assinatura que a da tela; republicar seria
     // trocar o vetor, subir a revisao e a home se remontar — foco, rolagem e
@@ -4496,9 +4577,9 @@ static void *montar(void *u) {
     // A partir daqui filsMontadas descreve o bloco da tela nos dois ramos:
     // publicado agora, ou igual (mesma assinatura) ao que ja estava.
     nFileirasMontadas = nFilsLote;
-    memcpy(filsMontadas, filsLote, sizeof(CatFileira) * (size_t)nFilsLote);
+    catalog_rows_project(filsMontadas, filsLote, (size_t)nFilsLote, CAT_FIL_MAX);
     if (depois != antes || cat_do_cache()) {
-      publicarMontagem(lote, n, filsMontadas, nFileirasMontadas);
+      publicarMontagem(lote, n, filsLote, nFilsLote);
       marco("catalogo da rede publicado");
       printf("[desc] catalogo montado com %d titulos\n", n);
     } else {
@@ -4692,7 +4773,7 @@ void desc_remontar_fileiras(void) {
   const char *chaves[CAT_FIL_MAX];
   int idxCat[CAT_FIL_MAX], ordem[CAT_FIL_MAX], antes[CAT_FIL_MAX];
   int i, k, q, nCat = 0, nOut = 0, teto, engolidas = 0;
-  if (nFileirasMontadas < 1) return;
+  if (nFileirasMontadas < 1 || !catalog_runtime_published_current()) return;
 
   // 1. as fixas primeiro, na ordem em que ja estavam.
   for (i = 0; i < nFileirasMontadas && nOut < CAT_FIL_MAX; i++)
@@ -4787,9 +4868,9 @@ void desc_remontar_fileiras(void) {
          nOut, nFileirasMontadas,
          engolidas ? " (algumas engolidas por colecao)" : "");
   fflush(stdout);
-  nFileirasMontadas = nOut;
-  memcpy(filsMontadas, saidaFil, sizeof(CatFileira) * (size_t)nOut);
   cat_republicar_fileiras(saidaFil, nOut);
+  catalog_rows_project(filsMontadas, saidaFil, (size_t)nOut, CAT_FIL_MAX);
+  nFileirasMontadas = nOut;
 
   // A VAGA QUE A COLECAO LIBEROU TEM DE SER PREENCHIDA, e so a rede tem com que.
   //
@@ -4853,31 +4934,34 @@ static int baseDeAddonLigado(const char *base) {
   return 0;
 }
 int desc_tirar_fileiras_de_addons_ausentes(void) {
-  static CatFileira publicadas[CAT_FIL_MAX], restam[CAT_FIL_MAX];
+  CatFileira *publicadas, *restam;
   int i, np = 0, nr = 0, tirou = 0;
   if (addons_n() < 1) return 0;
-  { int n = cat_n_fileiras();
-    for (i = 0; i < n && np < CAT_FIL_MAX; i++) {
-      const CatFileira *f = cat_fileira(i);
-      if (f) publicadas[np++] = *f;
-    } }
+  publicadas=calloc(CAT_FIL_MAX,sizeof *publicadas);
+  restam=calloc(CAT_FIL_MAX,sizeof *restam);
+  if (!publicadas || !restam) { free(publicadas); free(restam); return 0; }
+  np=catalog_copy_rows(publicadas,CAT_FIL_MAX);
   for (i = 0; i < np; i++) {
     if (publicadas[i].base[0] && !baseDeAddonLigado(publicadas[i].base)) { tirou++; continue; }
     restam[nr++] = publicadas[i];
   }
-  if (!tirou) return 0;
+  if (!tirou) goto cleanup;
   // A volta em curso e dona de filsMontadas: mexer nele aqui corre contra ela, e
   // ela termina publicando o conjunto novo de qualquer jeito.
   if (!buscando) {
     int w = 0;
     for (i = 0; i < nFileirasMontadas; i++)
-      if (!filsMontadas[i].base[0] || baseDeAddonLigado(filsMontadas[i].base))
-        filsMontadas[w++] = filsMontadas[i];
+      if (!filsMontadas[i].base[0] || baseDeAddonLigado(filsMontadas[i].base)) {
+        if (w != i) { filsMontadas[w] = filsMontadas[i]; memset(filsMontadas+i,0,sizeof *filsMontadas); }
+        w++;
+      } else catalog_row_clear(filsMontadas+i);
     nFileirasMontadas = w;
   }
   cat_republicar_fileiras(restam, nr);
   printf("[desc] %d fileira(s) de addon removido/desligado sairam da tela na hora\n", tirou);
   fflush(stdout);
+cleanup:
+  catalog_rows_clear(publicadas,(size_t)np); free(publicadas); free(restam);
   return tirou;
 }
 
@@ -4944,6 +5028,7 @@ static void metaCacheGuardar(const char *id, const char *corpo) {
   char *copia = strdup(corpo);
   if (!copia) return;
   pthread_mutex_lock(&metaTrava);
+  if (!catalog_metadata_current()) { pthread_mutex_unlock(&metaTrava); free(copia); return; }
   for (int i = 0; i < META_CACHE_N; i++) {
     if (metaCache[i].corpo && !strcmp(metaCache[i].id, id)) { vaga = i; break; }
     if (!metaCache[i].corpo || metaCache[i].uso < metaCache[vaga].uso) vaga = i;
@@ -4988,6 +5073,7 @@ static int metaNegAtiva(const char *chave) {
 }
 static void metaNegGuardar(const char *chave) {
   pthread_mutex_lock(&metaTrava);
+  if (!catalog_metadata_current()) { pthread_mutex_unlock(&metaTrava); return; }
   snprintf(metaNeg[metaNegProx].chave, sizeof metaNeg[0].chave, "%s", chave);
   metaNeg[metaNegProx].quando = (long)time(NULL);
   metaNegProx = (metaNegProx + 1) % META_NEG_N;
@@ -5006,6 +5092,7 @@ static void metaNegLimpar(void) {
 // `prazo` em segundos: o texto localizado espera 15; a ficha do catalogo 8, para
 // um addon lento nao segurar a pagina.
 static char *metaDoAddonT(int i, const char *tipo, const char *id, int prazo) {
+  if (!catalog_metadata_current()) return NULL;
   char url[NV_ADDON_PEDIDO_MAX], chave[96], idUrl[768], *c;
   const char *base;
   unsigned h;
@@ -5194,6 +5281,7 @@ static void locGuardar(const char *chave, const char *tit, const char *sin,
                        const char *logo, const char *fundo, int ok) {
   int i, vaga = -1;
   pthread_mutex_lock(&locTrava);
+  if (!catalog_metadata_current()) { pthread_mutex_unlock(&locTrava); return; }
   for (i = 0; i < LOC_N; i++)
     if (!strcmp(locCache[i].chave, chave)) { vaga = i; break; }
   if (vaga < 0) { vaga = locProx; locProx = (locProx + 1) % LOC_N; }
@@ -5216,6 +5304,18 @@ static void locGuardar(const char *chave, const char *tit, const char *sin,
 // (dados_dir vazio, os testes) nao ha arquivo e tudo segue so na memoria.
 #include "dados.h"
 static int locDiscoLido;
+void discovery_metadata_context_changed(void) {
+  int index;
+  pthread_mutex_lock(&metaTrava);
+  for (index=0;index<META_CACHE_N;index++) free(metaCache[index].corpo);
+  memset(metaCache,0,sizeof metaCache); metaRelogio=0;
+  memset(metaNeg,0,sizeof metaNeg); metaNegProx=0;
+  pthread_mutex_unlock(&metaTrava);
+  pthread_mutex_lock(&locTrava);
+  memset(locCache,0,sizeof locCache); locProx=0;
+  __atomic_store_n(&locDiscoLido,0,__ATOMIC_RELEASE);
+  pthread_mutex_unlock(&locTrava);
+}
 
 static int locCaminho(char *dst, size_t n) {
   const char *d = dados_dir();
@@ -5255,6 +5355,7 @@ static void locSalvarDisco(void) {
   char caminho[600], tmp[620], ident[128];
   FILE *f;
   int i, n = 0;
+  if (!catalog_metadata_current()) return;
   if (!locCaminho(caminho, sizeof caminho)) return;
   snprintf(tmp, sizeof tmp, "%s.tmp", caminho);
   locIdentidade(ident, sizeof ident);
@@ -5263,6 +5364,7 @@ static void locSalvarDisco(void) {
   if (!f) { return; }
   fprintf(f, "%s\n", ident);
   pthread_mutex_lock(&locTrava);
+  if (!catalog_metadata_current()) { pthread_mutex_unlock(&locTrava); fclose(f); remove(tmp); return; }
   for (i = 0; i < LOC_N; i++) {
     if (!locCache[i].chave[0] || !locCache[i].ok) continue;
     locEscapar(f, locCache[i].chave);   fputc('\t', f);
@@ -5273,7 +5375,9 @@ static void locSalvarDisco(void) {
     n++;
   }
   pthread_mutex_unlock(&locTrava);
-  if (fclose(f) != 0 || rename(tmp, caminho) != 0) remove(tmp);
+  { int closed=fclose(f); char current[sizeof ident]; locIdentidade(current,sizeof current);
+    if (closed || !catalog_metadata_current() || strcmp(current,ident) || rename(tmp,caminho)) remove(tmp);
+  }
 
 
   printf("[desc] texto localizado gravado: %d titulo(s)\n", n);
@@ -5294,7 +5398,7 @@ static void locLerDisco(void) {
   if (!fgets(linha, sizeof linha, f) || strncmp(linha, ident, strlen(ident)) ||
       (linha[strlen(ident)] != '\n' && linha[strlen(ident)] != 0)) {
     fclose(f);
-    remove(caminho);
+    if (catalog_metadata_current()) remove(caminho);
 
     printf("[desc] texto localizado do disco descartado (outra conta/perfil)\n");
     fflush(stdout);
@@ -5302,6 +5406,7 @@ static void locLerDisco(void) {
   }
   pthread_mutex_lock(&locTrava);
   while (fgets(linha, sizeof linha, f) && n < LOC_N) {
+    if (!catalog_metadata_current()) break;
     char chave[64], *p = linha;
     int i, vaga = -1;
     p = locCampo(p, chave, sizeof chave);
@@ -5368,6 +5473,7 @@ static int localizarTexto(const char *tipo, const char *id, char *tit, size_t nt
                           char *fundo, size_t nf) {
   char chave[64], logoTmdb[512] = "";
   int ok = 0, externo = ajustes_meta_externo(), naoIng = idiomaNaoIngles(), lido;
+  if (!catalog_metadata_current()) return 0;
   logo[0] = fundo[0] = 0;
   if (!externo && !naoIng) return 0;
   locLerDisco();
@@ -5464,7 +5570,7 @@ static void *fioLocalizar(void *u) {
       CatItem current = {0};
       char id[24], imdb[64], tit[160], sin[900], logo[512], fundo[512];
       const char *tipo;
-      if (!catalog_copy_index(lista[k], &current)) continue;
+      if (!catalog_metadata_copy(lista[k], &current)) continue;
       if (!locChaveDoItem(&current, id, sizeof id, &tipo)) {
         catalog_item_clear(&current); continue;
       }
@@ -5491,6 +5597,7 @@ static void *fioLocalizar(void *u) {
     if (locDeNovo) { pthread_mutex_unlock(&locFilaTrava); novos = 0; continue; }
     locVivo = 0;
     pthread_mutex_unlock(&locFilaTrava);
+    catalog_metadata_end();
     return NULL;
   }
 }
@@ -5858,6 +5965,7 @@ static char epAlvoId[64];
 // dezenas de pedidos em serie longa) roda depois de fioEpVivo ser solto, e o
 // proximo titulo ja reescreveu epAlvoId (sem _Thread_local no Tizen 4/5).
 static int epAlvoDe(int alvoItem, const char *id) {
+  if (!catalog_metadata_current()) return -1;
   int i = cat_indice_vivo(alvoItem, id);
   if (i != alvoItem) {
     printf("[desc] episodios de %s: catalogo remontou no meio do pedido (%d -> %d)\n",
@@ -6396,7 +6504,7 @@ static void *buscarEps(void *u) {
   int viaCatalogo = 0, solto = 0;
   (void)u;
   memset(&mf, 0, sizeof mf);
-  if (!catalog_copy_index(alvoItem, &base) || !catalog_title_id(&base)[0]) goto cleanup;
+  if (!catalog_metadata_copy(alvoItem, &base) || !catalog_title_id(&base)[0]) goto cleanup;
   snprintf(epAlvoId, sizeof epAlvoId, "%s", orig->imdb);
   snprintf(meuId, sizeof meuId, "%s", orig->imdb);
   /* The retained copy stays valid across network waits and Home replacement. */
@@ -6719,6 +6827,7 @@ cleanup:
   free(corpo);
   metaFontesLiberar(&mf);
   catalog_item_clear(&base);
+  catalog_metadata_end();
   if (!solto) fioEpVivo = 0;   // solto antes: um fio mais novo pode estar vivo
   return NULL;
 }

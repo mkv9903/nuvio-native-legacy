@@ -16,6 +16,7 @@
 #include "teclado.h"
 #include "ponteiro.h"
 #include "app.h"
+#include "catalog_runtime.h"
 #include "descanso.h"
 #include "iconeapp.h"
 #include "logoapp.h"
@@ -2380,6 +2381,7 @@ void app_atualizar(float dt, Uint32 agora) {
   {
     addon_registry_step(ajustes_addons_do_principal(), !player_aberto());
     home_order_runtime_step(!player_aberto());
+    catalog_runtime_step();
   }
   if (player_aberto() || player_mini_ativo()) diagnostico_cancelar_vazao();
   // Login e escolha de perfil retornam cedo; a atividade da conta anterior

@@ -18,6 +18,7 @@ const RustTitleSnapshot *nuvio_scene_title(const RustSceneSnapshot *scene, size_
 const RustRowSnapshot *nuvio_scene_row(const RustSceneSnapshot *scene, size_t index);
 const RustRowSnapshot *nuvio_row_retain(const RustRowSnapshot *row);
 void nuvio_row_release(const RustRowSnapshot *row);
+void nuvio_row_retire(const RustRowSnapshot *row);
 const char *nuvio_row_text(const RustRowSnapshot *row, unsigned field);
 void nuvio_row_copy_text(const RustRowSnapshot *row, unsigned field, char *output, size_t capacity);
 const RustRowInfo *nuvio_row_info(const RustRowSnapshot *row);

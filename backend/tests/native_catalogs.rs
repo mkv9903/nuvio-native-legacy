@@ -1,0 +1,621 @@
+#![cfg(feature = "native-ui-tests")]
+mod support;
+use nuvio_backend::{
+    addon_backend::AddonBackend,
+    addon_controller::AddonController,
+    addon_ffi::NativeAddonController,
+    addon_service::AddonAccount,
+    addon_storage::AddonStore,
+    addons::{InstalledAddon, Manifest},
+    catalog_cache::{CatalogCache, ProviderCache, ProviderResource},
+    catalog_ffi::*,
+    catalog_runtime::CatalogRuntime,
+    content_context::{AddonScope, ContentContext},
+    error::{Error, Result},
+    http::Response,
+    model::ProfileId,
+    provider_http::ProviderTransport,
+    scene_cache::SceneCache,
+    scene_snapshot::SceneSnapshot,
+    title_snapshot::TitleField,
+};
+use serde_json::json;
+use std::{
+    ffi::{c_char, c_void, CStr, CString},
+    sync::{Arc, Condvar, Mutex},
+    time::{Duration, Instant},
+};
+use support::Directory;
+use url::Url;
+use zeroize::Zeroizing;
+#[link(name = "nuvio_c_ui")]
+extern "C" {
+    fn catalog_runtime_test_attach(runtime: *const CatalogRuntime);
+    fn catalog_runtime_step();
+    fn catalog_runtime_use(work: *const NativeCatalogWork);
+    fn catalog_runtime_capture(save: i32) -> i32;
+    fn catalog_runtime_mark_published();
+    fn catalog_runtime_published_current() -> i32;
+    fn catalog_apply_scene(scene: *const SceneSnapshot, cached: i32) -> i32;
+    fn catalog_apply_scene_view(
+        scene: *const SceneSnapshot,
+        cached: i32,
+        view: *const NativeSceneView,
+        revision: u32,
+    ) -> i32;
+    fn catalog_capture_scene() -> *const SceneSnapshot;
+    fn cat_revisao() -> u32;
+    fn cat_n() -> i32;
+    fn cat_ler_cache(directory: *const c_char) -> i32;
+    fn native_title_current() -> *const c_void;
+    fn native_title_text(item: *const c_void, field: u32) -> *const c_char;
+    fn native_title_publish(item: *const c_void);
+    fn native_title_frame();
+    fn native_catalog_row_text(index: i32, field: u32) -> *const c_char;
+    fn native_title_create(title: *const c_void) -> *mut c_void;
+    fn native_title_destroy(title: *mut c_void);
+    fn cat_trocar_continuar(items: *const c_void, count: i32);
+    fn discovery_test_runtime_catalog(addon_index: usize, catalog_index: usize) -> i32;
+    fn native_metadata_copy(index: i32) -> *mut c_void;
+    fn native_metadata_try_episode() -> i32;
+    fn catalog_metadata_current() -> i32;
+    fn catalog_metadata_end();
+    fn native_title_update(title: *const c_void);
+    fn addon_registry_test_attach(controller: *mut c_void);
+    fn addon_registry_reader_current() -> i32;
+    fn native_catalog_project_reorder();
+    fn catalog_content_begin() -> i32;
+    fn catalog_content_end();
+}
+struct Account {
+    context: Mutex<ContentContext>,
+    addons: Vec<InstalledAddon>,
+}
+impl AddonAccount for Account {
+    fn current_context(&self, _: bool) -> Option<ContentContext> {
+        Some(self.context.lock().unwrap().clone())
+    }
+    fn is_current(&self, context: &ContentContext) -> bool {
+        *self.context.lock().unwrap() == *context
+    }
+    fn read_addons(&self, context: &ContentContext) -> Result<Vec<InstalledAddon>> {
+        if self.is_current(context) {
+            Ok(self.addons.clone())
+        } else {
+            Err(Error::Cancelled)
+        }
+    }
+    fn write_addons(&self, _: &ContentContext, _: &[InstalledAddon]) -> Result<()> {
+        Err(Error::InvalidData)
+    }
+}
+struct Transport {
+    body: Mutex<Vec<u8>>,
+    urls: Mutex<Vec<Url>>,
+    gate: Mutex<(bool, bool)>,
+    ready: Condvar,
+}
+impl ProviderTransport for Transport {
+    fn get(&self, url: &Url, _: Duration) -> Result<Response> {
+        self.urls.lock().unwrap().push(url.clone());
+        let mut gate = self.gate.lock().unwrap();
+        if gate.0 {
+            gate.1 = true;
+            self.ready.notify_all();
+            while gate.0 {
+                gate = self.ready.wait(gate).unwrap();
+            }
+        }
+        Ok(Response {
+            status: 200,
+            body: Zeroizing::new(self.body.lock().unwrap().clone()),
+        })
+    }
+}
+struct Environment {
+    account: Arc<Account>,
+    addons: AddonBackend,
+    runtime: Arc<CatalogRuntime>,
+    transport: Arc<Transport>,
+    directory: Directory,
+    catalog_id: String,
+    _native: Box<NativeAddonController>,
+}
+impl Environment {
+    fn new() -> Self {
+        let directory = Directory::new();
+        let base = format!(
+            "https://provider.invalid/{}/configured",
+            "private-config".repeat(220)
+        );
+        let account = Arc::new(Account {
+            context: Mutex::new(context(1, 1)),
+            addons: InstalledAddon::decode_account_list(
+                json!([{"url":base,"enabled":true}]).to_string().as_bytes(),
+            )
+            .unwrap(),
+        });
+        let addons = AddonBackend::new(
+            account.clone(),
+            Arc::new(AddonStore::open(&directory.path).unwrap()),
+        );
+        let transport = Arc::new(Transport {
+            body: Mutex::new(body("profile-one")),
+            urls: Mutex::new(Vec::new()),
+            gate: Mutex::new((false, false)),
+            ready: Condvar::new(),
+        });
+        let runtime = Arc::new(
+            CatalogRuntime::new(
+                account.clone(),
+                addons.clone(),
+                transport.clone(),
+                Arc::new(CatalogCache::open(&directory.path).unwrap()),
+                Arc::new(SceneCache::open(&directory.path).unwrap()),
+            )
+            .unwrap(),
+        );
+        let native = Box::new(NativeAddonController::new(
+            AddonController::new(addons.clone()).unwrap(),
+        ));
+        let env = Self {
+            account,
+            addons,
+            runtime,
+            transport,
+            directory,
+            catalog_id: format!("catalog:{}", "full-id".repeat(60)),
+            _native: native,
+        };
+        env.activate(1);
+        unsafe {
+            addon_registry_test_attach(
+                (&*env._native as *const NativeAddonController)
+                    .cast_mut()
+                    .cast(),
+            );
+            catalog_runtime_test_attach(Arc::as_ptr(&env.runtime));
+            catalog_runtime_step();
+        }
+        wait(|| !env.runtime.scenes.needs_restore());
+        env
+    }
+    fn activate(&self, profile: u32) {
+        {
+            let mut current = self.account.context.lock().unwrap();
+            let generation = current.content_generation + 1;
+            *current = context(profile, generation);
+        }
+        let context = self.addons.activate(false).unwrap();
+        self.addons.synchronize(&context).unwrap();
+        let snapshot = self.addons.snapshot();
+        let manifest=Manifest::decode(json!({"id":"provider","name":"Provider","resources":["catalog"],"catalogs":[{"type":"movie","id":self.catalog_id,"name":"Complete catalog"}]}).to_string().as_bytes()).unwrap();
+        self.addons
+            .attach_manifest(
+                snapshot.addons.context.as_ref().unwrap(),
+                &self.account.addons[0].url,
+                manifest,
+            )
+            .unwrap();
+    }
+    fn job(&self) -> *const NativeCatalogWork {
+        unsafe { nuvio_catalog_begin(Arc::as_ptr(&self.runtime)) }
+    }
+    fn load(&self, work: *const NativeCatalogWork) -> *const SceneSnapshot {
+        let mut responded = 0;
+        let scene = unsafe { nuvio_catalog_load_index(work, 0, 0, 24, &mut responded) };
+        assert!(!scene.is_null());
+        scene
+    }
+    fn publish(&self, work: *const NativeCatalogWork, scene: *const SceneSnapshot) {
+        unsafe {
+            catalog_runtime_use(work);
+            assert_eq!(catalog_apply_scene(scene, 0), 1);
+            catalog_runtime_mark_published();
+            assert_eq!(catalog_runtime_capture(1), 1);
+        }
+    }
+}
+impl Drop for Environment {
+    fn drop(&mut self) {
+        unsafe {
+            catalog_runtime_test_attach(std::ptr::null());
+            addon_registry_test_attach(std::ptr::null_mut());
+            native_title_publish(std::ptr::null());
+            native_title_publish(std::ptr::null());
+            native_title_frame();
+            native_title_frame();
+        }
+    }
+}
+fn context(profile: u32, generation: u64) -> ContentContext {
+    ContentContext {
+        account_generation: 1,
+        content_generation: generation,
+        profile: ProfileId::new(profile).unwrap(),
+        force_primary: false,
+        addons: AddonScope {
+            member: "member".into(),
+            owner: "owner".into(),
+            profile: ProfileId::new(1).unwrap(),
+        },
+    }
+}
+fn body(id: &str) -> Vec<u8> {
+    json!({"metas":[{"id":id,"imdb_id":"tt123","name":"A title","poster":"https://art.invalid/poster","imdbRating":10}]}).to_string().into_bytes()
+}
+fn wait(mut condition: impl FnMut() -> bool) {
+    let end = Instant::now() + Duration::from_secs(5);
+    while !condition() {
+        assert!(Instant::now() < end);
+        std::thread::sleep(Duration::from_millis(2));
+    }
+}
+unsafe fn current_id() -> String {
+    unsafe {
+        CStr::from_ptr(native_title_text(
+            native_title_current(),
+            TitleField::Id as u32,
+        ))
+    }
+    .to_str()
+    .unwrap()
+    .into()
+}
+
+#[test]
+fn runtime_catalogs_use_complete_rust_requests_and_round_trip_actual_c_enrichment() {
+    let env = Environment::new();
+    let work = env.job();
+    let id = format!("provider:{}", "complete-id".repeat(300));
+    *env.transport.body.lock().unwrap() = body(&id);
+    unsafe {
+        catalog_runtime_use(work);
+        assert_eq!(discovery_test_runtime_catalog(0, 0), 1);
+        assert_eq!(catalog_runtime_capture(1), 1);
+        assert_eq!(current_id(), id);
+        let request = env.transport.urls.lock().unwrap()[0].clone();
+        assert!(request.as_str().len() > 2048);
+        assert!(request.as_str().contains(&env.catalog_id));
+        assert_eq!(
+            CStr::from_ptr(native_catalog_row_text(0, 4))
+                .to_str()
+                .unwrap(),
+            env.catalog_id
+        );
+        let captured = Arc::from_raw(catalog_capture_scene());
+        assert_eq!(captured.titles[0].record.metadata.id, id);
+        assert_eq!(
+            captured.titles[0].record.metadata.imdb_id.as_deref(),
+            Some("tt123")
+        );
+        assert_eq!(
+            captured.rows[0].record.source.as_ref().unwrap().catalog_id,
+            env.catalog_id
+        );
+        nuvio_catalog_work_release(work);
+    }
+    let saved = SceneCache::open(&env.directory.path)
+        .unwrap()
+        .load(&(&context(1, 1)).into(), &|| true)
+        .unwrap()
+        .unwrap();
+    assert_eq!(saved.titles[0].metadata.id, id);
+}
+
+#[test]
+fn switching_profiles_hides_old_rows_and_restores_the_selected_private_scene() {
+    let env = Environment::new();
+    let a = env.job();
+    let scene = env.load(a);
+    unsafe {
+        env.publish(a, scene);
+        nuvio_backend::scene_snapshot::nuvio_scene_release(scene);
+        nuvio_catalog_work_release(a);
+    }
+    env.activate(2);
+    unsafe {
+        catalog_runtime_step();
+        assert_eq!(cat_n(), 0);
+        assert_eq!(catalog_runtime_published_current(), 0);
+    }
+    wait(|| !env.runtime.scenes.needs_restore());
+    *env.transport.body.lock().unwrap() = body("profile-two");
+    let b = env.job();
+    let scene = env.load(b);
+    unsafe {
+        env.publish(b, scene);
+        assert_eq!(current_id(), "profile-two");
+        nuvio_backend::scene_snapshot::nuvio_scene_release(scene);
+        nuvio_catalog_work_release(b);
+    }
+    env.activate(1);
+    unsafe {
+        catalog_runtime_step();
+        assert_eq!(current_id(), "profile-one");
+    }
+}
+
+#[test]
+fn a_confirmed_removed_manifest_catalog_is_removed_from_the_native_home() {
+    let env = Environment::new();
+    let job = env.job();
+    let scene = env.load(job);
+    unsafe {
+        env.publish(job, scene);
+        nuvio_backend::scene_snapshot::nuvio_scene_release(scene);
+    }
+    let source = env.addons.snapshot();
+    let manifest =
+        Manifest::decode(br#"{"id":"provider","name":"Provider","resources":[],"catalogs":[]}"#)
+            .unwrap();
+    env.addons
+        .attach_manifest(
+            source.addons.context.as_ref().unwrap(),
+            &env.account.addons[0].url,
+            manifest,
+        )
+        .unwrap();
+    unsafe {
+        catalog_runtime_step();
+        assert_eq!(cat_n(), 0);
+        nuvio_catalog_work_release(job);
+    }
+}
+
+#[test]
+fn a_catalog_reply_delayed_across_profile_selection_is_cancelled() {
+    let env = Environment::new();
+    let job = env.job();
+    env.transport.gate.lock().unwrap().0 = true;
+    let address = unsafe { nuvio_catalog_work_retain(job) } as usize;
+    let thread = std::thread::spawn(move || unsafe {
+        let work = address as *const NativeCatalogWork;
+        catalog_runtime_use(work);
+        let count = discovery_test_runtime_catalog(0, 0);
+        nuvio_catalog_work_release(work);
+        count
+    });
+    wait(|| env.transport.gate.lock().unwrap().1);
+    env.activate(2);
+    unsafe {
+        catalog_runtime_step();
+    }
+    env.transport.gate.lock().unwrap().0 = false;
+    env.transport.ready.notify_all();
+    assert_eq!(thread.join().unwrap(), 0);
+    assert_eq!(unsafe { cat_n() }, 0);
+    assert_eq!(unsafe { nuvio_catalog_work_current(job) }, 0);
+    unsafe {
+        nuvio_catalog_work_release(job);
+    }
+}
+
+#[test]
+fn confirmed_empty_catalogs_block_old_row_fallback_while_malformed_replies_keep_valid_cache() {
+    let env = Environment::new();
+    let job = env.job();
+    let first = env.load(job);
+    unsafe {
+        nuvio_backend::scene_snapshot::nuvio_scene_release(first);
+    }
+    *env.transport.body.lock().unwrap() = br#"{"metas":[{"id":"broken"}]}"#.to_vec();
+    let cached = env.load(job);
+    assert_eq!(unsafe { &*cached }.titles.len(), 1);
+    unsafe {
+        nuvio_backend::scene_snapshot::nuvio_scene_release(cached);
+    }
+    *env.transport.body.lock().unwrap() = br#"{"metas":[]}"#.to_vec();
+    let empty = env.load(job);
+    assert!(unsafe { &*empty }.titles.is_empty());
+    let source = unsafe { &*empty }.rows[0].record.source.as_ref().unwrap();
+    let base = CString::new(source.addon.as_str()).unwrap();
+    let kind = CString::new("movie").unwrap();
+    let id = CString::new(env.catalog_id.as_str()).unwrap();
+    assert_eq!(
+        unsafe { nuvio_catalog_row_reusable(job, base.as_ptr(), kind.as_ptr(), id.as_ptr()) },
+        0
+    );
+    unsafe {
+        nuvio_backend::scene_snapshot::nuvio_scene_release(empty);
+        nuvio_catalog_work_release(job);
+    }
+}
+
+#[test]
+fn restored_row_owners_survive_cw_replacement_and_preserve_extras_in_c_capture() {
+    let original = support::scene::complete_scene();
+    let scene = Arc::new(SceneSnapshot::new(original.clone()).unwrap());
+    let row = Arc::downgrade(&scene.rows[0]);
+    unsafe {
+        assert_eq!(catalog_apply_scene(Arc::as_ptr(&scene), 1), 1);
+        let item = native_title_create(Arc::into_raw(scene.titles[0].clone()).cast());
+        drop(scene);
+        cat_trocar_continuar(item, 1);
+        native_catalog_project_reorder();
+        native_title_destroy(item);
+        let captured = Arc::from_raw(catalog_capture_scene());
+        let restored = captured
+            .rows
+            .iter()
+            .find(|row| row.record.source.is_some())
+            .unwrap();
+        assert!(restored.record.source == original.rows[0].source);
+        assert!(row.upgrade().is_some());
+        drop(captured);
+        native_title_publish(std::ptr::null());
+        native_title_publish(std::ptr::null());
+        native_title_frame();
+        native_title_frame();
+    }
+    assert!(row.upgrade().is_none());
+}
+
+#[test]
+fn a_restored_view_cannot_overwrite_a_newer_c_publication() {
+    let env = Environment::new();
+    let work = env.job();
+    let scene = env.load(work);
+    env.runtime
+        .scenes
+        .accept(&unsafe { &*work }.work, unsafe {
+            Arc::increment_strong_count(scene);
+            Arc::from_raw(scene)
+        })
+        .unwrap();
+    let view = unsafe { nuvio_catalog_view(Arc::as_ptr(&env.runtime)) };
+    let revision = unsafe { cat_revisao() };
+    unsafe {
+        catalog_apply_scene(scene, 0);
+        assert_eq!(catalog_apply_scene_view(scene, 1, view, revision), 0);
+        assert_eq!(current_id(), "profile-one");
+        nuvio_catalog_view_release(view);
+        nuvio_backend::scene_snapshot::nuvio_scene_release(scene);
+        nuvio_catalog_work_release(work);
+    }
+}
+
+#[test]
+fn the_old_c_binary_file_is_ignored_while_only_rust_json_is_saved() {
+    let env = Environment::new();
+    let old = env.directory.path.join("catalogo-rede.bin");
+    std::fs::write(&old, b"original C bytes").unwrap();
+    let directory = CString::new(env.directory.path.to_str().unwrap()).unwrap();
+    assert_eq!(unsafe { cat_ler_cache(directory.as_ptr()) }, 0);
+    let job = env.job();
+    let scene = env.load(job);
+    unsafe {
+        env.publish(job, scene);
+        nuvio_backend::scene_snapshot::nuvio_scene_release(scene);
+        nuvio_catalog_work_release(job);
+    }
+    assert_eq!(std::fs::read(old).unwrap(), b"original C bytes");
+    assert!(SceneCache::open(&env.directory.path)
+        .unwrap()
+        .load(&(&context(1, 1)).into(), &|| true)
+        .unwrap()
+        .is_some());
+}
+
+#[test]
+fn logout_clears_only_this_rewrites_scene_and_provider_json() {
+    let env = Environment::new();
+    let job = env.job();
+    let scene = env.load(job);
+    unsafe {
+        env.publish(job, scene);
+        nuvio_backend::scene_snapshot::nuvio_scene_release(scene);
+    }
+    let context = env.account.context.lock().unwrap().clone();
+    let key = nuvio_backend::provider_loader::ProviderLoader::key(
+        &context,
+        &env.account.addons[0].url,
+        ProviderResource::Catalog {
+            media_type: "movie".into(),
+            id: env.catalog_id.clone(),
+            extras: Vec::new(),
+        },
+    );
+    let old = env.directory.path.join("catalogo-rede.bin");
+    std::fs::write(&old, b"unrelated old bytes").unwrap();
+    env.account.context.lock().unwrap().content_generation += 1;
+    env.runtime.logout();
+    wait(|| {
+        SceneCache::open(&env.directory.path)
+            .unwrap()
+            .load(&(&context).into(), &|| true)
+            .unwrap()
+            .is_none()
+            && CatalogCache::open(&env.directory.path)
+                .unwrap()
+                .load(&key)
+                .unwrap()
+                .is_none()
+    });
+    assert_eq!(std::fs::read(old).unwrap(), b"unrelated old bytes");
+    unsafe {
+        nuvio_catalog_work_release(job);
+    }
+}
+
+#[test]
+fn metadata_context_survives_home_refresh_but_cannot_update_the_next_profile() {
+    let env = Environment::new();
+    *env.transport.body.lock().unwrap() = body("shared-id");
+    let job = env.job();
+    let scene = env.load(job);
+    unsafe {
+        env.publish(job, scene);
+        nuvio_backend::scene_snapshot::nuvio_scene_release(scene);
+        nuvio_catalog_work_release(job);
+    }
+    let old = unsafe { native_metadata_copy(0) };
+    assert!(!old.is_null());
+    assert_eq!(unsafe { addon_registry_reader_current() }, 1);
+    let refresh = env.job();
+    let scene = env.load(refresh);
+    unsafe {
+        env.publish(refresh, scene);
+        nuvio_backend::scene_snapshot::nuvio_scene_release(scene);
+        nuvio_catalog_work_release(refresh);
+        assert_eq!(catalog_metadata_current(), 1);
+    }
+    env.activate(2);
+    unsafe {
+        catalog_runtime_step();
+    }
+    *env.transport.body.lock().unwrap()=json!({"metas":[{"id":"shared-id","name":"New profile title","poster":"https://art.invalid/new-profile"}]}).to_string().into_bytes();
+    let next = env.job();
+    let scene = env.load(next);
+    unsafe {
+        env.publish(next, scene);
+        assert_eq!(catalog_metadata_current(), 0);
+        assert_eq!(addon_registry_reader_current(), 0);
+        native_title_update(old);
+        assert_eq!(native_metadata_try_episode(), 0);
+        assert_eq!(
+            CStr::from_ptr(native_title_text(
+                native_title_current(),
+                TitleField::Name as u32
+            ))
+            .to_str()
+            .unwrap(),
+            "New profile title"
+        );
+        native_title_destroy(old);
+        catalog_metadata_end();
+        nuvio_backend::scene_snapshot::nuvio_scene_release(scene);
+        nuvio_catalog_work_release(next);
+    }
+}
+
+#[test]
+fn delayed_continue_watching_cannot_replace_the_selected_profiles_home() {
+    let env = Environment::new();
+    let first = env.job();
+    let scene = env.load(first);
+    let old = unsafe { native_title_create(Arc::into_raw((&*scene).titles[0].clone()).cast()) };
+    unsafe {
+        env.publish(first, scene);
+        nuvio_backend::scene_snapshot::nuvio_scene_release(scene);
+        nuvio_catalog_work_release(first);
+        assert_eq!(catalog_content_begin(), 1);
+    }
+    env.activate(2);
+    unsafe {
+        catalog_runtime_step();
+    }
+    *env.transport.body.lock().unwrap() = body("profile-two");
+    let next = env.job();
+    let scene = env.load(next);
+    unsafe {
+        env.publish(next, scene);
+        cat_trocar_continuar(old, 1);
+        assert_eq!(cat_n(), 1);
+        assert_eq!(current_id(), "profile-two");
+        native_title_destroy(old);
+        catalog_content_end();
+        nuvio_backend::scene_snapshot::nuvio_scene_release(scene);
+        nuvio_catalog_work_release(next);
+    }
+}

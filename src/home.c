@@ -3,6 +3,7 @@
 // hero no topo, rail fixa à esquerda e fileiras horizontais de posters. A
 // infraestrutura nativa cuida de cache assíncrono, foco e transições.
 #include "home.h"
+#include "home_focus.h"
 #include "botoes.h"
 #include "cwretido.h"
 #include "focoprof.h"
@@ -3809,6 +3810,7 @@ static void desenhaHero(Uint32 agora, float saida) {
         itemFoco.titulo = ci->titulo;
         itemFoco.genero = ci->genero;
         itemFoco.meta   = ci->meta;
+        home_focus_set(&itemFoco,ci);
         temItemFoco = 1;
       }
     } }
@@ -5141,6 +5143,7 @@ void home_desenhar(Uint32 agora) {
             itemFoco.titulo = cItem ? cItem->titulo : NULL;
             itemFoco.genero = cItem ? cItem->genero : NULL;
             itemFoco.meta   = cItem ? cItem->meta : NULL;
+            home_focus_set(&itemFoco,cItem);
             temItemFoco = 1;
           }
           // Pede pela largura REAL do card: e esta fileira que multiplica.
@@ -5265,7 +5268,8 @@ void home_desenhar(Uint32 agora) {
 // isso a gravacao de verdade e a de repouso, em home_atualizar; esta so pega o
 // caso em que a pessoa moveu o foco e saiu antes de completar o repouso.
 // Nada a gravar (#95): a posicao na home vive so enquanto o app esta aberto.
-void home_encerrar(void) { }
+void home_clear_focus(void) { temItemFoco=0; home_focus_forget(); }
+void home_encerrar(void) { home_clear_focus(); }
 // Rastro de desempenho (main.c, [qd]): onde o foco esta neste quadro.
 const char *home_rastro_foco(void) {
   static char b[160];
@@ -5317,8 +5321,7 @@ int home_quer_sair(void) { return sair; }
 
 int home_item_focado(HomeItem *out) {
   if (!temItemFoco) return 0;
-  *out = itemFoco;
-  return 1;
+  return home_focus_get(out);
 }
 
 // Quando ha catalogo, a arte vem dele (na ordem certa, casada com o titulo);

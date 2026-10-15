@@ -66,7 +66,7 @@ enum WorkKind {
 }
 #[derive(Clone)]
 pub struct SceneWork {
-    source: Arc<AddonBackendSnapshot>,
+    pub(crate) source: Arc<AddonBackendSnapshot>,
     epoch: u64,
     sequence: u64,
     version: u64,
@@ -88,9 +88,15 @@ pub struct SceneView {
     pub scene: Option<Arc<SceneSnapshot>>,
     pub revision: u64,
     pub from_cache: bool,
+    pub filtered: bool,
     pub error: Option<Error>,
     epoch: u64,
     raw_version: u64,
+}
+impl SceneView {
+    pub fn activation(&self) -> u64 {
+        self.epoch
+    }
 }
 #[derive(Default)]
 struct ProfileScene {
@@ -212,6 +218,7 @@ impl SceneBackend {
             scene: None,
             revision: 0,
             from_cache: false,
+            filtered: false,
             error: None,
             epoch: 0,
             raw_version: 0,
@@ -260,11 +267,19 @@ impl SceneBackend {
                 _ => None,
             }
         };
+        let filtered = match (
+            profile.and_then(|profile| profile.scene.as_ref()),
+            scene.as_ref(),
+        ) {
+            (Some(raw), Some(visible)) => !Arc::ptr_eq(raw, visible),
+            _ => false,
+        };
         state.published = Arc::new(SceneView {
             source: state.active.clone(),
             scene,
             revision: state.published.revision.wrapping_add(1),
             from_cache: profile.is_some_and(|profile| profile.from_cache),
+            filtered,
             error: profile.and_then(|profile| profile.error.clone()),
             epoch: state.epoch,
             raw_version,
@@ -321,6 +336,14 @@ impl SceneBackend {
                 .source
                 .as_ref()
                 .is_none_or(|source| self.0.source.current(&source.addons))
+    }
+    pub fn context_current(&self, view: &SceneView) -> bool {
+        let state = self.state();
+        state.epoch == view.epoch
+            && view
+                .source
+                .as_ref()
+                .is_some_and(|source| self.0.source.current(&source.addons))
     }
     fn work(&self, kind: WorkKind) -> Result<SceneWork> {
         let mut state = self.state();

@@ -53,13 +53,13 @@ IDs. Build-only artifacts and hashes are archived under
 test was performed. The earlier canonical package/runtime/symbol files were
 restored and hash-verified after the build.
 
-This checkpoint supplies capture and publication services. It does **not yet
-connect them to the application's Home publication/cache path**. Remaining
-native reader/row ownership and runtime wiring must be complete before replacing
+At checkpoint `839e1b17`, capture and publication services were prepared but
+were not yet connected to the application's Home publication/cache path. Remaining
+native reader/row ownership and runtime wiring had to be complete before replacing
 the binary reader/writer and enabling Rust catalog production. The existing
-profile-switch row bug is therefore still pending. No TV handoff is requested.
+profile-switch row bug was therefore still pending. No TV handoff was requested.
 
-The remaining integration order is:
+The integration plan at that checkpoint was:
 
 1. Retain catalog records under the publication lock before metadata workers
    leave for network requests. Their current raw display copies are insufficient
@@ -83,3 +83,12 @@ release their retained titles on success and early exits. Profile preview
 scratch records also release their owners. Two additional Rust-driven native
 tests cover asynchronous reads after Home replacement and invalid indices that
 must never wrap to another title; the native suite now passes 29 cases.
+
+The subsequent integrated catalog candidate connects these services to the
+real Home path and removes the binary scene-cache implementation. See
+[catalog runtime testing](catalog-runtime-testing.md). Shared C layout caches
+retain only projections; published catalogs and private worker batches own the
+Rust row references. Row-only reordering resolves complete row records from the
+current catalog under the publication lock. Metadata and Continue Watching
+callbacks carry verified Rust context leases, and metadata workers pin their
+addon snapshots. Their C parsing and service logic remain for later rewrites.

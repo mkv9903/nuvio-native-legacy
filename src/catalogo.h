@@ -190,53 +190,15 @@ int  cat_carregar(const char *dirArte);
 // substitui quando chega — o cache nao e a verdade, e o que mostrar enquanto a
 // verdade nao chega.
 //
-// Formato BINARIO e nao texto: CatItem e POD (so vetores de char e inteiros,
-// nenhum ponteiro), entao gravar em bloco e correto e dispensa um serializador
-// que teria de ser mantido em sincronia com a struct a cada campo novo. O
-// cabecalho guarda `sizeof(CatItem)` e uma versao: se a struct mudar, o arquivo
-// e RECUSADO em vez de lido torto. Ler lixo aqui seria pior que nao ter cache.
-//
-// ONDE O ARQUIVO MORA. `dirArte` continua no parametro por compatibilidade com
-// os chamadores, mas e o ULTIMO recurso: as duas funcoes preferem dados_dir(),
-// a pasta gravavel descoberta no arranque. No alvo Tizen `dirArte` e /app/art,
-// que vem de --preload-file e portanto e MEMFS — RAM apagada a cada recarga —,
-// e la o cache NUNCA sobreviveu a fechar o app: toda abertura refazia os ~30
-// pedidos e os 14,5 s medidos acima. A escolha fica dentro de catalogo.c, e nao
-// nos chamadores, porque quem le (home.c) e quem grava (descoberta.c) sao
-// arquivos diferentes e tem de concordar. Ver a nota longa em caminhoCache.
-int  cat_gravar_cache(const char *dirArte);
-int  cat_gravar_cache_se_identidade(const char *dirArte, const char *donoEsperado,
-                                    int perfilEsperado);
-// Returns 1 when this account's previous catalog was restored. On desktop it
-// also replaces the preview fixtures loaded by cat_carregar.
-int  cat_ler_cache(const char *dirArte);
-
-// APAGA O CACHE DO CATALOGO. 1 se havia arquivo e ele saiu.
-//
-// TEM DE SER CHAMADA NO LOGOUT, em sync_esquecer_usuario, junto das outras onze
-// coisas que ja sao esquecidas ali. Sem isso, a primeira abertura depois de
-// trocar de conta mostra a home da conta ANTERIOR — watchlist, continuar
-// assistindo, feed de amigos com nome e avatar — ate a rede substituir.
-//
-// E o dano nao para no estetico: cada CatFileira grava `base` (addonurl.h), campo desse
-// tamanho porque o Xperience embute um JWT no CAMINHO do addon (ver a nota do
-// campo). Um cache que sobrevive ao logout e credencial do usuario anterior
-// deixada em disco, do mesmo tipo que fez collections.json ser excluido do
-// pacote em tools/arm.sh.
-//
-// O cabecalho tambem grava a identidade (o `sub` do JWT e o perfil ativo) e
-// cat_ler_cache RECUSA E APAGA o que nao bater — mas isso e a rede de
-// seguranca, nao a porta da frente: enquanto o arquivo estiver la, ele estara
-// la. A verificacao cobre um caso que o logout nao ve, a troca de PERFIL dentro
-// da mesma conta, que nao passa por sync_esquecer_usuario.
-int  cat_apagar_cache(void);
-// 1 enquanto o que esta na tela veio do CACHE, e nao da rede desta sessao.
-//
-// A descoberta publica cada fileira assim que ela chega, o que e certo numa
-// tela vazia e ERRADO sobre o cache: a home iria de 16 fileiras para 1 e
-// voltaria a crescer na frente do dono. Com o cache no ar, ela espera o
-// catalogo completo. Sem cache, publica em partes como antes.
-int  cat_do_cache(void);
+/* Rust scene storage is private to the verified member, owner and selected
+ * profile. Only this rewrite's versioned JSON is restored; original C files
+ * and discarded test formats are never opened or imported. Restoration runs
+ * on the Rust worker and publishes at a frame boundary. */
+int cat_gravar_cache(const char *directory);
+int cat_gravar_cache_se_identidade(const char *directory, const char *member, int profile);
+int cat_ler_cache(const char *directory); /* startup compatibility, no disk I/O */
+int cat_apagar_cache(void);
+int cat_do_cache(void);
 void cat_cache_substituido(void);
 
 int  cat_n(void);
@@ -421,6 +383,7 @@ typedef struct {
   int estado;
   // Social-only account generation captured BEFORE fetching its source data.
   // Metadata/progress revisions never make an old account row current.
+  const struct RustRowSnapshot *rust_row;
 } CatFileira;
 
 int cat_n_fileiras(void);

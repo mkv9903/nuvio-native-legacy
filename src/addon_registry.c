@@ -8,6 +8,7 @@
 #include <string.h>
 
 static RustAddons *controller;
+const RustAddons *addon_registry_controller(void) { return controller; }
 static pthread_key_t reader_key;
 static pthread_once_t reader_once = PTHREAD_ONCE_INIT;
 static const RustAddonSnapshotView empty_view = { .status = RUST_ADDONS_UNAVAILABLE, .error = "" };

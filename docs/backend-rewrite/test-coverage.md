@@ -185,8 +185,9 @@ owner and selected-profile isolation (including primary-addon inheritance),
 configuration/extras separation, confirmed empties, invalid/cancelled saves,
 corrupt versions/identity/symlinks, ignored legacy files, cleanup, cached values
 before network, same-scope outage fallback, repaired corrupt caches and stale
-responses after a profile round trip. These services are prepared for the C
-integration; they are not yet application runtime paths.
+responses after a profile round trip. At that checkpoint these services were
+prepared for C integration. The integrated catalog runtime now uses them in
+the application's Home requests.
 
 Reference `tests/posterprov.sh` at `f8b4f72a` passes its poster-provider group,
 but its catalog-art driver cannot link normally: unused discovery functions
@@ -296,10 +297,11 @@ and `catcachecorrida` also pass with AddressSanitizer/UndefinedBehaviorSanitizer
 The latter two initially reached LeakSanitizer's sandbox/ptrace restriction;
 their unchanged checks pass outside that restriction, with sanitizers enabled.
 
-These C assertions remain because the application catalog producer and scene
-cache have not yet moved to Rust. Raw binary writing refuses Rust-owned titles
-so opaque addresses cannot reach disk. This foundation is not a complete
-catalog rewrite or a Linux/TV handoff; see [title ownership](title-ownership.md).
+At that checkpoint those C assertions covered the unmigrated catalog/cache
+paths. The integrated runtime now removes the C binary scene cache and replaces
+`catcache` and `catcachecorrida` with Rust storage, publication and native cases.
+The other C groups continue covering retained algorithms. See
+[title ownership](title-ownership.md).
 
 ## Rust Home scene model and storage
 
@@ -321,10 +323,10 @@ output buffer; strings are not silently truncated. The shared atomic-file helper
 retains its previous behavior for account/addon/Home-order callers; their full
 regression suite passes after adding the optional pre-rename context guard.
 
-The scene layer is not yet the application cache. Native scene capture/restore,
-remaining C copy ownership and actual catalog orchestration still need to be
-connected before removing the C binary routines and their retained test programs.
-See [the storage record](scene-cache.md).
+At that checkpoint the scene layer was not yet the application cache. The
+subsequent integrated runtime connects capture/restore and guarded publication,
+and removes the C binary routines and their two test programs. See
+[the storage record](scene-cache.md).
 
 The complete `ddc25bb9` source checkpoint builds for Linux and remains running
 during a ten-second Xvfb preview check with disposable data. Its webOS ARM build
@@ -349,3 +351,31 @@ passes soft-float/glibc <= 2.12 checks and matching runtime/full/debug build IDs
 build-only files and hashes are archived under its `checkpoints` directory.
 The earlier canonical IPK/runtime/symbol set was restored and hash-verified.
 No new IPK was produced and no TV runtime test was performed.
+
+## Integrated Home catalog runtime
+
+The current candidate passes 196 backend tests and 42 Rust-driven native tests.
+Eleven new native catalog cases exercise the actual C worker and publication
+path with fake account/provider transports: full configured URLs and IDs,
+live scene capture, selected-profile isolation with primary-addon sharing,
+explicit manifest removals, delayed old-profile results, malformed-response
+cache fallback, confirmed empties, complete row ownership across Continue
+Watching replacement and projection-only reordering, stale scene restoration,
+ignored original files, and selective logout cleanup. Metadata leases survive
+ordinary Home refreshes but reject same-ID title/episode writes after profile
+changes; delayed Continue Watching results cannot repopulate another profile.
+
+Four native title cases added after the capture checkpoint cover exact-index
+background reads and invalid indices, held Home focus, and Details transition
+artwork after source release. A backend case verifies recognized TMDb/Trakt
+backdrop variants while excluding poster-only fallbacks. Metadata parsing and
+Home orchestration remain C; these tests exercise their Rust-backed ownership
+and context boundaries without changing the UI design.
+
+The native catalog/title/capture suites pass all 34 cases with ASan/UBSan.
+Leak detection is disabled for process-lifetime application globals, while Rust
+weak-owner assertions verify final release of transferred records. Retained C
+row-window, Continue Watching, profile-preview and catalog-lifetime groups pass.
+Linux builds and completes a ten-second normal-mode login-UI startup followed
+by clean shutdown with disposable data. Real-account and TV playback checks are
+listed in [catalog runtime testing](catalog-runtime-testing.md).

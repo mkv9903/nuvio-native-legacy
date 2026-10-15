@@ -9,7 +9,7 @@ use crate::{
 use std::{
     ffi::{c_char, CString},
     ptr,
-    sync::Arc,
+    sync::{Arc, Mutex, OnceLock},
 };
 
 #[repr(u32)]
@@ -91,6 +91,29 @@ impl RowSnapshot {
 pub struct SceneSnapshot {
     pub titles: Vec<Arc<TitleSnapshot>>,
     pub rows: Vec<Arc<RowSnapshot>>,
+}
+#[derive(Default)]
+struct RetiredRows {
+    current: Vec<Arc<RowSnapshot>>,
+    previous: Vec<Arc<RowSnapshot>>,
+}
+fn retired_rows() -> &'static Mutex<RetiredRows> {
+    static ROWS: OnceLock<Mutex<RetiredRows>> = OnceLock::new();
+    ROWS.get_or_init(|| Mutex::new(RetiredRows::default()))
+}
+pub(crate) fn rows_next_frame() {
+    let mut rows = retired_rows().lock().unwrap();
+    rows.previous = std::mem::take(&mut rows.current);
+}
+#[no_mangle]
+pub unsafe extern "C" fn nuvio_row_retire(row: *const RowSnapshot) {
+    if !row.is_null() {
+        retired_rows()
+            .lock()
+            .unwrap()
+            .current
+            .push(unsafe { Arc::from_raw(row) });
+    }
 }
 impl SceneSnapshot {
     pub fn validate(&self) -> Result<()> {

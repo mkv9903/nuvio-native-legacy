@@ -37,6 +37,7 @@ int catalog_scene_capture_row(RustSceneCapture *capture, const CatFileira *row, 
   const RustRowInfo *info;
   if (!row || row->ini < 0 || row->n < 0 || (row->estado != 0 && row->estado != 1))
     return nuvio_scene_capture_row(capture, NULL);
+  if (!source) source = row->rust_row;
   view.source = source;
 #define FIELD(target, selector, member) view.target = row_text(source, selector, row->member, sizeof row->member)
   FIELD(key, ROW_KEY, chave); FIELD(name, ROW_NAME, titulo); FIELD(media_type, ROW_MEDIA_TYPE, tipo);

@@ -38,23 +38,25 @@ frame retirement. In-place updates retire their previous native reference for
 two frame advances so an already borrowed text pointer remains valid while
 that frame is rendered. Held selections require their own references.
 
-Raw C binary cache writing rejects native-owned records; native pointers must
-never be persisted. Binary reads clear the pointer field before publication.
-This is an interim guard, not the new Rust catalog cache. The loader already
-has versioned provider-document JSON, and a complete scene model/private JSON
-store is now tested in Rust. [Scene cache](scene-cache.md) still needs native
-capture/restore and application wiring before native titles are published.
+Home catalog loading now publishes Rust-owned titles and rows. Private provider
+documents and assembled scenes use versioned Rust JSON. The original C binary
+cache and its compatibility rules have been removed, so native addresses cannot
+be persisted by that path. See [scene cache](scene-cache.md).
 
 ## Remaining integration
 
-This checkpoint does **not** enable the Rust title producer in the application.
-Catalog loading still uses the C producer. Before switching it over, adapt
-worker arrays and remaining temporary copies; replace the assembled binary
-cache; and connect complete IDs and image strings
-through Details, source selection and rendering consumers. Existing enrichment,
-episode, progress and commercial-availability data must survive those changes.
-Profile-scoped catalog scheduling and publication remain part of this milestone.
-The previous-profile Home-row bug is not yet resolved.
+The integrated runtime uses complete Rust manifest catalog requests, owns worker
+results and rows, and applies the selected profile's cached scene or loading
+state at a frame boundary. Scoped publication rejects old profile replies;
+metadata and Continue Watching callbacks also carry verified context leases.
+Home focus and Details transitions retain their chosen artwork. Automated
+profile-switch cases pass; real-account confirmation is part of the manual
+handoff in [catalog runtime testing](catalog-runtime-testing.md).
+
+C Home orchestration, metadata enrichment, expanded catalogs, search and other
+services remain for their own rewrites. Their remaining interfaces and display
+quotas do not impose limits on the Rust domain, but not every unmigrated consumer
+uses the complete values yet. Existing UI layout and native playback remain.
 
 Details, playback, live-channel and saved/social menu selections now own their
 references. Details re-resolves the complete held provider ID and retains its
@@ -92,7 +94,8 @@ The native rating case exercises the actual C catalog/detail/partial-update
 paths with decimal and percent variants, numeric/string perfect scores, near-10
 rounding, tiny positive values, missing values, NaN/overflow and invalid scores.
 
-No TV handoff is requested for this foundation checkpoint.
+Those counts describe the foundation checkpoint; the current integrated build
+passes 196 backend tests and 42 native tests.
 
 ## Home assembly ownership checkpoint
 
@@ -127,10 +130,9 @@ behavioral assertions (except the required English date text). The unchanged
 pre-checkpoint discovery/Trakt sources reproduce the original fixture failures.
 Replace these C fixtures with Rust cases when their capabilities are rewritten.
 
-Remaining search/grid, metadata and renderer temporary ownership, native scene
-capture, complete request/artwork consumers and runtime Rust catalog
-publication are still pending. This checkpoint does not enable native title
-production or claim that the profile-switch Home-row issue is fixed.
+At that assembly checkpoint, native scene capture and runtime Rust catalog
+publication were still pending. The subsequent integrated runtime completes
+those paths. Search/grid and other C services still require their own rewrites.
 
 The subsequent native scene restoration checkpoint makes `TitleSnapshot` own
 the complete `SceneTitle` directly rather than duplicate its metadata model.

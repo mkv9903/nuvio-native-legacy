@@ -27,47 +27,48 @@ static int ajTipoCanal(const char *t) {
 enum { ART_REAL = 0, ART_LOGO, ART_AMOSTRA };
 static char ajFilCache[FIL_MAX][8][2][200];
 static unsigned char ajFilPronto[FIL_MAX], ajFilModo[FIL_MAX];
-static void ajFilLer(int fil) {
-  static unsigned rev = 0xffffffffu;
-  if (cat_revisao() != rev) { rev = cat_revisao(); memset(ajFilPronto, 0, sizeof ajFilPronto); }
-  if (fil >= 0 && fil < FIL_MAX && !ajFilPronto[fil]) {
-    static CatItem it[40];
-    CatFileira meta;
-    int n, j, i, dif = 0, comArte = 0;
-    memset(&meta, 0, sizeof meta);
-    n = cat_n() > 0 ? cat_copiar_fileira(fil_chave(fil), it, 40, &meta) : 0;
-    for (j = 0; j < 8; j++) { ajFilCache[fil][j][0][0] = ajFilCache[fil][j][1][0] = 0; }
-    // Os 8 quadros pegam itens de arte DIFERENTE (varias afiliadas de uma rede
-    // repetem o mesmo logo nos primeiros itens); so se faltar, repete.
-    for (j = 0; j < n; j++) {
-      const char *a = it[j].poster[0] ? it[j].poster : it[j].backdrop;
-      if (!a[0]) continue;
-      comArte++;
-      for (i = 0; i < dif; i++) {
-        const char *b = ajFilCache[fil][i][0][0] ? ajFilCache[fil][i][0] : ajFilCache[fil][i][1];
-        if (!strcmp(a, b)) break;
+static void load_row_preview(int row) {
+  static unsigned revision = 0xffffffffu;
+  if (cat_revisao() != revision) { revision = cat_revisao(); memset(ajFilPronto, 0, sizeof ajFilPronto); }
+  if (row >= 0 && row < FIL_MAX && !ajFilPronto[row]) {
+    static CatItem titles[40];
+    CatFileira metadata;
+    int count, index, previous, distinct = 0, with_artwork = 0;
+    memset(&metadata, 0, sizeof metadata);
+    count = cat_n() > 0 ? cat_copiar_fileira(fil_chave(row), titles, 40, &metadata) : 0;
+    for (index = 0; index < 8; index++) { ajFilCache[row][index][0][0] = ajFilCache[row][index][1][0] = 0; }
+    // Prefer eight distinct images, then repeat only when the row has fewer.
+    for (index = 0; index < count; index++) {
+      const char *artwork = titles[index].poster[0] ? titles[index].poster : titles[index].backdrop;
+      if (!artwork[0]) continue;
+      with_artwork++;
+      for (previous = 0; previous < distinct; previous++) {
+        const char *existing = ajFilCache[row][previous][0][0] ? ajFilCache[row][previous][0] : ajFilCache[row][previous][1];
+        if (!strcmp(artwork, existing)) break;
       }
-      if (i == dif && dif < 8) {
-        snprintf(ajFilCache[fil][dif][0], sizeof ajFilCache[fil][dif][0], "%s", it[j].poster);
-        snprintf(ajFilCache[fil][dif][1], sizeof ajFilCache[fil][dif][1], "%s", it[j].backdrop);
-        dif++;
+      if (previous == distinct && distinct < 8) {
+        snprintf(ajFilCache[row][distinct][0], sizeof ajFilCache[row][distinct][0], "%s", titles[index].poster);
+        snprintf(ajFilCache[row][distinct][1], sizeof ajFilCache[row][distinct][1], "%s", titles[index].backdrop);
+        distinct++;
       }
     }
-    // Menos de 8 distintos: completa repetindo, para o quadro k nunca ficar vazio.
-    for (j = dif; dif > 0 && j < 8; j++) {
-      memcpy(ajFilCache[fil][j], ajFilCache[fil][j % dif], sizeof ajFilCache[fil][j]);
+    // Repeat the available images so every preview shape has artwork.
+    for (index = distinct; distinct > 0 && index < 8; index++) {
+      memcpy(ajFilCache[row][index], ajFilCache[row][index % distinct], sizeof ajFilCache[row][index]);
     }
-    if (n < 1 || comArte < 1) ajFilModo[fil] = ART_AMOSTRA;
-    else if (dif < 2 && comArte >= 2) ajFilModo[fil] = ART_AMOSTRA;
-    else if (ajTipoCanal(meta.tipo)) ajFilModo[fil] = ART_LOGO;
-    else ajFilModo[fil] = ART_REAL;
-    ajFilPronto[fil] = 1;
+    if (count < 1 || with_artwork < 1) ajFilModo[row] = ART_AMOSTRA;
+    else if (distinct < 2 && with_artwork >= 2) ajFilModo[row] = ART_AMOSTRA;
+    else if (ajTipoCanal(metadata.tipo)) ajFilModo[row] = ART_LOGO;
+    else ajFilModo[row] = ART_REAL;
+    catalog_items_clear(titles, (size_t)count);
+    catalog_row_clear(&metadata);
+    ajFilPronto[row] = 1;
   }
 }
 static const char *ajArteFileira(int fil, int k, int fundo) {
   if (k < 0) k = 0;
   k %= 8;
-  ajFilLer(fil);
+  load_row_preview(fil);
   if (fil >= 0 && fil < FIL_MAX && ajFilModo[fil] != ART_AMOSTRA) {
     const char *c = ajFilCache[fil][k][fundo ? 1 : 0];
     if (!c[0]) c = ajFilCache[fil][k][fundo ? 0 : 1];

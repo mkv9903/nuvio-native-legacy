@@ -5,6 +5,7 @@
 #include "rust_account.h"
 #include "addon_registry.h"
 #include "home_order_runtime.h"
+#include "catalog_runtime.h"
 #include "nuvem.h"
 #include "fileiras.h"
 #include <pthread.h>
@@ -104,6 +105,7 @@ void session_init(void) {
   account = nuvio_account_create(data_dir(), NV_APP_ID);
   addon_registry_init(account, data_dir());
   home_order_runtime_init(account, data_dir());
+  catalog_runtime_init(account, addon_registry_controller(), data_dir());
   refresh_view();
   printf("[account] Rust backend %s\n", account ? "initialized" : "unavailable");
   printf("[account] Compiled C/Rust account configuration matches: %s\n",

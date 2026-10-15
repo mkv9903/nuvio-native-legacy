@@ -230,6 +230,7 @@ pub unsafe extern "C" fn nuvio_title_retire(title: *const TitleSnapshot) {
 }
 #[no_mangle]
 pub extern "C" fn nuvio_titles_next_frame() {
+    crate::scene_snapshot::rows_next_frame();
     let mut retired = retired().lock().unwrap();
     let next = std::mem::take(&mut retired.current);
     retired.previous = next;

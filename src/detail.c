@@ -164,12 +164,21 @@ static int  idx = 0;                 // titulo atual dentro do acervo
 // Keep an owned selection across catalog replacement and the closing animation.
 // Its full provider ID comes from the retained Rust snapshot, without a buffer.
 static CatItem opened_title;
+static char *transition_artwork;
 static int has_opened_title;
 static void hold_opened_title(const CatItem *title) {
   if (title) { catalog_item_replace(&opened_title, title); has_opened_title = 1; }
   else { catalog_item_clear(&opened_title); has_opened_title = 0; }
 }
-void details_release(void) { hold_opened_title(NULL); }
+static void bind_transition_text(const char *artwork) {
+  char *copy=artwork ? strdup(artwork) : NULL;
+  free(transition_artwork); transition_artwork=copy;
+  item.arte=copy ? copy : catalog_title_text(&opened_title,TITLE_BACKGROUND);
+  item.titulo=catalog_title_text(&opened_title,TITLE_NAME);
+  item.genero=catalog_title_text(&opened_title,TITLE_GENRE_TEXT);
+  item.meta=catalog_title_text(&opened_title,TITLE_METADATA_TEXT);
+}
+void details_release(void) { free(transition_artwork); transition_artwork=NULL; hold_opened_title(NULL); }
 // Ultima revisao do catalogo que esta pagina ja tratou. Ver detail_atualizar.
 static unsigned revistaVista;
 // O tipo (serie ou nao) com que os extras foram pedidos nesta abertura. Item
@@ -1232,6 +1241,7 @@ static void abrirInterno(const HomeItem *it) {
   arteFixa[0] = logoFixo[0] = logoCatalogoFixo[0] = 0;
   arteFixaPoster = 0;
   hold_opened_title(cat_item(idx));
+  bind_transition_text(item.arte);
   { const CatItem *ci0 = cat_item(idx);
     artehero_logo_sessao_iniciar(ci0); }
   // Nota do Trakt, comentarios e relacionados. Pedido na ABERTURA e nao no
@@ -2686,6 +2696,8 @@ static void revalidate_title_index(void) {
 
 #ifdef NV_NATIVE_UI_TEST
 void details_test_hold(const CatItem *title, int index) { hold_opened_title(title); idx = index; }
+void details_test_transition_hold(const CatItem *title, const char *artwork) { hold_opened_title(title); bind_transition_text(artwork); }
+const char *details_test_transition_art(void) { return item.arte; }
 int details_test_revalidate(void) { revalidate_title_index(); return idx; }
 const CatItem *details_test_selection(void) { return has_opened_title ? &opened_title : NULL; }
 #endif

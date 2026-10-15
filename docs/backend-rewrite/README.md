@@ -70,12 +70,14 @@ owner and otherwise wait/retry rather than using the signed-in member's ID.
 
 The Rust account domain, HTTP client, worker, native boundary, platform helper,
 Home ordering, addon networking/storage, edit merging and the native addon
-boundary, provider loading, complete catalog title models and scene storage/publication pass 195 tests.
-Twenty-nine additional Rust driver tests cover the retained C account/addon screens,
-view layouts, Home-order frame publication and actual source/subtitle workers
-under Xvfb. The five relevant C reference groups passed
+boundary, provider loading, complete catalog title models and scene
+storage/publication pass 196 tests. Forty-two additional Rust driver tests cover
+the retained C account/addon screens, view layouts, Home-order publication,
+source/subtitle workers, title lifetimes and integrated catalog/profile paths.
+All 34 native catalog/title/capture cases also pass ASan/UBSan. The five relevant
+C reference groups passed
 before their test cases moved to Rust. See [test coverage](test-coverage.md).
-The Linux app builds and starts under Xvfb using disposable isolated preview
+The Linux app builds and starts under Xvfb using disposable isolated normal-mode
 data. The addon runtime checkpoint also checks retained sync ordering, account
 outages, source cache/status/retries, progressive source publication, subtitle
 selection and transitional manifest cache behavior. Earlier checkpoints checked
@@ -122,13 +124,13 @@ Addon account state and edits now run in Rust in the actual app. The retained C
 addon screen, guide actions and source/subtitle workers read pinned Rust
 snapshots. The old C registry, file loader, account addon parsing and whole-list
 uploads have been removed. Subtitle work is limited to four concurrent requests,
-as confirmed by the user. Complete title ownership and Home catalog orchestration
-are still being integrated; the profile-switch Home-row fix is not complete.
+as confirmed by the user. The app now uses Rust catalog loading and private scene restoration/publication.
+C Home assembly and enrichment remain as transitional consumers.
 
 The native title foundation retains complete immutable Rust data across C
 catalog copies and replacement. The user approved keeping the existing title
-features and fixing perfect-score ratings. Runtime producer/cache/consumer
-integration remains pending; see [title ownership](title-ownership.md).
+features and fixing perfect-score ratings. Home catalog production and private scene storage are integrated; other C
+backend consumers remain for their own rewrites. See [title ownership](title-ownership.md).
 
 Details, playback, live-channel and saved-menu selections now retain their own
 title references. Deferred save/watched notifications clone and release an owned
@@ -139,14 +141,14 @@ until the session is discarded; normal closure releases it after progress work.
 Complete Home scenes now have a tested Rust model and private Serde JSON store,
 covering artwork/cast/resume/seasons/availability and full provider values.
 Native restoration now retains complete titles/rows and projects existing C
-display fields. Remaining consumer ownership and application cache wiring are
-still pending. See [scene cache](scene-cache.md).
+display fields. The application now captures/restores these scenes through the retained UI,
+with complete Rust row ownership across layout projections. See [scene cache](scene-cache.md).
 
 Live C title/row capture and the Rust scene publication service are now tested.
 They preserve complete Rust data across display projections, scope memory/disk
 work to the selected profile and configured addons, and reject stale restores
-and saves. Application cache/publication wiring and remaining native ownership
-are still pending; see [scene publication](scene-publication.md).
+and saves. The live Home path now uses these guards, including scoped metadata and
+Continue Watching callbacks; see [scene publication](scene-publication.md).
 The implementation checkpoint `839e1b17` passes Linux build/preview and webOS
 ARM soft-float/glibc 2.12 compatibility checks. Its build-only artifacts and
 matching symbols are archived separately; no IPK or TV handoff was made.
@@ -154,8 +156,8 @@ matching symbols are archived separately; no IPK or TV handoff was made.
 Home assembly and Continue Watching's transitional title handoffs now retain
 and release their Rust owners, including cancelled rounds, late results,
 temporary saved-list tails and compacted-away titles. Four additional native
-Rust cases verify these lifetimes. The Rust catalog producer remains disabled
-until the remaining consumers and assembled-scene cache are integrated.
+Rust cases verify these lifetimes. The Home catalog producer and private JSON scene cache are now active.
+Expanded catalogs, search and the other C services still await their own rewrite.
 
 The title/scene checkpoint at `ddc25bb9` also passes the Linux build and a
 disposable preview startup, plus webOS ARM compilation, soft-float/glibc 2.12
@@ -169,3 +171,8 @@ startup. Its webOS ARM build passes soft-float ABI and glibc 2.12 checks, with
 matching runtime/full/debug build IDs. Build-only files and hashes are archived
 under `build/backend/webos/checkpoints/c7198054`. No IPK or TV handoff was made;
 the earlier canonical package/runtime/symbol set was restored and hash-verified.
+
+The integrated catalog candidate and manual checks are described in
+[catalog runtime testing](catalog-runtime-testing.md). Use normal Linux mode
+(`bash tools/linux.sh`) to test account catalogs; `--preview` skips account work.
+The old binary scene-cache implementation and its C tests have been removed.

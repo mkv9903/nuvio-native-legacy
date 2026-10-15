@@ -65,14 +65,13 @@ converters, original-app directory searches or compatibility fallbacks in the
 Rust scene restore path. Only versioned Rust JSON belonging to this rewrite is
 eligible for restoration.
 
-This layer is **not yet connected** to the C application's assembled-scene
-cache. Live title/row capture and scoped publication services are now tested;
-remaining native ownership and runtime cache wiring are still pending. See
-[scene publication](scene-publication.md). The legacy binary reader/writer remains until that switch. Its C tests
-still cover its current runtime behavior. Connecting this Rust store and removing
-those binary-cache routines is part of the active catalog milestone, followed
-by context-scoped catalog scheduling/publication. No manual TV/Linux handoff is
-requested for this checkpoint.
+The integrated catalog runtime now connects this store to the C application's
+assembled Home scene. Live capture, asynchronous restore and scoped publication
+use retained Rust titles and rows. The original binary reader/writer,
+compression and format-compatibility tests have been removed; their replacement
+assertions are Rust tests. No original-file fallback exists. See
+[catalog runtime testing](catalog-runtime-testing.md) for the current test build
+and manual checks. The counts above describe the earlier restoration checkpoint.
 
 The build-only checkpoint at `c7198054` also passes webOS ARM compilation,
 soft-float ABI, imported glibc maximum 2.12 and matching executable/debug build

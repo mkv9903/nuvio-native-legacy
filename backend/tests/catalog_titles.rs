@@ -148,6 +148,33 @@ fn safe_backdrops_and_logo_fallback_preserve_full_provider_urls() {
 }
 
 #[test]
+fn scene_artwork_keeps_the_catalog_and_recognized_backdrop_variants() {
+    use nuvio_backend::catalog_scene::SceneTitle;
+    for (background, tmdb, trakt) in [
+        ("https://image.tmdb.org/t/p/w1280/scene.jpg", true, false),
+        ("https://media.trakt.tv/images/backdrop.jpg", false, true),
+        (
+            "https://provider.invalid/image.tmdb.org/scene.jpg",
+            false,
+            false,
+        ),
+    ] {
+        let parsed = SceneTitle::from(title(
+            json!({"id":"id","name":"Title","poster":"https://p.invalid/poster.jpg","background":background}),
+            "movie",
+        ));
+        assert_eq!(parsed.artwork.catalog_background, background);
+        assert_eq!(!parsed.artwork.tmdb_background.is_empty(), tmdb);
+        assert_eq!(!parsed.artwork.trakt_background.is_empty(), trakt);
+    }
+    let parsed = SceneTitle::from(title(
+        json!({"id":"id","name":"Title","poster":"https://image.tmdb.org/t/p/w500/poster.jpg"}),
+        "movie",
+    ));
+    assert!(parsed.artwork.tmdb_background.is_empty());
+}
+
+#[test]
 fn english_display_metadata_preserves_full_domain_fields_and_optional_numeric_variants() {
     let parsed = title(
         json!({"id":"id","name":"Title","poster":"https://p.invalid/x.jpg","genres":["Animation","Drama","Fantasy"],"releaseInfo":"2011-2019","runtime":"148m","country":"Japan","imdbRating":"8.1","moviedb_id":"4242"}),

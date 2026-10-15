@@ -7,6 +7,9 @@
 #include "ctxmenu.h"
 #include "trakt.h"
 #include "catalog_scene_adapter.h"
+#include "catalog_row.h"
+#include "home_focus.h"
+#include "catalog_runtime.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -27,8 +30,31 @@ CatItem *native_title_copy_catalog(int index) {
   if (item && !catalog_copy_index(index, item)) { free(item); item = NULL; }
   return item;
 }
+CatItem *native_metadata_copy(int index) {
+  CatItem *title=calloc(1,sizeof *title);
+  if (title && !catalog_metadata_copy(index,title)) { free(title); title=NULL; }
+  return title;
+}
+int native_metadata_try_episode(void) {
+  CatEp episode={0}; episode.temporada=1; episode.episodio=1;
+  snprintf(episode.nome,sizeof episode.nome,"Delayed episode");
+  cat_definir_episodios(0,&episode,1); return cat_n_episodios(0);
+}
+void native_catalog_project_reorder(void) {
+  CatFileira owned[CAT_FIL_MAX]={0}, projected[CAT_FIL_MAX]={0};
+  int count=catalog_copy_rows(owned,CAT_FIL_MAX),index;
+  catalog_rows_project(projected,owned,(size_t)count,CAT_FIL_MAX);
+  for (index=0;index<count/2;index++) { CatFileira row=projected[index]; projected[index]=projected[count-index-1]; projected[count-index-1]=row; }
+  cat_republicar_fileiras(projected,count);
+  catalog_rows_clear(owned,(size_t)count);
+}
 void native_title_destroy(CatItem *item) { catalog_item_clear(item); free(item); }
 const char *native_title_text(const CatItem *item, unsigned field) { return catalog_title_text(item, field); }
+const char *native_catalog_row_text(int index, unsigned field) { return catalog_row_text(cat_fileira(index),field); }
+void native_title_focus_hold(const CatItem *title, const char *artwork) {
+  HomeItem item={0}; item.arte=artwork; home_focus_set(&item,title);
+}
+int native_title_focus_available(void) { HomeItem item; return home_focus_get(&item); }
 void native_title_overlay_poster(CatItem *item, const char *poster) {
   snprintf(item->poster, sizeof item->poster, "%s", poster);
 }

@@ -31,6 +31,13 @@ extern "C" {
     fn native_title_details_revalidate() -> i32;
     fn native_title_details_selection() -> *const c_void;
     fn native_title_details_release();
+    fn native_title_focus_hold(title: *const c_void, artwork: *const c_char);
+    fn native_title_focus_available() -> i32;
+    fn home_focus_test_title() -> *const c_void;
+    fn home_focus_test_art() -> *const c_char;
+    fn home_focus_forget();
+    fn details_test_transition_hold(title: *const c_void, artwork: *const c_char);
+    fn details_test_transition_art() -> *const c_char;
     fn native_title_player_hold(item: *const c_void);
     fn native_title_player_selection() -> *const c_void;
     fn native_title_player_release();
@@ -59,6 +66,63 @@ extern "C" {
     fn native_title_compact_enrichment(rejected: *const c_void, kept: *const c_void)
         -> *mut c_void;
     fn native_title_filter_progress(finished: *const c_void, kept: *const c_void) -> *mut c_void;
+}
+
+#[test]
+fn focused_transition_owns_its_artwork_and_rejects_a_replaced_catalog_selection() {
+    let title = snapshot("provider:focused", "poster");
+    let weak = Arc::downgrade(&title);
+    let artwork = format!("https://art.invalid/{}", "complete-artwork".repeat(200));
+    unsafe {
+        let source = native_title_create(Arc::into_raw(title).cast());
+        native_title_publish(source);
+        {
+            let temporary = CString::new(artwork.as_str()).unwrap();
+            native_title_focus_hold(source, temporary.as_ptr());
+        }
+        native_title_destroy(source);
+        assert_eq!(native_title_focus_available(), 1);
+        native_title_publish(std::ptr::null());
+        native_title_publish(std::ptr::null());
+        native_title_frame();
+        native_title_frame();
+        assert_eq!(native_title_focus_available(), 0);
+        assert_eq!(
+            get(home_focus_test_title(), TitleField::Id),
+            "provider:focused"
+        );
+        assert_eq!(
+            CStr::from_ptr(home_focus_test_art()).to_str().unwrap(),
+            artwork
+        );
+        assert!(weak.upgrade().is_some());
+        home_focus_forget();
+    }
+    assert!(weak.upgrade().is_none());
+}
+
+#[test]
+fn details_transition_copies_temporary_artwork_before_the_source_is_released() {
+    let title = snapshot("provider:details-transition", "poster");
+    let weak = Arc::downgrade(&title);
+    let artwork = format!("https://art.invalid/{}", "selected-artwork".repeat(200));
+    unsafe {
+        let source = native_title_create(Arc::into_raw(title).cast());
+        {
+            let temporary = CString::new(artwork.as_str()).unwrap();
+            details_test_transition_hold(source, temporary.as_ptr());
+        }
+        native_title_destroy(source);
+        assert_eq!(
+            CStr::from_ptr(details_test_transition_art())
+                .to_str()
+                .unwrap(),
+            artwork
+        );
+        assert!(weak.upgrade().is_some());
+        native_title_details_release();
+    }
+    assert!(weak.upgrade().is_none());
 }
 
 #[test]
