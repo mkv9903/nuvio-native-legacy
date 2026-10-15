@@ -147,6 +147,9 @@ They preserve complete Rust data across display projections, scope memory/disk
 work to the selected profile and configured addons, and reject stale restores
 and saves. Application cache/publication wiring and remaining native ownership
 are still pending; see [scene publication](scene-publication.md).
+The implementation checkpoint `839e1b17` passes Linux build/preview and webOS
+ARM soft-float/glibc 2.12 compatibility checks. Its build-only artifacts and
+matching symbols are archived separately; no IPK or TV handoff was made.
 
 Home assembly and Continue Watching's transitional title handoffs now retain
 and release their Rust owners, including cancelled rounds, late results,
