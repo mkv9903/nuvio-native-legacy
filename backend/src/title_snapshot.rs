@@ -13,6 +13,7 @@ use std::{
 
 /// Field selectors belong to the native projection, not the domain model.
 #[repr(u32)]
+#[derive(Clone, Copy)]
 pub enum TitleField {
     Id,
     ImdbId,
@@ -41,6 +42,7 @@ pub enum TitleField {
     PurchaseLogo,
     EpisodeName,
 }
+pub const TITLE_FIELD_COUNT: usize = TitleField::EpisodeName as usize + 1;
 /// Read-only scalar projection; the complete scene record remains Rust-owned.
 #[repr(C)]
 pub struct TitleInfo {
@@ -56,7 +58,7 @@ pub struct TitleInfo {
 }
 pub struct TitleSnapshot {
     pub record: SceneTitle,
-    native: [CString; 26],
+    native: [CString; TITLE_FIELD_COUNT],
     cast: Vec<[CString; 3]>,
     info: TitleInfo,
 }
@@ -151,7 +153,7 @@ impl TitleSnapshot {
             info,
         }
     }
-    fn text(&self, field: u32) -> &CStr {
+    pub(crate) fn text(&self, field: u32) -> &CStr {
         self.native
             .get(field as usize)
             .map(CString::as_c_str)
@@ -255,7 +257,7 @@ pub unsafe extern "C" fn nuvio_title_copy_text(
         .unwrap_or_default();
     unsafe { copy_projection(value, output, capacity) };
 }
-unsafe fn copy_projection(value: &[u8], output: *mut c_char, capacity: usize) {
+pub(crate) unsafe fn copy_projection(value: &[u8], output: *mut c_char, capacity: usize) {
     if output.is_null() || capacity == 0 {
         return;
     }

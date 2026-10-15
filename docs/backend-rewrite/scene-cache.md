@@ -66,8 +66,9 @@ Rust scene restore path. Only versioned Rust JSON belonging to this rewrite is
 eligible for restoration.
 
 This layer is **not yet connected** to the C application's assembled-scene
-cache. Native capture of remaining C enrichment and runtime cache wiring are
-still pending. The legacy binary reader/writer remains until that switch. Its C tests
+cache. Live title/row capture and scoped publication services are now tested;
+remaining native ownership and runtime cache wiring are still pending. See
+[scene publication](scene-publication.md). The legacy binary reader/writer remains until that switch. Its C tests
 still cover its current runtime behavior. Connecting this Rust store and removing
 those binary-cache routines is part of the active catalog milestone, followed
 by context-scoped catalog scheduling/publication. No manual TV/Linux handoff is

@@ -6,6 +6,7 @@
 #include "player.h"
 #include "ctxmenu.h"
 #include "trakt.h"
+#include "catalog_scene_adapter.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -25,6 +26,55 @@ void native_title_destroy(CatItem *item) { catalog_item_clear(item); free(item);
 const char *native_title_text(const CatItem *item, unsigned field) { return catalog_title_text(item, field); }
 void native_title_overlay_poster(CatItem *item, const char *poster) {
   snprintf(item->poster, sizeof item->poster, "%s", poster);
+}
+void native_title_overlay_resume(CatItem *item, int percentage, int season, int episode, int remaining, int64_t watched) {
+  item->progresso=percentage; item->temporada=season; item->episodio=episode;
+  item->restanteMin=remaining; item->retomadoMs=watched;
+}
+void native_title_overlay_cast(CatItem *item, int mode) {
+  if (mode == 0) { item->nElenco=0; item->nTemporadas=0; }
+  if (mode == 1 && item->nElenco) {
+    snprintf(item->elenco[0].papel,sizeof item->elenco[0].papel,"Updated role");
+    if (item->nTemporadas) item->temporadas[0]=9;
+  }
+  if (mode == 2) { item->nElenco=CAT_ELENCO_MAX+1; }
+  if (mode == 3 && item->nElenco) memset(item->elenco[0].nome,'x',sizeof item->elenco[0].nome);
+  if (mode == 4) { item->nElenco=2; item->nTemporadas=3; }
+}
+const RustSceneSnapshot *native_title_capture(const CatItem *item, const RustRowSnapshot *source) {
+  RustSceneCapture *capture=nuvio_scene_capture_create();
+  CatFileira row={0};
+  const RustRowInfo *info;
+  if (!catalog_scene_capture_title(capture,item)) goto failed;
+  if (source) {
+#define FIELD(selector,member) nuvio_row_copy_text(source,selector,row.member,sizeof row.member)
+    FIELD(ROW_KEY,chave); FIELD(ROW_NAME,titulo); FIELD(ROW_MEDIA_TYPE,tipo);
+    FIELD(ROW_ADDON_URL,base); FIELD(ROW_CATALOG_ID,catId);
+#undef FIELD
+    info=nuvio_row_info(source);
+    row.ini=(int)info->start; row.n=(int)(info->end-info->start); row.estado=info->state==ROW_CONFIRMED_EMPTY;
+    if (!catalog_scene_capture_row(capture,&row,source)) goto failed;
+  }
+  return nuvio_scene_capture_finish(capture);
+failed:
+  nuvio_scene_capture_destroy(capture); return NULL;
+}
+const RustSceneSnapshot *native_title_capture_live_c_values(void) {
+  CatItem item={0};
+  CatFileira row={0};
+  snprintf(item.imdb,sizeof item.imdb,"kitsu:41370"); snprintf(item.tipo,sizeof item.tipo,"series");
+  snprintf(item.titulo,sizeof item.titulo,"Live title"); snprintf(item.poster,sizeof item.poster,"https://art.invalid/poster");
+  snprintf(item.genero,sizeof item.genero,"TV Show · Drama"); snprintf(item.meta,sizeof item.meta,"2026 · 48 min");
+  snprintf(item.classificacao,sizeof item.classificacao,"TV-14"); snprintf(item.sinopse,sizeof item.sinopse,"Live description");
+  snprintf(item.origem,sizeof item.origem,"live-provider"); item.nota=85; item.tmdb=987;
+  item.progresso=37; item.temporada=2; item.episodio=8; item.restanteMin=19; item.retomadoMs=123456789;
+  item.naLista=1; item.nElenco=1; item.nTemporadas=2; item.temporadas[0]=1; item.temporadas[1]=2;
+  snprintf(item.elenco[0].nome,sizeof item.elenco[0].nome,"Live actor");
+  snprintf(item.provNome,sizeof item.provNome,"Live subscription");
+  snprintf(row.chave,sizeof row.chave,"live-row"); snprintf(row.titulo,sizeof row.titulo,"Live catalog");
+  snprintf(row.tipo,sizeof row.tipo,"series"); snprintf(row.base,sizeof row.base,"https://provider.invalid/config?private=keep");
+  snprintf(row.catId,sizeof row.catId,"catalog"); row.n=1;
+  return catalog_scene_capture(&item,1,&row,1);
 }
 int64_t native_title_projection_value(const CatItem *item, unsigned field) {
   switch (field) {

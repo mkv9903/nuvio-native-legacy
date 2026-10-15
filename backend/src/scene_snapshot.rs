@@ -4,7 +4,7 @@ use crate::{
     content_context::ContentScope,
     error::{Error, Result},
     scene_cache::SceneCache,
-    title_snapshot::{native_text, TitleSnapshot},
+    title_snapshot::{copy_projection, native_text, TitleSnapshot},
 };
 use std::{
     ffi::{c_char, CString},
@@ -34,7 +34,7 @@ pub struct RowSnapshot {
     info: RowInfo,
 }
 impl RowSnapshot {
-    fn new(record: CatalogRow) -> Result<Self> {
+    pub(crate) fn new(record: CatalogRow) -> Result<Self> {
         let request = record
             .source
             .as_ref()
@@ -93,6 +93,13 @@ pub struct SceneSnapshot {
     pub rows: Vec<Arc<RowSnapshot>>,
 }
 impl SceneSnapshot {
+    pub fn validate(&self) -> Result<()> {
+        crate::catalog_scene::validate_scene(
+            self.titles.iter().map(|title| &title.record),
+            self.rows.iter().map(|row| &row.record),
+            self.titles.len(),
+        )
+    }
     pub fn new(scene: CatalogScene) -> Result<Self> {
         scene.validate()?;
         let rows = scene
@@ -208,4 +215,17 @@ pub unsafe extern "C" fn nuvio_row_info(row: *const RowSnapshot) -> *const RowIn
     unsafe { row.as_ref() }
         .map(|row| &row.info as *const _)
         .unwrap_or(ptr::null())
+}
+#[no_mangle]
+pub unsafe extern "C" fn nuvio_row_copy_text(
+    row: *const RowSnapshot,
+    field: u32,
+    output: *mut c_char,
+    capacity: usize,
+) {
+    let text = unsafe { row.as_ref() }
+        .and_then(|row| row.native.get(field as usize))
+        .map(|value| value.as_bytes())
+        .unwrap_or_default();
+    unsafe { copy_projection(text, output, capacity) };
 }

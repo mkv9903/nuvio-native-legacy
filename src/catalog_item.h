@@ -15,4 +15,6 @@ int catalog_item_from_rust(CatItem *destination, const RustTitleSnapshot *title)
 const char *catalog_title_text(const CatItem *item, unsigned field);
 const char *catalog_title_id(const CatItem *item);
 const char *catalog_title_imdb_id(const CatItem *item);
+/* Read the complete value if its bounded display projection is unchanged. */
+const char *catalog_text_with_overlay(const char *complete, const char *overlay, size_t capacity);
 #endif

@@ -156,60 +156,67 @@ impl CatalogScene {
     /// A cache is one coherent publication. Invalid windows are rejected,
     /// never clamped into another row's titles. Empty scenes are authoritative.
     pub fn validate(&self) -> Result<()> {
-        for title in &self.titles {
-            let metadata = &title.metadata;
-            if !identity(&metadata.id)
-                || !identity(&metadata.media_type)
-                || metadata.imdb_id.as_deref().is_some_and(|id| !identity(id))
-                || metadata
-                    .rating
-                    .is_some_and(|rating| !rating.is_finite() || !(0.0..=10.0).contains(&rating))
-                || metadata.tmdb_id == Some(0)
-                || title.resume.percentage > 100
-                || title.cast.iter().any(|member| member.tmdb_id == Some(0))
-            {
-                return Err(Error::InvalidData);
-            }
-            // Display text can be sanitized at the native boundary. Identities
-            // and request URLs cannot change when converted to C strings.
-            let artwork = &title.artwork;
-            let urls = [
-                metadata.poster.as_str(),
-                metadata.background.as_str(),
-                metadata.logo.as_str(),
-                artwork.catalog_background.as_str(),
-                artwork.tmdb_background.as_str(),
-                artwork.trakt_background.as_str(),
-                artwork.logo_language_url.as_str(),
-            ];
-            if title.origin.contains('\0')
-                || urls.iter().any(|url| url.contains('\0'))
-                || title.cast.iter().any(|member| member.photo.contains('\0'))
-                || [
-                    &title.availability.subscription,
-                    &title.availability.rental,
-                    &title.availability.purchase,
-                ]
-                .into_iter()
-                .flatten()
-                .any(|provider| provider.logo.contains('\0'))
-            {
-                return Err(Error::InvalidData);
-            }
-        }
-        for row in &self.rows {
-            if !identity(&row.key)
-                || !identity(&row.media_type)
-                || row.titles.start > row.titles.end
-                || row.titles.end > self.titles.len()
-                || (row.state == CatalogRowState::ConfirmedEmpty && !row.titles.is_empty())
-            {
-                return Err(Error::InvalidData);
-            }
-            if let Some(source) = &row.source {
-                source.validate()?;
-            }
-        }
-        Ok(())
+        validate_scene(self.titles.iter(), self.rows.iter(), self.titles.len())
     }
+}
+pub(crate) fn validate_scene<'a>(
+    titles: impl Iterator<Item = &'a SceneTitle>,
+    rows: impl Iterator<Item = &'a CatalogRow>,
+    title_count: usize,
+) -> Result<()> {
+    for title in titles {
+        let metadata = &title.metadata;
+        if !identity(&metadata.id)
+            || !identity(&metadata.media_type)
+            || metadata.imdb_id.as_deref().is_some_and(|id| !identity(id))
+            || metadata
+                .rating
+                .is_some_and(|rating| !rating.is_finite() || !(0.0..=10.0).contains(&rating))
+            || metadata.tmdb_id == Some(0)
+            || title.resume.percentage > 100
+            || title.cast.iter().any(|member| member.tmdb_id == Some(0))
+        {
+            return Err(Error::InvalidData);
+        }
+        // Display text can be sanitized at the native boundary. Identities
+        // and request URLs cannot change when converted to C strings.
+        let artwork = &title.artwork;
+        let urls = [
+            metadata.poster.as_str(),
+            metadata.background.as_str(),
+            metadata.logo.as_str(),
+            artwork.catalog_background.as_str(),
+            artwork.tmdb_background.as_str(),
+            artwork.trakt_background.as_str(),
+            artwork.logo_language_url.as_str(),
+        ];
+        if title.origin.contains('\0')
+            || urls.iter().any(|url| url.contains('\0'))
+            || title.cast.iter().any(|member| member.photo.contains('\0'))
+            || [
+                &title.availability.subscription,
+                &title.availability.rental,
+                &title.availability.purchase,
+            ]
+            .into_iter()
+            .flatten()
+            .any(|provider| provider.logo.contains('\0'))
+        {
+            return Err(Error::InvalidData);
+        }
+    }
+    for row in rows {
+        if !identity(&row.key)
+            || !identity(&row.media_type)
+            || row.titles.start > row.titles.end
+            || row.titles.end > title_count
+            || (row.state == CatalogRowState::ConfirmedEmpty && !row.titles.is_empty())
+        {
+            return Err(Error::InvalidData);
+        }
+        if let Some(source) = &row.source {
+            source.validate()?;
+        }
+    }
+    Ok(())
 }

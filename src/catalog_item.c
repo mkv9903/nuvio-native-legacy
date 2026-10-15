@@ -81,7 +81,7 @@ int catalog_item_from_rust(CatItem *destination, const RustTitleSnapshot *title)
 }
 const char *catalog_title_text(const CatItem *item, unsigned field) {
   const char *overlay = "", *complete;
-  size_t capacity = 1, length;
+  size_t capacity = 1;
   if (!item) return "";
 #define OVERLAY(selector, member) case selector: overlay = item->member; capacity = sizeof item->member; break
   switch (field) {
@@ -103,6 +103,11 @@ const char *catalog_title_text(const CatItem *item, unsigned field) {
   if (!item->rust_title) return overlay;
   complete = nuvio_title_text(item->rust_title, field);
   if (field == TITLE_ID) return complete; /* Provider identity is immutable. */
+  return catalog_text_with_overlay(complete, overlay, capacity);
+}
+const char *catalog_text_with_overlay(const char *complete, const char *overlay, size_t capacity) {
+  size_t length;
+  if (!complete || !overlay || !capacity) return "";
   length = strlen(complete);
   if (length >= capacity) length = capacity - 1;
   while (length && (((unsigned char)complete[length] & 0xc0) == 0x80)) length--;
