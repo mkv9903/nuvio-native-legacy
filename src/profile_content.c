@@ -1,6 +1,7 @@
 #include "profile_content.h"
 #include "progress.h"
 #include "catalogo.h"
+#include "catalog_item.h"
 #include "ajustes.h"
 #include "dados.h"
 #include <stdio.h>
@@ -74,7 +75,7 @@ static int find_snapshot(int profile) {
 
 // Progress record -> catalog-known title, or 0.
 static int from_catalog(const ProgressRecord *r) {
-  memset(&catalog_scratch, 0, sizeof catalog_scratch);
+  catalog_item_clear(&catalog_scratch);
   return cat_copiar_por_id(r->content_id, r->episode > 0 ? "series" : "movie", &catalog_scratch) &&
          catalog_scratch.titulo[0];
 }
@@ -91,6 +92,7 @@ int profile_content_from(const AccountProfile *p, ProfileContent *out) {
     if (catalog_scratch.temporada == r.season && catalog_scratch.episodio == r.episode)
       snprintf(out->episode_name, sizeof out->episode_name, "%s", catalog_scratch.nomeEpisodio);
   } else {
+    catalog_item_clear(&catalog_scratch);
     load_snapshots();
     i = find_snapshot(p->index);
     if (i < 0 || strcmp(snapshots[i].content_id, r.content_id)) return 0;
@@ -99,6 +101,7 @@ int profile_content_from(const AccountProfile *p, ProfileContent *out) {
     if (snapshots[i].season == r.season && snapshots[i].episode == r.episode)
       snprintf(out->episode_name, sizeof out->episode_name, "%s", snapshots[i].episode_name);
   }
+  catalog_item_clear(&catalog_scratch);
   out->is_series = r.episode > 0;
   out->season = r.season ? r.season : (out->is_series ? 1 : 0);
   out->episode = r.episode;
@@ -133,10 +136,12 @@ void profile_content_register(void) {
     snapshots[k] = s;
     changed = 1;
   }
+  catalog_item_clear(&catalog_scratch);
   if (changed) save_snapshots();
 }
 
 void profile_content_forget(void) {
+  catalog_item_clear(&catalog_scratch);
   num_snapshots = 0;
   snapshots_loaded = 1;
   dados_apagar(FILE_NAME);

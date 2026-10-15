@@ -77,3 +77,9 @@ The remaining integration order is:
    when the runtime switches to this private Rust JSON store. Do not add a file
    importer or fallback reader. Run integrated profile-switch, delayed-response,
    empty-result, restart and native-lifetime checks before a manual TV handoff.
+
+Metadata workers now copy exact catalog indices under the publication lock and
+release their retained titles on success and early exits. Profile preview
+scratch records also release their owners. Two additional Rust-driven native
+tests cover asynchronous reads after Home replacement and invalid indices that
+must never wrap to another title; the native suite now passes 29 cases.

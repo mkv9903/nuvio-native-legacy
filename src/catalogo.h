@@ -245,6 +245,9 @@ int  cat_n(void);
 // quantas vezes for nesse meio tempo. Nao guarde de um quadro para o outro:
 // guarde o indice, ou copie. Ver cat_quadro.
 const CatItem *cat_item(int i);
+/* Exact index, copied under the publication lock. The caller owns the result
+ * and must clear it after asynchronous work; invalid indices never wrap. */
+int catalog_copy_index(int index, CatItem *destination);
 // VIRADA DE QUADRO, chamada pelo fio de desenho no comeco de cada quadro
 // (main.c), num ponto onde nenhum ponteiro de cat_item() esta na mao.
 //

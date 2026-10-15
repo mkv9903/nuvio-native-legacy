@@ -1153,6 +1153,16 @@ const CatItem *cat_item(int i) {
   }
 }
 
+int catalog_copy_index(int index, CatItem *destination) {
+  int found;
+  if (!destination) return 0;
+  catTravar();
+  found = itens && index >= 0 && index < n;
+  if (found) catalog_item_copy(destination, &itens[index]);
+  pthread_mutex_unlock(&pubTrava);
+  return found;
+}
+
 // ":<digitos>:<digitos>" e so isso — o sufixo de temporada/episodio.
 static int ehSufixoEp(const char *r) {
   int n = 0;

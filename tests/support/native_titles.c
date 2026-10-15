@@ -22,6 +22,11 @@ CatItem *native_title_clone(const CatItem *source) {
   if (item) catalog_item_copy(item, source);
   return item;
 }
+CatItem *native_title_copy_catalog(int index) {
+  CatItem *item = calloc(1, sizeof *item);
+  if (item && !catalog_copy_index(index, item)) { free(item); item = NULL; }
+  return item;
+}
 void native_title_destroy(CatItem *item) { catalog_item_clear(item); free(item); }
 const char *native_title_text(const CatItem *item, unsigned field) { return catalog_title_text(item, field); }
 void native_title_overlay_poster(CatItem *item, const char *poster) {

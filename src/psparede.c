@@ -7,6 +7,7 @@
 #ifndef PSPAREDE_SO_PURO
 #include "progresso.h"
 #include "catalogo.h"
+#include "catalog_item.h"
 #include "dados.h"
 #endif
 
@@ -101,13 +102,14 @@ void psparede_registrar(void) {
   // 1) O que ele assistiu, do mais recente para o mais antigo.
   nr = prog_ler(regs, PROG_MAX);
   for (i = 0; i < nr && np < PSPAREDE_MAX * 2; i++) {
-    memset(&rascunho, 0, sizeof rascunho);
+    catalog_item_clear(&rascunho);
     if (cat_copiar_por_id(regs[i].contentId, regs[i].tipo, &rascunho) && rascunho.poster[0] &&
         strlen(rascunho.poster) < PSPAREDE_URL) {
       snprintf(posters[np], PSPAREDE_URL, "%s", rascunho.poster);
       cand[nc++] = posters[np++];
     }
   }
+  catalog_item_clear(&rascunho);
   // 2) A lista dele, 3) o comeco da Home dele.
   for (i = 0; i < cat_n() && nc < PSPAREDE_MAX * 4; i++) {
     const CatItem *c = cat_item(i);

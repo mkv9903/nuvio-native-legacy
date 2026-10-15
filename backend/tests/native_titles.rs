@@ -14,6 +14,7 @@ use std::{
 extern "C" {
     fn native_title_create(snapshot: *const c_void) -> *mut c_void;
     fn native_title_clone(item: *const c_void) -> *mut c_void;
+    fn native_title_copy_catalog(index: i32) -> *mut c_void;
     fn native_title_destroy(item: *mut c_void);
     fn native_title_text(item: *const c_void, field: u32) -> *const c_char;
     fn native_title_overlay_poster(item: *mut c_void, poster: *const c_char);
@@ -58,6 +59,49 @@ extern "C" {
     fn native_title_compact_enrichment(rejected: *const c_void, kept: *const c_void)
         -> *mut c_void;
     fn native_title_filter_progress(finished: *const c_void, kept: *const c_void) -> *mut c_void;
+}
+
+#[test]
+fn asynchronous_catalog_copy_retains_complete_values_after_home_is_replaced() {
+    let id = format!("provider:{}", "full-value".repeat(200));
+    let title = snapshot(&id, "poster");
+    let weak = Arc::downgrade(&title);
+    unsafe {
+        let original = native_title_create(Arc::into_raw(title).cast());
+        native_title_publish(original);
+        native_title_destroy(original);
+        let address = std::thread::spawn(|| native_title_copy_catalog(0) as usize)
+            .join()
+            .unwrap();
+        let held = address as *mut c_void;
+        assert!(!held.is_null());
+        native_title_publish(std::ptr::null());
+        native_title_publish(std::ptr::null());
+        native_title_frame();
+        native_title_frame();
+        assert_eq!(get(held, TitleField::Id), id);
+        assert!(weak.upgrade().is_some());
+        native_title_destroy(held);
+    }
+    assert!(weak.upgrade().is_none());
+}
+
+#[test]
+fn asynchronous_catalog_indices_never_wrap_to_another_title() {
+    unsafe {
+        assert!(native_title_copy_catalog(0).is_null());
+        let title = snapshot("provider:only", "poster");
+        let original = native_title_create(Arc::into_raw(title).cast());
+        native_title_publish(original);
+        native_title_destroy(original);
+        assert!(native_title_copy_catalog(-1).is_null());
+        assert!(native_title_copy_catalog(1).is_null());
+        assert!(native_title_copy_catalog(i32::MAX).is_null());
+        native_title_publish(std::ptr::null());
+        native_title_publish(std::ptr::null());
+        native_title_frame();
+        native_title_frame();
+    }
 }
 
 #[test]

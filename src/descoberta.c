@@ -5431,10 +5431,9 @@ int desc_localizar_catalogo_cache(void) {
   e = malloc(sizeof *e);
   if (!e) return 0;
   for (i = 0; i < n; i++) {
-    const CatItem *o = cat_item(i);
-    if (!o) continue;
-    *e = *o;
+    if (!catalog_copy_index(i, e)) continue;
     if (aplicarLocItem(e)) { cat_atualizar_item(i, e); mudou++; }
+    catalog_item_clear(e);
   }
   free(e);
   if (mudou) {
@@ -5462,24 +5461,24 @@ static void *fioLocalizar(void *u) {
     locDeNovo = 0;
     pthread_mutex_unlock(&locFilaTrava);
     for (k = 0; k < n; k++) {
-      const CatItem *o = lista[k] < cat_n() ? cat_item(lista[k]) : NULL;
+      CatItem current = {0};
       char id[24], imdb[64], tit[160], sin[900], logo[512], fundo[512];
       const char *tipo;
-      if (!o || !locChaveDoItem(o, id, sizeof id, &tipo)) continue;
-      snprintf(imdb, sizeof imdb, "%s", o->imdb);
+      if (!catalog_copy_index(lista[k], &current)) continue;
+      if (!locChaveDoItem(&current, id, sizeof id, &tipo)) {
+        catalog_item_clear(&current); continue;
+      }
+      snprintf(imdb, sizeof imdb, "%s", current.imdb);
+      catalog_item_clear(&current);
       if (!localizarTexto(tipo, id, tit, sizeof tit, sin, sizeof sin,
                           logo, sizeof logo, fundo, sizeof fundo)) continue;
       novos++;
       // Reler: o item pode ter mudado de lugar ou de texto enquanto a rede
       // respondia. So o titulo e a sinopse sao tocados.
-      o = lista[k] < cat_n() ? cat_item(lista[k]) : NULL;
-      if (o && !strcmp(o->imdb, imdb)) {
-        CatItem *e = malloc(sizeof *e);
-        if (e) {
-          *e = *o;
-          if (aplicarLocItem(e)) cat_atualizar_item(lista[k], e);
-          free(e);
-        }
+      if (catalog_copy_index(lista[k], &current)) {
+        if (!strcmp(current.imdb, imdb) && aplicarLocItem(&current))
+          cat_atualizar_item(lista[k], &current);
+        catalog_item_clear(&current);
       }
     }
     pthread_mutex_lock(&locFilaTrava);
@@ -6387,8 +6386,8 @@ static int episodiosDoCatalogo(int alvoItem, const char *titulo, const char *ser
 
 static void *buscarEps(void *u) {
   int alvoItem = epItem;
-  const CatItem *orig = cat_item(alvoItem);
-  CatItem base;
+  CatItem base = {0};
+  const CatItem *orig = &base;
   const CatItem *it;
   char *corpo = NULL;
   char serie[64];
@@ -6397,13 +6396,10 @@ static void *buscarEps(void *u) {
   int viaCatalogo = 0, solto = 0;
   (void)u;
   memset(&mf, 0, sizeof mf);
-  if (!orig || !orig->imdb[0]) { fioEpVivo = 0; return NULL; }
+  if (!catalog_copy_index(alvoItem, &base) || !catalog_title_id(&base)[0]) goto cleanup;
   snprintf(epAlvoId, sizeof epAlvoId, "%s", orig->imdb);
   snprintf(meuId, sizeof meuId, "%s", orig->imdb);
-  // COPIA AGORA (#190): o ponteiro de cat_item so vale ate o fim do quadro, e
-  // este fio vai para a rede antes de ler o resto dele.
-  base = *orig;
-  orig = &base;
+  /* The retained copy stays valid across network waits and Home replacement. */
   // CANAL NAO PASSA AQUI. O Cinemeta so conhece filme/serie por id do IMDb
   // ("tt..."); id de canal e "cs:channel:<hash>". "ehFilme = tipo != series"
   // tratava canal como filme, pedia /meta/movie/<id> com um id que o
@@ -6411,7 +6407,7 @@ static void *buscarEps(void *u) {
   // `serie`) reduzia TODO canal a "cs" — a mesma chave de cache para todos,
   // entao o primeiro canal aberto "vazava" elenco/genero/nota para os
   // seguintes. Medido: nenhum canal tem tipo "movie" nem "series" (#37).
-  if (ehCanal(orig->tipo)) { fioEpVivo = 0; return NULL; }
+  if (ehCanal(orig->tipo)) goto cleanup;
   // FILME TAMBEM PASSA AQUI. O /meta/movie traz elenco, direcao, generos e
   // nota — antes so os titulos enriquecidos no catalogo tinham elenco, e a
   // pagina do filme abria sem a fileira. O que e so de serie (episodios,
@@ -6426,9 +6422,7 @@ static void *buscarEps(void *u) {
   // util — ai o caminho de sempre: Cinemeta para "tt", nada para o resto.
   if (catalogoPrimeiro(orig)) viaCatalogo = metaCatalogoResolver(orig, &mf);
   if (!viaCatalogo && strncmp(orig->imdb, "tt", 2)) {
-    metaFontesLiberar(&mf);
-    fioEpVivo = 0;
-    return NULL;
+    goto cleanup;
   }
   // TIPO INCERTO ("anime" de catalogo do AIOMetadata, ou qualquer outro que
   // nao seja filme nem serie) NAO VIRA FILME POR PADRAO: pergunta como serie
@@ -6437,7 +6431,6 @@ static void *buscarEps(void *u) {
   // dele). Ver desc_meta_tipos.
   const char *tipos[2];
   int nTipos = desc_meta_tipos(orig->tipo, tipos), ti, ehFilme = 1;
-  base = *orig;
   it = &base;
   // idbase_copiar: "kitsu:41370" fica inteiro (cortar no primeiro ':' dava
   // "kitsu"); para o IMDb e o mesmo corte de sempre.
@@ -6466,7 +6459,7 @@ static void *buscarEps(void *u) {
     ehFilme = strcmp(tipos[ti], "series") != 0;
     if (ultimo || desc_meta_tem_temporadas(corpo)) break;
   }
-  if (!corpo) { metaFontesLiberar(&mf); fioEpVivo = 0; return NULL; }
+  if (!corpo) goto cleanup;
   if (nTipos > 1) {
     const char *resolvido = ehFilme ? "movie" : "series";
     printf("[desc] %s: tipo '%s' do catalogo resolvido como '%s' pelo /meta\n",
@@ -6722,8 +6715,10 @@ static void *buscarEps(void *u) {
     }
   }
 
+cleanup:
   free(corpo);
   metaFontesLiberar(&mf);
+  catalog_item_clear(&base);
   if (!solto) fioEpVivo = 0;   // solto antes: um fio mais novo pode estar vivo
   return NULL;
 }
