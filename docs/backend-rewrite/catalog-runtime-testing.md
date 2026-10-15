@@ -46,6 +46,12 @@ Run the real account flow on Linux:
 bash tools/linux.sh
 ```
 
+To save the Linux log while testing:
+
+```sh
+NUVIO_LOG=/tmp/space.mkv.nuvio.rusttest.log bash tools/linux.sh
+```
+
 `--preview` intentionally uses the static illustration catalog and skips account
 loading, so it does not test this capability. Linux media playback is stubbed;
 the real video/audio path still requires a targeted webOS check.
@@ -70,3 +76,28 @@ also pass with ASan/UBSan. Leak detection is disabled for process-lifetime app
 globals; explicit final-owner assertions cover the transferred Rust records.
 Linux compilation and a ten-second disposable normal-mode startup/shutdown pass.
 The startup check reaches the login UI without using real account credentials.
+
+## Packaged checkpoint
+
+Application source `cc351086f55f7ec79a01cec535567187db8024a7` was built from
+a clean tree on 2026-10-15 with Rust 1.85.1. The Linux checks above pass, as does
+the webOS ARM release build with the retained C UI and native media libraries.
+The runtime uses the soft-float ABI and imports glibc versions no newer than
+2.12. Runtime/full/debug build IDs match:
+`091bb7897485c48e03c3214e1cfe17b77cbcc035`.
+
+The manual-test package is
+`build/backend/webos/space.mkv.nuvio.rusttest_2.1.0_arm.ipk`, with the isolated
+`space.mkv.nuvio.rusttest` identity and **Nuvio Rust Test** name. Package checks
+verify the exact allowlisted runtime payload, executable permissions, and
+exclusion of private/sample data and symbols. Its SHA-256 is
+`4c7d556d45f271fdda15101dd1626cf79f1098a9a569d31a1a1198db55e70775`.
+The matching executable, full binary, debug symbols and source/hash record are
+under `build/backend/webos`; the previous matching package set is backed up
+under `checkpoints/package-before-cc351086` there.
+
+This package has not been installed or tested on a TV. In addition to the four
+account/catalog checks above, test movie and series playback, resume, seeking,
+audio/subtitle selection and returning to Home on webOS. The TV log is
+`/tmp/space.mkv.nuvio.rusttest.log`. The remaining C backend capabilities still
+need their own rewrites; this package validates the integrated catalog milestone.

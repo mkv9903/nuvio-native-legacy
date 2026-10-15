@@ -73,6 +73,8 @@ installs or launches the app; packages are written to `build/backend/webos`.
 Verify an existing package with `bash tools/test-ipk.sh path/to/package.ipk`.
 For the first account milestone, follow the
 [Linux and TV check steps](docs/backend-rewrite/first-tv-check.md).
+For the current integrated catalog build, follow the
+[catalog and profile test steps](docs/backend-rewrite/catalog-runtime-testing.md).
 
 The executable is `build/linux/nuvio-rusttest`. Local data defaults to
 `${XDG_DATA_HOME:-$HOME/.local/share}/space.mkv.nuvio.rusttest`; preview mode uses

@@ -176,3 +176,10 @@ The integrated catalog candidate and manual checks are described in
 [catalog runtime testing](catalog-runtime-testing.md). Use normal Linux mode
 (`bash tools/linux.sh`) to test account catalogs; `--preview` skips account work.
 The old binary scene-cache implementation and its C tests have been removed.
+
+The integrated application checkpoint `cc351086` is packaged for manual tests.
+Its Linux build/startup, 196 backend tests, 42 native tests and 34 native
+ASan/UBSan cases pass. The webOS release/IPK passes payload, identity,
+soft-float/glibc 2.12 and matching-symbol checks. Canonical artifacts and hashes
+are under `build/backend/webos`; TV runtime testing is pending. The linked
+catalog test guide records the exact source, package hash and manual cases.
