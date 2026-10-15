@@ -95,7 +95,7 @@ paths with decimal and percent variants, numeric/string perfect scores, near-10
 rounding, tiny positive values, missing values, NaN/overflow and invalid scores.
 
 Those counts describe the foundation checkpoint; the current integrated build
-passes 196 backend tests and 42 native tests.
+passes 196 backend tests and 45 native tests.
 
 ## Home assembly ownership checkpoint
 

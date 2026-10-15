@@ -379,3 +379,15 @@ row-window, Continue Watching, profile-preview and catalog-lifetime groups pass.
 Linux builds and completes a ten-second normal-mode login-UI startup followed
 by clean shutdown with disposable data. Real-account and TV playback checks are
 listed in [catalog runtime testing](catalog-runtime-testing.md).
+
+The subsequent profile-switch correction adds three native cases, bringing the
+native total to 45 and the ASan/UBSan catalog/title/capture group to 37. Two of
+the new cases fail against the earlier C library: the pre-login worker keeps
+zero addons after two arrive for the secondary profile, and the local default
+routes an independent profile to the primary list. The correction pins the
+worker's reader from its new Rust job and removes that local override, as the
+user requested. The real account parser/native adapter also verifies secondary
+selection first, repeated independent-profile switches and explicit primary
+sharing with different Settings counts. See
+[the regression record](profile-catalog-regression.md). The 196 backend tests,
+Linux build/startup and retained profile-settings/search/layout fixtures pass.

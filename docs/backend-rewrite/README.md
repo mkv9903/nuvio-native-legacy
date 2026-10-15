@@ -74,7 +74,7 @@ boundary, provider loading, complete catalog title models and scene
 storage/publication pass 196 tests. Forty-five additional Rust driver tests cover
 the retained C account/addon screens, view layouts, Home-order publication,
 source/subtitle workers, title lifetimes and integrated catalog/profile paths.
-All 34 native catalog/title/capture cases also pass ASan/UBSan. The five relevant
+All 37 native catalog/title/capture cases also pass ASan/UBSan. The five relevant
 C reference groups passed
 before their test cases moved to Rust. See [test coverage](test-coverage.md).
 The Linux app builds and starts under Xvfb using disposable isolated normal-mode
@@ -187,3 +187,8 @@ catalog test guide records the exact source, package hash and manual cases.
 The subsequent [profile catalog regression](profile-catalog-regression.md)
 removes the user-rejected local sharing override and pins the Home worker
 reader to its Rust job after the account wait.
+
+Application checkpoint `204511dd` also passes the webOS ARM/IPK checks and
+37 ASan/UBSan native cases. The current canonical test package contains this
+profile-switch correction; source/build IDs, its SHA-256 and retest steps are
+recorded in the linked regression guide. TV runtime remains unverified.

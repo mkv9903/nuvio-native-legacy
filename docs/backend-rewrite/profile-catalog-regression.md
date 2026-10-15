@@ -73,5 +73,24 @@ profile/catalog and playback checks after local validation.
 
 The corrected source passes 196 backend tests, 45 native integration tests,
 Linux compilation and disposable normal-mode startup/shutdown. Both retained
-settings fixture groups also pass. Final sanitizer/package evidence is recorded
-with the manual-test handoff.
+settings fixture groups also pass. All 37 native catalog/title/capture cases
+pass ASan/UBSan, including the new startup, independent-profile and native
+account-routing cases. Leak detection is disabled for process-lifetime app
+globals; explicit ownership assertions remain enabled.
+
+## Verified test package
+
+Application source `204511dd962f24f9a9cdeb4dc8004091db37d094` was built from a
+clean tree on 2026-10-15. The webOS ARM build and isolated IPK pass package
+payload/identity/permissions checks, the soft-float ABI check and imported glibc
+maximum 2.12. The executable, full binary and debug symbols share build ID
+`ab06913c19b196da96811dc914c8d3b7d6cbe80e`.
+
+The current package is
+`build/backend/webos/space.mkv.nuvio.rusttest_2.1.0_arm.ipk`
+(**Nuvio Rust Test**, `space.mkv.nuvio.rusttest`). Its SHA-256 is
+`dbbaa6a46430f00198a384e05e225d65d6193ec74f07a986ab44267cd5467c86`.
+The matching runtime, symbols and source/hash record are under
+`build/backend/webos`. The previous matching package set is preserved under
+`checkpoints/package-before-204511dd` there. TV runtime testing is pending; no
+package was installed or launched on a TV during these checks.
