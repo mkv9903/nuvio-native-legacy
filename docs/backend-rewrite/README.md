@@ -202,3 +202,8 @@ The next [Home coordination checkpoint](home-coordination.md) moves manifest
 scheduling, candidate selection, bounded catalog work and catalog-scene assembly
 into Rust. It retains the approved Home features and removes new-addon promotion.
 The C UI and the contributions of services awaiting their rewrite remain in place.
+
+
+Application source `78137d87` is the current Home coordination test build.
+Its verified Linux/ARM/IPK checks and manual-test steps are in the linked Home
+record. The backend/native/ASan totals are 214/53/45; TV runtime remains untested.

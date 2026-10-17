@@ -142,3 +142,29 @@ The native complete-value case also asserts that the actual runtime saves the
 full declaration key before requesting a catalog. Saved declaration order is
 separate from the visible scene; a successful fallback cannot permanently
 consume a preferred failed row's retry slot.
+
+## Verified manual-test package
+
+Application source `78137d8764c5cc5be444ba961655edc7fb4fa51e` was built from a clean tree on 2026-10-17 using
+Rust 1.85.1. The final Linux build and ten-second disposable normal-mode
+startup/clean shutdown pass, along with 214 backend tests, 53 native integration
+tests and 45 native ASan/UBSan cases. The full-source native catalog group also
+passes its added saved-plan runtime assertion.
+
+The isolated package is `build/backend/webos/space.mkv.nuvio.rusttest_2.1.0_arm.ipk`:
+**Nuvio Rust Test**, `space.mkv.nuvio.rusttest`, version 2.1.0. Its SHA-256 is
+`f0a84adce7f4553fd122f5271973c08890a5e95ada35cb1abbb81d52ac89a6f3`.
+
+ARM soft-float, imported glibc maximum 2.12, exact allowlisted payload, executable
+permissions and exclusion of private/sample data and symbols are verified.
+Runtime/full/debug files share build ID `eb4b5cc1a911566d43c740bf81c972153b62e5f8`. The matching files and
+source/hash record are under `build/backend/webos`. The preceding matching
+application package set is saved under `checkpoints/package-before-78137d87`.
+No TV was installed or launched by these checks. TV login/networking, real
+playback and hardware timing remain manual checks.
+
+Test cold Home, a warm restart/background refresh, independent/shared profile
+switches and their Settings addon counts, row order/disabled rows, collections
+and Continue Watching. Confirm movie/series Details and source navigation still
+work. On TV, also try one movie and one series episode through native playback.
+For the Linux log use `/tmp/space.mkv.nuvio.rusttest.log` from the command above.

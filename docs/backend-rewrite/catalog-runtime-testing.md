@@ -1,5 +1,10 @@
 # Integrated catalog test build
 
+For the current manual-test package, see [Home coordination](home-coordination.md).
+The source and package hashes below describe the earlier catalog checkpoint;
+its matching package set is archived under
+`build/backend/webos/checkpoints/package-before-204511dd`.
+
 For the subsequent profile-switch correction, see
 [profile catalog regression](profile-catalog-regression.md). The packaged
 checkpoint below records the earlier integrated catalog build.

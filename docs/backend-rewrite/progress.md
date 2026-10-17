@@ -52,6 +52,12 @@ This is one completed backend coordination area; the estimate remains about 30%
 until the larger remaining service groups are implemented. General settings and
 the local row editor have not become Rust services in this step.
 
+Application source `78137d87` is pushed and packaged for manual tests.
+It passes 214 backend tests, 53 native integration tests, 45 native ASan/UBSan
+cases, Linux build/startup and ARM/IPK verification. The exact source, package
+hash, build ID and focused manual cases are in the linked Home coordination
+record. TV runtime testing is pending.
+
 ## Subsequent areas
 
 The proposed sequence after this Home test checkpoint is search/expanded catalogs,

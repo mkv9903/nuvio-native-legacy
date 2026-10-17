@@ -1,5 +1,8 @@
 # Profile catalog regression
 
+This records the earlier profile-fix checkpoint. The current package, which
+includes that correction, is documented in [Home coordination](home-coordination.md).
+
 The Linux report identified two problems in the integrated catalog test build.
 The account log showed seven Rust addons while the Home worker, after waiting
 for account startup, still reported zero. It also showed the independent second
@@ -86,11 +89,10 @@ payload/identity/permissions checks, the soft-float ABI check and imported glibc
 maximum 2.12. The executable, full binary and debug symbols share build ID
 `ab06913c19b196da96811dc914c8d3b7d6cbe80e`.
 
-The current package is
-`build/backend/webos/space.mkv.nuvio.rusttest_2.1.0_arm.ipk`
+The package for that checkpoint is archived at
+`build/backend/webos/checkpoints/package-before-78a6e57f/space.mkv.nuvio.rusttest_2.1.0_arm.ipk`
 (**Nuvio Rust Test**, `space.mkv.nuvio.rusttest`). Its SHA-256 is
 `dbbaa6a46430f00198a384e05e225d65d6193ec74f07a986ab44267cd5467c86`.
-The matching runtime, symbols and source/hash record are under
-`build/backend/webos`. The previous matching package set is preserved under
+The matching runtime, symbols and source/hash record are in that same archive. The previous matching package set is preserved under
 `checkpoints/package-before-204511dd` there. TV runtime testing is pending; no
 package was installed or launched on a TV during these checks.
