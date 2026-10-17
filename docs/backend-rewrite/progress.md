@@ -14,10 +14,10 @@ but they do not make their remaining C service implementations complete.
 | --- | --- |
 | Account login, sessions, refresh, profiles and PIN rules | Rust backend integrated |
 | Addon account lists, edits, offline journals and synchronization | Rust backend integrated |
-| Manifest models, validation, provider requests and document cache | Rust services integrated; native manifest scheduling remains C |
+| Manifest models, validation, provider requests and document cache | Rust services and Home manifest scheduling integrated |
 | Account Home ordering and preferences | Rust backend integrated; local row registry remains C |
 | Home catalog title/row models, ownership and private scene JSON | Rust backend integrated |
-| Home request scheduling and row assembly | Transitional C orchestration using Rust requests, records and scope guards |
+| Home request scheduling and row assembly | Rust planning, bounded loading and catalog assembly integrated; C service contributions retained |
 | Search and expanded catalog browsing | C backend remains |
 | Details metadata, episodes and enrichment/artwork services | C services remain; complete title models and rating helper are Rust |
 | Playback source aggregation and selection rules | C backend using Rust-owned addon data |
@@ -39,52 +39,21 @@ Linux build/startup and ARM/IPK verification. See
 [the profile regression record](profile-catalog-regression.md) for exact package
 identity, source and hashes. This progress update changes documentation only.
 
-## Recommended next area
+## Home coordination checkpoint
 
-Finish Home loading coordination before starting another user-facing backend
-area. Rust already owns the catalog requests and records; C still schedules
-manifest/catalog work, chooses candidates, assembles rows and merges the other
-services' contributions. Moving this coordination reduces the remaining
-cross-language state involved in the profile flow just tested.
+The user approved all reviewed Home features and removal of automatic new-addon
+promotion. Rust now plans and loads Home catalogs, preserves saved/accepted order,
+fills empty slots and assembles immutable catalog scenes. C screens retain their
+appearance and the contributions of still-C collection, progress and tracking
+services. See [Home coordination](home-coordination.md) for boundaries and cases.
 
-Retain the C screen design and existing service contributions while replacing
-this orchestration with Rust collections, bounded workers, immutable snapshots
-and versioned private storage where this area owns saved state. Continue
-Watching, collection and tracking service implementations can supply scoped
-inputs until their own rewrites. Do not import their original saved files.
-
-The feature review for this area is pending:
-
-- Progressive rows during the first load and a stable cached Home during
-  background refresh.
-- Row limits, saved order, disabled rows and selection of further eligible
-  catalogs when earlier candidates return empty.
-- Collection-row composition and integration of Continue Watching and saved-list
-  data, using the existing services until those are rewritten.
-- Immediate removal of rows from removed or disabled addons.
-- A separate choice about the existing automatic placement of new-addon rows.
-  The recommendation is to preserve saved order and append new rows; removing
-  automatic promotion requires the user's feature decision.
-
-No implementation of this next area starts before those feature answers arrive.
-
-## Validation plan for Home coordination
-
-Inventory the retained cases before replacement, including manifest cache/wait,
-discovery start races, progressive Home, row quotas/ordering, duplicate rows,
-collection composition and profile isolation. Translate rewritten assertions
-into Rust; retain C cases only for capabilities still implemented in C.
-
-Cover empty and delayed responses, failed-load cache retention, selected-profile
-first startup, independent/shared profile switches, cancellation during assembly,
-bounded concurrency, stable refresh publication and final owner release. Verify
-the selected new-addon placement policy rather than preserving that algorithm
-implicitly. Run backend/native/Linux checks and relevant sanitizers, push tested
-checkpoints, and package the next manual-test milestone.
+This is one completed backend coordination area; the estimate remains about 30%
+until the larger remaining service groups are implemented. General settings and
+the local row editor have not become Rust services in this step.
 
 ## Subsequent areas
 
-The proposed sequence after Home coordination is search/expanded catalogs,
+The proposed sequence after this Home test checkpoint is search/expanded catalogs,
 Details metadata and episodes, source aggregation, progress/Continue Watching
 and saved data, subtitle services, tracking integrations, Live TV/EPG and remaining
 settings/utilities. Dependency findings may change this order. Review each

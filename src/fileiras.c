@@ -773,10 +773,14 @@ static int achar(const char *chave) {
 
 static void registrar(const char *chave, const char *titulo,
                       const char *addon, const char *conteudo, int itens,
-                      int podeDespejar) {
+                      int podeDespejar, int expected_profile, unsigned expected_generation, int *accepted) {
   int i, grava = 0;
   if (!chave || !chave[0]) return;
   pthread_mutex_lock(&trava);
+  if (expected_profile>=0 && (perfil!=expected_profile || perfilGeracao!=expected_generation)) {
+    pthread_mutex_unlock(&trava); return;
+  }
+  if (accepted) *accepted=1;
   garantir();
   i = achar(chave);
   if (i < 0 && !podeDespejar && nLinhas >= FIL_MAX) {
@@ -929,12 +933,19 @@ static void registrar(const char *chave, const char *titulo,
 
 void fil_registrar(const char *chave, const char *titulo,
                    const char *addon, const char *conteudo, int itens) {
-  registrar(chave, titulo, addon, conteudo, itens, 1);
+  registrar(chave, titulo, addon, conteudo, itens, 1, -1, 0, NULL);
+}
+
+int register_profile_row(int profile, unsigned generation, const char *key, const char *name,
+                         const char *addon, const char *media_type, int items, int suggestion) {
+  int accepted=0;
+  registrar(key,name,addon,media_type,items,!suggestion,profile,generation,&accepted);
+  return accepted;
 }
 
 void fil_registrar_se_couber(const char *chave, const char *titulo,
                              const char *addon, const char *conteudo) {
-  registrar(chave, titulo, addon, conteudo, -1, 0);
+  registrar(chave, titulo, addon, conteudo, -1, 0, -1, 0, NULL);
 }
 
 int fil_escolhida(const char *chave) {

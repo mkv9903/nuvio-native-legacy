@@ -73,6 +73,91 @@ pub struct CatalogResult {
     pub responded: bool,
 }
 impl CatalogRuntime {
+    pub fn home_source_current(&self, source: &AddonSnapshot, work: &SceneWork) -> bool {
+        self.scenes.current(work)
+            && self.addons.snapshot_current(source)
+            && self
+                .addons
+                .snapshot()
+                .addons
+                .records
+                .iter()
+                .zip(source.records.iter())
+                .all(
+                    |(current, held)| match (&current.manifest, &held.manifest) {
+                        (Some(current), Some(held)) => {
+                            Arc::ptr_eq(current, held) || current == held
+                        }
+                        (None, None) => true,
+                        _ => false,
+                    },
+                )
+    }
+    /// Runs on a Home worker. Manifest parsing and all configured URL handling
+    /// stay in Rust; only immutable catalog descriptions cross to native UI.
+    pub fn prepare_home(
+        &self,
+        work: &SceneWork,
+        order: Arc<crate::catalog_order::HomeOrder>,
+        progress: &(impl Fn(usize, usize) + Sync),
+    ) -> Result<crate::home_loading::HomePlan> {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        if !self.scenes.current(work) {
+            return Err(Error::Cancelled);
+        }
+        let source = self.addons.snapshot();
+        let context = source.addons.context.as_ref().ok_or(Error::Cancelled)?;
+        let account = Arc::new(RequestAccount {
+            account: self.account.clone(),
+            addons: self.addons.clone(),
+            source: work.source.addons.clone(),
+        });
+        let loader = ProviderLoader::new(account, self.transport.clone(), self.cache.clone());
+        let next = AtomicUsize::new(0);
+        let done = AtomicUsize::new(0);
+        progress(0, source.addons.records.len());
+        let worker = || loop {
+            if !self.scenes.current(work) {
+                break;
+            }
+            let index = next.fetch_add(1, Ordering::Relaxed);
+            let Some(record) = source.addons.records.get(index) else {
+                break;
+            };
+            if record.installed.enabled && record.manifest.is_none() {
+                if let Ok(result) = loader.manifest(context, &record.installed.url) {
+                    if self.scenes.current(work) {
+                        let _ = self.addons.attach_manifest(
+                            context,
+                            &record.installed.url,
+                            result.value,
+                        );
+                    }
+                }
+            }
+            let completed = done.fetch_add(1, Ordering::Relaxed) + 1;
+            if self.scenes.current(work) {
+                progress(completed, source.addons.records.len());
+            }
+        };
+        std::thread::scope(|scope| {
+            for _ in 1..crate::home_loading::MANIFEST_WORKERS.min(source.addons.records.len()) {
+                let worker = &worker;
+                let _ = std::thread::Builder::new()
+                    .name("nuvio-home-manifest".into())
+                    .spawn_scoped(scope, worker);
+            }
+            worker();
+        });
+        if !self.scenes.current(work) {
+            return Err(Error::Cancelled);
+        }
+        Ok(crate::home_loading::HomePlan::new(
+            self.addons.snapshot().addons.clone(),
+            order,
+            self.scenes.snapshot().scene.clone(),
+        ))
+    }
     pub fn content_context(&self) -> Option<ContentContext> {
         self.account.current_context(false)
     }

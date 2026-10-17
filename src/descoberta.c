@@ -14,6 +14,7 @@
 #include "catalog_item.h"
 #include "catalog_row.h"
 #include "catalog_runtime.h"
+#include "rust_home_loading.h"
 #include "addons.h"
 #include "addon_registry.h"
 #include "rede.h"
@@ -971,7 +972,9 @@ static unsigned geracaoLida;
 static pthread_mutex_t listaTrava = PTHREAD_MUTEX_INITIALIZER;
 static int listaLidaNaVolta;
 // Fim de volta: `buscando` cai sob a mesma trava em que desc_iniciar o testa e marca.
+static void clear_home_worker_rows(void);
 static void buscandoSoltar(void) {
+  clear_home_worker_rows();
   catalog_runtime_cycle_end();
   pthread_mutex_lock(&listaTrava); buscando = 0; pthread_mutex_unlock(&listaTrava);
 }
@@ -1260,6 +1263,10 @@ static CatFileira filsMontadas[CAT_FIL_MAX];
 static int nFileirasMontadas;
 static CatFileira filsLote[CAT_FIL_MAX];
 static int nFilsLote;
+static void clear_home_worker_rows(void) {
+  catalog_rows_clear(filsLote,CAT_FIL_MAX); nFilsLote=0;
+}
+
 
 typedef struct {
   char chave[192];      // homeCatalogKey:        <addonId>_<tipo>_<catalogoId>
@@ -1540,6 +1547,7 @@ void desc_home_carga(DescHomeCarga *estado) {
   if (carga.ativo && cargaDesde) carga.ms = SDL_GetTicks() - cargaDesde;
   *estado = carga;
   pthread_mutex_unlock(&cargaTrava);
+  if (catalog_runtime_enabled()) return;
   pthread_mutex_lock(&maniTrava);
   estado->addonsProntos = estado->addonsTotal = 0;
   for (int i = 0; i < maniN; i++) if (mani[i].ativo) {
@@ -1875,6 +1883,7 @@ static void registrarNomeCatalogo(const char *base, const char *tipo, const char
   int i;
   if (!base || !nome || !nome[0]) return;
   pthread_mutex_lock(&nomeCatTrava);
+  if (catalog_runtime_enabled() && !catalog_runtime_current()) { pthread_mutex_unlock(&nomeCatTrava); return; }
   for (i = 0; i < nNomeCat; i++)
     if (nomeCatBase(i, base) && !strcmp(nomeCat[i].tipo, tipo) && !strcmp(nomeCat[i].id, id)) break;
   if (i == nNomeCat) { i = nomeCatProx; nomeCatProx = (nomeCatProx + 1) % NOMECAT_MAX; if (nNomeCat < NOMECAT_MAX) nNomeCat++; }
@@ -3324,63 +3333,6 @@ static int ordenarCandidatos(Decl *decls, int nDecl, int *ordem, int nFixas,
   if (teto > CAT_FIL_MAX) teto = CAT_FIL_MAX;
   if (tetoSaida) *tetoSaida = teto;
 
-  // UMA VAGA GARANTIDA POR ADDON, e ela vem DEPOIS das duas ordens.
-  //
-  // A partilha por addon (la em cima) so governa o que a conta nao ordena,
-  // e isso nao bastou: MEDIDO na LG do dono com os sete addons, as seis
-  // fileiras continuaram sendo as da conta e o FrostView — um catalogo,
-  // recem-instalado — seguiu invisivel. A ordem da conta sozinha ja tem
-  // mais de seis catalogos, entao o orcamento acaba antes de a partilha ser
-  // alcancada. Eu tinha dito na issue #37 que a partilha resolvia; nao
-  // resolvia, e a correcao esta publicada la.
-  //
-  // Aqui a regra e mais forte e o preco esta dito: um addon que ficaria com
-  // ZERO fileira toma a vaga do addon que ja tem mais de uma, o mais tarde
-  // possivel dentro da janela. Isso mexe de proposito numa ordem que a
-  // pessoa arrumou no app web — o que se ganha e a garantia de que instalar
-  // um addon mostra alguma coisa dele, que e a pergunta que traz a issue.
-  // Quem ja aparece nao perde a vaga; quem perde e a SEGUNDA fileira de
-  // quem tem duas.
-  //
-  // RESTRITA EM 24/09, decisao do dono (a regra e os porques estao em
-  // cotacat.h, cota_vaga_garantida): so para addon NOVO, nunca por cima de
-  // ordem propria, nunca com fileira desligada. Na C9 ela punha Pluto TV,
-  // Minha TV, FrostView e Fenix TV — desligados na conta — e o Meu Futebol que
-  // ele tinha tirado da home nas posicoes 11 a 13 de uma ordem arrumada a mao.
-  { int nAd3 = addons_n(), q, c, dadas;
-    static int addonDe[DECL_MAX];
-    static char deslig[DECL_MAX];
-    CotaAddon ad[16];
-    int vagaAd[16], vagaCand[16];
-    if (nAd3 > 16) nAd3 = 16;
-    for (c = 0; c < nDecl; c++) {
-      addonDe[c] = -1;
-      deslig[c] = (char)desligada(&decls[c]);
-      for (q = 0; q < nAd3; q++) {
-        const char *b = addons_base(q);
-        if (b && b[0] && decls[c].base && !strcmp(decls[c].base, b)) { addonDe[c] = q; break; }
-      }
-    }
-    for (q = 0; q < nAd3; q++) {
-      ad[q].ativo = addons_ativo(q);
-      // NOVO: este perfil nunca viu fileira dele (fileiras.c) e nenhuma das
-      // declaradas agora esta desligada — na TV, na conta ou engolida por
-      // colecao. Uma desligada e uma decisao sobre o addon.
-      ad[q].novo = ad[q].ativo && fil_addon_novo(addons_id_manifesto(q), addons_base(q));
-      for (c = 0; c < nDecl && ad[q].novo; c++)
-        if (addonDe[c] == q && deslig[c]) ad[q].novo = 0;
-    }
-    dadas = cota_vaga_garantida(ordem, nOrdem, addonDe, deslig, ad, nAd3,
-                                teto - nFixas, fil_tem_ordem(), vagaAd, vagaCand, 16);
-    if (registrar)
-      for (q = 0; q < dadas && q < 16; q++) {
-        int pos = 0;
-        while (pos < nOrdem && ordem[pos] != vagaCand[q]) pos++;
-        printf("[desc] vaga garantida (addon novo): %s entra em %d (%s)\n",
-               addons_nome(vagaAd[q]), pos, decls[vagaCand[q]].titulo);
-      }
-  }
-
   // Uma resposta nova de manifesto nao muda a estrutura que a pessoa ja
   // aceitou. Enquanto a assinatura owner/perfil/idioma/config continuar
   // valida, as chaves do snapshot vem PRIMEIRO, na ordem dele; o usuario pode
@@ -3748,6 +3700,8 @@ int discovery_test_filter_owned(CatItem *items, int count) {
 }
 #endif
 
+#include "home_loading_adapter.inc"
+
 static void *montar(void *u) {
   catalog_runtime_cycle_end();
   catalog_rows_clear(filsLote,CAT_FIL_MAX); nFilsLote=0;
@@ -3807,7 +3761,7 @@ static void *montar(void *u) {
   // LIMPEZA UNICA DO #197 (fileiras.c, fil_migrar_197). So com a ordem da conta
   // na mao: ela e a prova de escolha que a limpeza usa; sem ela, fica para a
   // volta em que a ordem chegar. Depois da primeira vez e um teste de inteiro.
-  { int nc = catordem_n();
+  if (!catalog_runtime_enabled()) { int nc = catordem_n();
     if (nc > 0) {
       const char **lig = (const char **)malloc(sizeof *lig * (size_t)nc);
       char (*chaves)[CATORD_CHAVE] = malloc(sizeof *chaves * (size_t)nc);
@@ -3831,7 +3785,7 @@ static void *montar(void *u) {
   // logo depois dele.
   versaoLargada = addons_versao();
   cargaFase(1);
-  maniLargar();
+  if (!catalog_runtime_enabled()) maniLargar();
   // E a watchlist/colecao do Trakt tambem: ver ListasTrakt.
   listas = listasLargar();
   // VOLTA CONDENADA PARA AQUI, e nao no fim. desc_repetir (credencial, idioma,
@@ -3909,11 +3863,61 @@ static void *montar(void *u) {
       if (maior) { lote = maior; cap = novoCap; } \
     } } while (0)
 
+    { static int jaEsperou;
+      int k;
+      // ESPERA O CICLO INTEIRO DA CONTA, nao so os addons: as colecoes e a
+      // ordem chegam ~3 s depois deles (TCL: addons 06.05, "sync aplicado"
+      // 09.31), e a volta que ja tinha escolhido os catalogos refazia a Home
+      // no meio — 14 fileiras, cai para 8, volta para 14 com outras. Enquanto
+      // isso a tela e a do cache.
+      if (!jaEsperou && esperaAddons && esperaAddons()) {
+        Uint32 desde = 0;
+        jaEsperou = 1;
+        printf("[desc] esperando a conta (addons, colecoes, ordem) antes de montar a Home\n"); fflush(stdout);
+        while (minhaGeracao == montagemGeracao && (k = esperaAddons()) != 0) {
+          if (k == 2) {   // perfil ja escolhido: o prazo corre
+            if (!desde) desde = SDL_GetTicks();
+            else if (SDL_GetTicks() - desde > 10000u) break;
+          }
+          SDL_Delay(50);
+        }
+        printf("[desc] conta pronta: %d addon(s) (espera encerrada)\n", addons_n()); fflush(stdout);
+      } }
+    catalog_runtime_cycle_begin();
+    if (catalog_runtime_enabled() && !catalog_runtime_current()) goto waiting_context;
+
   // As fileiras vem dos CATALOGOS declarados nos manifestos dos addons, e nao
   // de uma lista fixa. A ordem, o que fica de fora e os nomes seguem o
   // algoritmo do web (sortAndFilterRowsInternal), com as preferencias lidas de
   // art/fileiras.txt.
-  {
+  if (catalog_runtime_enabled()) {
+    RustHomePlan *plan;
+    RustHomeLoadStats stats={0};
+    int limit=fil_limite(), fixed=nContinuar>0;
+    HomeLoadingBridge bridge={&lote,&cap,&n,nContinuar,minhaGeracao,&ctxIni,listas,&listasNaTela,&progressivo,&nPublicado,0};
+    if (limit>CAT_FIL_MAX-fixed) limit=CAT_FIL_MAX-fixed;
+    if (limit<0) limit=0;
+    pthread_mutex_lock(&listaTrava);
+    geracaoLida=geracaoPedida; listaLidaNaVolta=1;
+    { HomeContexto current; homeestado_contexto(&current); ctxIni.addons=current.addons; }
+    pthread_mutex_unlock(&listaTrava);
+    plan=nuvio_home_prepare(catalog_runtime_work(),update_home_manifest_progress,(void *)(uintptr_t)minhaGeracao);
+    if (!plan) { ondeParou="preparing Rust Home catalogs"; goto condenada; }
+    if (!prepare_home_choices(plan)) { nuvio_home_destroy(plan); ondeParou="reading Home choices"; goto condenada; }
+    marco("manifestos lidos"); cargaFase(2);
+    { HomeContexto current; homeestado_contexto(&current);
+      ctxIni.ajustes=current.ajustes; ctxIni.fileiras=current.fileiras;
+      ctxIni.ordemConta=current.ordemConta; ctxIni.colecoes=current.colecoes; }
+    int loaded=nuvio_home_load(plan,catalog_runtime_work(),(size_t)limit,(size_t)(ajustes_itens_fileira()>MAX_POR_FILEIRA?MAX_POR_FILEIRA:ajustes_itens_fileira()),publish_home_loading,&bridge,&stats);
+    nuvio_home_destroy(plan);
+    if (loaded<0) goto waiting_context;
+    if (!loaded) { ondeParou="loading Rust Home catalogs"; goto condenada; }
+    catalogosNaoPedidos=stats.remaining>INT_MAX?INT_MAX:(int)stats.remaining;
+    catalogosFora=catalogosNaoPedidos;
+    if (catalogosFora>CAT_FIL_MAX-nFilsLote) catalogosFora=CAT_FIL_MAX-nFilsLote;
+    printf("[catalogs] Rust Home: %zu requests, %zu responses, %zu empty, %zu failed, %zu rows, %zu remaining\n",
+           stats.requested,stats.responded,stats.empty,stats.failed,stats.rows,stats.remaining);
+  } else {
     // static: 256 entradas passam de 200 KB, e isso nao cabe com folga na
     // pilha de um fio. montar() roda uma vez e num fio so, entao nao ha
     // reentrada que isto quebre.
@@ -3959,27 +3963,6 @@ static void *montar(void *u) {
     // (o sync pede uma ao aplicar a conta: montagemGeracao muda).
     // Quem sabe de conta e de perfil e o app (desc_espera_addons_definir): os
     // testes que compilam este arquivo sozinho nao tem sessao nem perfis.
-    { static int jaEsperou;
-      int k;
-      // ESPERA O CICLO INTEIRO DA CONTA, nao so os addons: as colecoes e a
-      // ordem chegam ~3 s depois deles (TCL: addons 06.05, "sync aplicado"
-      // 09.31), e a volta que ja tinha escolhido os catalogos refazia a Home
-      // no meio — 14 fileiras, cai para 8, volta para 14 com outras. Enquanto
-      // isso a tela e a do cache.
-      if (!jaEsperou && esperaAddons && esperaAddons()) {
-        Uint32 desde = 0;
-        jaEsperou = 1;
-        printf("[desc] esperando a conta (addons, colecoes, ordem) antes de montar a Home\n"); fflush(stdout);
-        while (minhaGeracao == montagemGeracao && (k = esperaAddons()) != 0) {
-          if (k == 2) {   // perfil ja escolhido: o prazo corre
-            if (!desde) desde = SDL_GetTicks();
-            else if (SDL_GetTicks() - desde > 10000u) break;
-          }
-          SDL_Delay(50);
-        }
-        printf("[desc] conta pronta: %d addon(s) (espera encerrada)\n", addons_n()); fflush(stdout);
-      } }
-    catalog_runtime_cycle_begin();
     // A LISTA DE ADDONS E LIDA AQUI. Marcar o instante e o que permite dizer,
     // no fim, se um pedido de remontagem que chegou no meio do caminho ja foi
     // atendido por esta volta. Ver geracaoPedida.
@@ -4523,11 +4506,11 @@ static void *montar(void *u) {
     n = w;
     if (np) printf("[desc] plantowatch do Simkl: %d, %d novo(s) no catalogo\n", np, novos);
   }
-  preservarFileirasAusentes(&lote, &n, &cap, filsLote, &nFilsLote);
+  if (!catalog_runtime_enabled()) preservarFileirasAusentes(&lote, &n, &cap, filsLote, &nFilsLote);
   // Reanexar linhas sem resposta acontece depois das chamadas de rede; aplicar
   // a ordem salva ao conjunto inteiro impede que uma resposta parcial desloque
   // essas linhas para o fim da Home.
-  ordenarPorSnapshot(filsLote, nFilsLote);
+  if (!catalog_runtime_enabled()) ordenarPorSnapshot(filsLote, nFilsLote);
 #undef GARANTE
 
   if (n || nFilsLote > 0 || (catalog_runtime_enabled() && catalog_runtime_current())) {
@@ -4698,6 +4681,16 @@ static void *montar(void *u) {
     else
       desc_iniciar();
   }
+  return NULL;
+
+waiting_context:
+  /* Account/profile readiness is driven by its next frame, not a retry loop
+   * that repeatedly launches Home workers while the login screen is open. */
+  listasAbandonar(listas);
+  catalog_items_clear(lote,(size_t)n); free(lote);
+  int requested=repetirAoFim; repetirAoFim=0;
+  buscandoSoltar();
+  if (requested) desc_iniciar();
   return NULL;
 
 condenada:

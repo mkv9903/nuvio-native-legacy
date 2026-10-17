@@ -75,10 +75,10 @@ owner and otherwise wait/retry rather than using the signed-in member's ID.
 The Rust account domain, HTTP client, worker, native boundary, platform helper,
 Home ordering, addon networking/storage, edit merging and the native addon
 boundary, provider loading, complete catalog title models and scene
-storage/publication pass 196 tests. Forty-five additional Rust driver tests cover
+storage/publication and Home coordination pass 210 tests. Fifty-three additional Rust driver tests cover
 the retained C account/addon screens, view layouts, Home-order publication,
 source/subtitle workers, title lifetimes and integrated catalog/profile paths.
-All 37 native catalog/title/capture cases also pass ASan/UBSan. The five relevant
+All 45 native catalog/title/capture cases also pass ASan/UBSan. The five relevant
 C reference groups passed
 before their test cases moved to Rust. See [test coverage](test-coverage.md).
 The Linux app builds and starts under Xvfb using disposable isolated normal-mode
@@ -129,7 +129,7 @@ addon screen, guide actions and source/subtitle workers read pinned Rust
 snapshots. The old C registry, file loader, account addon parsing and whole-list
 uploads have been removed. Subtitle work is limited to four concurrent requests,
 as confirmed by the user. The app now uses Rust catalog loading and private scene restoration/publication.
-C Home assembly and enrichment remain as transitional consumers.
+C service contributions, collection composition and enrichment remain as transitional consumers.
 
 The native title foundation retains complete immutable Rust data across C
 catalog copies and replacement. The user approved keeping the existing title
@@ -196,3 +196,9 @@ Application checkpoint `204511dd` also passes the webOS ARM/IPK checks and
 37 ASan/UBSan native cases. The current canonical test package contains this
 profile-switch correction; source/build IDs, its SHA-256 and retest steps are
 recorded in the linked regression guide. TV runtime remains unverified.
+
+
+The next [Home coordination checkpoint](home-coordination.md) moves manifest
+scheduling, candidate selection, bounded catalog work and catalog-scene assembly
+into Rust. It retains the approved Home features and removes new-addon promotion.
+The C UI and the contributions of services awaiting their rewrite remain in place.

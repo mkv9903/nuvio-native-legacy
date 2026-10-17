@@ -95,7 +95,7 @@ const char *addons_id_manifesto(int i) { (void)i; return AID; }
 const char *addons_nome(int i)         { (void)i; return "Addon"; }
 unsigned addons_versao(void)           { return versaoAddons; }
 const char *addons_base_por_id(const char *id) { return id && !strcmp(id, AID) ? baseAtual() : ""; }
-void  addons_manifesto_lido(int i, const char *c) { (void)i; (void)c; }
+int addons_manifesto_lido(int i, const char *c) { (void)i; (void)c; return 1; }
 
 // ------------------------------------------------------------------ o relogio
 static unsigned long long agoraMs(void) {

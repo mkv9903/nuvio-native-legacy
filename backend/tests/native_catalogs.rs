@@ -12,6 +12,7 @@ use nuvio_backend::{
     catalog_runtime::CatalogRuntime,
     content_context::{AddonScope, ContentContext},
     error::{Error, Result},
+    home_loading_ffi::*,
     http::Response,
     model::ProfileId,
     provider_http::ProviderTransport,
@@ -33,6 +34,28 @@ use zeroize::Zeroizing;
 extern "C" {
     fn account_ui_test_attach(account: *mut c_void);
     fn profiles_active_addons() -> i32;
+    fn data_init(art: *const c_char);
+    fn fil_definir_perfil(profile: i32);
+    fn fil_perfil_geracao() -> u32;
+    fn fil_n() -> i32;
+    fn register_profile_row(
+        profile: i32,
+        generation: u32,
+        key: *const c_char,
+        name: *const c_char,
+        addon: *const c_char,
+        kind: *const c_char,
+        items: i32,
+        suggestion: i32,
+    ) -> i32;
+    fn discovery_test_home_loading(
+        plan: *mut NativeHomePlan,
+        work: *const NativeCatalogWork,
+        continuing: *const c_void,
+        saved: *const c_void,
+        limit: i32,
+        stats: *mut NativeLoadStats,
+    ) -> i32;
     fn catalog_runtime_test_attach(runtime: *const CatalogRuntime);
     fn catalog_runtime_step();
     fn catalog_runtime_cycle_begin();
@@ -826,4 +849,403 @@ fn the_native_profile_adapter_and_settings_counts_honor_account_sharing_flags() 
         account_ui_test_attach(std::ptr::null_mut());
         addon_registry_test_attach(std::ptr::null_mut());
     }
+}
+
+struct HomePlanGuard(*mut NativeHomePlan);
+impl Drop for HomePlanGuard {
+    fn drop(&mut self) {
+        unsafe {
+            nuvio_home_destroy(self.0);
+        }
+    }
+}
+fn home_plan(env: &Environment, work: *const NativeCatalogWork) -> HomePlanGuard {
+    std::env::set_var("NUVIO_DADOS", &env.directory.parent);
+    unsafe {
+        data_init(std::ptr::null());
+        fil_definir_perfil(0);
+        fil_definir_perfil(env.account.context.lock().unwrap().profile.get() as i32);
+    }
+    let plan = HomePlanGuard(unsafe { nuvio_home_prepare(work, None, std::ptr::null_mut()) });
+    assert!(!plan.0.is_null());
+    plan
+}
+
+#[test]
+fn rust_home_coordination_drives_actual_native_publication_with_complete_values() {
+    let env = Environment::new();
+    let work = env.job();
+    let plan = home_plan(&env, work);
+    let id = format!("provider:{}", "complete-identity".repeat(220));
+    *env.transport.body.lock().unwrap() = body(&id);
+    unsafe {
+        assert_eq!(nuvio_home_count(plan.0), 1);
+        let text = nuvio_home_text(plan.0, 0, 4);
+        assert_eq!(CStr::from_ptr(text).to_str().unwrap(), env.catalog_id);
+        nuvio_backend::ffi::nuvio_text_destroy(text);
+        let mut stats = NativeLoadStats::default();
+        assert_eq!(
+            discovery_test_home_loading(
+                plan.0,
+                work,
+                std::ptr::null(),
+                std::ptr::null(),
+                7,
+                &mut stats
+            ),
+            1
+        );
+        assert_eq!(stats.rows, 1);
+        assert_eq!(stats.requested, 1);
+        assert_eq!(current_id(), id);
+        assert_eq!(
+            CStr::from_ptr(native_catalog_row_text(0, 4))
+                .to_str()
+                .unwrap(),
+            env.catalog_id
+        );
+        let captured = Arc::from_raw(catalog_capture_scene());
+        assert_eq!(
+            captured.rows[0].record.source.as_ref().unwrap().catalog_id,
+            env.catalog_id
+        );
+        assert!(env.transport.urls.lock().unwrap()[0].as_str().len() > 2048);
+        nuvio_catalog_work_release(work);
+    }
+}
+#[test]
+fn rust_home_keeps_continue_watching_and_saved_list_owners_through_native_assembly() {
+    let env = Environment::new();
+    let work = env.job();
+    let plan = home_plan(&env, work);
+    let scene = env.load(work);
+    unsafe {
+        let source = nuvio_backend::scene_snapshot::nuvio_scene_title(scene, 0);
+        let continuing =
+            native_title_create(nuvio_backend::title_snapshot::nuvio_title_retain(source).cast());
+        let saved =
+            native_title_create(nuvio_backend::title_snapshot::nuvio_title_retain(source).cast());
+        let mut stats = NativeLoadStats::default();
+        assert_eq!(
+            discovery_test_home_loading(plan.0, work, continuing, saved, 7, &mut stats),
+            1
+        );
+        assert_eq!(stats.rows, 1);
+        assert_eq!(
+            CStr::from_ptr(native_catalog_row_text(0, 0))
+                .to_str()
+                .unwrap(),
+            "continue_watching"
+        );
+        assert_eq!(
+            CStr::from_ptr(native_catalog_row_text(1, 4))
+                .to_str()
+                .unwrap(),
+            env.catalog_id
+        );
+        native_title_destroy(continuing);
+        native_title_destroy(saved);
+        nuvio_backend::title_snapshot::nuvio_title_release(source);
+        nuvio_backend::scene_snapshot::nuvio_scene_release(scene);
+        let captured = Arc::from_raw(catalog_capture_scene());
+        assert!(captured.titles.len() >= 2);
+        assert_eq!(captured.rows[1].record.titles.start, 1);
+        assert_eq!(captured.titles[0].record.metadata.id, "profile-one");
+        assert!(captured
+            .titles
+            .iter()
+            .any(|title| title.record.on_watchlist));
+        nuvio_catalog_work_release(work);
+    }
+}
+#[test]
+fn a_home_plan_is_bound_to_its_profile_and_manifest_declarations() {
+    let env = Environment::new();
+    let a = env.job();
+    let plan = home_plan(&env, a);
+    let source = env.addons.snapshot();
+    let changed =
+        Manifest::decode(br#"{"id":"provider","name":"Provider","resources":[],"catalogs":[]}"#)
+            .unwrap();
+    env.addons
+        .attach_manifest(
+            source.addons.context.as_ref().unwrap(),
+            &env.account.addons[0].url,
+            changed,
+        )
+        .unwrap();
+    unsafe extern "C" fn count_publications(
+        _: *const SceneSnapshot,
+        _: i32,
+        _: *const NativeLoadStats,
+        context: *mut c_void,
+    ) -> i32 {
+        *unsafe { &mut *context.cast::<usize>() } += 1;
+        1
+    }
+    let mut publications = 0usize;
+    unsafe {
+        assert_eq!(
+            nuvio_home_load(
+                plan.0,
+                a,
+                7,
+                24,
+                Some(count_publications),
+                (&mut publications as *mut usize).cast(),
+                std::ptr::null_mut()
+            ),
+            0,
+            "a changed manifest must invalidate the old candidate plan"
+        );
+    }
+    assert_eq!(publications, 0);
+    env.activate(2);
+    unsafe {
+        catalog_runtime_step();
+    }
+    let b = env.job();
+    unsafe {
+        assert_eq!(
+            nuvio_home_load(
+                plan.0,
+                b,
+                7,
+                24,
+                Some(count_publications),
+                (&mut publications as *mut usize).cast(),
+                std::ptr::null_mut()
+            ),
+            0,
+            "a foreign profile job cannot reuse the old plan"
+        );
+        assert_eq!(publications, 0);
+        assert_eq!(cat_n(), 0);
+        nuvio_catalog_work_release(a);
+        nuvio_catalog_work_release(b);
+    }
+}
+
+#[test]
+fn a_delayed_rust_home_publication_is_rejected_after_native_profile_switch() {
+    let env = Environment::new();
+    let work = env.job();
+    let plan = home_plan(&env, work);
+    env.transport.gate.lock().unwrap().0 = true;
+    let plan_ptr = plan.0 as usize;
+    let work_ptr = work as usize;
+    let running = std::thread::spawn(move || unsafe {
+        let mut stats = NativeLoadStats::default();
+        discovery_test_home_loading(
+            plan_ptr as *mut NativeHomePlan,
+            work_ptr as *const NativeCatalogWork,
+            std::ptr::null(),
+            std::ptr::null(),
+            7,
+            &mut stats,
+        )
+    });
+    wait(|| env.transport.gate.lock().unwrap().1);
+    env.activate(2);
+    unsafe {
+        catalog_runtime_step();
+        assert_eq!(cat_n(), 0);
+    }
+    {
+        let mut gate = env.transport.gate.lock().unwrap();
+        gate.0 = false;
+        env.transport.ready.notify_all();
+    }
+    assert_eq!(running.join().unwrap(), 0);
+    unsafe {
+        assert_eq!(cat_n(), 0);
+        nuvio_catalog_work_release(work);
+    }
+}
+
+#[test]
+fn the_home_row_editor_rejects_registration_from_an_older_profile_activation() {
+    let env = Environment::new();
+    let work = env.job();
+    let _plan = home_plan(&env, work);
+    unsafe {
+        let generation = fil_perfil_geracao();
+        fil_definir_perfil(2);
+        let before = fil_n();
+        let text = CString::new("old-profile-row").unwrap();
+        assert_eq!(
+            register_profile_row(
+                1,
+                generation,
+                text.as_ptr(),
+                text.as_ptr(),
+                text.as_ptr(),
+                text.as_ptr(),
+                0,
+                0
+            ),
+            0
+        );
+        assert_eq!(fil_n(), before);
+        fil_definir_perfil(1);
+        assert_eq!(
+            register_profile_row(
+                1,
+                generation,
+                text.as_ptr(),
+                text.as_ptr(),
+                text.as_ptr(),
+                text.as_ptr(),
+                0,
+                0
+            ),
+            0
+        );
+        let current = fil_n();
+        assert_eq!(
+            register_profile_row(
+                1,
+                fil_perfil_geracao(),
+                text.as_ptr(),
+                text.as_ptr(),
+                text.as_ptr(),
+                text.as_ptr(),
+                0,
+                0
+            ),
+            1
+        );
+        assert_eq!(fil_n(), current + 1);
+        nuvio_catalog_work_release(work);
+    }
+}
+
+#[test]
+fn a_fresh_rust_home_fetches_and_parses_the_manifest_before_catalog_loading() {
+    let env = Environment::new();
+    env.addons.forget_runtime();
+    let context = env.addons.activate(false).unwrap();
+    env.addons.synchronize(&context).unwrap();
+    *env.transport.body.lock().unwrap()=json!({"id":"provider","name":"Provider","resources":["catalog"],"catalogs":[{"type":"movie","id":env.catalog_id,"name":"Complete catalog"}]}).to_string().into_bytes();
+    unsafe {
+        catalog_runtime_step();
+    }
+    let work = env.job();
+    let plan = home_plan(&env, work);
+    assert_eq!(unsafe { nuvio_home_count(plan.0) }, 1);
+    assert!(env
+        .transport
+        .urls
+        .lock()
+        .unwrap()
+        .iter()
+        .any(|url| url.path().ends_with("manifest.json")));
+    *env.transport.body.lock().unwrap() = body("fresh-home-title");
+    unsafe {
+        let mut stats = NativeLoadStats::default();
+        assert_eq!(
+            discovery_test_home_loading(
+                plan.0,
+                work,
+                std::ptr::null(),
+                std::ptr::null(),
+                7,
+                &mut stats
+            ),
+            1
+        );
+        assert_eq!(current_id(), "fresh-home-title");
+        nuvio_catalog_work_release(work);
+    }
+}
+#[test]
+fn a_manifest_outage_preserves_the_private_home_scene_through_the_native_adapter() {
+    let env = Environment::new();
+    let first = env.job();
+    let scene = env.load(first);
+    unsafe {
+        env.publish(first, scene);
+        nuvio_backend::scene_snapshot::nuvio_scene_release(scene);
+        nuvio_catalog_work_release(first);
+    }
+    env.addons.forget_runtime();
+    let context = env.addons.activate(false).unwrap();
+    env.addons.synchronize(&context).unwrap();
+    *env.transport.body.lock().unwrap() = b"malformed manifest".to_vec();
+    env.transport.urls.lock().unwrap().clear();
+    unsafe {
+        catalog_runtime_step();
+    }
+    let work = env.job();
+    let plan = home_plan(&env, work);
+    unsafe {
+        let mut stats = NativeLoadStats::default();
+        assert_eq!(
+            discovery_test_home_loading(
+                plan.0,
+                work,
+                std::ptr::null(),
+                std::ptr::null(),
+                7,
+                &mut stats
+            ),
+            1
+        );
+        assert_eq!(stats.rows, 1);
+        assert_eq!(current_id(), "profile-one");
+        assert!(env
+            .transport
+            .urls
+            .lock()
+            .unwrap()
+            .iter()
+            .all(|url| url.path().ends_with("manifest.json")));
+        nuvio_catalog_work_release(work);
+    }
+}
+#[test]
+fn native_channel_registration_does_not_enable_unselected_tv_rows_on_later_refreshes() {
+    let env = Environment::new();
+    let source = env.addons.snapshot();
+    let manifest=Manifest::decode(json!({"id":"provider","resources":["catalog"],"catalogs":[{"type":"channel","id":"live","name":"TV channels"},{"type":"movie","id":env.catalog_id,"name":"Movies"}]}).to_string().as_bytes()).unwrap();
+    env.addons
+        .attach_manifest(
+            source.addons.context.as_ref().unwrap(),
+            &env.account.addons[0].url,
+            manifest,
+        )
+        .unwrap();
+    for _ in 0..2 {
+        let work = env.job();
+        let plan = home_plan(&env, work);
+        unsafe {
+            let mut stats = NativeLoadStats::default();
+            assert_eq!(
+                discovery_test_home_loading(
+                    plan.0,
+                    work,
+                    std::ptr::null(),
+                    std::ptr::null(),
+                    7,
+                    &mut stats
+                ),
+                1
+            );
+            assert_eq!(stats.rows, 1);
+            assert_eq!(
+                CStr::from_ptr(native_catalog_row_text(0, 4))
+                    .to_str()
+                    .unwrap(),
+                env.catalog_id
+            );
+            nuvio_catalog_work_release(work);
+        }
+    }
+    assert!(env
+        .transport
+        .urls
+        .lock()
+        .unwrap()
+        .iter()
+        .all(|url| !url.path().contains("/channel/")));
 }

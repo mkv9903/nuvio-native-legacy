@@ -14,7 +14,7 @@ use std::{
     sync::{Arc, Mutex, OnceLock},
 };
 
-fn state() -> &'static HomeOrderState {
+pub(crate) fn state() -> &'static HomeOrderState {
     static STATE: OnceLock<HomeOrderState> = OnceLock::new();
     STATE.get_or_init(HomeOrderState::default)
 }

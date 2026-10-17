@@ -266,6 +266,10 @@ void fil_registrar(const char *chave, const char *titulo,
 // descoberta.c nao leu nesta volta (issue #126, Ultra MAX com 174 catalogos e
 // 32 de cota): eles entram na lista para a pessoa poder escolher um, e escolher
 // e o que faz a cota da volta seguinte le-lo. Nao valem a vaga de ninguem.
+/* Background discovery cannot register rows in a later profile activation. */
+int register_profile_row(int profile, unsigned generation, const char *key, const char *name,
+                         const char *addon, const char *media_type, int items, int suggestion);
+
 void fil_registrar_se_couber(const char *chave, const char *titulo,
                              const char *addon, const char *conteudo);
 

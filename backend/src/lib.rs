@@ -23,6 +23,8 @@ pub mod content_context;
 pub mod controller;
 pub mod error;
 pub mod ffi;
+pub mod home_loading;
+pub mod home_loading_ffi;
 pub mod home_order_backend;
 pub mod home_order_controller;
 pub mod http;
