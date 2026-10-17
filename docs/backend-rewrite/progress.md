@@ -66,3 +66,9 @@ and saved data, subtitle services, tracking integrations, Live TV/EPG and remain
 settings/utilities. Dependency findings may change this order. Review each
 area's features with the user before implementation and pause for feature
 decisions, even when the implementation recommendation is straightforward.
+
+
+The next [search and expanded-catalog inventory](search-and-catalogs.md) is ready.
+The two feature groups have been presented to the user; implementation is paused
+for the keep/remove answers. This inventory does not change application behavior
+or increase the completion estimate.
