@@ -19,7 +19,7 @@
 #include "salvosorg.h"
 #include "salvos.h"
 #include "fontepref.h"
-#include "buscasrec.h"
+#include "search_history.h"
 #include "trakt.h"
 #include "traktauth.h"
 #include "catalogo.h"
@@ -1418,10 +1418,8 @@ void sync_esquecer_usuario(void) {
   // E A ARTE ESCOLHIDA A MAO (#142): diz o que a pessoa abriu e guardou, e
   // sem esta linha a proxima conta herdaria as fotos de quem saiu.
   arteesc_esquecer();
-  // E AS BUSCAS RECENTES. Nao sobem para a conta (sao deste aparelho), mas sao
-  // o que a pessoa procurou — a proxima a entrar abriria a Busca com a lista
-  // de quem saiu nas pilulas, a um OK de refazer cada uma.
-  buscasrec_esquecer();
+  /* Device-local recent queries are private to the account that is signing out. */
+  search_history_logout();
   free(bibBlob);    bibBlob = NULL;    temBibBlob = 0;
   free(vistosBlob); vistosBlob = NULL; temVistosBlob = 0;
   // A cycle completed just before logout must not publish old collections

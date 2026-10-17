@@ -9,7 +9,6 @@
 #define NV_BUSCA_H
 #include <SDL2/SDL.h>
 #include "home.h"
-#include "spotlight.h"
 
 int  busca_iniciar(void);
 void busca_evento(const SDL_Event *e);
@@ -26,11 +25,6 @@ void busca_encerrar(void);
 // `indiceCatalogo` o indice em cat_item(). Consome o pedido, como
 // home_pediu_abrir.
 int  busca_pediu_abrir(int *indiceCatalogo);
-
-// OK sobre uma PESSOA da fileira de Pessoas: devolve 1 UMA vez e escreve o mesmo
-// pedido que o Spotlight devolve (SPOT_PESSOA), para o app abrir a filmografia
-// pelo mesmo caminho.
-int  busca_pediu_pessoa(SpotPedido *p);
 
 // Poster em foco com o retangulo que ele ocupa na tela NESTE quadro, no mesmo
 // formato que a home entrega — e o que detail_abrir precisa para o card voar

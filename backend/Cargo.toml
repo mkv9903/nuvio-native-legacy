@@ -27,6 +27,7 @@ uuid = { version = "=1.11.1", features = ["v4", "serde"] }
 zeroize = "=1.8.1"
 libc = "=0.2.190"
 ring = "=0.17.14"
+unicode-normalization = "=0.1.24"
 
 [profile.release]
 panic = "abort"

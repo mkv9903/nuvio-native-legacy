@@ -214,3 +214,12 @@ void native_title_reset_undo(void) {
   action_notice_clear();
   free(executed_id); executed_id = NULL; executed_intent = 0; executions = 0;
 }
+
+void native_search_test_seed(const CatItem *title) {
+  CatFileira row = {0};
+  snprintf(row.chave,sizeof row.chave,"search-fixture-movies");
+  snprintf(row.titulo,sizeof row.titulo,"Movies");
+  snprintf(row.tipo,sizeof row.tipo,"movie");
+  row.n = title ? 1 : 0;
+  cat_definir_tudo(title,title ? 1 : 0,title ? &row : NULL,title ? 1 : 0);
+}

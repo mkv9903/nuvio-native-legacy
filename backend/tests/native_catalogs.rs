@@ -217,6 +217,11 @@ impl Environment {
             catalog_runtime_step();
         }
         wait(|| !env.runtime.scenes.needs_restore());
+        // An initial frame can be superseded by the asynchronous restore.
+        // Pump the next frame, as the real app does, before using its view.
+        unsafe {
+            catalog_runtime_step();
+        }
         env
     }
     fn activate(&self, profile: u32) {

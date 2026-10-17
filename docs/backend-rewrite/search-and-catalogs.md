@@ -1,7 +1,9 @@
 # Search and expanded catalog browsing
 
-Feature review requested on 2026-10-17. Implementation has not started; wait for
-the user's keep/remove answers. The application checkpoint remains `78137d87`,
+Feature review completed on 2026-10-17. The user removed People search from
+both Search and Spotlight, and kept all reviewed expanded-browsing features.
+Retain the remaining Search features, Details cast information and filmography
+navigation. Implementation is now in progress. The application checkpoint remains `78137d87`,
 with its package and validation recorded in [Home coordination](home-coordination.md).
 
 ## Existing features for review
@@ -9,14 +11,16 @@ with its package and validation recorded in [Home coordination](home-coordinatio
 Search combines built-in Nuvio movie/series catalogs, optional Cinemeta fallback
 and installed addon catalogs that declare search support. It also matches titles
 already loaded locally. Results arrive progressively in catalog/provider rows,
-with a Best Result card. Short/empty queries show Popular suggestions. People
-results combine matching loaded cast with the shared TMDb person-search service;
-selecting a person opens the existing filmography flow.
+with a Best Result card. Short/empty queries show Popular suggestions. The
+former People results (loaded cast and TMDb person-name search) are removed
+from both search surfaces. Details cast and filmography navigation remain.
 
 The device remembers ten confirmed searches per profile, newest first. Repeated
 queries move to the front; individual removal and clear-all are supported, and
-logout removes history. The current C history uses byte-sized buffers and old
-text files; none of those files will be imported by the Rust implementation.
+logout removes history. Recent-query storage and text normalization now run in
+Rust through both retained C screens. The discarded C text files are never read.
+Provider search, query-input ownership, grouped result assembly and expanded
+browsing are still C services awaiting their next integration step.
 
 Expanded browsing supports addon catalogs, genre filters and near-end page
 loading. It deduplicates overlapping pages, stops on confirmed exhaustion, retains
@@ -32,7 +36,7 @@ provider IDs and query text remain data; providers receive the original query,
 while local matching uses normalized text. UI appearance and navigation are not
 redesigned in this milestone.
 
-## Proposed Rust boundary, subject to the feature answers
+## Approved Rust boundary
 
 Move search target discovery and eligibility, query state, provider requests,
 parsing, grouped immutable results, local matching and recent-query storage into
@@ -41,8 +45,8 @@ native actions/views. Bound background workers and completed replies for the TV.
 Profile, addon, query and request generations must reject obsolete results.
 
 Move expanded-list state, source identity, pagination, duplicate handling,
-retry/end status, genre encoding and ordering into Rust. If retained, include the
-TMDb/Trakt browsing requests and person-search requests used by these flows;
+retry/end status, genre encoding and ordering into Rust. Include the
+TMDb/Trakt browsing requests used by these flows;
 this does not complete their broader tracking/enrichment integrations. Retained
 Details and collection services can consume complete Rust records until their
 own rewrites. Translate each complete touched C UI component while preserving
@@ -77,3 +81,63 @@ ownership and guarded publication foundations rather than copying C parsers.
 
 Run the relevant Rust, native, memory and Linux checks for the completed area,
 push tested checkpoints, then build the isolated package before a manual handoff.
+
+## Integrated text and recent-query checkpoint
+
+The original People/name-search service and its network requests are removed
+from Search and Spotlight. Cast metadata and the cast-to-filmography action in
+Details remain. The other reviewed browsing features remain enabled.
+
+Rust's UTF-8 decoder and the pinned `unicode-normalization` crate replace the
+custom C decoding/folding table. Original provider query text remains distinct
+from the local matching key. Latin accents and casing fold for local matching;
+other scripts retain their characters. Invalid input bytes become spaces, and
+native output copies stop at a complete character. The crate's
+[upstream manifest](https://github.com/unicode-rs/unicode-normalization/blob/v0.1.24/Cargo.toml)
+declares a Rust-only dependency path and a minimum Rust version below the TV's
+Rust 1.85.1 toolchain; the final ARM build also verifies the selected lockfile.
+
+`SearchHistoryRuntime` owns account/owner/selected-profile history and a single
+serial storage worker. Rendering reads immutable native snapshots. A switch
+immediately selects that profile's memory cache or an empty view while its Rust
+JSON loads. Confirmed edits made during restoration merge in order, including
+clear/remove. An outgoing profile's unsaved history remains in its own scope.
+Logout cancels obsolete writes and queues deletion ahead of any new-session
+loads. Normal shutdown drains confirmed edits. A damaged Rust history file is
+retained for retry rather than silently overwritten; pending edits remain in
+memory. No original-app files or discarded rewrite files are imported.
+
+The recent-query C component has English names, comments and visible controls,
+with its original chip geometry, animations and remote actions retained. The
+rest of each Search screen will receive its complete component translation as
+its query/results backend is integrated. The Rust store has no old 47-byte
+query limit; the retained C query-entry fields still have their original display
+limits and will be replaced during that integration. Native projections must
+never cut a UTF-8 character when displaying/replaying a history query.
+
+`tests/buscanorm.c` and `tests/buscasrec.c` are replaced by Rust text, history and
+worker tests. Additional cases cover canonical Unicode deduplication, full
+queries, private versioned JSON, account/owner/profile isolation, ignored old
+files, corrupt envelopes, guarded writes, restoration races, edits during a
+write, logout during a write and normal shutdown. Rust native drivers exercise
+the real C Search/Spotlight builders and history actions. Retained screenshot
+fixtures continue checking C navigation and rendering against Rust history.
+
+The native catalog fixture now pumps the next C frame after asynchronous scene
+restoration: a safely rejected superseded frame must not be mistaken for a
+published view. This is a fixture timing correction, with production publication
+guards unchanged.
+
+### Focused manual checks
+
+Run `bash tools/linux.sh` with the Rust Test account; use normal account mode
+for history/profile checks. Search for a movie and a series, enter results,
+open Details and return. Clear the query and replay a recent search; remove one
+with hold-OK and clear the list. Restart to confirm history persistence. Repeat
+in another profile and verify that histories stay separate.
+
+Search a cast member's name in both Search and Spotlight: no People category
+or person result should appear. Open a title's Details cast list and its actor's
+filmography to verify the retained action. Title matches with the same name may
+still appear as ordinary titles. The existing collection tabs, genre selection,
+See All paging, retry and returning to the same position remain available.

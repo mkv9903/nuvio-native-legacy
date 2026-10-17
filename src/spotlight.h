@@ -7,7 +7,7 @@
 // direita, que muda A CADA LETRA. Os resultados vem agrupados — melhor
 // resultado em destaque, Titulos, Pessoas, Colecoes, Canais, Catalogos e
 // Addons — e com o campo vazio a lista mostra as PESQUISAS RECENTES do perfil
-// (as mesmas de buscasrec.h, que a tela de Busca usa) e "Em alta".
+// (as mesmas de search_history.h, que a tela de Busca usa) e "Em alta".
 //
 // QUEM ABRE (pesquisa de 01/10/2026):
 //   - Android TV: KEYCODE_SEARCH (84), que e o que o botao de microfone da
@@ -104,9 +104,7 @@ void spot_veu(void);
 enum {
   SPOT_NADA = 0,
   SPOT_TITULO,      // indice = indice no catalogo
-  SPOT_PESSOA,      // indice = titulo de onde a pessoa veio (-1 = veio do
-                    // TMDB: abre por tituloTmdb/tituloTipo); tmdb/nome/arte
-  SPOT_COLECAO,     // indice = col_folder(indice)
+  SPOT_COLECAO = 3,     // indice = col_folder(indice)
   SPOT_CANAL,       // id/nome/base do canal (guia_item_do_canal)
   SPOT_CATALOGO,    // indice = cat_fileira(indice)
   SPOT_ADDONS,      // abre a tela de Addons
@@ -115,9 +113,6 @@ enum {
 typedef struct {
   int  tipo;
   int  indice;
-  long tmdb;
-  long tituloTmdb;
-  char tituloTipo[8];
   char id[80];
   char nome[140];
   char arte[512];

@@ -1332,14 +1332,6 @@ void detail_fechar_seco(void) {
   t = 0.0f;
 }
 
-void detail_mostrar_pessoa(long tmdb, const char *nome, const char *foto) {
-  if (!aberto || tmdb <= 0) return;
-  pessoa_pedir(tmdb, nome ? nome : "", foto ? foto : "");
-  pessoaAberta = 1;
-  pessoaFoco = 0;
-  pessoaLinha = 0;
-}
-
 void detail_abrir(const HomeItem *it) {
   int replacing = aberto && !saindo;
   if (!replacing) { nVolta = 0; voltando = 0; }

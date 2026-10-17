@@ -87,9 +87,8 @@ int ctxlista_abrir(int idx, GfxRect r, const char *arte) {
   return ctx_aberto();
 }
 
-// O pedido que espera o meta. Vale SPOT_PESSOA_PRAZO_MS (app.c): um titulo que
-// chegue depois disso e outro pedido, e abrir um menu que ninguem espera seria
-// pior que nao abrir.
+/* A pending menu request expires after twenty seconds. A later metadata
+ * result belongs to another interaction and must not reopen the old menu. */
 #define CTXL_PRAZO_MS 20000u
 static struct { int vivo; Uint32 desde; GfxRect r; char arte[1024]; } pend;
 

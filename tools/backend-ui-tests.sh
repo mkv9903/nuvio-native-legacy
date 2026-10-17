@@ -16,4 +16,4 @@ export RUSTFLAGS="${RUSTFLAGS:-} -L native=$directory -C link-arg=-Wl,--export-d
 export NUVIO_UI_TEST_CAPTURE_DIR="$directory/screens"
 mkdir -p "$NUVIO_UI_TEST_CAPTURE_DIR"
 cd backend
-xvfb-run -a -s '-screen 0 1920x1080x24' cargo test --locked --features native-ui-tests --test native_ui --test native_addons --test native_home_order --test native_titles --test native_scene_capture --test native_catalogs -- --test-threads=1
+xvfb-run -a -s '-screen 0 1920x1080x24' cargo test --locked --features native-ui-tests --test native_ui --test native_addons --test native_home_order --test native_titles --test native_scene_capture --test native_catalogs --test native_search_ui -- --test-threads=1

@@ -409,3 +409,33 @@ fixture has the maintenance limitation recorded in the linked inventory.
 The follow-up preserves declaration-order persistence independently of successful
 scene rows. It adds a retry regression and three storage cases, and extends the
 native complete-value assertion to verify runtime wiring of the saved plan.
+
+## Search text, recent queries and removal of People search
+
+The first integrated Search checkpoint passes 234 Rust backend cases and 55
+native integration cases. Nine Rust text tests replace `buscanorm.c`; six history
+model/store tests and five worker tests replace `buscasrec.c` and extend its
+coverage. The real C Search/Spotlight consumers now use Rust normalization and
+Rust-owned per-profile recent-query snapshots. The custom C decoder, text-file
+history store and People/name-search service are removed.
+
+Two new Rust native cases verify both search surfaces omit cast/person results,
+still select titles and preserve Details cast metadata. They also drive the
+actual C history actions with a Rust context and private store, including full
+Unicode queries, immediate selected-profile isolation, removal, clear and
+logout. The retained C Search/Spotlight visual fixtures keep navigation and
+rendering assertions, with test-only Rust history accounts excluded from app
+builds. Existing account, addon, Home, title ownership and native screen cases
+still pass. Retained C sync-order and offline-account suites pass after adapting
+their logout double to the new history boundary.
+
+A native catalog fixture now pumps the next frame after background restoration
+finishes. Restoration can supersede a frame's captured revision, so that frame
+is correctly rejected; a running app would publish it on its next frame. This
+fixture correction does not weaken production generation checks.
+
+Linux build and normal startup/clean shutdown pass with disposable Rust Test
+data. Final visual, ASan/UBSan and ARM/package verification is recorded with the
+package checkpoint in [Search and expanded browsing](search-and-catalogs.md).
+Provider-query scheduling, grouped results and expanded browsing remain C and
+are not counted as rewritten by these text/history tests.

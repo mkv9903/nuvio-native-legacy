@@ -36,7 +36,7 @@
 #define TRA_FLUXO_LEGADO "trakt-fluxo.txt"
 #define TRA_ARQ_FMT      "trakt-p%d.txt"
 #define TRA_FLUXO_FMT    "trakt-fluxo-p%d.txt"
-// Quantos perfis o logout varre. Mesmo teto de fontepref/buscasrec (o dobro
+// Quantos perfis o logout varre. Mesmo teto de fontepref (o dobro
 // de CONTA_PERFIL_MAX): dados_apagar em arquivo que nao existe custa nada.
 #define TRA_PERFIS 16
 #define TRA_BASE "https://api.trakt.tv"

@@ -18,7 +18,7 @@ but they do not make their remaining C service implementations complete.
 | Account Home ordering and preferences | Rust backend integrated; local row registry remains C |
 | Home catalog title/row models, ownership and private scene JSON | Rust backend integrated |
 | Home request scheduling and row assembly | Rust planning, bounded loading and catalog assembly integrated; C service contributions retained |
-| Search and expanded catalog browsing | C backend remains |
+| Search and expanded catalog browsing | Rust text and per-profile recent-query storage integrated; provider search and expanded browsing remain C |
 | Details metadata, episodes and enrichment/artwork services | C services remain; complete title models and rating helper are Rust |
 | Playback source aggregation and selection rules | C backend using Rust-owned addon data |
 | Subtitle fetching, parsing and synchronization | C backend using Rust-owned addon data |
@@ -69,6 +69,9 @@ decisions, even when the implementation recommendation is straightforward.
 
 
 The next [search and expanded-catalog inventory](search-and-catalogs.md) is ready.
-The two feature groups have been presented to the user; implementation is paused
-for the keep/remove answers. This inventory does not change application behavior
-or increase the completion estimate.
+The user removed People search from both Search and Spotlight, kept Details cast
+and filmography navigation, and kept all reviewed expanded-browsing features.
+The next milestone is in progress. Rust text handling and per-profile recent-query
+storage now feed both C search interfaces, and People search is removed. Provider
+search, query ownership, grouped results and expanded browsing remain pending.
+This smaller integrated area does not change the approximate 30% estimate.

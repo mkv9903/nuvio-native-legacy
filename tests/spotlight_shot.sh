@@ -1,12 +1,11 @@
-#!/bin/bash
-# Capturas do Spotlight (src/spotlight.c) para revisao visual, com as
-# conferencias de comportamento do .c (filtro, pedido, recentes, Voltar).
-#
-#   bash tests/spotlight_shot.sh /tmp/nuvio-spotlight
-#
-# Nao entra na suite (tools/test-all.sh pula *_shot.sh): precisa de janela GL.
+#!/usr/bin/env bash
+# Exercise retained C search navigation and appearance with the real Rust history.
 set -eu
 cd "$(dirname "$0")/.."
+export CARGO_TARGET_DIR="$PWD/build/backend/ui-target"
+cargo build --locked --manifest-path backend/Cargo.toml --features native-ui-tests
+export NUVIO_TEST_BACKEND_LIB="$CARGO_TARGET_DIR/debug/libnuvio_backend.a"
+source tools/test-support.sh
 IMAGE_TOOL="$(command -v magick || command -v convert)"
 saida="${1:-/tmp/nuvio-spotlight}"
 tmp="$(mktemp -d "${TMPDIR:-/tmp}/nuvio-spot-shot-XXXXXX")"
@@ -20,7 +19,7 @@ for source in src/*.c; do
   sources+=("$source")
 done
 cc "${sources[@]}" tests/spotlight_shot.c -Isrc -o "$tmp/shot" -O1 -g \
-  -DNV_LINUX_DESKTOP $(pkg-config --cflags sdl2 SDL2_image SDL2_ttf)   \
+  -DNV_LINUX_DESKTOP -DNV_NATIVE_UI_TEST '-DNV_APP_ID="space.mkv.nuvio.rusttest"' $(pkg-config --cflags sdl2 SDL2_image SDL2_ttf)   \
   -lSDL2 -lSDL2_image -lSDL2_ttf -lz $(pkg-config --libs glesv2 egl) -ldl -pthread -lm \
   -Wno-deprecated-declarations -Wno-macro-redefined
 NUVIO_DADOS="$dados" SPOT_CANAIS_BASE="http://127.0.0.1:8767" "$tmp/shot" "$saida"

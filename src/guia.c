@@ -71,7 +71,7 @@
 #include "streams.h"    /* Stream: url do preview vinda do fio */
 #include "livetv_regras.h" /* variantes FHD/HD/SD do mesmo canal */
 #include "teclado.h"       /* a busca do guia */
-#include "buscanorm.h"     /* guia_buscar_canais (Spotlight) */
+#include "search_text.h"     /* guia_buscar_canais (Spotlight) */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -4234,7 +4234,7 @@ int guia_buscar_canais(const char *alvoNorm, int *indices, int max) {
   // cacheLer); o fio de carga mexe em sCanais. Ter canal basta.
   if (nCanais < 1) return 0;
   for (i = 0; i < nCanais && n < max; i++) {
-    busca_normalizar(canais[i].nome, nome, sizeof nome);
+    search_normalize(canais[i].nome, nome, sizeof nome);
     if (strstr(nome, alvoNorm)) indices[n++] = i;
   }
   return n;

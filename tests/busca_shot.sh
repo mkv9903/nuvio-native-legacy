@@ -1,13 +1,15 @@
-#!/bin/bash
-# Capturas da Busca para revisao visual. A compilacao exclui novidades1312.c
-# porque o pacote de trabalho atual tem esse arquivo em edicao por outro agente;
-# os simbolos da tela ficam neutros neste harness e nenhuma fonte e revertida.
+#!/usr/bin/env bash
+# Exercise retained C search navigation and appearance with the real Rust history.
 set -eu
 cd "$(dirname "$0")/.."
+export CARGO_TARGET_DIR="$PWD/build/backend/ui-target"
+cargo build --locked --manifest-path backend/Cargo.toml --features native-ui-tests
+export NUVIO_TEST_BACKEND_LIB="$CARGO_TARGET_DIR/debug/libnuvio_backend.a"
+source tools/test-support.sh
 IMAGE_TOOL="$(command -v magick || command -v convert)"
 saida="${1:-/tmp/nuvio-busca}"
 tmp="$(mktemp -d "${TMPDIR:-/tmp}/nuvio-busca-shot-XXXXXX")"
-trap 'rm -rf "$tmp"' EXIT
+trap 'rm -rf "$tmp" "${dados:-}"' EXIT
 sources=()
 for source in src/*.c; do
   [ "$source" = "src/main.c" ] && continue
@@ -16,7 +18,7 @@ for source in src/*.c; do
 done
 cc "${sources[@]}" tests/busca_shot.c -x c - -Isrc -o "$tmp/shot" \
   -DNV_TRAKT_CLIENT_ID='"chave-de-teste"' -O1 -g \
-  -DNV_LINUX_DESKTOP $(pkg-config --cflags sdl2 SDL2_image SDL2_ttf)   \
+  -DNV_LINUX_DESKTOP -DNV_NATIVE_UI_TEST '-DNV_APP_ID="space.mkv.nuvio.rusttest"' $(pkg-config --cflags sdl2 SDL2_image SDL2_ttf)   \
   -lSDL2 -lSDL2_image -lSDL2_ttf -lz $(pkg-config --libs glesv2 egl) -ldl -pthread -lm \
   -Wno-deprecated-declarations -Wno-macro-redefined <<'EOF'
 int novidades1312_aberto(void) { return 0; }

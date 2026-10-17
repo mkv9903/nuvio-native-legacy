@@ -20,26 +20,21 @@
 // AS FONTES SAO AS QUE O APP JA TEM, nenhuma rede nova:
 //   - titulos: o catalogo em memoria (as fileiras da home) + desc_buscar, a
 //     mesma busca nos addons da tela de Busca;
-//   - pessoas: o ELENCO dos titulos ja carregados (CatItem.elenco), com o id do
-//     TMDB que abre a filmografia, e depois o /search/person do TMDB
-//     (spotpessoa.h) — com debounce, um pedido quando o texto para, nunca um
-//     por letra. A do elenco vem antes: e da biblioteca do dono;
 //   - colecoes (pastas), canais da Live TV (lista publicada do guia),
 //     catalogos (titulos das fileiras) e addons instalados.
-//   Fora isso so a busca nos addons (desc_buscar) e a de pessoas vao a rede.
+// Only title-provider search uses the network in this overlay.
 //
 // CUSTO (60 fps na C9): remontar so roda quando o texto muda ou a resposta da
 // rede chega, nunca por quadro. O desenho e um veu, um painel e no maximo
 // ~12 linhas visiveis; com a entrada assentada app.c congela o fundo numa
 // copia (como o painel de Salvos), e o quadro passa a ser copia + painel.
 #include "spotlight.h"
-#include "buscasrec.h"
-#include "buscanorm.h"
+#include "search_history.h"
+#include "search_text.h"
 #include "catalogo.h"
 #include "descoberta.h"
 #include "colecoes.h"
 #include "guia.h"
-#include "spotpessoa.h"
 #include "addons.h"
 #include "teclado.h"
 #include "gfx.h"
@@ -111,10 +106,10 @@ static float spBW = SP_BW_BASE;
 #define SP_LISTA_X0  (SP_BX + SP_ILHA_PAD)            // sem o teclado do app
 #define SP_LISTA_X1  (SP_KB_X + SP_KB_W + 44.0f)     // com ele
 #define SP_LISTA_XF  (SP_BX + SP_BW - SP_ILHA_PAD)
-#define SP_MAX_TXT   48             // = BUSCASREC_TERMO
+#define SP_MAX_TXT   48             // Retained keyboard display buffer; Rust history has full queries.
 #define SP_MAX_LIN   48
 #define SP_KB_MAX_FIL 8
-#define SP_MAX_RECENTES 4
+#define QUICK_SEARCH_RECENT_LIMIT 4
 // A mola da ilha (ilha.c): subamortecida, o corpo passa um pouco e volta.
 #define SP_MOLA_W    10.0f
 #define SP_MOLA_Z    0.72f
@@ -125,13 +120,12 @@ enum {
   L_AVISO,        // "Buscando...", "Nada encontrado" (nao focavel)
   L_TOPO,         // melhor resultado
   L_TITULO,
-  L_PESSOA,
-  L_COLECAO,
+  L_COLECAO = 5,
   L_CANAL,
   L_CATALOGO,
   L_ADDON,
-  L_RECENTE,
-  L_LIMPAR,
+  ROW_RECENT_QUERY,
+  ROW_CLEAR_RECENT,
   L_AJUSTE,
 };
 // Alturas SEM vao entre as linhas, como as .row do mockup: o melhor resultado
@@ -141,10 +135,7 @@ static const float ALTURA[] = { 50, 64, 172, 86, 86, 86, 86, 72, 72, 64, 64, 80 
 typedef struct {
   int  tipo;
   int  ref;          // indice de catalogo / pasta / canal / fileira / addon / termo
-  int  ref2;         // pessoa: indice do titulo de onde ela veio
-  long tmdb;
-  long tituloTmdb;   // pessoa do TMDB: o titulo pelo qual a filmografia abre
-  char tituloTipo[8];
+  int  ref2;         // Secondary settings-match flags.
   char t1[160];
   char t2[200];
   char arte[1024];
@@ -178,8 +169,8 @@ static int   kbF, kbC;             // tecla focada
 static char  consulta[SP_MAX_TXT];
 static int   nConsulta;
 static char  montada[SP_MAX_TXT];  // consulta da ultima remontagem
+static uint64_t last_history_revision;
 static int   ultimoRemoto = -1, ultimoBuscando = -1, ultimaGeracao = -1;
-static unsigned ultimaGerPessoa;
 static float scrollY, scrollAlvo, velY;
 static float animTecla[SP_KB_MAX_FIL + 1][SP_KB_COLS];
 static float animCampo;
@@ -358,7 +349,7 @@ static void montarTitulos(const char *alvo) {
         idx = it.imdb[0] ? cat_indice_por_imdb(it.imdb) : -1;
         if (idx >= 0) for (k = 0; k < nc; k++) if (c[k].idx == idx) { dup = 1; break; }
         if (dup) continue;
-        busca_normalizar(it.titulo, nome, sizeof nome);
+        search_normalize(it.titulo, nome, sizeof nome);
         c[nc].pont = pontuar(nome, alvo);
         if (c[nc].pont < 20) c[nc].pont = 20;
         c[nc].pont += 6 - (a < 6 ? a : 6);   // primeiro addon desempata
@@ -381,7 +372,7 @@ static void montarTitulos(const char *alvo) {
       const CatItem *ci = cat_item(cf->ini + i);
       int p, k, dup = 0;
       if (!ci || !strcmp(ci->tipo, "channel")) continue;
-      busca_normalizar(ci->titulo, nome, sizeof nome);
+      search_normalize(ci->titulo, nome, sizeof nome);
       if (!(p = pontuar(nome, alvo))) continue;
       for (k = 0; k < nc; k++) {
         const CatItem *o = c[k].idx >= 0 ? cat_item(c[k].idx) : NULL;
@@ -418,11 +409,11 @@ static void montarTitulos(const char *alvo) {
       int junta = -1;
       if (a && a->imdb[0] && strncmp(a->imdb, "tt", 2) && strncmp(a->imdb, "kitsu:", 6)) {
         char na[160], nb[160];
-        busca_normalizar(a->titulo, na, sizeof na);
+        search_normalize(a->titulo, na, sizeof na);
         for (k = 0; k < nc && junta < 0; k++) {
           const CatItem *b = k == i ? NULL : cat_item(c[k].idx);
           if (!b || strncmp(b->imdb, "tt", 2) || strcmp(a->tipo, b->tipo)) continue;
-          busca_normalizar(b->titulo, nb, sizeof nb);
+          search_normalize(b->titulo, nb, sizeof nb);
           if (strcmp(na, nb)) continue;
           if (isdigit((unsigned char)a->meta[0]) && isdigit((unsigned char)b->meta[0]) &&
               strncmp(a->meta, b->meta, 4)) continue;
@@ -444,56 +435,6 @@ static void montarTitulos(const char *alvo) {
   }
 }
 
-static void montarPessoas(const char *alvo) {
-  long vistos[SPP_MAX + 4];
-  int nv = 0, i, j, n = cat_n(), cab = 0;
-  char nome[160];
-  for (i = 0; i < n && nv < 4; i++) {
-    const CatItem *ci = cat_item(i);
-    if (!ci || ci->nElenco <= 0) continue;
-    for (j = 0; j < ci->nElenco && nv < 4; j++) {
-      int k, dup = 0;
-      Linha *l;
-      if (ci->elenco[j].tmdb <= 0 || !ci->elenco[j].nome[0]) continue;
-      for (k = 0; k < nv; k++) if (vistos[k] == ci->elenco[j].tmdb) { dup = 1; break; }
-      if (dup) continue;
-      busca_normalizar(ci->elenco[j].nome, nome, sizeof nome);
-      if (pontuar(nome, alvo) < 60) continue;   // pessoa: so inicio de nome/sobrenome
-      if (!cab) { cabecalho(i18n("Pessoas")); cab = 1; }
-      if (!(l = nova(L_PESSOA))) return;
-      vistos[nv++] = ci->elenco[j].tmdb;
-      l->ref2 = i;
-      l->tmdb = ci->elenco[j].tmdb;
-      snprintf(l->t1, sizeof l->t1, "%s", ci->elenco[j].nome);
-      snprintf(l->t2, sizeof l->t2, i18n("Em %s"), ci->titulo);
-      snprintf(l->arte, sizeof l->arte, "%s", ci->elenco[j].foto);
-      snprintf(l->chave, sizeof l->chave, "p|%ld", l->tmdb);
-    }
-  }
-  // O TMDB completa ate SPP_MAX, na ordem de popularidade dele. Sem resposta
-  // ainda (debounce, rede) a lista fica com as do elenco e remonta quando a
-  // resposta chega (spot_atualizar).
-  { int nt = spotpessoa_n(consulta);
-    for (i = 0; i < nt && nv < SPP_MAX; i++) {
-      SpotPessoa sp;
-      int k, dup = 0;
-      Linha *l;
-      if (!spotpessoa_item(consulta, i, &sp)) break;
-      for (k = 0; k < nv; k++) if (vistos[k] == sp.tmdb) { dup = 1; break; }
-      if (dup) continue;
-      if (!cab) { cabecalho(i18n("Pessoas")); cab = 1; }
-      if (!(l = nova(L_PESSOA))) return;
-      vistos[nv++] = sp.tmdb;
-      l->tmdb = sp.tmdb;
-      l->tituloTmdb = sp.tituloTmdb;
-      snprintf(l->tituloTipo, sizeof l->tituloTipo, "%s", sp.tituloTipo);
-      snprintf(l->t1, sizeof l->t1, "%s", sp.nome);
-      if (sp.conhecido[0]) snprintf(l->t2, sizeof l->t2, i18n("Conhecido por  %s"), sp.conhecido);
-      snprintf(l->arte, sizeof l->arte, "%s", sp.foto);
-      snprintf(l->chave, sizeof l->chave, "p|%ld", l->tmdb);
-    } }
-}
-
 static void montarColecoes(const char *alvo) {
   int i, n = col_n(), achou = 0;
   char t[300];
@@ -501,9 +442,9 @@ static void montarColecoes(const char *alvo) {
     const ColFolder *f = col_folder(i);
     Linha *l;
     if (!f || !f->title[0]) continue;
-    busca_normalizar(f->title, t, sizeof t);
+    search_normalize(f->title, t, sizeof t);
     if (!pontuar(t, alvo)) {
-      busca_normalizar(f->group, t, sizeof t);
+      search_normalize(f->group, t, sizeof t);
       if (!f->group[0] || pontuar(t, alvo) < 60) continue;
     }
     if (!achou) cabecalho(i18n("Coleções"));
@@ -544,7 +485,7 @@ static void montarCatalogos(const char *alvo) {
     const CatFileira *cf = cat_fileira(r);
     Linha *l;
     if (!cf || !cf->base[0] || !cf->catId[0]) continue;
-    busca_normalizar(cf->titulo, t, sizeof t);
+    search_normalize(cf->titulo, t, sizeof t);
     if (pontuar(t, alvo) < 60) continue;
     if (!achou) cabecalho(i18n("Catálogos"));
     if (!(l = nova(L_CATALOGO))) return;
@@ -560,7 +501,7 @@ static void montarCatalogos(const char *alvo) {
     const char *nm = addons_nome(i);
     Linha *l;
     if (!nm || !nm[0]) continue;
-    busca_normalizar(nm, t, sizeof t);
+    search_normalize(nm, t, sizeof t);
     if (pontuar(t, alvo) < 60) continue;
     if (!achou) cabecalho(i18n("Addons"));
     if (!(l = nova(L_ADDON))) return;
@@ -573,27 +514,22 @@ static void montarCatalogos(const char *alvo) {
   }
 }
 
-// Campo vazio: pesquisas recentes e "Em alta" (os primeiros da primeira
-// fileira de catalogo de addon — o que o dono ja ve no topo da home, e o unico
-// "em alta" que existe sem uma viagem de rede).
-// CAMPO VAZIO: so as pesquisas recentes, curtas (o dono: "mantenha
-// discreto"). Sem recentes, a barra fica sozinha — nada de "Em alta" nem de
-// frase de ajuda abrindo o corpo antes de a pessoa digitar.
-static void montarVazio(void) {
-  int i, n = buscasrec_n();
-  if (n <= 0) return;
-  cabecalho(i18n("Pesquisas recentes"));
-  for (i = 0; i < n && i < SP_MAX_RECENTES; i++) {
-    Linha *l = nova(L_RECENTE);
-    if (!l) return;
-    l->ref = i;
-    snprintf(l->t1, sizeof l->t1, "%s", buscasrec_termo(i));
-    snprintf(l->icone, sizeof l->icone, "aj_rotate-ccw-clock");
-    snprintf(l->chave, sizeof l->chave, "r|%s", l->t1);
+/* Empty quick search shows only this profile's confirmed recent queries. */
+static void build_recent_searches(void) {
+  int index, count = search_history_count();
+  if (count <= 0) return;
+  cabecalho("Recent searches");
+  for (index = 0; index < count && index < QUICK_SEARCH_RECENT_LIMIT; index++) {
+    Linha *row = nova(ROW_RECENT_QUERY);
+    if (!row) return;
+    row->ref = index;
+    snprintf(row->t1, sizeof row->t1, "%s", search_history_query(index));
+    snprintf(row->icone, sizeof row->icone, "aj_rotate-ccw-clock");
+    snprintf(row->chave, sizeof row->chave, "r|%s", row->t1);
   }
-  { Linha *l = nova(L_LIMPAR);
-    if (l) { snprintf(l->t1, sizeof l->t1, "%s", i18n("Limpar pesquisas recentes"));
-             snprintf(l->chave, sizeof l->chave, "limpar"); } }
+  { Linha *row = nova(ROW_CLEAR_RECENT);
+    if (row) { snprintf(row->t1, sizeof row->t1, "%s", "Clear recent searches");
+             snprintf(row->chave, sizeof row->chave, "clear-recent"); } }
 }
 
 static void montarAjustes(const char *consultaLocal) {
@@ -710,7 +646,7 @@ static void remontar(void) {
   for (i = 0; i < nLin; i++) { memcpy(chavesAntes[i], lin[i].chave, 96); entraAntes[i] = entraLin[i]; }
   snprintf(montada, sizeof montada, "%s", consulta);
   nLin = 0;
-  busca_normalizar(consulta, alvo, sizeof alvo);
+  search_normalize(consulta, alvo, sizeof alvo);
   if (modoAjustes) {
     montarAjustes(consulta);
     if (nLin <= (modoAjustes ? 1 : 0)) {
@@ -721,14 +657,10 @@ static void remontar(void) {
       }
     }
   } else {
-  // Sempre, inclusive com o campo vazio: o debounce precisa saber que o
-  // texto mudou para nao disparar um termo que ja nao esta no campo.
-  spotpessoa_pedir(consulta, SDL_GetTicks());
-  if (busca_codepoints(alvo) < 2) montarVazio();
+  if (search_character_count(alvo) < 2) build_recent_searches();
   else {
     desc_buscar(consulta);
     montarTitulos(alvo);
-    montarPessoas(alvo);
     montarColecoes(alvo);
     montarCanais(alvo);
     montarCatalogos(alvo);
@@ -766,16 +698,16 @@ static void remontar(void) {
     for (i = 0; i < nLin; i++) if (!strcmp(lin[i].chave, chaveFoco)) { focoL = i; break; }
   if (focoL < 0) for (i = 0; i < nLin; i++) if (focavel(lin[i].tipo)) { focoL = i; break; }
   if (focoL < 0 && painel == P_LISTA) painel = P_CAMPO;
-  ultimoRemoto = !modoAjustes && busca_codepoints(alvo) >= 2 ? remotoTotal() : -1;
+  ultimoRemoto = !modoAjustes && search_character_count(alvo) >= 2 ? remotoTotal() : -1;
   ultimoBuscando = modoAjustes ? 0 : desc_buscando();
   ultimaGeracao = modoAjustes ? 0 : desc_busca_geracao();
-  ultimaGerPessoa = modoAjustes ? 0 : spotpessoa_geracao();
+  last_history_revision = search_history_snapshot_revision();
 }
 
 static int temResultados(void) {
   int i;
   for (i = 0; i < nLin; i++)
-    if (focavel(lin[i].tipo) && lin[i].tipo != L_RECENTE && lin[i].tipo != L_LIMPAR) return 1;
+    if (focavel(lin[i].tipo) && lin[i].tipo != ROW_RECENT_QUERY && lin[i].tipo != ROW_CLEAR_RECENT) return 1;
   return 0;
 }
 // QUANDO A BUSCA CONTA COMO FEITA: a mesma regra da tela de Busca (busca.c,
@@ -783,7 +715,7 @@ static int temResultados(void) {
 // o ditado trouxe o texto. Nunca por letra.
 static void registrar(void) {
   if (modoAjustes) return;
-  if (nConsulta >= 2 && temResultados()) buscasrec_registrar(consulta);
+  if (nConsulta >= 2 && temResultados()) search_history_record(consulta);
 }
 
 // --- Campo -------------------------------------------------------------------------
@@ -794,7 +726,7 @@ static void acrescentar(const char *t) {
   nConsulta += (int)n;
   consulta[nConsulta] = 0;
 }
-static void apagar(void) { nConsulta = (int)busca_apagar_ultimo(consulta, (size_t)nConsulta); }
+static void apagar(void) { nConsulta = (int)search_delete_last_character(consulta, (size_t)nConsulta); }
 
 // O campo inteiro de uma vez (ditado, teclado do sistema, testes). `aparar` tira
 // os espacos das pontas — o reconhecedor as vezes devolve; o IME NAO apara: o
@@ -969,26 +901,18 @@ static void acionar(int i) {
   l = &lin[i];
   memset(&pedido, 0, sizeof pedido);
   switch (l->tipo) {
-    case L_RECENTE:
-      snprintf(consulta, sizeof consulta, "%s", buscasrec_termo(l->ref));
-      nConsulta = (int)strlen(consulta);
-      buscasrec_registrar(consulta);
+    case ROW_RECENT_QUERY:
+      search_history_record(search_history_query(l->ref));
+      campoDefinir(search_history_query(0), 1);
       remontar();
       return;
-    case L_LIMPAR:
-      buscasrec_limpar();
+    case ROW_CLEAR_RECENT:
+      search_history_clear();
       painel = P_CAMPO;
       remontar();
       return;
     case L_TOPO: case L_TITULO:
       pedido.tipo = SPOT_TITULO; pedido.indice = l->ref; break;
-    case L_PESSOA:
-      pedido.tipo = SPOT_PESSOA; pedido.indice = l->ref2; pedido.tmdb = l->tmdb;
-      pedido.tituloTmdb = l->tituloTmdb;
-      snprintf(pedido.tituloTipo, sizeof pedido.tituloTipo, "%s", l->tituloTipo);
-      snprintf(pedido.nome, sizeof pedido.nome, "%s", l->t1);
-      snprintf(pedido.arte, sizeof pedido.arte, "%s", l->arte);
-      break;
     case L_COLECAO:  pedido.tipo = SPOT_COLECAO;  pedido.indice = l->ref; break;
     case L_CATALOGO: pedido.tipo = SPOT_CATALOGO; pedido.indice = l->ref; break;
     case L_ADDON:    pedido.tipo = SPOT_ADDONS;   pedido.indice = l->ref; break;
@@ -1013,8 +937,8 @@ static void acionar(int i) {
 
 static void removerRecente(int i) {
   if (i < 0 || i >= nLin) return;
-  if (lin[i].tipo == L_RECENTE) buscasrec_remover(lin[i].ref);
-  else if (lin[i].tipo == L_LIMPAR) buscasrec_limpar();
+  if (lin[i].tipo == ROW_RECENT_QUERY) search_history_remove(lin[i].ref);
+  else if (lin[i].tipo == ROW_CLEAR_RECENT) search_history_clear();
   else return;
   remontar();
 }
@@ -1119,7 +1043,7 @@ void spot_evento(const SDL_Event *e) {
   // OK numa pesquisa recente decide na SOLTURA (toque = buscar, segurar =
   // remover), como as pilulas da tela de Busca.
   if ((k == SDLK_RETURN || k == SDLK_KP_ENTER) && painel == P_LISTA && focoL >= 0 && focoL < nLin &&
-      (lin[focoL].tipo == L_RECENTE || lin[focoL].tipo == L_LIMPAR)) {
+      (lin[focoL].tipo == ROW_RECENT_QUERY || lin[focoL].tipo == ROW_CLEAR_RECENT)) {
     if (e->type == SDL_KEYDOWN) {
       if (!okPress) { okPress = 1; okLongo = 0; okDesde = SDL_GetTicks(); }
     } else if (okPress) {
@@ -1255,12 +1179,10 @@ void spot_atualizar(float dt, Uint32 agora) {
   lerSistema();
   // A RESPOSTA DA REDE CHEGA DEPOIS DA TECLA: remonta quando a contagem do termo
   // corrente muda ou quando a busca termina (o aviso "Buscando..." sai).
-  if (!modoAjustes) spotpessoa_atualizar(agora);
-  if (strcmp(montada, consulta)) remontar();
+  if (strcmp(montada, consulta) || (!modoAjustes && nConsulta < 2 && last_history_revision != search_history_revision())) remontar();
   else if (!modoAjustes && nConsulta >= 2) {
     int n = remotoTotal(), b = desc_buscando(), g = desc_busca_geracao();
-    if (n != ultimoRemoto || b != ultimoBuscando || g != ultimaGeracao ||
-        spotpessoa_geracao() != ultimaGerPessoa) remontar();
+    if (n != ultimoRemoto || b != ultimoBuscando || g != ultimaGeracao) remontar();
   }
   corpoH = molaIlha(&corpoV, corpoH, corpoAlvo(), dt);
   if (corpoH < 0.0f) { corpoH = 0.0f; if (corpoV < 0.0f) corpoV = 0.0f; }
@@ -1402,8 +1324,8 @@ static void desenhaCampo(float dy, float a, Uint32 agora) {
     const char *ph = ouve ? i18n(st_estado() == ST_PERMISSAO ? "Permita o microfone para falar…" : "Ouvindo…")
                    : av[0] ? i18n(av)
                    : modoAjustes ? i18n("Buscar nos ajustes")
-                   : i18n(comMic ? "Buscar ou falar: filmes, séries, pessoas, canais"
-                                 : "Buscar filmes, séries, pessoas e canais");
+                   : i18n(comMic ? "Search or speak: movies, series, channels"
+                                 : "Search movies, series and channels");
     int amb = !ouve && av[0];
     TxtLinha l = amb ? txt_linha_corta(TXT_ILHA_META, ph, 240, 190, 130, 255, xMax - tx - 10.0f)
                      : txt_linha_corta(TXT_CALLOUT, ph, SP_TINTA, 255, xMax - tx - 10.0f);
@@ -1606,16 +1528,6 @@ static void desenhaLinha(int i, float x, float y, float a) {
     float tx;
     switch (l->tipo) {
       case L_TITULO:  ic.w = 42.0f; arte(ic, l->arte, 8.0f / ic.h, 0, a); break;
-      case L_PESSOA:
-        ic.w = ic.h;
-        if (l->arte[0]) arte(ic, l->arte, 0.5f, 1, a);
-        else {
-          // Sem foto no TMDB: o disco com o icone de pessoa, nao um buraco.
-          gfx_cor(ic, 0.5f, 0.20f, 0.205f, 0.225f, a);
-          gfx_icone((GfxRect){ ic.x + ic.w * 0.25f, ic.y + ic.h * 0.25f, ic.w * 0.5f, ic.h * 0.5f },
-                    "aj_user-round", 0.78f, 0.79f, 0.82f, a);
-        }
-        break;
       case L_COLECAO: ic.w = ic.h * 16.0f / 9.0f; arte(ic, l->arte, 8.0f / ic.h, 0, a); break;
       case L_CANAL:
         ic.w = ic.h * 16.0f / 9.0f;
@@ -1643,10 +1555,10 @@ static void desenhaLinha(int i, float x, float y, float a) {
         break; }
     }
     tx = ic.x + ic.w + 18.0f;
-    if (l->tipo == L_RECENTE || l->tipo == L_LIMPAR) {
-      TxtLinha t = txt_linha_corta(l->tipo == L_LIMPAR ? TXT_ILHA_META : TXT_PG_ROTULO, l->t1,
+    if (l->tipo == ROW_RECENT_QUERY || l->tipo == ROW_CLEAR_RECENT) {
+      TxtLinha t = txt_linha_corta(l->tipo == ROW_CLEAR_RECENT ? TXT_ILHA_META : TXT_PG_ROTULO, l->t1,
                                    SP_TINTA, 255, r.x + r.w - tx - 16.0f);
-      txt_desenhar_alpha(t, tx, r.y + (r.h - t.h) * 0.5f, (l->tipo == L_LIMPAR ? .62f : a1) * a);
+      txt_desenhar_alpha(t, tx, r.y + (r.h - t.h) * 0.5f, (l->tipo == ROW_CLEAR_RECENT ? .62f : a1) * a);
       // A barra da pressao longa: solte antes de encher e nao apaga.
       if (painel == P_LISTA && i == focoL && okPress && !okLongo) {
         float p = anim_clamp((SDL_GetTicks() - okDesde) / (float)NV_HOLD_MS, 0.0f, 1.0f);
@@ -1688,7 +1600,7 @@ static float dica(float x, float y, const char *tecla, const char *acao, float a
 
 static void desenhaRodape(float dy, float a) {
   float x = SP_LISTA_X0 + 16.0f, y = SP_CORPO_Y + corpoH - SP_RODAPE_H + 14.0f + dy;
-  int recente = painel == P_LISTA && focoL >= 0 && focoL < nLin && lin[focoL].tipo == L_RECENTE;
+  int recente = painel == P_LISTA && focoL >= 0 && focoL < nLin && lin[focoL].tipo == ROW_RECENT_QUERY;
   a *= anim_clamp((corpoH - 80.0f) / 80.0f, 0.0f, 1.0f);
   if (a < 0.01f) return;
   if (painel == P_TECLADO) {
@@ -1745,3 +1657,12 @@ static void spot_desenharCorpo_(Uint32 agora, int veuPronto) {
     desenhaRodape(dy, a);
   }
 }
+
+#ifdef NV_NATIVE_UI_TEST
+/* The Rust driver exercises the production result builder without drawing. */
+void quick_search_test_query(const char *text) {
+  modoAjustes = 0;
+  campoDefinir(text, 1);
+  remontar();
+}
+#endif

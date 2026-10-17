@@ -39,6 +39,12 @@ pub mod scene_backend;
 pub mod scene_cache;
 pub mod scene_capture;
 pub mod scene_snapshot;
+pub mod search_history;
+pub mod search_text;
+pub mod search_text_ffi;
 pub mod service;
 pub mod storage;
 pub mod title_snapshot;
+
+pub mod search_history_ffi;
+pub mod search_history_runtime;

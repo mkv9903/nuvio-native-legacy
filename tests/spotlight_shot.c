@@ -1,39 +1,11 @@
-// CAPTURAS DO SPOTLIGHT (spotlight.h), sem rede e sem interacao.
-//
-// O que cada foto prova:
-//   -barra       sem pesquisa recente nenhuma: SO a barra (lupa, campo), sem
-//                corpo — o desenho do dono, "so a barra e so crescer";
-//   -entrada     a barra no meio da animacao de entrada;
-//   -vazio       campo vazio com recentes: a lista curta logo abaixo;
-//   -crescendo   logo depois de "the": o corpo no meio da mola, crescendo;
-//   -teclado-app OK no campo onde nao ha teclado do sistema (LG/Samsung/Mac):
-//                o teclado do app a esquerda do corpo, resultados a direita;
-//   -android-ime o caminho do Android (sistexto em modo de teste): o teclado
-//                do sistema "aberto", o texto vindo dele no campo;
-//   -android-voz o microfone ouvindo, com a parcial no campo e o anel do som;
-//   -android-semvoz  sem reconhecedor: o aviso e o teclado do sistema;
-//   -digitado    "the" digitado: melhor resultado em destaque e Titulos, a
-//                lista mudando a cada letra;
-//   -foco        o foco na lista (direita a partir da ultima coluna): a linha
-//                do melhor resultado acesa na cor do tema e o "OK Abrir";
-//   -foco2       duas linhas abaixo;
-//   -pessoa      a pessoa (elenco com id do TMDB) em foco, sem foto;
-//   -colecao     uma pasta de colecao achada pelo nome;
-//   -nada        um termo sem resultado: o aviso, nao uma lista vazia;
-//   -vidro       a mesma busca com a Interface de vidro ligada;
-//   -pessoa-tmdb "keanu": pessoas do /search/person do TMDB (resposta de
-//                tests/fixtures, sem rede) com "Conhecido por";
-//   -canal       "brasil": dois canais da Live TV de um guia carregado de um
-//                addon falso local (tests/spotlight_canais_servidor.py);
-//   -pessoa-tmdb-vivo  so com NUVIO_TMDB_DIR (pasta com tmdb.txt): o mesmo
-//                pedido no TMDB de verdade, com as fotos de perfil.
-// E confere, sem olho: digitar filtra, OK no titulo pede SPOT_TITULO com o
-// indice certo e fecha, OK na pessoa pede SPOT_PESSOA com o tmdb, Voltar
-// fecha, a busca feita entra nas recentes; a pessoa do TMDB so e pedida
-// quando o texto para (um pedido para "keanu" inteiro, nenhum por letra), a
-// URL leva o idioma, e OK nela pede SPOT_PESSOA com o titulo conhecido.
+/* Retained Spotlight visual/navigation checks: title and settings search,
+ * recent queries, collections, channels, keyboard actions and Back behavior.
+ * People-name search was explicitly removed; Details cast navigation remains. */
 #include "spotlight.h"
-#include "buscasrec.h"
+#include "search_history.h"
+#include "app_id.h"
+extern RustSearchHistory *nuvio_test_search_history_create(const char *directory);
+extern void search_history_test_attach(RustSearchHistory *history);
 #include "dados.h"
 #include "ajustes.h"
 #include "ajustes_ux.h"
@@ -42,7 +14,6 @@
 #include "tex_cache.h"
 #include "catalogo.h"
 #include "colecoes.h"
-#include "spotpessoa.h"
 #include "guia.h"
 #include "addons.h"
 #include "descoberta.h"
@@ -58,25 +29,9 @@
 #include <sys/stat.h>
 
 // Tipos de linha de spotlight.c (enum interno L_*).
-enum { T_AVISO = 1, T_TOPO = 2, T_PESSOA = 4, T_COLECAO = 5, T_RECENTE = 9, T_AJUSTE = 11 };
+enum { T_AVISO = 1, T_TOPO = 2, T_COLECAO = 5, T_RECENTE = 9, T_AJUSTE = 11 };
 
 static SDL_Window *janela;
-static char ultimaUrl[800];
-
-// O TMDB de mentira: guarda a URL e devolve a resposta gravada.
-static char *tmdbFalso(const char *url) {
-  FILE *f = fopen("tests/fixtures/tmdb_search_person.json", "rb");
-  char *b;
-  long n;
-  snprintf(ultimaUrl, sizeof ultimaUrl, "%s", url);
-  if (!f) return NULL;
-  fseek(f, 0, SEEK_END); n = ftell(f); fseek(f, 0, SEEK_SET);
-  b = malloc((size_t)n + 1);
-  if (b && fread(b, 1, (size_t)n, f) != (size_t)n) { free(b); b = NULL; }
-  if (b) b[n] = 0;
-  fclose(f);
-  return b;
-}
 static char dirArte[600];
 
 static void tecla(SDL_Keycode k) {
@@ -193,7 +148,12 @@ int main(int argc, char **argv) {
   tex_iniciar(160);
   gfx_icones_dir("deploy/app/art");
   dados_iniciar(dir);
-  assert(!strcmp(dados_dir(), dir));
+  { char expected[1024];
+    snprintf(expected, sizeof expected, "%s/%s", dir, NV_APP_ID);
+    assert(!strcmp(dados_dir(), expected)); }
+  RustSearchHistory *history = nuvio_test_search_history_create(dados_dir());
+  assert(history);
+  search_history_test_attach(history);
   ajustes_iniciar();
   // NUVIO_SHOT_PT=1: interface em portugues (a lingua dos mockups), para a
   // comparacao lado a lado medir o mesmo texto.
@@ -257,7 +217,7 @@ int main(int argc, char **argv) {
   fechar();
 
   { static const char *termos[] = { "duna", "breaking bad", "interestelar", "the office" };
-    int i; for (i = 0; i < 4; i++) buscasrec_registrar(termos[i]); }
+    int i; for (i = 0; i < 4; i++) search_history_record(termos[i]); }
 
   spot_abrir(0);
   capturaQuadros(saida, "entrada", 5);
@@ -276,7 +236,6 @@ int main(int argc, char **argv) {
   captura(saida, "digitado");
   assert(spot_altura_corpo() > 300.0f);
   assert(achar(T_TOPO, NULL) >= 0);
-  assert(achar(T_PESSOA, NULL) < 0);   // "the" nao comeca nome nenhum
   paraLista();
   assert(spot_linha_focada() == achar(T_TOPO, NULL));
   captura(saida, "foco");
@@ -310,31 +269,23 @@ int main(int argc, char **argv) {
   assert(spot_linha_focada() >= 0 && !spot_teclado_app_aberto());
   fechar();
 
-  // Pessoa: "chri" acha Christian Bale no elenco do Prestige.
+  /* An actor present in loaded cast must not produce a People result. */
   spot_abrir(0);
   digitar("chri");
-  { int alvo = achar(T_PESSOA, "Christian Bale"), k;
-    assert(alvo >= 0);
-    paraLista();
-    for (k = 0; k < 20 && spot_linha_focada() != alvo; k++) tecla(SDLK_DOWN);
-    assert(spot_linha_focada() == alvo); }
-  captura(saida, "pessoa");
-  tecla(SDLK_RETURN);
-  assert(spot_pediu(&p));
-  assert(p.tipo == SPOT_PESSOA && p.tmdb == 3894);
-  assert(!spot_aberto());
-  assert(!strcmp(buscasrec_termo(0), "chri"));
+  for (int row = 0; row < spot_n_linhas(); row++)
+    assert(!strstr(spot_linha_texto(row), "Christian Bale"));
+  fechar();
 
   // Ajustes: a busca local encontra opcoes, seleciona o OpcaoId estavel e
   // nao grava o termo no historico de pesquisas de midia.
   { AjusteBuscaResultado esperado[1];
-    int antes = buscasrec_n(), alvo, passos;
+    int antes = search_history_count(), alvo, passos;
     char textoFoco[160];
     assert(ajustes_buscar("idioma", esperado, 1) == 1);
     spot_abrir_ajustes(0);
     assert(achar(T_AJUSTE, NULL) >= 0); /* sugestoes locais sem consulta */
     tecla(SDLK_ESCAPE);
-    assert(!spot_aberto() && buscasrec_n() == antes);
+    assert(!spot_aberto() && search_history_count() == antes);
     spot_abrir_ajustes(0);
     spot_texto_externo("idioma");
     alvo = achar(T_AJUSTE, NULL);
@@ -345,14 +296,14 @@ int main(int argc, char **argv) {
     snprintf(textoFoco, sizeof textoFoco, "%s", spot_linha_texto(spot_linha_focada()));
     tecla(SDLK_RETURN);
     assert(spot_pediu(&p) && p.tipo == SPOT_AJUSTE && p.indice == esperado[0].op);
-    assert(buscasrec_n() == antes);
+    assert(search_history_count() == antes);
     spot_reabrir_ajustes();
     assert(spot_aberto() && !strcmp(spot_consulta(), "idioma"));
     assert(spot_linha_focada() >= 0 && spot_linha_tipo(spot_linha_focada()) == T_AJUSTE);
     assert(!strcmp(spot_linha_texto(spot_linha_focada()), textoFoco));
-    assert(buscasrec_n() == antes);
+    assert(search_history_count() == antes);
     tecla(SDLK_ESCAPE);
-    assert(!spot_aberto() && buscasrec_n() == antes);
+    assert(!spot_aberto() && search_history_count() == antes);
     spot_abrir_ajustes(0);
     assert(!spot_consulta()[0] && achar(T_AJUSTE, NULL) >= 0);
     tecla(SDLK_ESCAPE);
@@ -409,54 +360,6 @@ int main(int argc, char **argv) {
   captura(saida, "vidro");
   ajustes_definir_vidro(0);
   fechar();
-
-  // PESSOA DO TMDB, com debounce. Digitar "keanu" de uma vez: nada sai antes
-  // de SPP_ESPERA_MS; depois sai UM pedido, com o termo inteiro e o idioma.
-  { SpotPessoa lidas[SPP_MAX];
-    char *json = tmdbFalso("");
-    int n0, alvo, k;
-    assert(json);
-    // a leitura pura: quem nao tem titulo conhecido fica de fora, e o "name"
-    // de dentro de known_for nao vira o nome da pessoa
-    assert(spotpessoa_extrair(json, lidas, SPP_MAX) == 2);
-    assert(!strcmp(lidas[0].nome, "Keanu Reeves") && lidas[0].tmdb == 6384);
-    assert(lidas[0].tituloTmdb == 603 && !strcmp(lidas[0].tituloTipo, "movie"));
-    assert(strstr(lidas[0].conhecido, "Matrix") && strstr(lidas[0].conhecido, "Constantine"));
-    assert(!lidas[0].foto[0]);
-    assert(lidas[1].tituloTmdb == 1399 && !strcmp(lidas[1].tituloTipo, "tv"));
-    free(json);
-    spotpessoa_teste(tmdbFalso);
-    n0 = spotpessoa_disparos();
-    spot_abrir(0);
-    digitar("keanu");
-    quadro(); quadro();
-    assert(spotpessoa_disparos() == n0);          // ainda dentro da espera
-    assert(achar(T_PESSOA, "Keanu") < 0);
-    { Uint32 t0 = SDL_GetTicks(); while (SDL_GetTicks() - t0 < 900) quadro(); }
-    assert(spotpessoa_disparos() == n0 + 1);      // um pedido so
-    assert(strstr(ultimaUrl, "/search/person?") && strstr(ultimaUrl, "query=keanu"));
-    { char lg[40]; snprintf(lg, sizeof lg, "language=%s", desc_tmdb_idioma());
-      assert(strstr(ultimaUrl, lg)); }
-    alvo = achar(T_PESSOA, "Keanu Reeves");
-    assert(alvo >= 0);
-    assert(achar(T_PESSOA, "Sem Titulo") < 0);
-    paraLista();
-    for (k = 0; k < 30 && spot_linha_focada() != alvo; k++) tecla(SDLK_DOWN);
-    assert(spot_linha_focada() == alvo);
-    captura(saida, "pessoa-tmdb");
-    // apagar e redigitar a ultima letra antes da espera: "kean" nunca sai, e
-    // "keanu" vem do cache
-    tecla(SDLK_BACKSPACE); digitar("u");
-    { Uint32 t0 = SDL_GetTicks(); while (SDL_GetTicks() - t0 < 600) quadro(); }
-    assert(spotpessoa_disparos() == n0 + 1);
-    alvo = achar(T_PESSOA, "Keanu Reeves");
-    paraLista();
-    for (k = 0; k < 30 && spot_linha_focada() != alvo; k++) tecla(SDLK_DOWN);
-    tecla(SDLK_RETURN);
-    assert(spot_pediu(&p));
-    assert(p.tipo == SPOT_PESSOA && p.indice < 0 && p.tmdb == 6384);
-    assert(p.tituloTmdb == 603 && !strcmp(p.tituloTipo, "movie"));
-    spotpessoa_teste(NULL); }
 
   // ANDROID (sistexto em modo de teste): abrir ja chama o teclado do sistema, e
   // o texto que vem dele SUBSTITUI o campo (com o espaco do fim, que o IME
@@ -533,21 +436,7 @@ int main(int argc, char **argv) {
     assert(spot_pediu(&p) && p.tipo == SPOT_CANAL && !strcmp(p.id, "teste:espn"));
   }
 
-  // O TMDB de verdade, so quando pedido (NUVIO_TMDB_DIR com tmdb.txt).
-  if (getenv("NUVIO_TMDB_DIR") && *getenv("NUVIO_TMDB_DIR")) {
-    Uint32 t0;
-    desc_tmdb(getenv("NUVIO_TMDB_DIR"));
-    { char cd[700]; snprintf(cd, sizeof cd, "%s/img", dir); mkdir(cd, 0755); tex_cache_dir(cd); }
-    spot_abrir(0);
-    digitar("pedro pascal");
-    t0 = SDL_GetTicks();
-    while (SDL_GetTicks() - t0 < 10000 && spotpessoa_n("pedro pascal") < 0) quadro();
-    quadro();   // a remontagem e no spot_atualizar seguinte
-    printf("tmdb vivo: %d pessoas\n", spotpessoa_n("pedro pascal"));
-    assert(spotpessoa_n("pedro pascal") > 0);
-    assert(achar(T_PESSOA, "Pedro Pascal") >= 0);
-    capturaEm(saida, "pessoa-tmdb-vivo", 3500);
-  }
-  puts("PASS: Spotlight filtra, abre titulo/pessoa, guarda a busca e fecha.");
+  puts("PASS: Spotlight filtra, abre titulo, guarda a busca e fecha.");
+  search_history_shutdown();
   return 0;
 }
