@@ -75,7 +75,7 @@ owner and otherwise wait/retry rather than using the signed-in member's ID.
 The Rust account domain, HTTP client, worker, native boundary, platform helper,
 Home ordering, addon networking/storage, edit merging and the native addon
 boundary, provider loading, complete catalog title models and scene
-storage/publication and Home coordination pass 210 tests. Fifty-three additional Rust driver tests cover
+storage/publication and Home coordination pass 214 tests. Fifty-three additional Rust driver tests cover
 the retained C account/addon screens, view layouts, Home-order publication,
 source/subtitle workers, title lifetimes and integrated catalog/profile paths.
 All 45 native catalog/title/capture cases also pass ASan/UBSan. The five relevant

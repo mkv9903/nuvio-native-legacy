@@ -406,3 +406,48 @@ fn an_explicitly_removed_catalog_is_not_recovered_from_previous_scene() {
         .unwrap();
     assert!(loaded.scene.rows.is_empty());
 }
+
+#[test]
+fn failed_preferred_rows_are_retried_before_successful_replacements() {
+    let mut first = plan(1, 3);
+    first.saved_keys = first
+        .declared_order()
+        .iter()
+        .map(|index| first.catalogs[*index].key.clone())
+        .collect();
+    let loaded = first
+        .load(
+            1,
+            &|index| {
+                if index == 0 {
+                    Err(Error::Network)
+                } else {
+                    Ok(result(&first, index, false))
+                }
+            },
+            &|| true,
+            |_, _, _| true,
+        )
+        .unwrap();
+    assert_eq!(loaded.scene.rows[0].record.key, "provider0_movie_c1");
+    let mut next = HomePlan::new(
+        first.source.clone(),
+        first.account_order.clone(),
+        Some(loaded.scene),
+    );
+    next.saved_keys = first.saved_keys.clone();
+    assert_eq!(
+        next.order()[0],
+        0,
+        "a failed row keeps its original retry position"
+    );
+    next.account_order = Arc::new(HomeOrder {
+        keys: vec!["provider0_movie_c2".into()],
+        ..Default::default()
+    });
+    assert_eq!(
+        next.order()[0],
+        2,
+        "a later explicit account choice still wins"
+    );
+}

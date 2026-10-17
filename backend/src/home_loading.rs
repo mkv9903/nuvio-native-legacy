@@ -46,6 +46,7 @@ pub struct HomePlan {
     pub catalogs: Vec<HomeCatalog>,
     pub account_order: Arc<HomeOrder>,
     pub previous: Option<Arc<SceneSnapshot>>,
+    pub saved_keys: Vec<String>,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(i32)]
@@ -161,6 +162,7 @@ impl HomePlan {
             catalogs,
             account_order,
             previous,
+            saved_keys: Vec::new(),
         }
     }
     pub fn disable_key(&self, index: usize) -> String {
@@ -187,10 +189,19 @@ impl HomePlan {
     /// Explicit local and account order win; accepted rows precede new rows.
     /// No new-addon promotion, fixed declaration quota or provider count exists.
     pub fn order(&self) -> Vec<usize> {
+        self.declared_order()
+            .into_iter()
+            .filter(|index| self.eligible(*index))
+            .collect()
+    }
+    /// Remember declarations, including unsuccessful and hidden rows, so a
+    /// temporary failure cannot permanently move a preferred catalog behind
+    /// the successful replacement that happened to fill its slot.
+    pub fn declared_order(&self) -> Vec<usize> {
         let mut groups: Vec<VecDeque<usize>> = vec![VecDeque::new(); self.source.records.len()];
         let mut seen = HashSet::new();
         for (index, catalog) in self.catalogs.iter().enumerate() {
-            if self.eligible(index) && seen.insert(catalog.key.as_str()) {
+            if seen.insert(catalog.key.as_str()) {
                 groups[catalog.addon_index].push_back(index);
             }
         }
@@ -213,7 +224,7 @@ impl HomePlan {
             .enumerate()
             .map(|(index, key)| (key.as_str(), index))
             .collect();
-        let previous: HashMap<_, _> = self
+        let mut previous: HashMap<_, _> = self
             .previous
             .as_ref()
             .map(|scene| {
@@ -225,6 +236,14 @@ impl HomePlan {
                     .collect()
             })
             .unwrap_or_default();
+        if !self.saved_keys.is_empty() {
+            previous = self
+                .saved_keys
+                .iter()
+                .enumerate()
+                .map(|(index, key)| (key.as_str(), index))
+                .collect();
+        }
         order.sort_by_key(|index| {
             let entry = &self.catalogs[*index];
             (

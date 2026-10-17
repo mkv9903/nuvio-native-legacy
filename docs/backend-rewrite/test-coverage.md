@@ -395,9 +395,9 @@ Linux build/startup and retained profile-settings/search/layout fixtures pass.
 
 ## Rust Home loading coordination
 
-The [Home coordination inventory](home-coordination.md) records fourteen new Rust
+The [Home coordination inventory](home-coordination.md) records fifteen new Rust
 planner/loading tests and eight additional native cases. The backend suite now
-passes 210 tests and the native suite 53; all 45 catalog/title/capture cases pass
+passes 214 tests and the native suite 53; all 45 catalog/title/capture cases pass
 ASan/UBSan. The native cases execute the production choices/publication adapter,
 including manifest fetching, changes to declarations, complete values,
 Continue Watching and saved lists, profile activation guards, outage fallback
@@ -405,3 +405,7 @@ and channel selection across repeated refreshes. Rust owns the production Home
 coordinator. Collection composition and the local row editor remain C services
 with their current real Home/editor fixtures; the older discovery-only collection
 fixture has the maintenance limitation recorded in the linked inventory.
+
+The follow-up preserves declaration-order persistence independently of successful
+scene rows. It adds a retry regression and three storage cases, and extends the
+native complete-value assertion to verify runtime wiring of the saved plan.

@@ -26,6 +26,21 @@ impl SceneSource for AddonBackend {
     }
 }
 pub trait SceneStorage: Send + Sync {
+    fn home_plan_keys(
+        &self,
+        _scope: &ContentScope,
+        _current: &dyn Fn() -> bool,
+    ) -> Result<Vec<String>> {
+        Ok(Vec::new())
+    }
+    fn save_home_plan(
+        &self,
+        _scope: &ContentScope,
+        _keys: &[String],
+        _current: &dyn Fn() -> bool,
+    ) -> Result<()> {
+        Ok(())
+    }
     fn load(
         &self,
         scope: &ContentScope,
@@ -40,6 +55,21 @@ pub trait SceneStorage: Send + Sync {
     fn clear(&self) -> Result<()>;
 }
 impl SceneStorage for SceneCache {
+    fn home_plan_keys(
+        &self,
+        scope: &ContentScope,
+        current: &dyn Fn() -> bool,
+    ) -> Result<Vec<String>> {
+        SceneCache::home_plan_keys(self, scope, current)
+    }
+    fn save_home_plan(
+        &self,
+        scope: &ContentScope,
+        keys: &[String],
+        current: &dyn Fn() -> bool,
+    ) -> Result<()> {
+        SceneCache::save_home_plan(self, scope, keys, current)
+    }
     fn load(
         &self,
         scope: &ContentScope,
@@ -212,6 +242,16 @@ fn visible(scene: &Arc<SceneSnapshot>, source: &AddonSnapshot) -> Result<Arc<Sce
     Ok(Arc::new(SceneSnapshot { titles, rows }))
 }
 impl SceneBackend {
+    pub fn home_plan_keys(&self, work: &SceneWork) -> Result<Vec<String>> {
+        self.0
+            .storage
+            .home_plan_keys(&work.scope(), &|| self.current(work))
+    }
+    pub fn save_home_plan(&self, work: &SceneWork, keys: &[String]) -> Result<()> {
+        self.0
+            .storage
+            .save_home_plan(&work.scope(), keys, &|| self.current(work))
+    }
     pub fn new(source: Arc<dyn SceneSource>, storage: Arc<dyn SceneStorage>) -> Self {
         let published = Arc::new(SceneView {
             source: None,

@@ -876,6 +876,22 @@ fn rust_home_coordination_drives_actual_native_publication_with_complete_values(
     let env = Environment::new();
     let work = env.job();
     let plan = home_plan(&env, work);
+    let plan_path = std::fs::read_dir(env.directory.path.join("rust-backend-v1"))
+        .unwrap()
+        .map(|entry| entry.unwrap().path())
+        .find(|path| {
+            path.file_name()
+                .unwrap()
+                .to_string_lossy()
+                .starts_with("home-plan-")
+        })
+        .expect("the runtime saves declarations before catalog requests");
+    let saved: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(plan_path).unwrap()).unwrap();
+    assert_eq!(
+        saved["keys"][0],
+        format!("provider_movie_{}", env.catalog_id)
+    );
     let id = format!("provider:{}", "complete-identity".repeat(220));
     *env.transport.body.lock().unwrap() = body(&id);
     unsafe {

@@ -28,8 +28,8 @@ but they do not make their remaining C service implementations complete.
 | Live TV providers, channels and EPG | C backend remains |
 | General settings, credentials and remaining utilities/integrations | C backend remains; rewritten capabilities use their private Rust storage |
 
-The latest application correction is `204511dd`. It removes the local addon
-sharing override and pins the Home worker's addon snapshot after the account
+Before this milestone, application correction `204511dd` removed the local addon
+sharing override and pinned the Home worker's addon snapshot after the account
 wait. The user reported that the corrected behavior seems fine on 2026-10-17.
 That report does not establish a new TV-runtime validation result.
 
@@ -37,13 +37,14 @@ Recorded automated checks for that source are 196 backend tests, 45 native
 integration tests, 37 native ASan/UBSan cases, retained settings regressions,
 Linux build/startup and ARM/IPK verification. See
 [the profile regression record](profile-catalog-regression.md) for exact package
-identity, source and hashes. This progress update changes documentation only.
+identity, source and hashes. The current Home milestone is described below.
 
 ## Home coordination checkpoint
 
 The user approved all reviewed Home features and removal of automatic new-addon
-promotion. Rust now plans and loads Home catalogs, preserves saved/accepted order,
-fills empty slots and assembles immutable catalog scenes. C screens retain their
+promotion. Rust now plans and loads Home catalogs, preserves saved declaration order,
+fills empty slots and assembles immutable catalog scenes. Failed preferred rows
+retain their retry positions across refreshes and restarts. C screens retain their
 appearance and the contributions of still-C collection, progress and tracking
 services. See [Home coordination](home-coordination.md) for boundaries and cases.
 

@@ -152,11 +152,25 @@ impl CatalogRuntime {
         if !self.scenes.current(work) {
             return Err(Error::Cancelled);
         }
-        Ok(crate::home_loading::HomePlan::new(
+        let mut plan = crate::home_loading::HomePlan::new(
             self.addons.snapshot().addons.clone(),
             order,
             self.scenes.snapshot().scene.clone(),
-        ))
+        );
+        plan.saved_keys = self.scenes.home_plan_keys(work).unwrap_or_default();
+        let keys = plan
+            .declared_order()
+            .iter()
+            .map(|index| plan.catalogs[*index].key.clone())
+            .collect::<Vec<_>>();
+        if let Err(error) = self.scenes.save_home_plan(work, &keys) {
+            if error == Error::Cancelled {
+                return Err(error);
+            }
+            eprintln!("[catalogs] Home plan order could not be saved: {error:?}");
+        }
+        plan.saved_keys = keys;
+        Ok(plan)
     }
     pub fn content_context(&self) -> Option<ContentContext> {
         self.account.current_context(false)

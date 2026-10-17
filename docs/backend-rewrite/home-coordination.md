@@ -11,8 +11,8 @@ removing automatic new-addon promotion: preserve saved order and append new rows
 `backend/src/home_loading.rs` owns catalog enumeration, eligibility, ordering,
 request scheduling, fallback and immutable catalog-scene assembly. It uses the
 complete Rust addon manifests and configured URLs, not the previous C declaration
-quotas or addon limit. Explicit local order precedes account order; accepted rows
-precede new candidates. Unordered fresh candidates are interleaved by addon.
+quotas or addon limit. Explicit local order precedes account order; saved declaration order
+precedes new candidates. Unordered fresh candidates are interleaved by addon.
 Required extras, hidden rows and catalogs represented by visible collections are
 excluded. Channel rows still require explicit selection. New channels registered
 as Settings suggestions do not enable themselves on a later refresh.
@@ -38,7 +38,11 @@ row composition are retained. Local row-editor persistence, styles, layout and
 immediate rearrangement also remain C; this step does not claim those services or
 all their fixed UI projection limits are rewritten. No original C data is read
 into a new Rust format. Existing Rust-private catalog/document/scene storage is
-reused; this coordinator does not introduce another saved-file format.
+reused. A private versioned `home-plan-<scope-hash>.json` stores declaration order,
+including unsuccessful and hidden catalogs. It is saved before requests start so
+a failed preferred row is retried before its temporary replacement on the next
+refresh or restart. It is scoped to member/owner/profile and removed with Rust
+scene data on logout; no C file is consulted.
 
 A plan is bound to its account, selected profile, addon selection and manifest
 declarations. Profile changes or meaningful source changes cancel it before
@@ -55,7 +59,7 @@ assertions were removed; the chosen placement rule is tested in Rust.
 
 ## Test inventory
 
-Fourteen Rust domain tests cover:
+Fifteen Rust domain tests cover:
 
 - Complete enumeration beyond the old addon/declaration quotas, local/account/
   accepted order, no new-addon promotion and duplicate suppression.
@@ -66,7 +70,7 @@ Fourteen Rust domain tests cover:
 - Progressive cold loads despite delayed earlier replies; stable warm Home,
   including saved-list-only data; ordered final assembly.
 - Three-worker concurrency, cancellation before and during publication, and
-  release of shared title owners.
+  release of shared title owners; failed preferred rows retain their retry position.
 - Missing-manifest fallback and explicit catalog removal.
 
 Eight new Rust-driven native tests execute the real choices/publication adapter:
@@ -111,7 +115,7 @@ establish TV runtime performance.
 
 ## Validation record
 
-The application passes 210 Rust backend tests, 53 Rust-driven native integration
+The application passes 214 Rust backend tests, 53 Rust-driven native integration
 tests and 45 ASan/UBSan native catalog/title/capture cases. Linux compilation and
 a ten-second disposable normal-mode startup/clean shutdown pass. The login-screen
 startup launches one Home worker, with no retry loop. Rust formatting and diff
@@ -130,3 +134,11 @@ covered by the Rust planner and the current `tests/colfileiras_home.sh` real
 Home/editor integration. Metadata/name-lookup reference assertions in that old
 fixture remain a test-maintenance follow-up for their service rewrites. This
 limitation does not apply to the full-source native Rust driver suite.
+
+Four additional Rust cases verify preferred-row retry after replacement, private
+plan-key persistence with full values and owner/profile isolation, cancellation
+preserving the prior file, malformed documents and selective namespace cleanup.
+The native complete-value case also asserts that the actual runtime saves the
+full declaration key before requesting a catalog. Saved declaration order is
+separate from the visible scene; a successful fallback cannot permanently
+consume a preferred failed row's retry slot.

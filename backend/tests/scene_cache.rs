@@ -527,3 +527,109 @@ fn cache_symlinks_are_not_read_and_atomic_recovery_cannot_modify_their_target() 
         "recovered"
     );
 }
+
+#[test]
+fn home_plan_order_round_trips_complete_keys_and_isolates_profiles_and_owners() {
+    let directory = Directory::new();
+    let cache = SceneCache::open(&directory.path).unwrap();
+    let keys = vec![
+        "catalog-failed".into(),
+        "catalog-hidden".into(),
+        "complete-key".repeat(3000),
+    ];
+    cache.save_home_plan(&scope(1), &keys, &|| true).unwrap();
+    let reopened = SceneCache::open(&directory.path).unwrap();
+    assert_eq!(reopened.home_plan_keys(&scope(1), &|| true).unwrap(), keys);
+    assert!(reopened
+        .home_plan_keys(&scope(2), &|| true)
+        .unwrap()
+        .is_empty());
+    let mut other = scope(1);
+    other.owner = "other-owner".into();
+    assert!(reopened
+        .home_plan_keys(&other, &|| true)
+        .unwrap()
+        .is_empty());
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        for entry in fs::read_dir(directory.path.join("rust-backend-v1")).unwrap() {
+            let entry = entry.unwrap();
+            if entry
+                .file_name()
+                .to_string_lossy()
+                .starts_with("home-plan-")
+            {
+                assert_eq!(
+                    entry.metadata().unwrap().permissions().mode() & 0o777,
+                    0o600
+                );
+            }
+        }
+    }
+}
+#[test]
+fn cancelled_home_plan_writes_preserve_the_confirmed_order_and_remove_temporaries() {
+    let directory = Directory::new();
+    let cache = SceneCache::open(&directory.path).unwrap();
+    let original = vec!["original".into()];
+    cache
+        .save_home_plan(&scope(1), &original, &|| true)
+        .unwrap();
+    let calls = AtomicUsize::new(0);
+    assert_eq!(
+        cache.save_home_plan(&scope(1), &["late".into()], &|| calls
+            .fetch_add(1, Ordering::SeqCst)
+            == 0),
+        Err(Error::Cancelled)
+    );
+    assert_eq!(cache.home_plan_keys(&scope(1), &|| true).unwrap(), original);
+    assert_eq!(
+        cache.home_plan_keys(&scope(1), &|| false),
+        Err(Error::Cancelled)
+    );
+    no_temporaries(&directory);
+}
+#[test]
+fn home_plan_storage_rejects_damage_and_clears_only_its_own_namespaces() {
+    let directory = Directory::new();
+    let cache = SceneCache::open(&directory.path).unwrap();
+    cache
+        .save_home_plan(&scope(1), &["original".into()], &|| true)
+        .unwrap();
+    let root = directory.path.join("rust-backend-v1");
+    let path = fs::read_dir(&root)
+        .unwrap()
+        .map(|entry| entry.unwrap().path())
+        .find(|path| {
+            path.file_name()
+                .unwrap()
+                .to_string_lossy()
+                .starts_with("home-plan-")
+        })
+        .unwrap();
+    let original = fs::read(&path).unwrap();
+    for change in [
+        json!({"version":2}),
+        json!({"language":"pt"}),
+        json!({"keys":[""]}),
+        json!({"scope":scope(2)}),
+    ] {
+        let mut document: serde_json::Value = serde_json::from_slice(&original).unwrap();
+        for (key, value) in change.as_object().unwrap() {
+            document[key] = value.clone();
+        }
+        fs::write(&path, serde_json::to_vec(&document).unwrap()).unwrap();
+        assert_eq!(
+            cache.home_plan_keys(&scope(1), &|| true),
+            Err(Error::InvalidData)
+        );
+    }
+    fs::write(root.join("account.json"), "preserve").unwrap();
+    cache.clear().unwrap();
+    assert!(!path.exists());
+    assert_eq!(
+        fs::read_to_string(root.join("account.json")).unwrap(),
+        "preserve"
+    );
+}

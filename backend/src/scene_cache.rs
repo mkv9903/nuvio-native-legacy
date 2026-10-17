@@ -32,6 +32,14 @@ struct SavedEnvelope {
     scope: ContentScope,
     scene: CatalogScene,
 }
+#[derive(Serialize, Deserialize)]
+struct HomePlanEnvelope {
+    version: u32,
+    app_id: String,
+    language: String,
+    scope: ContentScope,
+    keys: Vec<String>,
+}
 struct LimitedBuffer {
     bytes: Zeroizing<Vec<u8>>,
     exceeded: bool,
@@ -64,6 +72,69 @@ pub struct SceneCache {
     files: JsonStore,
 }
 impl SceneCache {
+    pub fn home_plan_keys(
+        &self,
+        scope: &ContentScope,
+        current: &dyn Fn() -> bool,
+    ) -> Result<Vec<String>> {
+        if !current() {
+            return Err(Error::Cancelled);
+        }
+        let bytes = self.files.read(
+            &format!("home-plan-{}.json", Self::key(scope)?),
+            SCENE_CACHE_LIMIT,
+        )?;
+        if !current() {
+            return Err(Error::Cancelled);
+        }
+        let Some(bytes) = bytes else {
+            return Ok(Vec::new());
+        };
+        let saved: HomePlanEnvelope =
+            serde_json::from_slice(&bytes).map_err(|_| Error::InvalidData)?;
+        if saved.version != 1
+            || saved.app_id != TEST_APP_ID
+            || saved.language != "en"
+            || &saved.scope != scope
+            || saved
+                .keys
+                .iter()
+                .any(|key| key.is_empty() || key.contains('\0'))
+        {
+            return Err(Error::InvalidData);
+        }
+        Ok(saved.keys)
+    }
+    pub fn save_home_plan(
+        &self,
+        scope: &ContentScope,
+        keys: &[String],
+        current: &dyn Fn() -> bool,
+    ) -> Result<()> {
+        if !current() {
+            return Err(Error::Cancelled);
+        }
+        if keys.iter().any(|key| key.is_empty() || key.contains('\0')) {
+            return Err(Error::InvalidData);
+        }
+        let key = Self::key(scope)?;
+        let saved = HomePlanEnvelope {
+            version: 1,
+            app_id: TEST_APP_ID.into(),
+            language: "en".into(),
+            scope: scope.clone(),
+            keys: keys.to_vec(),
+        };
+        let bytes = Zeroizing::new(serde_json::to_vec(&saved).map_err(|_| Error::Storage)?);
+        self.files.with_lock(&format!("scene-lock-{key}"), || {
+            self.files.write_guarded(
+                &format!("home-plan-{key}.json"),
+                &bytes,
+                SCENE_CACHE_LIMIT,
+                current,
+            )
+        })
+    }
     pub fn open(directory: impl AsRef<Path>) -> Result<Self> {
         Ok(Self {
             files: JsonStore::open(directory, TEST_APP_ID)?,
@@ -169,6 +240,7 @@ impl SceneCache {
         for name in self.files.names()? {
             if let Some(key) = name
                 .strip_prefix("scene-cache-")
+                .or_else(|| name.strip_prefix("home-plan-"))
                 .and_then(|name| name.strip_suffix(".json"))
                 .filter(|key| key.len() == 64 && key.bytes().all(|byte| byte.is_ascii_hexdigit()))
             {
