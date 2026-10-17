@@ -4,6 +4,10 @@ Active branch: `codex/rust-backend`, starting directly from `main` at `eff1a0b9`
 The former `rust-rewrite` branch is an inactive backup at `326077d5`.
 No implementation from either discarded rewrite is carried into this branch.
 
+For the current completion estimate, capability inventory and next feature
+review, see [rewrite progress](progress.md). Older sections below preserve the
+implementation and validation history of individual checkpoints.
+
 ## Agreed approach
 
 - Preserve the C UI's appearance, layout, rendering and remote navigation.
