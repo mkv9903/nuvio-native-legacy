@@ -2,12 +2,10 @@
 // cima de qualquer tela (pedido do dono, 01/10/2026), no lugar de levar a
 // pessoa para a tela de Busca inteira.
 //
-// O QUE E: um painel de vidro centrado, com o campo no topo, o teclado de tela
-// a esquerda (o D-pad continua precisando dele) e a lista de resultados a
-// direita, que muda A CADA LETRA. Os resultados vem agrupados — melhor
-// resultado em destaque, Titulos, Pessoas, Colecoes, Canais, Catalogos e
-// Addons — e com o campo vazio a lista mostra as PESQUISAS RECENTES do perfil
-// (as mesmas de search_history.h, que a tela de Busca usa) e "Em alta".
+/* The retained overlay groups title results, collections, channels, catalogs
+ * and addons. An empty query shows this profile's recent searches from the
+ * Rust history capability shared with the Search screen. Layout, keyboard
+ * placement and remote controls remain those of the original C interface. */
 //
 // QUEM ABRE (pesquisa de 01/10/2026):
 //   - Android TV: KEYCODE_SEARCH (84), que e o que o botao de microfone da
@@ -83,7 +81,7 @@
 // `voz` = 1 quando quem abriu foi o botao de microfone: com ditado disponivel
 // ele comeca na hora.
 void spot_abrir(int voz);
-// Busca somente preferencias locais, sem consultas de catalogo/pessoas nem historico.
+// Search local preferences without provider requests or recent queries.
 void spot_abrir_ajustes(int voz);
 // Reabre a busca local após abrir um resultado, restaurando consulta e foco.
 void spot_reabrir_ajustes(void);

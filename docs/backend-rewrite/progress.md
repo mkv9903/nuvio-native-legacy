@@ -75,3 +75,23 @@ The next milestone is in progress. Rust text handling and per-profile recent-que
 storage now feed both C search interfaces, and People search is removed. Provider
 search, query ownership, grouped results and expanded browsing remain pending.
 This smaller integrated area does not change the approximate 30% estimate.
+
+
+## Search text and recent-query checkpoint
+
+Application `e44e99d3` is pushed and packaged. People search is removed from
+Search and Spotlight; Details cast/filmography remains. Rust owns shared text
+normalization and confirmed recent searches, including private JSON, selected
+profile isolation, background storage and logout cleanup. The retained recent
+query controls use English and preserve their layout and remote actions.
+
+The checkpoint passes 234 backend cases, 55 native cases, 47 native ASan/UBSan
+cases, both C Search/Spotlight visual/navigation fixtures, retained account
+regressions, Linux build/startup and ARM/IPK verification. See
+[Search and expanded browsing](search-and-catalogs.md) for package identity,
+hash, build ID and focused manual tests. TV runtime testing remains pending.
+
+Provider target discovery, query/input ownership, provider requests, grouped
+result assembly, pagination, filters and expanded browsing are the next work in
+this already-approved milestone. They are still C services; the overall estimate
+remains about 30% of the backend, excluding C UI and LG playback integration.

@@ -3,8 +3,9 @@
 Feature review completed on 2026-10-17. The user removed People search from
 both Search and Spotlight, and kept all reviewed expanded-browsing features.
 Retain the remaining Search features, Details cast information and filmography
-navigation. Implementation is now in progress. The application checkpoint remains `78137d87`,
-with its package and validation recorded in [Home coordination](home-coordination.md).
+navigation. Text handling and recent-query storage are integrated at `e44e99d3`;
+provider search and expanded browsing remain in progress. The verified package
+and focused manual checks for this checkpoint are recorded below.
 
 ## Existing features for review
 
@@ -141,3 +142,34 @@ or person result should appear. Open a title's Details cast list and its actor's
 filmography to verify the retained action. Title matches with the same name may
 still appear as ordinary titles. The existing collection tabs, genre selection,
 See All paging, retry and returning to the same position remain available.
+
+## Verified package, 2026-10-17
+
+Application source: `e44e99d36e175e49626629336a801885a5c086f7` on
+`codex/rust-backend`. This is an intermediate Search integration, with the
+remaining provider-search and expanded-browsing rewrite still pending.
+
+- 234 Rust backend tests and 55 native integration cases pass.
+- All 47 native catalog/title/capture/search cases pass under ASan/UBSan.
+- Both retained C Search and Spotlight visual/navigation fixtures pass;
+  screenshots are in `build/backend/search-visual/screens` (ignored artifacts).
+- Retained C sync-order and offline-account regressions pass.
+- Linux build, normal account-screen startup and clean shutdown pass with
+  disposable test data.
+- ARM Rust/C linking, soft-float ABI, glibc imports no newer than 2.12,
+  exact package allowlist and executable permissions pass. Runtime/full/debug
+  artifacts have the same build ID. TV runtime testing remains pending.
+
+Package: `build/backend/webos/space.mkv.nuvio.rusttest_2.1.0_arm.ipk`.
+Identity remains `space.mkv.nuvio.rusttest` / **Nuvio Rust Test**.
+Build ID: `2fee45325947db8ca1ce2778cadcabf80171f414`.
+IPK SHA-256: `433f5487a3ee9cefd5ddac5978f6c4034ebe99a6b54350e608d77bea5fe42fd3`.
+The matching runtime, full binary, debug symbols, ELF report and `build.json`
+remain beside it. The preceding verified package is preserved under
+`build/backend/webos/checkpoints/package-before-e44e99d3`.
+
+For Linux, run `bash tools/linux.sh` in normal account mode. Check the focused
+search/history cases above. The same IPK is ready for a targeted TV check of
+login, profile-specific Home catalogs, movie/series search, recent-search
+persistence and remote actions. Confirm that Details cast/filmography still
+works. The package has not been installed or launched on a TV automatically.
