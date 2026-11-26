@@ -18,7 +18,15 @@
 # entrar de proposito, o teste ACUSA e devolve 1.
 set -e
 cd "$(dirname "$0")/.."
-ARES="../NuvioWeb-0.3.38-beta/node_modules/.bin/ares-package"
+ARES="${NUVIO_ARES_PACKAGE:-}"
+if [ -z "$ARES" ]; then
+  if [ -x "../NuvioWeb-0.3.38-beta/node_modules/.bin/ares-package" ]; then
+    ARES="../NuvioWeb-0.3.38-beta/node_modules/.bin/ares-package"
+  else
+    ARES="$(command -v ares-package || true)"
+  fi
+fi
+[ -n "$ARES" ] && [ -x "$ARES" ] || { echo "ABORTADO: ares-package nao encontrado" >&2; exit 1; }
 ARQ_DE_PESSOA="trakt.txt addons.txt tmdb.txt mdblist.txt ajustes.txt
                progresso.txt nuvem.txt sessao.txt perfil.txt cliente.txt home-pos.txt debrid.txt fanart.txt p2p.txt seekr.txt seekr.txt.tmp"
 PALCO=$(mktemp -d)

@@ -38,7 +38,14 @@ cd "$(dirname "$0")/.." && source tools/ctr.sh
 TV_IP="${NUVIO_TV_IP:-192.168.1.32}"
 TV_PASS="${NUVIO_TV_PASS:-alpine}"
 APP_ID="space.nuvio.native.legacy"
-ARES="${NUVIO_ARES_PACKAGE:-../NuvioWeb-0.3.38-beta/node_modules/.bin/ares-package}"
+ARES="${NUVIO_ARES_PACKAGE:-}"
+if [ -z "$ARES" ]; then
+  if [ -x "../NuvioWeb-0.3.38-beta/node_modules/.bin/ares-package" ]; then
+    ARES="../NuvioWeb-0.3.38-beta/node_modules/.bin/ares-package"
+  else
+    ARES="$(command -v ares-package || true)"
+  fi
+fi
 # Use ctr_run / ctr_build helpers instead (see tools/ctr.sh)
 BUILD_PLATFORM="${NUVIO_BUILD_PLATFORM:-linux/arm64}"
 SDK_IMAGE="${NUVIO_SDK_IMAGE:-nuvio-webos-sdk}"
@@ -168,7 +175,7 @@ ctr_run --rm --platform "$BUILD_PLATFORM" --env-file "$ENVF" \
     P2P_CFLAGS="-DNV_P2P_MOTOR -I/p2p/nuvio-engine/include"
     # C++, libatomic e libgcc estaticos: o firmware da TV tem libstdc++ de outra
     # versao (ou nenhuma), e libatomic.so.1 nao e garantida.
-    P2P_LIBS="/p2p/build-arm/libnuvio_engine.a /p2p/build-arm/_deps/nuvio_libtorrent-build/libtorrent-rasterbar.a $SR/usr/lib/libssl.a $SR/usr/lib/libcrypto.a -static-libgcc -Wl,-Bstatic -lstdc++ -latomic -Wl,-Bdynamic -lrt -Wl,--gc-sections"
+    P2P_LIBS="/p2p/build-arm/libnuvio_engine.a /p2p/build-arm/_deps/nuvio_libtorrent-build/libtorrent-rasterbar.a $SR/usr/lib/libssl.a $SR/usr/lib/libcrypto.a -static-libgcc -Wl,-Bstatic -lstdc++ -latomic -Wl,-Bdynamic -lrt"
   fi
   # #297: p2pmotor.c vai num objeto proprio com -D_FILE_OFFSET_BITS=64. O webOS
   # e ARM de 32 bits: sem a flag o lstat/readdir falham (EOVERFLOW) num arquivo
@@ -177,9 +184,9 @@ ctr_run --rm --platform "$BUILD_PLATFORM" --env-file "$ENVF" \
   # resto do binario segue sem a flag. O _Static_assert do .c barra o esquecimento.
   CC="arm-webos-linux-gnueabi-gcc"
   if command -v ccache >/dev/null 2>&1; then CC="ccache $CC"; fi
-  $CC -c src/p2pmotor.c -o /tmp/p2pmotor.o -O2 -DNV_WEBOS -D_FILE_OFFSET_BITS=64 $NUVIO_EXTRA_CFLAGS $P2P_CFLAGS \
+  $CC -c src/p2pmotor.c -o /tmp/p2pmotor.o -O2 -ffunction-sections -fdata-sections -DNV_WEBOS -D_FILE_OFFSET_BITS=64 $NUVIO_EXTRA_CFLAGS $P2P_CFLAGS \
     -I$SR/usr/include -I$SR/usr/include/SDL2
-  printf "%s\n" -O2 -DNV_WEBOS $NUVIO_EXTRA_CFLAGS $ASS_CFLAGS $P2P_CFLAGS $DTS_CFLAGS \
+  printf "%s\n" -O2 -ffunction-sections -fdata-sections -DNV_WEBOS $NUVIO_EXTRA_CFLAGS $ASS_CFLAGS $P2P_CFLAGS $DTS_CFLAGS \
     -I$SR/usr/include -I$SR/usr/include/SDL2 > /tmp/arm-flags
   for k in NV_SUPABASE_URL NV_SUPABASE_ANON_KEY NV_TV_LOGIN_BASE NV_TRAKT_CLIENT_ID \
            NV_TRAKT_CLIENT_SECRET NV_SIMKL_CLIENT_ID NV_SIMKL_APP NV_TMDB_API_KEY NV_SEEKR_API_KEY \
@@ -213,7 +220,8 @@ ctr_run --rm --platform "$BUILD_PLATFORM" --env-file "$ENVF" \
     -DNV_VERSAO="\"$NV_VERSAO\"" \
     -I$SR/usr/include -I$SR/usr/include/SDL2 \
     $RUST_LIBS -lSDL2 -lSDL2_image -lSDL2_ttf -lGLESv2 -lEGL $P2P_LIBS -ldl -lpthread -lz -lm $ASS_LIBS $DTS_LIBS $DV7_LIBS \
-    -Wl,--export-dynamic-symbol=pthread_create -Wl,--exclude-libs,ALL
+    -Wl,--gc-sections -Wl,-O1 -Wl,--export-dynamic-symbol=pthread_create -Wl,--exclude-libs,ALL
+  arm-webos-linux-gnueabi-strip --strip-all nuvio-proto.arm
   # #317: --exclude-libs,ALL tira da tabela dinamica tudo o que vem de arquivo
   # .a (FreeType/harfbuzz do libass, libstdc++ do P2P, FFmpeg). Sem ele o ld
   # exportava 178 FT_* (+ TT_RunIns/TT_New_Context) do nosso FreeType 2.13,
@@ -343,7 +351,61 @@ GLOB_DE_PESSOA="livetv-contas-p*.txt epg-conta-*.* m3u-p*.txt m3u-cache-p*.txt s
 ACERVO_DE_PESSOA="collections.json catalogo-rede.bin catalogo-rede.bin.tmp"
 DIR_DE_PESSOA="collections"
 
+keep_only_matches() {
+  local dir="$1" glob="$2" f k keep
+  shift 2
+  [ -d "$dir" ] || return 0
+  for f in "$dir"/$glob; do
+    [ -e "$f" ] || continue
+    keep=0
+    for k in "$@"; do
+      [ "$(basename "$f")" = "$k" ] && { keep=1; break; }
+    done
+    [ "$keep" = 1 ] || rm -rf "$f"
+  done
+}
+
+prune_webos_stage() {
+  local stage_app="$1"
+  # Strip Samsung Tizen assets, owner collection art (dead without collections.json),
+  # unused sample catalog art/metadata, and source SVGs/READMEs never read on webOS.
+  rm -rf "$stage_app/tizen" \
+         "$stage_app/art/cinematic" \
+         "$stage_app/art/editorial" \
+         "$stage_app/art/prov" \
+         "$stage_app/art/icones/lucide" \
+         "$stage_app/art/icones/player" \
+         "$stage_app/art/icones/menu-traco"
+  rm -f "$stage_app/art/LEIA-ME-addons.txt" \
+        "$stage_app/art/catalogo.txt" \
+        "$stage_app/art/episodios.txt" \
+        "$stage_app/art/elenco.txt" \
+        "$stage_app/art/extra.txt" \
+        "$stage_app/art/ids.txt" \
+        "$stage_app/appinfo.json.stamped"
+  find "$stage_app" -type f \( -name '*.svg' -o -name '*.md' -o -name '.DS_Store' \) -delete
+  if [ "$DTS_ENABLED" = "0" ]; then
+    rm -f "$stage_app/lib"/dts-starfish-webos*.so
+    rm -rf "$stage_app/licenses/dts"
+  fi
+  keep_only_matches "$stage_app/art/elenco" "*" 07_0.jpg 11_2.jpg
+  keep_only_matches "$stage_app/art/ep" "*" 00_1_03.jpg
+  keep_only_matches "$stage_app/art/logo" "*" 00.png 03.png 07.png 12.png 13.png
+  keep_only_matches "$stage_app/art/poster" "*" \
+    00.jpg 01.jpg 02.jpg 03.jpg 04.jpg 05.jpg 06.jpg 07.jpg 08.jpg 09.jpg \
+    10.jpg 11.jpg 12.jpg 13.jpg 14.jpg 15.jpg 16.jpg 17.jpg 18.jpg 19.jpg \
+    20.jpg 21.jpg 22.jpg 23.jpg 24.jpg 25.jpg 26.jpg 27.jpg 28.jpg 29.jpg \
+    33.jpg 36.jpg 38.jpg 39.jpg
+  keep_only_matches "$stage_app/art" "*.jpg" \
+    00.jpg 02.jpg 03.jpg 04.jpg 05.jpg 06.jpg 07.jpg 08.jpg 09.jpg 10.jpg \
+    12.jpg 13.jpg 14.jpg 15.jpg 16.jpg 20.jpg 21.jpg 29.jpg 33.jpg 36.jpg 39.jpg
+}
+
 if [ "$1" = "--ipk" ]; then
+  [ -n "$ARES" ] && [ -x "$ARES" ] || {
+    echo "    ABORTADO: ares-package nao encontrado (defina NUVIO_ARES_PACKAGE ou instale no PATH)" >&2
+    exit 1
+  }
   echo "==> empacotando (sem credenciais)"
   PALCO=$(mktemp -d "${TMPDIR:-/tmp}/nuvio-arm-pacote.XXXXXXXX"); LIXO="$LIXO $PALCO"
   cp -R deploy/app "$PALCO/app"
@@ -353,6 +415,7 @@ if [ "$1" = "--ipk" ]; then
   for f in $ARQ_DE_PESSOA $ACERVO_DE_PESSOA; do rm -f "$PALCO/app/art/$f"; done
   for g in $GLOB_DE_PESSOA; do rm -f "$PALCO"/app/art/$g; done
   for d in $DIR_DE_PESSOA; do rm -rf "$PALCO/app/art/$d"; done
+  prune_webos_stage "$PALCO/app"
   # MODO DO BINARIO: o ares-package copia o modo do arquivo, e o `cp` la de cima
   # SOBRESCREVE um deploy/app/nuvio-proto existente mantendo o modo ANTIGO dele.
   # A 1.7.1 saiu assim com -rwx---r--: o app roda como uid 5152, que nao e dono
@@ -411,6 +474,16 @@ if [ "$1" = "--ipk" ]; then
   done
   if [ -n "$VAZOU" ]; then
     echo "    ABORTADO: o pacote leva credencial ->$VAZOU"
+    rm -f "$IPK"
+    exit 1
+  fi
+  BLOAT=""
+  for d in tizen art/cinematic art/editorial art/prov art/icones/lucide art/icones/player art/icones/menu-traco; do
+    printf '%s\n' "$LISTA" | grep -qE "(^|/)$d/" && BLOAT="$BLOAT $d/"
+  done
+  printf '%s\n' "$LISTA" | grep -qE '\.(svg|md)$' && BLOAT="$BLOAT source-svg/md"
+  if [ -n "$BLOAT" ]; then
+    echo "    ABORTADO: o pacote leva bloat ->$BLOAT"
     rm -f "$IPK"
     exit 1
   fi
@@ -543,7 +616,10 @@ echo "==> sincronizando arte"
 # de PIPESTATUS, que ficam ambiguos assim que se acrescenta um `|| true`.
 if ! ( set -o pipefail
        tar czf - -C deploy/app --exclude 'art/cache' \
-           --exclude 'appinfo.json.stamped' \
+           --exclude 'art/cinematic' --exclude 'art/editorial' --exclude 'art/prov' \
+           --exclude 'art/icones/lucide' --exclude 'art/icones/player' --exclude 'art/icones/menu-traco' \
+           --exclude '*.svg' --exclude '*.md' --exclude 'art/LEIA-ME-addons.txt' \
+           --exclude 'tizen' --exclude 'appinfo.json.stamped' \
            art fonts icon.png icon-large.png icon-20.png icon-large-20.png splash.png \
          | $SSH "root@$TV_IP" "tar xzf - -C $APPDIR" ) 2>&1 \
      | grep -v 'unknown extended header keyword'; then

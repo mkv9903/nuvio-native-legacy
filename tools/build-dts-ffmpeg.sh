@@ -70,7 +70,7 @@ fi
   --enable-decoder="$DECODERS" --enable-encoder=aac,ac3 \
   --enable-demuxer=matroska,mov --enable-parser="$PARSERS" \
   --enable-bsf="$BSFS" \
-  --extra-cflags="${CFLAGS:--O2}"
+  --extra-cflags="${CFLAGS:--O2 -ffunction-sections -fdata-sections}"
 make -j"${NUVIO_DTS_JOBS:-2}"
 make install
 # Include license text and pin provenance for redistribution of static LGPL libs.
